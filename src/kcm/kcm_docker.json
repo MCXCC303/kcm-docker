@@ -1,0 +1,23 @@
+{
+    "KPlugin": {
+        "Id": "kcm_docker",
+        "Name": "Docker",
+        "Name[zh_CN]": "Docker 容器",
+        "Description": "Read-only Docker Engine status panel",
+        "Description[zh_CN]": "只读的 Docker Engine 状态面板",
+        "Icon": "folder-docker",
+        "Version": "0.1.0",
+        "License": "GPL-2.0-or-later",
+        "Authors": [
+            {
+                "Name": "kontainer developers"
+            }
+        ]
+    },
+    "KLocalizedString": {
+        "TranslationDomain": "kcm_docker"
+    },
+    "X-KDE-Keywords": "docker,container,containers,image,images,kontainer,status,状态,容器,镜像",
+    "X-KDE-System-Settings-Parent-Category": "hardware",
+    "X-KDE-Weight": 50
+}

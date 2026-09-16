@@ -1,0 +1,68 @@
+/*
+    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "domain/image_detail.h"
+
+#include <QStringList>
+
+namespace Kontainer
+{
+
+namespace
+{
+constexpr auto digestPrefix = "sha256:";
+
+QStringList partsOf(const QString &tag)
+{
+    return tag.split(QLatin1Char(':'));
+}
+} // namespace
+
+QString ImageDetail::primaryRepository() const
+{
+    for (const QString &tag : repoTags) {
+        if (tag == QLatin1String("<none>:<none>")) {
+            continue;
+        }
+        const QStringList parts = partsOf(tag);
+        if (parts.size() >= 2) {
+            // tag 可能是 host:port/path:tag，因此最后一个 ':' 之后才是 tag
+            const int lastColon = tag.lastIndexOf(QLatin1Char(':'));
+            const int lastSlash = tag.lastIndexOf(QLatin1Char('/'));
+            if (lastColon > lastSlash) {
+                return tag.left(lastColon);
+            }
+        }
+        return tag;
+    }
+    return {};
+}
+
+QString ImageDetail::primaryTag() const
+{
+    for (const QString &tag : repoTags) {
+        if (tag == QLatin1String("<none>:<none>")) {
+            continue;
+        }
+        const int lastColon = tag.lastIndexOf(QLatin1Char(':'));
+        const int lastSlash = tag.lastIndexOf(QLatin1Char('/'));
+        if (lastColon > lastSlash) {
+            return tag.mid(lastColon + 1);
+        }
+        return QStringLiteral("latest");
+    }
+    return {};
+}
+
+QString ImageDetail::shortId() const
+{
+    QString bare = id;
+    if (bare.startsWith(QLatin1String(digestPrefix))) {
+        bare.remove(0, int(sizeof(digestPrefix)) - 1);
+    }
+    return bare.left(12);
+}
+
+} // namespace Kontainer
