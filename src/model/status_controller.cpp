@@ -170,6 +170,39 @@ QString StatusController::engineStateKey() const
     return engineStateKeyFor(m_engineState);
 }
 
+QString StatusController::engineStateSemanticKey() const
+{
+    // Partial = 已连接但 /info 概要读不到：降级（警告），不是失败。
+    switch (m_engineState) {
+    case EngineState::Ready:
+    case EngineState::Refreshing:
+        return QStringLiteral("positive");
+    case EngineState::Partial:
+        return QStringLiteral("neutral");
+    case EngineState::Loading:
+        return QStringLiteral("disabled");
+    case EngineState::Unavailable:
+        return QStringLiteral("negative");
+    }
+    return QStringLiteral("disabled");
+}
+
+QString StatusController::engineStateIconName() const
+{
+    switch (m_engineState) {
+    case EngineState::Ready:
+    case EngineState::Refreshing:
+        return QStringLiteral("dialog-ok-apply");
+    case EngineState::Partial:
+        return QStringLiteral("data-warning");
+    case EngineState::Loading:
+        return QStringLiteral("chronometer");
+    case EngineState::Unavailable:
+        return QStringLiteral("dialog-error");
+    }
+    return QStringLiteral("dialog-question");
+}
+
 QString StatusController::containersStateKey() const
 {
     return listStateKeyFor(m_containersState);

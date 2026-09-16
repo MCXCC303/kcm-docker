@@ -1,0 +1,391 @@
+/*
+    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-License-Identifier: GPL-2.0-or-later
+
+    离屏渲染工具（开发用，不参与 ctest）：把界面渲染成 PNG，用于人工视觉复核。
+
+    为什么需要它：
+      - Qt 的 vnc platform 插件在本机不可用（渲染期间段错误 / 不响应
+        FramebufferUpdateRequest），无法用它截图；
+      - 直接在用户桌面上开窗口截图会干扰用户，而且只能看到当前主题。
+
+    本工具完全离屏：使用确定性 fixture（MockDockerBackend）+ 显式注入的
+    Breeze 亮色 / 暗色配色，因此可以稳定复现两种主题下的排版与配色，
+    用来核对 ARCH_V3_pre §1.4/§1.8 的对比度与 §1.2/§1.5 的排版要求。
+
+    用法：
+        render_ui <page> <width> <height> <light|dark> <output.png>
+        page = main | container-detail | image-detail | engine
+
+    注意：注入的是 Kirigami.Theme 的颜色 token（Kirigami 允许应用覆盖它们），
+    不会修改任何业务代码；字体的度量仍来自当前平台。
+*/
+
+#include "i18n.h"
+#include "model/qml_registration.h"
+#include "support/mock_docker_backend.h"
+#include "support/qml_stub_kcm.h"
+
+#include <KIconLoader>
+
+#include <QDir>
+#include <QFile>
+#include <QGuiApplication>
+#include <QIcon>
+#include <QQmlComponent>
+#include <QQmlContext>
+#include <QQmlEngine>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QTimer>
+#include <QtGlobal>
+
+#include <cstdio>
+#include <memory>
+
+using namespace Kontainer;
+
+namespace
+{
+
+/*! 确定性 fixture：覆盖运行中 / 暂停 / 已退出 / 不健康、多个镜像与悬空镜像。 */
+void fillFixture(MockDockerBackend &backend)
+{
+    EngineInfo engine;
+    engine.available = true;
+    engine.countsAvailable = true;
+    engine.serverVersion = QStringLiteral("29.8.0");
+    engine.apiVersion = QStringLiteral("1.56");
+    engine.minApiVersion = QStringLiteral("1.24");
+    engine.osType = QStringLiteral("linux");
+    engine.architecture = QStringLiteral("x86_64");
+    engine.kernelVersion = QStringLiteral("6.17.4-arch1-1");
+    engine.engineName = QStringLiteral("unix:///run/docker.sock");
+    engine.operatingSystem = QStringLiteral("Arch Linux");
+    engine.cgroupVersion = QStringLiteral("2");
+    engine.storageDriver = QStringLiteral("overlayfs");
+    engine.containerTotal = 5;
+    engine.containersRunning = 3;
+    engine.containersPaused = 1;
+    engine.containersStopped = 1;
+    engine.imageCount = 6;
+    engine.memoryTotalBytes = 38ll * 1024 * 1024 * 1024;
+    backend.setEngineInfo(engine);
+
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const auto makeContainer = [&now](const QString &id, const QString &name, const QString &image, ContainerState state, HealthState health, const QString &status, int ageMinutes) {
+        Container container;
+        container.id = id;
+        container.name = name;
+        container.image = image;
+        container.imageId = QStringLiteral("sha256:aaaa");
+        container.state = state;
+        container.health = health;
+        container.status = status;
+        container.created = now.addSecs(-60ll * ageMinutes);
+        return container;
+    };
+
+    Container running = makeContainer(QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"),
+                                      QStringLiteral("web-frontend"),
+                                      QStringLiteral("registry.example.com/team/frontend:2.4.1"),
+                                      ContainerState::Running,
+                                      HealthState::Healthy,
+                                      QStringLiteral("Up 2 hours (healthy)"),
+                                      180);
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}, {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")}};
+
+    Container unhealthy = makeContainer(QStringLiteral("2222222222222222222222222222222222222222222222222222222222222222"),
+                                        QStringLiteral("postgres-primary"),
+                                        QStringLiteral("postgres:17-alpine"),
+                                        ContainerState::Running,
+                                        HealthState::Unhealthy,
+                                        QStringLiteral("Up 5 hours (unhealthy)"),
+                                        300);
+    unhealthy.ports = {{QStringLiteral("127.0.0.1"), 5432, 5432, QStringLiteral("tcp")}};
+
+    Container paused = makeContainer(QStringLiteral("3333333333333333333333333333333333333333333333333333333333333333"),
+                                     QStringLiteral("worker-batch"),
+                                     QStringLiteral("python:3.13-slim"),
+                                     ContainerState::Paused,
+                                     HealthState::None,
+                                     QStringLiteral("Up 12 minutes (Paused)"),
+                                     30);
+
+    Container restarting = makeContainer(QStringLiteral("4444444444444444444444444444444444444444444444444444444444444444"),
+                                         QStringLiteral("cache-redis"),
+                                         QStringLiteral("redis:7"),
+                                         ContainerState::Restarting,
+                                         HealthState::Starting,
+                                         QStringLiteral("Restarting (1) 3 seconds ago"),
+                                         15);
+
+    Container exited = makeContainer(QStringLiteral("5555555555555555555555555555555555555555555555555555555555555555"),
+                                     QStringLiteral("migration-job"),
+                                     QStringLiteral("alpine:3.21"),
+                                     ContainerState::Exited,
+                                     HealthState::None,
+                                     QStringLiteral("Exited (0) 5 minutes ago"),
+                                     45);
+
+    backend.setContainers({running, unhealthy, paused, restarting, exited});
+
+    Image frontend;
+    frontend.id = QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    frontend.repoTags = {QStringLiteral("registry.example.com/team/frontend:2.4.1"), QStringLiteral("registry.example.com/team/frontend:latest")};
+    frontend.repoDigests = {QStringLiteral("registry.example.com/team/frontend@sha256:bbbbbbbbbbbb")};
+    frontend.sizeBytes = 412ll * 1024 * 1024;
+    frontend.created = now.addDays(-9);
+    frontend.containerCount = 2;
+    frontend.inUse = true;
+
+    Image postgres;
+    postgres.id = QStringLiteral("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+    postgres.repoTags = {QStringLiteral("postgres:17-alpine")};
+    postgres.sizeBytes = 268ll * 1024 * 1024;
+    postgres.created = now.addDays(-30);
+    postgres.containerCount = 1;
+    postgres.inUse = true;
+
+    Image dangling;
+    dangling.id = QStringLiteral("sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc");
+    dangling.sizeBytes = 96ll * 1024 * 1024;
+    dangling.created = now.addDays(-120);
+
+    backend.setImages({frontend, postgres, dangling});
+
+    StorageUsage storage;
+    storage.valid = true;
+    storage.buildCacheAvailable = true;
+    storage.imagesBytes = 812ll * 1024 * 1024;
+    storage.containersBytes = 148ll * 1024 * 1024;
+    storage.volumesBytes = 2ll * 1024 * 1024 * 1024 + 340ll * 1024 * 1024;
+    storage.buildCacheBytes = 96ll * 1024 * 1024;
+    storage.layersBytes = 1400ll * 1024 * 1024;
+    storage.imageCount = 6;
+    storage.containerCount = 5;
+    storage.volumeCount = 3;
+    storage.buildCacheCount = 12;
+    backend.setStorageUsage(storage);
+
+    ContainerDetail detail;
+    detail.id = QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111");
+    detail.name = QStringLiteral("web-frontend");
+    detail.image = QStringLiteral("registry.example.com/team/frontend:2.4.1");
+    detail.imageId = QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    detail.state = ContainerState::Running;
+    detail.health = HealthState::Healthy;
+    detail.status = QStringLiteral("Up 2 hours (healthy)");
+    detail.created = now.addSecs(-60ll * 180);
+    detail.started = now.addSecs(-60ll * 120);
+    detail.exitCode = 0;
+    detail.restartCount = 2;
+    detail.pid = 41237;
+    detail.platform = QStringLiteral("linux");
+    detail.restartPolicy = QStringLiteral("unless-stopped");
+    detail.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
+                    {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
+                    {QStringLiteral("::"), 9090, 0, QStringLiteral("tcp")}};
+    detail.networks = {{QStringLiteral("bridge"),
+                        QStringLiteral("a1b2c3d4e5f6"),
+                        QStringLiteral("172.17.0.4"),
+                        QStringLiteral("fd00::4"),
+                        QStringLiteral("02:42:ac:11:00:04"),
+                        QStringLiteral("172.17.0.1")}};
+    detail.mounts = {{QStringLiteral("bind"),
+                      QStringLiteral("/srv/frontend/config"),
+                      QStringLiteral("/etc/frontend"),
+                      QStringLiteral("ro"),
+                      true},
+                     {QStringLiteral("volume"),
+                      QStringLiteral("frontend-cache"),
+                      QStringLiteral("/var/cache/frontend"),
+                      QStringLiteral("rw"),
+                      false}};
+    detail.environment = {QStringLiteral("NODE_ENV=production"),
+                          QStringLiteral("API_BASE_URL=https://api.example.com"),
+                          QStringLiteral("LOG_LEVEL=info"),
+                          QStringLiteral("TZ=Asia/Shanghai")};
+    detail.command = {QStringLiteral("node"), QStringLiteral("server.js")};
+    detail.entrypoint = {QStringLiteral("/usr/local/bin/docker-entrypoint.sh")};
+    detail.workingDirectory = QStringLiteral("/app");
+    detail.user = QStringLiteral("node");
+    detail.hostname = QStringLiteral("a1b2c3d4e5f6");
+    detail.labels = {{QStringLiteral("com.example.stack"), QStringLiteral("frontend")},
+                     {QStringLiteral("com.example.version"), QStringLiteral("2.4.1")}};
+    backend.setContainerDetail(detail);
+
+    ContainerStats stats;
+    stats.containerId = detail.id;
+    stats.timestamp = now;
+    stats.cpuTotalUsage = 42'000'000'000ull;
+    stats.cpuPreTotalUsage = 41'000'000'000ull;
+    stats.systemCpuUsage = 900'000'000'000ull;
+    stats.systemPreCpuUsage = 899'000'000'000ull;
+    stats.onlineCpus = 16;
+    stats.memoryUsageBytes = 340ll * 1024 * 1024;
+    stats.memoryCacheBytes = 40ll * 1024 * 1024;
+    stats.memoryLimitBytes = 1ll * 1024 * 1024 * 1024;
+    stats.networkRxBytes = 128ll * 1024 * 1024;
+    stats.networkTxBytes = 24ll * 1024 * 1024;
+    stats.blockReadBytes = 12ll * 1024 * 1024;
+    stats.blockWriteBytes = 3ll * 1024 * 1024;
+    stats.pids = 18;
+    backend.setContainerStats(stats);
+
+    ImageDetail imageDetail;
+    imageDetail.id = QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    imageDetail.repoTags = {QStringLiteral("registry.example.com/team/frontend:2.4.1"), QStringLiteral("registry.example.com/team/frontend:latest")};
+    imageDetail.repoDigests = {QStringLiteral("registry.example.com/team/frontend@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")};
+    imageDetail.created = now.addDays(-9);
+    imageDetail.sizeBytes = 412ll * 1024 * 1024;
+    imageDetail.architecture = QStringLiteral("amd64");
+    imageDetail.variant = QStringLiteral("v3");
+    imageDetail.os = QStringLiteral("linux");
+    imageDetail.author = QStringLiteral("Platform Team <platform@example.com>");
+    for (int i = 0; i < 14; ++i) {
+        imageDetail.layers.append(QStringLiteral("sha256:%1").arg(QStringLiteral("0123456789abcdef").repeated(4).left(64), 0).arg(i));
+    }
+    imageDetail.environment = {QStringLiteral("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"),
+                               QStringLiteral("NODE_VERSION=22.11.0"),
+                               QStringLiteral("NODE_ENV=production")};
+    imageDetail.entrypoint = {QStringLiteral("docker-entrypoint.sh")};
+    imageDetail.command = {QStringLiteral("node"), QStringLiteral("server.js")};
+    imageDetail.workingDirectory = QStringLiteral("/app");
+    backend.setImageDetail(imageDetail);
+}
+
+/*!
+    选择图标主题。
+
+    离屏渲染默认没有图标主题（平台主题为空时 Qt 只找 hicolor），
+    结果是所有 Kirigami.Icon / 图标按钮都渲染成空白——
+    而「图标 + 颜色 + 文字」三重编码正是 ARCH_V3 §1.6/§1.8 的验收项，
+    所以这里显式指定 Breeze 图标主题，保证渲染结果能反映真实观感。
+*/
+void applyIconTheme(bool dark)
+{
+    const QString theme = dark ? QStringLiteral("breeze-dark") : QStringLiteral("breeze");
+
+    // QIcon 侧（QQC2 的图标按钮走这条路径）
+    QIcon::setThemeName(theme);
+    QIcon::setFallbackThemeName(QStringLiteral("breeze"));
+
+    // Kirigami.Icon 走 KDE 的 KIconLoader，它自己缓存主题（KIconTheme 从
+    // QIcon::themeName() 读取），因此设置 QIcon 之后必须让它重新加载配置。
+    if (KIconLoader *loader = KIconLoader::global()) {
+        loader->reconfigure(QStringLiteral("kontainer-render-ui"));
+    }
+}
+
+} // namespace
+
+int main(int argc, char **argv)
+{
+    QGuiApplication app(argc, argv);
+
+    if (argc < 6) {
+        std::fprintf(stderr, "usage: %s <main|container-detail|image-detail|engine> <width> <height> <light|dark> <output.png>\n", argv[0]);
+        return 2;
+    }
+
+    const QString page = QString::fromLocal8Bit(argv[1]);
+    const int width = QString::fromLocal8Bit(argv[2]).toInt();
+    const int height = QString::fromLocal8Bit(argv[3]).toInt();
+    const QString theme = QString::fromLocal8Bit(argv[4]);
+    const QString output = QString::fromLocal8Bit(argv[5]);
+    const bool dark = theme == QLatin1String("dark");
+
+    // 主题必须在引擎创建之前设好：Kirigami 从应用 QPalette 推导主题色
+    applyIconTheme(dark);
+
+    // 必须使用 KDE 的 QQC2 样式（真实会话里 kcmshell6 就是这个）：
+    // 默认样式（Fusion/Basic）下的 Label 颜色取自 QPalette，而 Kirigami.AbstractCard
+    // 内部是 `Theme.inherit: false` + `colorSet: View`，两者不一致时会出现
+    // 「深色卡片 + 黑色文字」这种只属于离屏渲染的组合。用 KDE 样式后
+    // 控件颜色统一由 Kirigami.Theme 决定，渲染结果与真实会话一致。
+    // QQuickStyle 需要单独的 include 路径，这里直接用环境变量等价设置
+    qputenv("QT_QUICK_CONTROLS_STYLE", "org.kde.desktop");
+
+    setupTranslationDomain();
+    registerKontainerQmlTypes();
+
+    auto backend = std::make_unique<MockDockerBackend>();
+    fillFixture(*backend);
+    auto stub = std::make_unique<QmlStubKcm>(backend.get());
+
+    QQmlEngine engine;
+    engine.rootContext()->setContextProperty(QStringLiteral("kcm"), stub.get());
+    // i18n 桩必须做 %N 替换，否则渲染出来的文案是 "%1 · created %2 ago · ID %3"，
+    // 与真实运行结果不符（真实运行时由 KLocalizedString 替换）。
+    engine.evaluate(QStringLiteral("function _ktFormat(text, args) {\n"
+                                   "    return String(text).replace(/%(\\d+)/g, function (match, index) {\n"
+                                   "        const value = args[index - 1];\n"
+                                   "        return value !== undefined ? value : match;\n"
+                                   "    });\n"
+                                   "}\n"
+                                   "function i18n(text) { return _ktFormat(text, Array.prototype.slice.call(arguments, 1)); }\n"
+                                   "function i18nc(context, text) { return _ktFormat(text, Array.prototype.slice.call(arguments, 2)); }\n"
+                                   "function i18np(singular, plural, count) { return _ktFormat(count === 1 ? singular : plural, [count]); }\n"
+                                   "function i18ncp(context, singular, plural, count) { return _ktFormat(count === 1 ? singular : plural, [count]); }\n"));
+
+
+    // 先让 controller 完成一轮刷新，页面才有数据可渲染
+    stub->controller()->refresh();
+    backend->completeRefresh();
+
+    const QString sourceDir = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/");
+    QString qmlFile;
+    QVariantMap initialProperties;
+    if (page == QLatin1String("main") || page == QLatin1String("engine")) {
+        qmlFile = QStringLiteral("MainPage.qml");
+    } else if (page == QLatin1String("container-detail")) {
+        qmlFile = QStringLiteral("ContainerDetail.qml");
+        initialProperties.insert(QStringLiteral("containerId"), QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"));
+    } else if (page == QLatin1String("image-detail")) {
+        qmlFile = QStringLiteral("ImageDetail.qml");
+        initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    } else {
+        std::fprintf(stderr, "unknown page: %s\n", qPrintable(page));
+        return 2;
+    }
+
+    QQmlComponent component(&engine, QUrl::fromLocalFile(sourceDir + qmlFile));
+    if (component.isError()) {
+        std::fprintf(stderr, "component error: %s\n", qPrintable(component.errorString()));
+        return 1;
+    }
+    QObject *object = component.createWithInitialProperties(initialProperties, engine.rootContext());
+    if (!object) {
+        std::fprintf(stderr, "create failed: %s\n", qPrintable(component.errorString()));
+        return 1;
+    }
+    backend->completeRefresh();
+
+    auto *item = qobject_cast<QQuickItem *>(object);
+    if (!item) {
+        std::fprintf(stderr, "root object is not an Item\n");
+        return 1;
+    }
+
+    QQuickWindow window;
+    window.resize(width, height);
+    item->setParentItem(window.contentItem());
+    item->setWidth(width);
+    item->setHeight(height);
+    window.show();
+
+    // 等布局与 delegate 完成（一次事件循环 + 一小段等待即可）
+    QTimer::singleShot(900, &app, [&]() {
+        const QImage image = window.grabWindow();
+        if (image.isNull() || !image.save(output)) {
+            std::fprintf(stderr, "failed to save %s\n", qPrintable(output));
+            app.exit(1);
+            return;
+        }
+        std::printf("saved %s (%dx%d, %s, %s)\n", qPrintable(output), image.width(), image.height(), qPrintable(theme), qPrintable(page));
+        app.exit(0);
+    });
+
+    return app.exec();
+}

@@ -2,10 +2,16 @@
     SPDX-FileCopyrightText: 2026 kontainer developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    容器资源视图（ARCH_V2 §22）：CPU / 内存 / 网络 / Block I/O。
+    容器资源视图（ARCH_V2 §22 / ARCH_V3 §2.4、§2.5）：
 
-    所有百分比与速率都由 C++ 的 MetricsModel 算好（§18：统计公式不属于 UI），
-    QML 只做单位与文本格式化。
+    CPU / 内存 / 网络 / 块 I/O。
+
+    - 所有百分比与速率都由 C++ 的 MetricsModel 算好（§18：统计公式不属于 UI），
+      QML 只做单位与文本格式化。
+    - 趋势线使用 ChartPalette 的**数据序列色**，不再借用 positive/negative
+      这类状态语义色（§1.4 把数据可视化列为语义色的例外）。
+    - 数值统一右对齐（§1.5）：同一列数字上下对齐，避免「12.3% / 97.4 MiB / 38.2 GiB」
+      这种参差观感。
 */
 
 import QtQuick
@@ -66,13 +72,16 @@ ColumnLayout {
             Kirigami.FormData.label: i18n("CPU:")
 
             QQC2.Label {
+                Layout.fillWidth: true
                 text: view.percentText(view.metrics.cpuPercent)
+                horizontalAlignment: Text.AlignRight
                 font.bold: true
             }
             Components.MiniTrend {
                 visible: view.metrics.sampleCount > 1
                 values: view.metrics.cpuHistory
                 maxValue: 100
+                barColor: Components.ChartPalette.cpuSeries
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             }
         }
@@ -81,6 +90,7 @@ ColumnLayout {
             Kirigami.FormData.label: i18n("Memory:")
 
             QQC2.Label {
+                Layout.fillWidth: true
                 text: {
                     if (!view.metrics.hasData) {
                         return i18n("—");
@@ -92,19 +102,22 @@ ColumnLayout {
                     }
                     return used;
                 }
+                horizontalAlignment: Text.AlignRight
                 font.bold: true
             }
             QQC2.Label {
+                Layout.fillWidth: true
                 // 没有有效 memory limit 时不显示虚假百分比（§19）
                 visible: view.metrics.memoryLimitEffective && view.metrics.memoryPercent >= 0
                 text: view.percentText(view.metrics.memoryPercent)
+                horizontalAlignment: Text.AlignRight
                 font: Kirigami.Theme.smallFont
                 opacity: 0.8
             }
             Components.MiniTrend {
                 visible: view.metrics.sampleCount > 1
                 values: view.metrics.memoryHistory
-                barColor: Kirigami.Theme.neutralTextColor
+                barColor: Components.ChartPalette.memorySeries
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             }
         }
@@ -113,15 +126,19 @@ ColumnLayout {
             Kirigami.FormData.label: i18n("Network:")
 
             QQC2.Label {
+                Layout.fillWidth: true
                 text: i18nc("@info network receive rate", "↓ %1", view.rateText(view.metrics.networkRxPerSecond))
+                horizontalAlignment: Text.AlignRight
             }
             QQC2.Label {
+                Layout.fillWidth: true
                 text: i18nc("@info network transmit rate", "↑ %1", view.rateText(view.metrics.networkTxPerSecond))
+                horizontalAlignment: Text.AlignRight
             }
             Components.MiniTrend {
                 visible: view.metrics.sampleCount > 1
                 values: view.metrics.networkHistory
-                barColor: Kirigami.Theme.positiveTextColor
+                barColor: Components.ChartPalette.networkSeries
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             }
         }
@@ -130,10 +147,14 @@ ColumnLayout {
             Kirigami.FormData.label: i18n("Block I/O:")
 
             QQC2.Label {
+                Layout.fillWidth: true
                 text: i18nc("@info block read rate", "Read %1", view.rateText(view.metrics.blockReadPerSecond))
+                horizontalAlignment: Text.AlignRight
             }
             QQC2.Label {
+                Layout.fillWidth: true
                 text: i18nc("@info block write rate", "Write %1", view.rateText(view.metrics.blockWritePerSecond))
+                horizontalAlignment: Text.AlignRight
             }
         }
     }

@@ -27,7 +27,15 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 | 刷新 | 5 秒自动刷新（高频）+ 30 秒 storage（中频）+ 手动刷新；Last Updated / Update failed / Data is stale；后台刷新不清空列表、不重置搜索/过滤/排序 |
 | 资源监控 | 每个详情页 5 秒采样一次，内存中保留 60 个采样点（约 5 分钟），离开页面立即停止采样并释放历史 |
 | 状态体系 | State（机器可读）/ Status（Docker 摘要）/ Health（独立语义）严格分离；颜色只作辅助，始终配文本 + 图标 |
-| 国际化 | 全部用户可见文本走 KDE i18n（C++ 与 QML），含复数形式；已随附简体中文翻译 |
+| 状态徽标 | 所有状态统一由 `StatusChip` 呈现（图标 + 颜色 + 文字三重编码）；语义 key → 主题色的映射只在 `StatusPalette` 里存在一份 |
+| 可复制字段 | 容器名称/ID、镜像仓库/标签/完整引用/ID 统一使用 `CopyableText` / `CopyButton`；列表卡片也有复制入口 |
+| 空状态 | 统一使用 `EmptyPlaceholder`（`Kirigami.PlaceholderMessage`）；「没有数据」「搜索无结果」「过滤无结果」文案互不相同，后两者提供清除条件的入口 |
+| 容器详情分区 | 概览 / 资源 / 网络 / 挂载 / 日志（占位）五个分区，各自滚动；页面不再是一个超长滚动条 |
+| 镜像详情收敛 | 层列表默认只显示前 5 层、可展开全部；多 tag 以 chip 呈现 |
+| 存储可视化 | Overview 的存储区有横向堆叠条（镜像/容器/数据卷/构建缓存）+ 色块图例；不可用的类别显示 `—`，不伪装成 0 |
+| 数据可视化配色 | 趋势线与存储条使用 `ChartPalette` 的专用取色（亮/暗各一套，均通过 WCAG AA 4.5:1 校验），不再借用状态语义色 |
+| 排版与响应 | 详情页正文限宽 42 gridUnit 居中；资源数值右对齐；统计卡按窗口宽度 5/3/2 列重排；数值字号走 `Kirigami.Heading` |
+| 国际化 | 全部用户可见文本走 KDE i18n（C++ 与 QML），含复数形式；已随附简体中文翻译；并有 lint 测试阻止裸字符串 |
 
 ---
 
@@ -40,6 +48,9 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 - Environment / Labels 默认只显示数量，用户显式展开才渲染取值（§40）
 - 剪贴板只提供标识类字段的复制（容器名称/ID、镜像仓库/标签/完整引用/ID），不提供“复制整个 inspect JSON”（§41）
 - UI 线程不做阻塞 I/O；全部请求基于 `QLocalSocket` + 事件循环
+- **只读边界由测试守着**：`tst_source_conventions` 会在生产代码里出现
+  `"POST"/"PUT"/"PATCH"/"DELETE"` 字面量，或引入 `QProcess` / `KAuth` 时直接失败——
+  打开写操作必须是一次显式的设计变更，而不是某次顺手加上的请求
 
 ---
 
@@ -175,8 +186,10 @@ ctest --test-dir build --output-on-failure
 | `tst_metrics` | CPU 公式、零增量、计数器回绕、缺内存上限、page cache 扣除、首采样无速率、环形缓冲上限、离开页面释放历史、宿主内存视为无限制 |
 | `tst_detail_controllers` | 详情页生命周期（进入/离开）、列表构建、错误与重试、镜像与容器只读关联、停止采样 |
 | `tst_format` / `tst_status_controller` | 时间与体积格式化；整页/分区状态机、错误隔离、Last Updated 与 stale、刷新间隔来自 RefreshPolicy |
-| `tst_i18n_consistency` | 翻译域一致性、译文完整性 |
-| `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
+| `tst_i18n_consistency` | 翻译域一致性、译文完整性、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
+| `tst_source_conventions` | 复制动作只有 `CopyButton` 一个实现；状态语义色只出现在 `StatusPalette`；**只读边界**（生产代码不得出现写请求动词 / `QProcess` / `KAuth`） |
+| `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
+| `tst_qml_resource` | **从 qrc 加载界面**（与插件运行时完全一致的路径）：`main.qml` 能加载、源码目录里每个界面文件都在资源里且内容一致（期望值由扫描源码树得出，不维护第二份清单）、单例能从 qrc 解析。资源清单漏项这类问题不会被源码目录测试发现，只会让安装后的 KCM 打不开 |
 | `tst_docker_backend_against_fake_engine` | 进程内假 Engine：协商、chunked、去重、inspect/stats/df 解析、`/info` 失败后计数作废、版本不匹配、stats 生命周期 |
 | `tst_docker_backend_integration` | 真实 Docker 只读端到端（无 socket 时自动跳过） |
 
@@ -193,7 +206,24 @@ tests/tools/fake_docker_server.py /tmp/fake-docker.sock --empty   # 去掉 --emp
 DOCKER_HOST=unix:///tmp/fake-docker.sock kcmshell6 kcm_docker
 ```
 
-另：`tests/tools/vnc_grab.py` 可在 Qt 的 `vnc` 虚拟屏上抓取渲染结果（无桌面环境时用）。
+### 离屏截图（亮 / 暗两套，不干扰桌面）
+
+```bash
+cmake --build build --target kontainer_render_ui
+tests/tools/render_ui.sh main             1200 900 light build/logs/main-light.png
+tests/tools/render_ui.sh container-detail 1200 900 dark  build/logs/detail-dark.png
+tests/tools/render_ui.sh image-detail     1200 900 light build/logs/image-light.png
+```
+
+用确定性 fixture（`MockDockerBackend`）渲染，因此同样的命令永远得到同样的图，
+适合做「改版前后」对比与亮/暗主题复核。包装脚本会准备 KDE 配色方案
+（复制 `/usr/share/color-schemes/BreezeLight.colors` / `BreezeDark.colors`
+到私有 `XDG_CONFIG_HOME`）并设置 KDE 的 QQC2 样式——
+这两点都必须在进程启动前完成，否则渲染结果不代表真实会话（详见
+`tests/tools/render_ui.sh` 与 `tests/tools/render_ui.cpp` 里的说明）。
+
+另：`tests/tools/vnc_grab.py` 是早期的 VNC 抓图工具；本机 Qt 的 `vnc` platform
+插件在渲染期间会段错误 / 不响应更新请求，因此截图请使用上面的离屏渲染工具。
 
 ### 调试日志
 
@@ -225,14 +255,31 @@ src/
 │                           ImageDetail / StorageUsage / EngineInfo
 ├── model/                  ContainerModel / ImageModel / Filter 代理 / 详情 Controller /
 │                           MetricsModel / RefreshScheduler / StorageStatus / Format / Presentation
-└── ui/                     main.qml, MainPage.qml, *Card.qml, *Detail.qml, *View.qml, components/
-tests/                      15 个测试目标 + support（mock/stub）+ tools（假 Engine、VNC 抓图）
+└── ui/                     main.qml, MainPage.qml, *Card.qml, *Detail.qml, *View.qml
+    └── components/         StatusChip / CopyButton / CopyableText / EmptyPlaceholder /
+                            CollapsibleSection / KeyValueList / StatTile / MiniTrend /
+                            StorageBar + 单例 StatusPalette / ChartPalette（qmldir）
+tests/                      17 个测试目标 + support（mock/stub）
+└── tools/                  fake_docker_server.py（假 Engine）
+                            render_ui.{cpp,sh}（离屏截图，亮/暗两套）
+                            vnc_grab.py（早期 VNC 抓图，本机不可用，见上）
 po/                         翻译（zh_CN 已完整）
 ```
 
 ---
 
-## 与 ARCH_V2 的已知偏离
+## 与 ARCH_V2 / ARCH_V3_pre 的已知偏离
+
+三期（ARCH_V3 §四）新增/确认的偏离：
+
+| 项 | 规范 | 实现 | 说明 |
+| --- | --- | --- | --- |
+| 卡片基类 | ARCH_V3_pre §1.3 建议统一用 `Kirigami.AbstractCard` | 统计卡用 `AbstractCard`；**列表行保留 `QQC2.ItemDelegate`** | `AbstractCard` 会接管 `contentItem`：把它包进 `KirigamiLayouts.Padding`（`visible: contentItem !== null`）并用 `onXChanged/onYChanged` 强制覆盖内容坐标（Kirigami 6.30 `templates/AbstractCard.qml:110-140`）。二期正是在这里踩到「折叠区与标题重叠」的 bug。列表行还需要 hover/focus/Enter 与 `Accessible.role`，`ItemDelegate` 更合适 |
+| 页面过渡 | ARCH_V3_pre §1.7 用 Kirigami 自带过渡 | 页内 `StackView` 显式使用空 `Transition {}`（`main.qml`） | KCM 是配置界面而非内容浏览界面，切换动效会带来「窗口在跳」的观感；四期若加入日志流等长驻页面可重新评估 |
+| 数值精度 | ARCH_V3 §2.5 原计划新增定精度字节格式化变体 | **未新增**，沿用 `KFormat::formatByteSize` | 实测 `KFormat` 的默认精度就是 1 位小数（`formatByteSize(100) == "100 B"`），再加一层变体属于重复实现且偏离 KDE 惯例；三期的实际问题是**对齐**而不是小数位，已通过右对齐解决 |
+| 端口「两行并一行」 | ARCH_V3_pre §1.9 | 现状本就每端口一行；本次收敛标签列宽与省略，避免折行 | 原截图所指待与讨论方确认 |
+
+二期以来沿用的偏离：
 
 | 项 | 规范 | 实现 | 说明 |
 | --- | --- | --- | --- |
@@ -249,6 +296,28 @@ po/                         翻译（zh_CN 已完整）
 
 ---
 
+## 三期完成定义（DoD）自查
+
+- 界面：`StatusChip` 是状态呈现的唯一实现 ✅、状态色 token 只在 `StatusPalette` ✅、
+  `CopyableText`/`CopyButton` 覆盖全部标识字段且列表卡片有复制入口 ✅、
+  `EmptyPlaceholder` 覆盖列表与详情空状态且四态文案互不相同 ✅、
+  容器详情五分区（含日志占位）✅、Environment/Labels 默认折叠保持 ✅、
+  镜像层默认前 5 层可展开 ✅、多 tag chip ✅、
+  存储堆叠条 + 图例且缺项不伪装成 0 ✅、
+  详情页限宽居中 + 资源数值右对齐 ✅、统计卡 `AbstractCard` + `Heading` + 5/3/2 列重排 ✅、
+  数据可视化色板与状态语义色分离且过 AA 对比度 ✅
+- 工程：i18n lint 生效（人为插入裸字符串会被抓出并给出位置）✅、`CHANGELOG.md` 建立 ✅、
+  zh_CN 译文完整（185 条、0 fuzzy、0 未翻译）✅、全部 17 个测试通过 ✅、
+  新增界面文件全部进入 qrc 且由 `tst_qml_resource` 守着 ✅、
+  只读声明仍然真实（并由 `tst_source_conventions` 守着）✅
+- KDE：`kcmshell6 --smoke-test kcm_docker` 英文/中文均退出码 0 ✅、
+  亮/暗主题离屏截图复核 ✅、键盘导航与焦点可见性未回归 ✅
+- 说明：三期开工时曾出现「源码目录测试全绿、安装后的插件打不开」的回归
+  （`StatusPalette.qml` / `ChartPalette.qml` 漏出资源清单），
+  由新增的 `tst_qml_resource` 定位并修复；该测试即是为此类问题加的常驻防线。
+
+---
+
 ## 二期完成定义（DoD）自查
 
 - 功能：卡片可打开 Container/Image Detail ✅、搜索 ✅、状态过滤 ✅、排序 ✅、State/Status/Health 语义分离 ✅、
@@ -261,7 +330,11 @@ po/                         翻译（zh_CN 已完整）
 
 ---
 
-## 下一阶段（不在二期范围）
+## 下一阶段（四期，不在三期范围）
 
-Docker actions（start/stop/…）、日志、exec/Konsole 集成、Compose metadata、Plasma/KRunner/Dolphin 集成、
-多 endpoint、Podman/Incus backend、持久化监控。二期确立的 domain model 与 backend 边界即为这些能力的扩展基础。
+按 ARCH_V3.md §7 的顺序：写操作地基（权限模型、变更传输层、统一反馈通道、确认对话框、
+start/stop/restart → remove）→ 日志 → 卷与网络 → 创建/克隆 → exec → Compose → 诊断导出。
+
+权限模型已经定好（ARCH_V3 §1.3）：**按 socket 实际权限工作，不引入提权机制**；
+本机是 rootless Docker，OS 层面已放行写权限，引入 root helper 属于权限放大。
+四期开工前只需把 README 顶部的「只读」声明改成对应的新表述并升次版本号。

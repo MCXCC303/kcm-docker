@@ -1,0 +1,17 @@
+# 组件目录元数据（ARCH_V3 §2.1 / 附录 A）。
+#
+# 注意：qmldir 只支持 “#” 注释，不支持 /* */ 块注释——写成块注释会被当成指令解析。
+#
+# 只有 QML 单例需要在这里声明；普通组件（*.qml）由 QML 引擎从目录隐式发现，
+# 不必逐条登记。
+#
+# 单例必须同时满足三个条件，缺一即运行时报
+# 「qmldir defines type as singleton, but no pragma Singleton found」：
+#   1. 在本文件声明 singleton
+#   2. 对应 .qml 文件首行写 pragma Singleton
+#   3. 使用方通过目录导入访问（import "components" as Components）
+#
+# 本文件必须加入 src/CMakeLists.txt 的 qt_add_resources 列表：
+# 否则源码目录下的测试仍然通过，而安装后从 qrc 加载时会解析失败。
+singleton StatusPalette 1.0 StatusPalette.qml
+singleton ChartPalette 1.0 ChartPalette.qml

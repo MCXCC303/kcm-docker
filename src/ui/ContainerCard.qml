@@ -2,11 +2,12 @@
     SPDX-FileCopyrightText: 2026 kontainer developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    容器卡片（ARCH_V2 §6）：整张卡片是一个可点击导航区域。
+    容器卡片（ARCH_V2 §6 / ARCH_V3 §2.1）：整张卡片是一个可点击导航区域。
 
     - 使用 QQC2.ItemDelegate：自带 hover / focus / Enter / Space 行为（§6.2/§38）
-    - 卡片内不放任何 Start/Stop/Restart 按钮（二期禁止 mutation）
-    - 状态同时用文本 + 图标 + 颜色表达（§12）
+    - 卡片内不放任何 Start/Stop/Restart 按钮（三期仍然禁止 mutation）
+    - 状态用统一的 StatusChip 呈现（图标 + 颜色 + 文字三重编码，§12）
+    - 复制入口：只复制标识（容器 ID），不复制整个 inspect JSON（ARCH_V2 §41）
 */
 
 import QtQuick
@@ -15,6 +16,8 @@ import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
 import org.kde.kontainer as Kontainer
+
+import "components" as Components
 
 QQC2.ItemDelegate {
     id: card
@@ -46,12 +49,16 @@ QQC2.ItemDelegate {
     Accessible.description: card.image
     Accessible.role: Accessible.ListItem
 
+    /*! 状态语义：健康问题优先于状态（Unhealthy 的 Running 必须看起来有问题，§11.3） */
+    readonly property string stateSemanticKey: Kontainer.Presentation.stateSemanticKey(card.stateKey, card.healthKey)
+    readonly property bool healthVisible: card.healthKey === "healthy" || card.healthKey === "unhealthy" || card.healthKey === "starting"
+
     contentItem: RowLayout {
         spacing: Kirigami.Units.smallSpacing
 
         Kirigami.Icon {
-            source: card.stateIcon(card.stateKey)
-            color: card.stateColor(card.stateKey, card.healthKey)
+            source: Kontainer.Presentation.stateIconName(card.stateKey)
+            color: Components.StatusPalette.color(card.stateSemanticKey)
             implicitWidth: Kirigami.Units.iconSizes.smallMedium
             implicitHeight: Kirigami.Units.iconSizes.smallMedium
             Layout.alignment: Qt.AlignTop
@@ -70,18 +77,20 @@ QQC2.ItemDelegate {
                     elide: Text.ElideRight
                     Layout.fillWidth: true
                 }
-                QQC2.Label {
+
+                Components.StatusChip {
+                    semanticKey: card.stateSemanticKey
+                    iconName: Kontainer.Presentation.stateIconName(card.stateKey)
                     text: card.stateText
-                    color: card.stateColor(card.stateKey, card.healthKey)
-                    font: Kirigami.Theme.smallFont
                 }
+
                 RowLayout {
-                    visible: card.healthKey === "healthy" || card.healthKey === "unhealthy" || card.healthKey === "starting"
+                    visible: card.healthVisible
                     spacing: Kirigami.Units.smallSpacing / 2
 
                     Kirigami.Icon {
-                        source: card.healthIcon(card.healthKey)
-                        color: card.stateColor(card.stateKey, card.healthKey)
+                        source: Kontainer.Presentation.healthIconName(card.healthKey)
+                        color: Components.StatusPalette.color(card.stateSemanticKey)
                         implicitWidth: Kirigami.Units.iconSizes.small
                         implicitHeight: Kirigami.Units.iconSizes.small
                     }
@@ -120,6 +129,14 @@ QQC2.ItemDelegate {
             }
         }
 
+        // 列表里的复制入口（§1.3）：复制容器 ID——点击本按钮不会触发卡片导航，
+        // 因为 AbstractButton 会接受鼠标事件，不再向父 delegate 传播。
+        Components.CopyButton {
+            value: card.containerId
+            fieldLabel: i18n("container ID")
+            Layout.alignment: Qt.AlignVCenter
+        }
+
         Kirigami.Icon {
             source: "go-next-symbolic"
             implicitWidth: Kirigami.Units.iconSizes.small
@@ -127,27 +144,5 @@ QQC2.ItemDelegate {
             opacity: 0.5
             Layout.alignment: Qt.AlignVCenter
         }
-    }
-
-    /* 语义色 → Kirigami palette（颜色只作辅助，文本与图标始终同时存在，§12） */
-    function stateColor(stateKey: string, healthKey: string): color {
-        switch (Kontainer.Presentation.stateSemanticKey(stateKey, healthKey)) {
-        case "positive":
-            return Kirigami.Theme.positiveTextColor;
-        case "neutral":
-            return Kirigami.Theme.neutralTextColor;
-        case "negative":
-            return Kirigami.Theme.negativeTextColor;
-        default:
-            return Kirigami.Theme.disabledTextColor;
-        }
-    }
-
-    function stateIcon(stateKey: string): string {
-        return Kontainer.Presentation.stateIconName(stateKey);
-    }
-
-    function healthIcon(healthKey: string): string {
-        return Kontainer.Presentation.healthIconName(healthKey);
     }
 }

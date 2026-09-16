@@ -13,6 +13,8 @@ import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
 
+import "." as Local
+
 RowLayout {
     id: trend
 
@@ -20,7 +22,13 @@ RowLayout {
     property var values: []
     /*! 归一化上限；<= 0 时自动取序列最大值。 */
     property real maxValue: 0
-    property color barColor: Kirigami.Theme.highlightColor
+    /*!
+        柱色默认取 ChartPalette 的 CPU 序列色。
+        注意：数据序列必须使用 ChartPalette 的专用色，不能用
+        positive/negative 这类状态语义色（§1.4），否则「绿色」会同时表示
+        「运行中」和「网络流量」。
+    */
+    property color barColor: Local.ChartPalette.cpuSeries
     property int barWidth: 3
 
     spacing: 1
@@ -46,8 +54,9 @@ RowLayout {
             Layout.fillHeight: true
             Layout.preferredWidth: trend.barWidth
             radius: width / 2
+            // 不做透明度衰减：ChartPalette 的取色已按对比度校验过（§1.8），
+            // 再乘一个 alpha 会把有效对比度拉回不达标区间。
             color: trend.barColor
-            opacity: 0.85
             // 最低 1px，保证“有值但很小”也能看见
             Layout.preferredHeight: Math.max(1, parent.height * Math.min(1, modelData / trend.effectiveMax))
             Layout.alignment: Qt.AlignBottom

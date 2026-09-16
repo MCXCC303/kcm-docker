@@ -18,22 +18,44 @@ int DetailListModel::rowCount(const QModelIndex &parent) const
     if (parent.isValid()) {
         return 0;
     }
-    return int(m_entries.size());
+    return count();
 }
 
 int DetailListModel::count() const
+{
+    if (m_limit > 0 && m_limit < m_entries.size()) {
+        return m_limit;
+    }
+    return int(m_entries.size());
+}
+
+int DetailListModel::totalCount() const
 {
     return int(m_entries.size());
 }
 
 bool DetailListModel::empty() const
 {
+    // 「有没有数据」与「当前显示几条」是两件事：折叠时 empty() 仍应为 false
     return m_entries.isEmpty();
+}
+
+void DetailListModel::setLimit(int limit)
+{
+    const int normalized = limit < 0 ? 0 : limit;
+    if (normalized == m_limit) {
+        return;
+    }
+    beginResetModel();
+    m_limit = normalized;
+    endResetModel();
+    Q_EMIT limitChanged();
+    Q_EMIT countChanged();
 }
 
 QVariant DetailListModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.row() < 0 || index.row() >= m_entries.size()) {
+    if (!index.isValid() || index.row() < 0 || index.row() >= count()) {
         return {};
     }
     const DetailEntry &entry = m_entries.at(index.row());

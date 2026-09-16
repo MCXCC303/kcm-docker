@@ -2,11 +2,22 @@
     SPDX-FileCopyrightText: 2026 kontainer developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Container Detail（ARCH_V2 §7）：把运行信息按用户理解方式重新组织，
-    不是 docker inspect JSON 的漂亮化输出。
+    Container Detail（ARCH_V2 §7 / ARCH_V3 §2.2）：
 
-    信息层级（§7.2）：一级（Name/State/Status/Image/Health）→ 二级（Runtime/Network/Mounts）
-    → 三级（Environment/Labels，默认折叠）。
+    把运行信息按用户理解方式重新组织，不是 docker inspect JSON 的漂亮化输出。
+
+    分区（§2.2）：概览 / 资源 / 网络 / 挂载 / 日志（占位）。
+    - 概览：一级信息（Name/State/Health/Status/Image/ID/时间）+ Runtime + Configuration
+            + Environment/Labels（默认折叠，§40）
+    - 资源：CPU / 内存 / 网络 / 块 IO + 短期趋势
+    - 网络：网络接口 + 端口
+    - 挂载：Bind / Volume
+    - 日志：四期实现，这里明确说明而不是留空白页
+
+    页面本身不滚动：每个分区各自滚动（§2.2 约束 4），
+    因此基类用 KCM.AbstractKCM 而不是 SimpleKCM。
+
+    ARCH_V3 §2.1：本文件不做状态语义判断，语义 key 与图标名都来自 C++。
 */
 
 import QtQuick
@@ -17,14 +28,20 @@ import org.kde.kcmutils as KCM
 import org.kde.kirigami as Kirigami
 import org.kde.kontainer as Kontainer
 
-// 详情内容明显高于窗口：必须用可滚动页面（Kirigami.Page 不提供滚动）
-KCM.SimpleKCM {
+import "components" as Components
+
+KCM.AbstractKCM {
     id: page
 
     property string containerId: ""
 
     readonly property var controller: kcm.controller.containerDetail
     readonly property bool ready: controller.loadStateKey === "ready"
+    /*! 健康问题优先于状态（Unhealthy 的 Running 必须看起来有问题，§11.3） */
+    readonly property string stateSemanticKey: Kontainer.Presentation.stateSemanticKey(controller.stateKey, controller.healthKey)
+    readonly property bool healthVisible: controller.healthKey !== "unknown" && controller.healthKey !== "none"
+    /*! 正文最大宽度：约 42 gridUnit，宽窗口下避免一行过长（§1.2）。 */
+    readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
 
     /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
@@ -42,26 +59,21 @@ KCM.SimpleKCM {
     // 离开页面：停止 stats 采样并释放指标历史（§27）
     Component.onDestruction: controller.stop()
 
+    /*!
+        四期扩展点：破坏性/状态操作按钮统一放在 KCM.AbstractKCM 的 footer 里
+        （ARCH_V3 §2.2 约束 5）。三期仍然只读，因此 footer 保持为空——
+        不放没有功能的按钮占位。
+    */
 
+    contentItem: ColumnLayout {
+        spacing: Kirigami.Units.smallSpacing
 
-    function stateColor(stateKey: string, healthKey: string): color {
-        switch (Kontainer.Presentation.stateSemanticKey(stateKey, healthKey)) {
-        case "positive":
-            return Kirigami.Theme.positiveTextColor;
-        case "neutral":
-            return Kirigami.Theme.neutralTextColor;
-        case "negative":
-            return Kirigami.Theme.negativeTextColor;
-        default:
-            return Kirigami.Theme.disabledTextColor;
-        }
-    }
-
-    ColumnLayout {
-        spacing: Kirigami.Units.largeSpacing
-
+        /* ------------------------------------------------------------------ */
+        /* 页头：返回 + 名称 + 复制名称                                          */
+        /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
+            Layout.topMargin: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
@@ -73,24 +85,20 @@ KCM.SimpleKCM {
                 Layout.fillWidth: true
                 level: 2
                 elide: Text.ElideRight
-                text: controller.name.length > 0 ? controller.name : i18n("Container")
+                text: page.controller.name.length > 0 ? page.controller.name : i18n("Container")
             }
-            QQC2.ToolButton {
-                icon.name: "edit-copy"
-                display: QQC2.AbstractButton.IconOnly
-                enabled: controller.name.length > 0
-                QQC2.ToolTip.text: i18n("Copy container name")
-                QQC2.ToolTip.visible: hovered
-                onClicked: Kontainer.Presentation.copyToClipboard(controller.name)
+            Components.CopyButton {
+                value: page.controller.name
+                fieldLabel: i18n("container name")
             }
         }
 
-        // ---------------------------------------------------------------- //
-        // Loading / Error（§31：详细失败不影响列表页）                        //
-        // ---------------------------------------------------------------- //
+        /* ------------------------------------------------------------------ */
+        /* Loading / Error（§31：详细失败不影响列表页）                          */
+        /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
-            visible: controller.loadStateKey === "loading"
+            visible: page.controller.loadStateKey === "loading"
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.BusyIndicator {
@@ -106,14 +114,14 @@ KCM.SimpleKCM {
 
         Kirigami.InlineMessage {
             Layout.fillWidth: true
-            visible: controller.loadStateKey === "error"
+            visible: page.controller.loadStateKey === "error"
             type: Kirigami.MessageType.Error
-            text: controller.errorText.length > 0 ? controller.errorText : i18n("Unable to retrieve container details.")
+            text: page.controller.errorText.length > 0 ? page.controller.errorText : i18n("Unable to retrieve container details.")
             actions: [
                 Kirigami.Action {
                     text: i18n("Retry")
                     icon.name: "view-refresh"
-                    onTriggered: controller.refresh()
+                    onTriggered: page.controller.refresh()
                 },
                 Kirigami.Action {
                     text: i18n("Back")
@@ -123,466 +131,402 @@ KCM.SimpleKCM {
             ]
         }
 
-        // ---------------------------------------------------------------- //
-        // 一级信息                                                          //
-        // ---------------------------------------------------------------- //
-        Kirigami.FormLayout {
+        /* ------------------------------------------------------------------ */
+        /* 分区切换（§1.3：为日志与后续操作留出位置）                            */
+        /* ------------------------------------------------------------------ */
+        QQC2.TabBar {
+            id: sectionBar
+
+            objectName: "detailTabBar"
             Layout.fillWidth: true
             visible: page.ready
 
-            RowLayout {
-                Kirigami.FormData.label: i18n("State:")
-
-                Kirigami.Icon {
-                    source: Kontainer.Presentation.stateIconName(controller.stateKey)
-                    color: page.stateColor(controller.stateKey, controller.healthKey)
-                    implicitWidth: Kirigami.Units.iconSizes.small
-                    implicitHeight: Kirigami.Units.iconSizes.small
-                }
-                QQC2.Label {
-                    text: controller.stateText
-                    color: page.stateColor(controller.stateKey, controller.healthKey)
-                    font.bold: true
-                }
-                QQC2.Label {
-                    visible: controller.healthKey !== "unknown" && controller.healthKey !== "none"
-                    text: controller.healthText
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.8
-                }
+            QQC2.TabButton {
+                text: i18nc("@title:tab container overview", "Overview")
             }
-
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Status:")
-                text: controller.status.length > 0 ? controller.status : i18n("Unknown")
+            QQC2.TabButton {
+                text: i18nc("@title:tab container resources", "Resources")
             }
-
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Image:")
-                text: controller.image
+            QQC2.TabButton {
+                text: i18nc("@title:tab container network", "Network")
             }
-
-            RowLayout {
-                Kirigami.FormData.label: i18n("Container ID:")
-
-                QQC2.Label {
-                    text: controller.shortId
-                    font.family: "monospace"
-                }
-                QQC2.ToolButton {
-                    icon.name: "edit-copy"
-                    text: i18n("Copy")
-                    display: QQC2.AbstractButton.IconOnly
-                    QQC2.ToolTip.text: i18n("Copy container ID")
-                    QQC2.ToolTip.visible: hovered
-                    onClicked: Kontainer.Presentation.copyToClipboard(controller.containerId)
-                }
+            QQC2.TabButton {
+                text: i18nc("@title:tab container mounts", "Mounts")
             }
-
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Created:")
-                visible: Kontainer.Format.isValid(controller.created)
-                text: Kontainer.Format.absoluteTime(controller.created)
-            }
-
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Started:")
-                visible: Kontainer.Format.isValid(controller.started)
-                text: i18nc("@info absolute time and relative", "%1 (%2 ago)", Kontainer.Format.absoluteTime(controller.started), Kontainer.Format.elapsed(controller.started))
-            }
-
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Finished:")
-                visible: Kontainer.Format.isValid(controller.finished)
-                text: Kontainer.Format.absoluteTime(controller.finished)
+            QQC2.TabButton {
+                text: i18nc("@title:tab container logs", "Logs")
             }
         }
 
-        // ---------------------------------------------------------------- //
-        // Runtime                                                          //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready
-            text: i18n("Runtime")
-        }
         Kirigami.Separator {
             Layout.fillWidth: true
             visible: page.ready
         }
 
-        Kirigami.FormLayout {
+        StackLayout {
+            id: sectionStack
+
+            objectName: "detailSectionStack"
             Layout.fillWidth: true
+            Layout.fillHeight: true
             visible: page.ready
+            // 切换分区不触碰 controller 生命周期：不重新 inspect、不重启动 stats 采样（§2.2 约束 2/3）
+            currentIndex: sectionBar.currentIndex
 
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Restart count:")
-                text: String(controller.restartCount)
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Exit code:")
-                text: String(controller.exitCode)
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("OOM killed:")
-                visible: controller.oomKilled
-                text: i18n("Yes")
-                color: Kirigami.Theme.negativeTextColor
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Process ID:")
-                visible: controller.pid > 0
-                text: String(controller.pid)
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Restart policy:")
-                visible: text.length > 0
-                text: controller.restartPolicy
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Platform:")
-                visible: text.length > 0
-                text: controller.platform
-            }
-        }
+            /* ============================ 概览 ============================ */
+            QQC2.ScrollView {
+                id: overviewScroll
 
-        // ---------------------------------------------------------------- //
-        // Resources（§22）                                                  //
-        // ---------------------------------------------------------------- //
-        ResourceView {
-            Layout.fillWidth: true
-            visible: page.ready
-            metrics: controller.metrics
-        }
+                clip: true
+                contentWidth: availableWidth
 
-        // ---------------------------------------------------------------- //
-        // Network（§7.2 二级信息）                                          //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready
-            text: i18n("Network")
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready
-        }
+                ColumnLayout {
+                    width: Math.min(overviewScroll.availableWidth, page.contentMaxWidth)
+                    x: Math.max(0, (overviewScroll.availableWidth - width) / 2)
+                    spacing: Kirigami.Units.largeSpacing
 
-        QQC2.Label {
-            visible: page.ready && controller.networks.empty
-            text: i18n("No network information.")
-            opacity: 0.7
-        }
-
-        Repeater {
-            model: controller.networks
-
-            delegate: Kirigami.FormLayout {
-                required property string label
-                required property string value
-                required property string detail
-                required property string entryKey
-
-                Layout.fillWidth: true
-
-                QQC2.Label {
-                    Kirigami.FormData.label: entryKey === "network-ipv6" ? i18n("IPv6:") : (entryKey === "network-gateway" ? i18n("Gateway:") : i18n("Network:"))
-                    text: label
-                }
-                QQC2.Label {
-                    Kirigami.FormData.label: entryKey === "network" ? i18n("IPv4:") : i18n("Address:")
-                    visible: value.length > 0
-                    text: value
-                    font.family: "monospace"
-                }
-                QQC2.Label {
-                    Kirigami.FormData.label: i18n("MAC:")
-                    visible: entryKey === "network" && detail.length > 0
-                    text: detail
-                    font.family: "monospace"
-                }
-            }
-        }
-
-        QQC2.Label {
-            Layout.fillWidth: true
-            visible: page.ready
-            text: i18n("Ports")
-            font.bold: true
-        }
-
-        QQC2.Label {
-            visible: page.ready && controller.ports.empty
-            text: i18n("No published ports.")
-            opacity: 0.7
-        }
-
-        Repeater {
-            model: controller.ports
-
-            delegate: RowLayout {
-                required property string label
-                required property string value
-
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                QQC2.Label {
-                    text: label
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
-                }
-                QQC2.Label {
-                    text: value.length > 0 ? value : i18n("not published")
-                    opacity: value.length > 0 ? 1.0 : 0.6
-                    Layout.fillWidth: true
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------- //
-        // Storage（挂载）                                                    //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready
-            text: i18n("Mounts")
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready
-        }
-
-        QQC2.Label {
-            visible: page.ready && controller.mounts.empty
-            text: i18n("No mounts.")
-            opacity: 0.7
-        }
-
-        Repeater {
-            model: controller.mounts
-
-            delegate: ColumnLayout {
-                required property string label
-                required property string value
-                required property string detail
-
-                Layout.fillWidth: true
-                spacing: 0
-
-                QQC2.Label {
-                    text: label
-                    font.bold: true
-                    elide: Text.ElideMiddle
-                    Layout.fillWidth: true
-                }
-                QQC2.Label {
-                    // 挂载源路径属于潜在敏感信息（§40）：只在详情页展示，不写日志
-                    text: value
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.7
-                    elide: Text.ElideMiddle
-                    Layout.fillWidth: true
-                }
-                QQC2.Label {
-                    text: detail
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.6
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------- //
-        // Configuration（三级信息：默认折叠，§40）                            //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready
-            text: i18n("Configuration")
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready
-        }
-
-        Kirigami.FormLayout {
-            Layout.fillWidth: true
-            visible: page.ready
-
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Entrypoint:")
-                visible: text.length > 0
-                text: controller.entrypoint.join(" ")
-                font.family: "monospace"
-                wrapMode: Text.WrapAnywhere
-                Layout.maximumWidth: Kirigami.Units.gridUnit * 28
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Command:")
-                visible: text.length > 0
-                text: controller.command.join(" ")
-                font.family: "monospace"
-                wrapMode: Text.WrapAnywhere
-                Layout.maximumWidth: Kirigami.Units.gridUnit * 28
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Working directory:")
-                visible: text.length > 0
-                text: controller.workingDirectory
-                font.family: "monospace"
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("User:")
-                visible: text.length > 0
-                text: controller.user
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Hostname:")
-                visible: text.length > 0
-                text: controller.hostname
-            }
-        }
-
-        // Environment / Labels：默认只显示数量，展开后才渲染真实值（§40）
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: page.ready
-            spacing: 0
-
-            QQC2.ItemDelegate {
-                Layout.fillWidth: true
-                text: i18ncp("@info environment variable count", "Environment (%1 variable)", "Environment (%1 variables)", controller.environmentCount)
-                onClicked: environmentValues.expanded = !environmentValues.expanded
-
-                contentItem: RowLayout {
-                    spacing: Kirigami.Units.smallSpacing
-
-                    Kirigami.Icon {
-                        source: environmentValues.expanded ? "arrow-down" : "arrow-right"
-                        implicitWidth: Kirigami.Units.iconSizes.small
-                        implicitHeight: Kirigami.Units.iconSizes.small
-                    }
-                    QQC2.Label {
-                        text: parent.parent.text
+                    /* ---------------- 一级信息 ---------------- */
+                    Kirigami.FormLayout {
                         Layout.fillWidth: true
-                    }
-                    QQC2.Label {
-                        visible: !environmentValues.expanded
-                        text: i18n("hidden by default")
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        opacity: 0.6
-                    }
-                }
-            }
 
-            Kirigami.Separator {
-                Layout.fillWidth: true
-            }
+                        RowLayout {
+                            Kirigami.FormData.label: i18n("State:")
 
-            // §40：默认只显示数量；展开后才渲染取值。用 visible 控制（ColumnLayout 会忽略不可见子项）
-            ColumnLayout {
-                id: environmentValues
-
-                objectName: "environmentValues"
-                property bool expanded: false
-                visible: expanded
-                Layout.fillWidth: true
-                spacing: 0
-
-                Repeater {
-                    model: controller.environmentVariables
-
-                    delegate: RowLayout {
-                        required property string label
-                        required property string value
-
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-
-                        QQC2.Label {
-                            text: label
-                            font.family: "monospace"
-                            Layout.preferredWidth: Kirigami.Units.gridUnit * 10
-                            elide: Text.ElideRight
+                            Components.StatusChip {
+                                semanticKey: page.stateSemanticKey
+                                iconName: Kontainer.Presentation.stateIconName(page.controller.stateKey)
+                                text: page.controller.stateText
+                            }
+                            QQC2.Label {
+                                visible: page.healthVisible
+                                text: page.controller.healthText
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.8
+                            }
                         }
+
                         QQC2.Label {
-                            text: value
-                            font.family: "monospace"
+                            Kirigami.FormData.label: i18n("Status:")
+                            text: page.controller.status.length > 0 ? page.controller.status : i18n("Unknown")
+                        }
+
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Image:")
                             Layout.fillWidth: true
+                            text: page.controller.image
                             elide: Text.ElideMiddle
                         }
+
+                        Components.CopyableText {
+                            Kirigami.FormData.label: i18n("Container ID:")
+                            value: page.controller.shortId
+                            copyValue: page.controller.containerId
+                            fieldLabel: i18n("container ID")
+                        }
+
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Created:")
+                            visible: Kontainer.Format.isValid(page.controller.created)
+                            text: Kontainer.Format.absoluteTime(page.controller.created)
+                        }
+
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Started:")
+                            visible: Kontainer.Format.isValid(page.controller.started)
+                            text: i18nc("@info absolute time and relative", "%1 (%2 ago)", Kontainer.Format.absoluteTime(page.controller.started), Kontainer.Format.elapsed(page.controller.started))
+                        }
+
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Finished:")
+                            visible: Kontainer.Format.isValid(page.controller.finished)
+                            text: Kontainer.Format.absoluteTime(page.controller.finished)
+                        }
+                    }
+
+                    /* ---------------- Runtime ---------------- */
+                    Kirigami.Heading {
+                        level: 3
+                        text: i18n("Runtime")
+                    }
+                    Kirigami.Separator {
+                        Layout.fillWidth: true
+                    }
+
+                    Kirigami.FormLayout {
+                        Layout.fillWidth: true
+
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Restart count:")
+                            text: String(page.controller.restartCount)
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Exit code:")
+                            text: String(page.controller.exitCode)
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("OOM killed:")
+                            visible: page.controller.oomKilled
+                            text: i18n("Yes")
+                            color: Components.StatusPalette.color("negative")
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Process ID:")
+                            visible: page.controller.pid > 0
+                            text: String(page.controller.pid)
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Restart policy:")
+                            visible: text.length > 0
+                            text: page.controller.restartPolicy
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Platform:")
+                            visible: text.length > 0
+                            text: page.controller.platform
+                        }
+                    }
+
+                    /* ---------------- Configuration ---------------- */
+                    Kirigami.Heading {
+                        level: 3
+                        text: i18n("Configuration")
+                    }
+                    Kirigami.Separator {
+                        Layout.fillWidth: true
+                    }
+
+                    Kirigami.FormLayout {
+                        Layout.fillWidth: true
+
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Entrypoint:")
+                            visible: text.length > 0
+                            text: page.controller.entrypoint.join(" ")
+                            font.family: "monospace"
+                            wrapMode: Text.WrapAnywhere
+                            Layout.maximumWidth: Kirigami.Units.gridUnit * 28
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Command:")
+                            visible: text.length > 0
+                            text: page.controller.command.join(" ")
+                            font.family: "monospace"
+                            wrapMode: Text.WrapAnywhere
+                            Layout.maximumWidth: Kirigami.Units.gridUnit * 28
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Working directory:")
+                            visible: text.length > 0
+                            text: page.controller.workingDirectory
+                            font.family: "monospace"
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("User:")
+                            visible: text.length > 0
+                            text: page.controller.user
+                        }
+                        QQC2.Label {
+                            Kirigami.FormData.label: i18n("Hostname:")
+                            visible: text.length > 0
+                            text: page.controller.hostname
+                        }
+                    }
+
+                    /* ---------------- Environment / Labels（默认折叠） ---------------- */
+                    Components.CollapsibleSection {
+                        Layout.fillWidth: true
+                        contentObjectName: "environmentValues"
+                        title: i18ncp("@info environment variable count", "Environment (%1 variable)", "Environment (%1 variables)", page.controller.environmentCount)
+
+                        Components.KeyValueList {
+                            model: page.controller.environmentVariables
+                        }
+                    }
+
+                    Components.CollapsibleSection {
+                        Layout.fillWidth: true
+                        contentObjectName: "labelValues"
+                        title: i18ncp("@info label count", "Labels (%1)", "Labels (%1)", page.controller.labels.count)
+
+                        Components.KeyValueList {
+                            model: page.controller.labels
+                        }
                     }
                 }
             }
-        }
 
-        // Labels 同样默认折叠（§40），展开后才渲染取值
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: page.ready
-            spacing: 0
+            /* ============================ 资源 ============================ */
+            QQC2.ScrollView {
+                id: resourcesScroll
 
-            QQC2.ItemDelegate {
-                Layout.fillWidth: true
-                text: i18ncp("@info label count", "Labels (%1)", "Labels (%1)", controller.labels.count)
-                onClicked: labelValues.expanded = !labelValues.expanded
+                clip: true
+                contentWidth: availableWidth
 
-                contentItem: RowLayout {
+                ResourceView {
+                    width: Math.min(resourcesScroll.availableWidth, page.contentMaxWidth)
+                    x: Math.max(0, (resourcesScroll.availableWidth - width) / 2)
+                    metrics: page.controller.metrics
+                }
+            }
+
+            /* ============================ 网络 ============================ */
+            QQC2.ScrollView {
+                id: networkScroll
+
+                clip: true
+                contentWidth: availableWidth
+
+                ColumnLayout {
+                    width: Math.min(networkScroll.availableWidth, page.contentMaxWidth)
+                    x: Math.max(0, (networkScroll.availableWidth - width) / 2)
                     spacing: Kirigami.Units.smallSpacing
 
-                    Kirigami.Icon {
-                        source: labelValues.expanded ? "arrow-down" : "arrow-right"
-                        implicitWidth: Kirigami.Units.iconSizes.small
-                        implicitHeight: Kirigami.Units.iconSizes.small
+                    Components.EmptyPlaceholder {
+                        Layout.fillWidth: true
+                        message: page.controller.networks.empty ? i18n("No network information.") : ""
                     }
-                    QQC2.Label {
-                        text: parent.parent.text
+
+                    Repeater {
+                        model: page.controller.networks
+
+                        delegate: Kirigami.FormLayout {
+                            required property string label
+                            required property string value
+                            required property string detail
+                            required property string entryKey
+
+                            Layout.fillWidth: true
+
+                            QQC2.Label {
+                                Kirigami.FormData.label: entryKey === "network-ipv6" ? i18n("IPv6:") : (entryKey === "network-gateway" ? i18n("Gateway:") : i18n("Network:"))
+                                text: label
+                            }
+                            QQC2.Label {
+                                Kirigami.FormData.label: entryKey === "network" ? i18n("IPv4:") : i18n("Address:")
+                                visible: value.length > 0
+                                text: value
+                                font.family: "monospace"
+                            }
+                            QQC2.Label {
+                                Kirigami.FormData.label: i18n("MAC:")
+                                visible: entryKey === "network" && detail.length > 0
+                                text: detail
+                                font.family: "monospace"
+                            }
+                        }
+                    }
+
+                    Kirigami.Heading {
+                        level: 3
+                        text: i18n("Ports")
+                    }
+                    Kirigami.Separator {
                         Layout.fillWidth: true
                     }
-                    QQC2.Label {
-                        visible: !labelValues.expanded
-                        text: i18n("hidden by default")
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        opacity: 0.6
+
+                    Components.EmptyPlaceholder {
+                        Layout.fillWidth: true
+                        message: page.controller.ports.empty ? i18n("No published ports.") : ""
+                    }
+
+                    Repeater {
+                        model: page.controller.ports
+
+                        delegate: RowLayout {
+                            required property string label
+                            required property string value
+
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            // 端口映射是「一行一条」：标签列固定宽度并省略，
+                            // 避免长标签把值挤到第二行（§1.5 排版）
+                            QQC2.Label {
+                                text: label
+                                elide: Text.ElideRight
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 8
+                            }
+                            QQC2.Label {
+                                text: value.length > 0 ? value : i18n("not published")
+                                opacity: value.length > 0 ? 1.0 : 0.6
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                        }
                     }
                 }
             }
 
-            Kirigami.Separator {
-                Layout.fillWidth: true
-            }
+            /* ============================ 挂载 ============================ */
+            QQC2.ScrollView {
+                id: mountsScroll
 
-            ColumnLayout {
-                id: labelValues
+                clip: true
+                contentWidth: availableWidth
 
-                objectName: "labelValues"
-                property bool expanded: false
-                visible: expanded
-                Layout.fillWidth: true
-                spacing: 0
+                ColumnLayout {
+                    width: Math.min(mountsScroll.availableWidth, page.contentMaxWidth)
+                    x: Math.max(0, (mountsScroll.availableWidth - width) / 2)
+                    spacing: Kirigami.Units.smallSpacing
 
-                Repeater {
-                    model: controller.labels
-
-                    delegate: RowLayout {
-                        required property string label
-                        required property string value
-
+                    Components.EmptyPlaceholder {
                         Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                        message: page.controller.mounts.empty ? i18n("No mounts.") : ""
+                    }
 
-                        QQC2.Label {
-                            text: label
-                            font.family: "monospace"
-                            Layout.preferredWidth: Kirigami.Units.gridUnit * 10
-                            elide: Text.ElideRight
-                        }
-                        QQC2.Label {
-                            text: value
-                            font.family: "monospace"
+                    Repeater {
+                        model: page.controller.mounts
+
+                        delegate: ColumnLayout {
+                            required property string label
+                            required property string value
+                            required property string detail
+
                             Layout.fillWidth: true
-                            elide: Text.ElideMiddle
+                            spacing: 0
+
+                            QQC2.Label {
+                                text: label
+                                font.bold: true
+                                elide: Text.ElideMiddle
+                                Layout.fillWidth: true
+                            }
+                            QQC2.Label {
+                                // 挂载源路径属于潜在敏感信息（§40）：只在详情页展示，不写日志
+                                text: value
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.7
+                                elide: Text.ElideMiddle
+                                Layout.fillWidth: true
+                            }
+                            QQC2.Label {
+                                text: detail
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.6
+                            }
                         }
                     }
+                }
+            }
+
+            /* ============================ 日志（占位） ============================ */
+            ColumnLayout {
+                Layout.margins: Kirigami.Units.largeSpacing
+
+                Item {
+                    Layout.fillHeight: true
+                }
+
+                Components.EmptyPlaceholder {
+                    objectName: "logsPlaceholder"
+                    Layout.fillWidth: true
+                    iconName: "view-list-text"
+                    message: i18n("Container logs are not available yet.")
+                    explanationText: i18n("Streaming logs will be added in a later version. Until then, use the docker CLI or your container's own log destination.")
+                }
+
+                Item {
+                    Layout.fillHeight: true
                 }
             }
         }

@@ -2,7 +2,11 @@
     SPDX-FileCopyrightText: 2026 kontainer developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Docker disk usage（ARCH_V2 §23/§30）：Engine 级信息，数据来自 /system/df 结构化 API。
+    Docker disk usage（ARCH_V2 §23/§30 / ARCH_V3 §2.4）。
+
+    数据来自 `/system/df` 结构化 API。可视化（堆叠条 + 图例）交给
+    components/StorageBar，本文件只负责标题、错误隔离与合计。
+
     某项不可用时显示 “—” 而不是 0；失败只影响本区块。
 */
 
@@ -12,6 +16,8 @@ import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
 import org.kde.kontainer as Kontainer
+
+import "components" as Components
 
 ColumnLayout {
     id: view
@@ -59,64 +65,25 @@ ColumnLayout {
         ]
     }
 
-    GridLayout {
+    Components.StorageBar {
         Layout.fillWidth: true
         visible: view.controller.storageStateKey !== "error"
-        columns: 2
-        columnSpacing: Kirigami.Units.largeSpacing
-        rowSpacing: 0
+        storage: view.storage
+    }
+
+    Kirigami.Separator {
+        Layout.fillWidth: true
+        visible: view.controller.storageStateKey !== "error"
+    }
+
+    RowLayout {
+        Layout.fillWidth: true
+        visible: view.controller.storageStateKey !== "error"
 
         QQC2.Label {
-            text: i18n("Images")
-            opacity: 0.75
             Layout.fillWidth: true
-        }
-        QQC2.Label {
-            text: view.sizeText(view.storage.imagesBytes)
-            horizontalAlignment: Text.AlignRight
-        }
-
-        QQC2.Label {
-            text: i18n("Containers")
-            opacity: 0.75
-            Layout.fillWidth: true
-        }
-        QQC2.Label {
-            text: view.sizeText(view.storage.containersBytes)
-            horizontalAlignment: Text.AlignRight
-        }
-
-        QQC2.Label {
-            text: i18n("Volumes")
-            opacity: 0.75
-            Layout.fillWidth: true
-        }
-        QQC2.Label {
-            text: view.sizeText(view.storage.volumesBytes)
-            horizontalAlignment: Text.AlignRight
-        }
-
-        QQC2.Label {
-            text: i18n("Build cache")
-            opacity: 0.75
-            visible: view.storage.buildCacheAvailable
-            Layout.fillWidth: true
-        }
-        QQC2.Label {
-            text: view.sizeText(view.storage.buildCacheBytes)
-            visible: view.storage.buildCacheAvailable
-            horizontalAlignment: Text.AlignRight
-        }
-
-        Kirigami.Separator {
-            Layout.columnSpan: 2
-            Layout.fillWidth: true
-        }
-
-        QQC2.Label {
             text: i18n("Total")
             font.bold: true
-            Layout.fillWidth: true
         }
         QQC2.Label {
             text: view.sizeText(view.storage.totalBytes)

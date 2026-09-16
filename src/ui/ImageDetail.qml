@@ -2,8 +2,17 @@
     SPDX-FileCopyrightText: 2026 kontainer developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Image Detail（ARCH_V2 §8/§52）：Repository / Tag / Digest / Size / Architecture / OS /
-    Layers / 使用该镜像的容器（只读关联）。
+    Image Detail（ARCH_V2 §8/§52 / ARCH_V3 §2.3）：
+
+    Repository / Tag / 完整引用 / ID / Digest / Size / Architecture / OS /
+    Layers / 使用该镜像的容器（只读关联）/ Environment（默认折叠）。
+
+    三期的两处收敛（§2.3）：
+    - 层次默认只显示前 5 层，可展开全部（层数可达数十，全铺会把页面撑得很长）
+    - 多 tag 用 chip 呈现，不再逐行占高
+
+    详情内容明显高于窗口：仍然用可滚动页面（Kirigami.Page 不提供滚动），
+    正文限宽居中避免宽窗口下一行过长（§1.2）。
 */
 
 import QtQuick
@@ -14,7 +23,8 @@ import org.kde.kcmutils as KCM
 import org.kde.kirigami as Kirigami
 import org.kde.kontainer as Kontainer
 
-// 详情内容明显高于窗口：必须用可滚动页面（Kirigami.Page 不提供滚动）
+import "components" as Components
+
 KCM.SimpleKCM {
     id: page
 
@@ -23,24 +33,61 @@ KCM.SimpleKCM {
     readonly property var controller: kcm.controller.imageDetail
     readonly property bool ready: controller.loadStateKey === "ready"
 
+    /*! 折叠时显示的层数（§2.3）。 */
+    readonly property int collapsedLayerCount: 5
+    property bool layersExpanded: false
 
     /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
     signal closeRequested
 
+    /*! 正文最大宽度：约 42 gridUnit，避免宽窗口下一行过长（§1.2）。 */
+    readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
+
     Component.onCompleted: {
-        // 同上：二次进入同一镜像也要重新加载
+        // 二次进入同一镜像也要重新加载
         if (page.imageId.length > 0) {
             controller.imageId = page.imageId;
             controller.start();
         }
+        // 层列表默认折叠：只让 model 暴露前 N 条（§2.3）
+        controller.layers.limit = page.collapsedLayerCount;
     }
 
     Component.onDestruction: controller.stop()
 
+    function toggleLayers() {
+        page.layersExpanded = !page.layersExpanded;
+        // 0 = 不限制
+        controller.layers.limit = page.layersExpanded ? 0 : page.collapsedLayerCount;
+    }
 
     ColumnLayout {
         spacing: Kirigami.Units.largeSpacing
+
+        /* ------------------------------------------------------------------ */
+        /* 页头：返回 + 镜像名（与容器详情保持一致，用户始终知道自己在看哪个镜像）  */
+        /* ------------------------------------------------------------------ */
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Button {
+                text: i18n("Images")
+                icon.name: "go-previous"
+                onClicked: page.closeRequested()
+            }
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                level: 2
+                elide: Text.ElideMiddle
+                text: controller.primaryTag.length > 0 ? controller.primaryTag : i18n("Image")
+            }
+            Components.CopyButton {
+                value: controller.primaryTag
+                fieldLabel: i18n("image reference")
+            }
+        }
 
         RowLayout {
             Layout.fillWidth: true
@@ -77,315 +124,275 @@ KCM.SimpleKCM {
             ]
         }
 
-        // ---------------------------------------------------------------- //
-        // Overview                                                          //
-        // ---------------------------------------------------------------- //
-        Kirigami.FormLayout {
-            Layout.fillWidth: true
-            visible: page.ready
-
-            RowLayout {
-                Kirigami.FormData.label: i18n("Repository:")
-
-                QQC2.Label {
-                    text: controller.primaryRepository.length > 0 ? controller.primaryRepository : i18n("<none> (dangling)")
-                }
-                QQC2.ToolButton {
-                    icon.name: "edit-copy"
-                    display: QQC2.AbstractButton.IconOnly
-                    enabled: controller.primaryRepository.length > 0
-                    QQC2.ToolTip.text: i18n("Copy repository")
-                    QQC2.ToolTip.visible: hovered
-                    onClicked: Kontainer.Presentation.copyToClipboard(controller.primaryRepository)
-                }
-            }
-            RowLayout {
-                Kirigami.FormData.label: i18n("Tag:")
-
-                QQC2.Label {
-                    text: controller.tagName.length > 0 ? controller.tagName : i18n("<none>")
-                }
-                QQC2.ToolButton {
-                    icon.name: "edit-copy"
-                    display: QQC2.AbstractButton.IconOnly
-                    enabled: controller.tagName.length > 0
-                    QQC2.ToolTip.text: i18n("Copy tag")
-                    QQC2.ToolTip.visible: hovered
-                    onClicked: Kontainer.Presentation.copyToClipboard(controller.tagName)
-                }
-            }
-            RowLayout {
-                Kirigami.FormData.label: i18n("Full reference:")
-
-                QQC2.Label {
-                    text: controller.primaryTag.length > 0 ? controller.primaryTag : i18n("<none>")
-                }
-                QQC2.ToolButton {
-                    icon.name: "edit-copy"
-                    display: QQC2.AbstractButton.IconOnly
-                    enabled: controller.primaryTag.length > 0
-                    QQC2.ToolTip.text: i18n("Copy image reference")
-                    QQC2.ToolTip.visible: hovered
-                    onClicked: Kontainer.Presentation.copyToClipboard(controller.primaryTag)
-                }
-            }
-            RowLayout {
-                Kirigami.FormData.label: i18n("Image ID:")
-
-                QQC2.Label {
-                    text: controller.shortId
-                    font.family: "monospace"
-                }
-                QQC2.ToolButton {
-                    icon.name: "edit-copy"
-                    display: QQC2.AbstractButton.IconOnly
-                    QQC2.ToolTip.text: i18n("Copy image ID")
-                    QQC2.ToolTip.visible: hovered
-                    onClicked: Kontainer.Presentation.copyToClipboard(controller.imageId)
-                }
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Created:")
-                visible: Kontainer.Format.isValid(controller.created)
-                text: i18nc("@info absolute time and relative", "%1 (%2 ago)", Kontainer.Format.absoluteTime(controller.created), Kontainer.Format.elapsed(controller.created))
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Size:")
-                text: Kontainer.Format.byteSize(controller.sizeBytes)
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Architecture:")
-                visible: text.length > 0
-                text: controller.variant.length > 0 ? controller.architecture + "/" + controller.variant : controller.architecture
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("OS:")
-                visible: text.length > 0
-                text: controller.os
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: i18n("Author:")
-                visible: text.length > 0
-                text: controller.author
-            }
-        }
-
-        // ---------------------------------------------------------------- //
-        // Tags / Digests                                                    //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready && controller.tags.count > 0
-            text: i18n("Tags")
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready && controller.tags.count > 0
-        }
-
-        Repeater {
-            model: controller.tags
-
-            delegate: QQC2.Label {
-                required property string label
-
-                Layout.fillWidth: true
-                text: label
-                font.family: "monospace"
-                elide: Text.ElideMiddle
-            }
-        }
-
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready && controller.digests.count > 0
-            text: i18n("Digests")
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready && controller.digests.count > 0
-        }
-
-        Repeater {
-            model: controller.digests
-
-            delegate: ColumnLayout {
-                required property string label
-                required property string value
-
-                Layout.fillWidth: true
-                spacing: 0
-
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    text: label
-                    font.family: "monospace"
-                    elide: Text.ElideMiddle
-                }
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    text: value
-                    // 不能先整体赋值 font 再赋值 font.family（QML 会报 Property has already been assigned）
-                    font.family: "monospace"
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    opacity: 0.6
-                    elide: Text.ElideMiddle
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------- //
-        // Layers                                                            //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready
-            text: i18ncp("@info image layer count", "Layers (%1)", "Layers (%1)", controller.layerCount)
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready
-        }
-
-        QQC2.Label {
-            Layout.fillWidth: true
-            visible: page.ready
-            text: i18n("The Docker API reports layer digests, not per-layer sizes.")
-            font: Kirigami.Theme.smallFont
-            opacity: 0.6
-            wrapMode: Text.WordWrap
-        }
-
-        Repeater {
-            model: controller.layers
-
-            delegate: RowLayout {
-                required property string label
-                required property string value
-
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                QQC2.Label {
-                    text: label
-                    Layout.preferredWidth: Kirigami.Units.gridUnit * 2
-                    opacity: 0.7
-                }
-                QQC2.Label {
-                    text: value
-                    font.family: "monospace"
-                    Layout.fillWidth: true
-                    elide: Text.ElideMiddle
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------- //
-        // Containers using this image（只读关联，§52）                        //
-        // ---------------------------------------------------------------- //
-        Kirigami.Heading {
-            level: 3
-            visible: page.ready
-            text: i18n("Containers")
-        }
-        Kirigami.Separator {
-            Layout.fillWidth: true
-            visible: page.ready
-        }
-
-        QQC2.Label {
-            Layout.fillWidth: true
-            visible: page.ready && controller.usedByContainers.empty
-            text: i18n("No containers use this image.")
-            opacity: 0.7
-        }
-
-        Repeater {
-            model: controller.usedByContainers
-
-            delegate: RowLayout {
-                required property string label
-                required property string value
-                required property string detail
-                required property string entryKey
-
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                Kirigami.Icon {
-                    source: Kontainer.Presentation.stateIconName(entryKey)
-                    implicitWidth: Kirigami.Units.iconSizes.small
-                    implicitHeight: Kirigami.Units.iconSizes.small
-                }
-                QQC2.Label {
-                    text: label
-                    Layout.fillWidth: true
-                }
-                QQC2.Label {
-                    text: value
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.8
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------- //
-        // Configuration（默认折叠，§40）                                       //
-        // ---------------------------------------------------------------- //
+        /* ------------------------------------------------------------------ */
+        /* 正文：限宽居中（§1.2）                                                */
+        /* ------------------------------------------------------------------ */
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.alignment: Qt.AlignHCenter
+            Layout.maximumWidth: page.contentMaxWidth
             visible: page.ready
-            spacing: 0
+            spacing: Kirigami.Units.largeSpacing
 
-            QQC2.ItemDelegate {
+            /* ---------------- Overview ---------------- */
+            Kirigami.FormLayout {
                 Layout.fillWidth: true
-                text: i18ncp("@info environment variable count", "Environment (%1 variable)", "Environment (%1 variables)", controller.environmentCount)
-                onClicked: imageEnvironmentValues.expanded = !imageEnvironmentValues.expanded
 
-                contentItem: RowLayout {
-                    spacing: Kirigami.Units.smallSpacing
+                Components.CopyableText {
+                    Kirigami.FormData.label: i18n("Repository:")
+                    value: controller.primaryRepository
+                    placeholderText: i18n("<none> (dangling)")
+                    fieldLabel: i18n("repository")
+                }
 
-                    Kirigami.Icon {
-                        source: imageEnvironmentValues.expanded ? "arrow-down" : "arrow-right"
-                        implicitWidth: Kirigami.Units.iconSizes.small
-                        implicitHeight: Kirigami.Units.iconSizes.small
-                    }
-                    QQC2.Label {
-                        text: parent.parent.text
-                        Layout.fillWidth: true
-                    }
-                    QQC2.Label {
-                        visible: !imageEnvironmentValues.expanded
-                        text: i18n("hidden by default")
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        opacity: 0.6
+                Components.CopyableText {
+                    Kirigami.FormData.label: i18n("Tag:")
+                    value: controller.tagName
+                    placeholderText: i18n("<none>")
+                    fieldLabel: i18n("tag")
+                }
+
+                Components.CopyableText {
+                    Kirigami.FormData.label: i18n("Full reference:")
+                    value: controller.primaryTag
+                    placeholderText: i18n("<none>")
+                    fieldLabel: i18n("image reference")
+                }
+
+                Components.CopyableText {
+                    Kirigami.FormData.label: i18n("Image ID:")
+                    value: controller.shortId
+                    copyValue: controller.imageId
+                    fieldLabel: i18n("image ID")
+                }
+
+                QQC2.Label {
+                    Kirigami.FormData.label: i18n("Created:")
+                    visible: Kontainer.Format.isValid(controller.created)
+                    text: i18nc("@info absolute time and relative", "%1 (%2 ago)", Kontainer.Format.absoluteTime(controller.created), Kontainer.Format.elapsed(controller.created))
+                }
+                QQC2.Label {
+                    Kirigami.FormData.label: i18n("Size:")
+                    text: Kontainer.Format.byteSize(controller.sizeBytes)
+                }
+                QQC2.Label {
+                    Kirigami.FormData.label: i18n("Architecture:")
+                    visible: text.length > 0
+                    text: controller.variant.length > 0 ? controller.architecture + "/" + controller.variant : controller.architecture
+                }
+                QQC2.Label {
+                    Kirigami.FormData.label: i18n("OS:")
+                    visible: text.length > 0
+                    text: controller.os
+                }
+                QQC2.Label {
+                    Kirigami.FormData.label: i18n("Author:")
+                    visible: text.length > 0
+                    text: controller.author
+                }
+            }
+
+            /* ---------------- Tags（chip 呈现，§2.3） ---------------- */
+            Kirigami.Heading {
+                level: 3
+                visible: controller.tags.count > 0
+                text: i18n("Tags")
+            }
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                visible: controller.tags.count > 0
+            }
+
+            Flow {
+                Layout.fillWidth: true
+                visible: controller.tags.count > 0
+                spacing: Kirigami.Units.smallSpacing
+
+                Repeater {
+                    model: controller.tags
+
+                    delegate: Kirigami.Badge {
+                        required property string label
+
+                        text: label
+                        // tag 只是展示，不可点击删除（三期没有写操作）
+                        Accessible.role: Accessible.StaticText
+                        Accessible.name: label
                     }
                 }
             }
 
+            /* ---------------- Digests ---------------- */
+            Kirigami.Heading {
+                level: 3
+                visible: controller.digests.count > 0
+                text: i18n("Digests")
+            }
+            Kirigami.Separator {
+                Layout.fillWidth: true
+                visible: controller.digests.count > 0
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: controller.digests.count > 0
+                spacing: 0
+
+                Repeater {
+                    model: controller.digests
+
+                    delegate: ColumnLayout {
+                        required property string label
+                        required property string value
+
+                        Layout.fillWidth: true
+                        spacing: 0
+
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            text: label
+                            font.family: "monospace"
+                            elide: Text.ElideMiddle
+                        }
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            text: value
+                            // 不能先整体赋值 font 再赋值 font.family（QML 会报 Property has already been assigned）
+                            font.family: "monospace"
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            opacity: 0.6
+                            elide: Text.ElideMiddle
+                        }
+                    }
+                }
+            }
+
+            /* ---------------- Layers（默认折叠前 5 层，§2.3） ---------------- */
+            Kirigami.Heading {
+                level: 3
+                text: i18ncp("@info image layer count", "Layers (%1)", "Layers (%1)", controller.layerCount)
+            }
             Kirigami.Separator {
                 Layout.fillWidth: true
             }
 
-            ColumnLayout {
-                id: imageEnvironmentValues
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: i18n("The Docker API reports layer digests, not per-layer sizes.")
+                font: Kirigami.Theme.smallFont
+                opacity: 0.6
+                wrapMode: Text.WordWrap
+            }
 
-                objectName: "imageEnvironmentValues"
-                property bool expanded: false
-                visible: expanded
+            ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 0
 
                 Repeater {
-                    model: controller.environment
+                    model: controller.layers
 
-                    delegate: QQC2.Label {
-                        required property string modelData
+                    delegate: RowLayout {
+                        required property string label
+                        required property string value
 
                         Layout.fillWidth: true
-                        text: modelData
-                        font.family: "monospace"
-                        elide: Text.ElideMiddle
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.Label {
+                            text: label
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 2
+                            opacity: 0.7
+                        }
+                        QQC2.Label {
+                            text: value
+                            font.family: "monospace"
+                            Layout.fillWidth: true
+                            elide: Text.ElideMiddle
+                        }
+                    }
+                }
+            }
+
+            QQC2.Button {
+                Layout.alignment: Qt.AlignHCenter
+                visible: controller.layerCount > page.collapsedLayerCount
+                text: page.layersExpanded ? i18n("Show fewer layers") : i18ncp("@info show all image layers", "Show all %1 layers", "Show all %1 layers", controller.layerCount)
+                icon.name: page.layersExpanded ? "arrow-up" : "arrow-down"
+                onClicked: page.toggleLayers()
+            }
+
+            /* ---------------- Containers using this image（只读关联，§52） ---------------- */
+            Kirigami.Heading {
+                level: 3
+                text: i18n("Containers")
+            }
+            Kirigami.Separator {
+                Layout.fillWidth: true
+            }
+
+            Components.EmptyPlaceholder {
+                Layout.fillWidth: true
+                message: controller.usedByContainers.empty ? i18n("No containers use this image.") : ""
+            }
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: !controller.usedByContainers.empty
+                spacing: 0
+
+                Repeater {
+                    model: controller.usedByContainers
+
+                    delegate: RowLayout {
+                        required property string label
+                        required property string value
+                        required property string entryKey
+
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.Icon {
+                            source: Kontainer.Presentation.stateIconName(entryKey)
+                            color: Components.StatusPalette.color(Kontainer.Presentation.stateSemanticKey(entryKey, "none"))
+                            implicitWidth: Kirigami.Units.iconSizes.small
+                            implicitHeight: Kirigami.Units.iconSizes.small
+                        }
+                        QQC2.Label {
+                            text: label
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+                        QQC2.Label {
+                            text: value
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.8
+                        }
+                    }
+                }
+            }
+
+            /* ---------------- Environment（默认折叠，§40） ---------------- */
+            Components.CollapsibleSection {
+                Layout.fillWidth: true
+                contentObjectName: "imageEnvironmentValues"
+                title: i18ncp("@info environment variable count", "Environment (%1 variable)", "Environment (%1 variables)", controller.environmentCount)
+
+                // 镜像的 environment 是字符串列表（"KEY=value"），不是键值模型
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 0
+
+                    Repeater {
+                        model: controller.environment
+
+                        delegate: QQC2.Label {
+                            required property string modelData
+
+                            Layout.fillWidth: true
+                            text: modelData
+                            font.family: "monospace"
+                            elide: Text.ElideMiddle
+                        }
                     }
                 }
             }

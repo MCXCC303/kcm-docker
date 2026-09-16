@@ -135,19 +135,12 @@ target_link_libraries(kcm_docker PRIVATE
 # --- QML 界面 -----------------------------------------------------------------
 # 打进插件自己的 qrc，资源路径必须是 :/kcm/<插件id>/main.qml
 # （KQuickConfigModule::mainUi() 就从这个位置加载界面）
+#
+# 文件清单定义在顶层 CMakeLists.txt（KONTAINER_QML_FILES），
+# 与 tests/ui/tst_qml_resource.cpp 共用，避免两处清单不一致。
 qt_add_resources(kcm_docker "kcm_docker_qml"
     PREFIX "/kcm/kcm_docker"
-    BASE "${CMAKE_CURRENT_SOURCE_DIR}/ui"
+    BASE "${KONTAINER_QML_BASE_DIR}"
     FILES
-        ui/main.qml
-        ui/MainPage.qml
-        ui/ContainerCard.qml
-        ui/ImageCard.qml
-        ui/ContainerDetail.qml
-        ui/ImageDetail.qml
-        ui/EngineStatusView.qml
-        ui/StorageView.qml
-        ui/ResourceView.qml
-        ui/components/StatTile.qml
-        ui/components/MiniTrend.qml
+        ${KONTAINER_QML_FILES}
 )

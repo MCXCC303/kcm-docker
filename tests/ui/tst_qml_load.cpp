@@ -12,6 +12,8 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QtTest>
@@ -44,10 +46,20 @@ private Q_SLOTS:
     void instantiatesPages();
     void sensitiveSectionsAreCollapsedByDefault();
     void delegateActivationIsWired();
+    void statusChipMapsSemanticKeys_data();
+    void statusChipMapsSemanticKeys();
+    void copyButtonFollowsValueAvailability();
+    void emptyPlaceholderDistinguishesStates();
+    void containerDetailHasSections();
+    void imageLayersCollapseByDefault();
+    void keyboardNavigationAndAccessibilityAreWired();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
     void failOnQmlRuntimeErrors();
+
+    /*! 按 objectName 在已实例化的页面里查找子项。 */
+    static QQuickItem *childByObjectName(QQuickItem *root, const QString &objectName);
 
     std::unique_ptr<MockDockerBackend> m_backend;
     std::unique_ptr<QmlStubKcm> m_stubKcm;
@@ -94,10 +106,17 @@ void QmlLoadTest::init()
     m_engine = std::make_unique<QQmlEngine>();
     // 真实运行时由 KCMUtils 的 KLocalizedQmlContext 提供这些全局函数；
     // 测试里用等价的 identity 实现，保证界面文件的绑定能被正常求值。
-    m_engine->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
-                                      "function i18nc(context, text) { return text; }\n"
-                                      "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
-                                      "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    m_engine->evaluate(QStringLiteral(
+        "function _ktFormat(text, args) {\n"
+        "    return String(text).replace(/%(\\d+)/g, function (match, index) {\n"
+        "        const value = args[index - 1];\n"
+        "        return value !== undefined ? value : match;\n"
+        "    });\n"
+        "}\n"
+        "function i18n(text) { return text; }\n"
+        "function i18nc(context, text) { return _ktFormat(text, Array.prototype.slice.call(arguments, 2)); }\n"
+        "function i18np(singular, plural, count) { return _ktFormat(count === 1 ? singular : plural, [count]); }\n"
+        "function i18ncp(context, singular, plural, count) { return _ktFormat(count === 1 ? singular : plural, [count]); }\n"));
     m_engine->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
 }
 
@@ -217,6 +236,13 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("ResourceView.qml"),
         QStringLiteral("components/StatTile.qml"),
         QStringLiteral("components/MiniTrend.qml"),
+        QStringLiteral("components/StorageBar.qml"),
+        QStringLiteral("components/StatusChip.qml"),
+        QStringLiteral("components/CopyButton.qml"),
+        QStringLiteral("components/CopyableText.qml"),
+        QStringLiteral("components/EmptyPlaceholder.qml"),
+        QStringLiteral("components/CollapsibleSection.qml"),
+        QStringLiteral("components/KeyValueList.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
@@ -312,6 +338,297 @@ void QmlLoadTest::sensitiveSectionsAreCollapsedByDefault()
     QCOMPARE(environment->height(), 0.0);
 }
 
-QTEST_MAIN(QmlLoadTest)
+QQuickItem *QmlLoadTest::childByObjectName(QQuickItem *root, const QString &objectName)
+{
+    if (!root) {
+        return nullptr;
+    }
+    const QList<QQuickItem *> items = root->findChildren<QQuickItem *>();
+    for (QQuickItem *item : items) {
+        if (item->objectName() == objectName) {
+            return item;
+        }
+    }
+    return nullptr;
+}
 
+/*!
+ * ARCH_V3 §2.1：状态徽标是状态呈现的唯一实现。
+ * 语义 key → Kirigami.Badge.Type 的映射只允许发生在 StatusPalette 里。
+ *
+ * Kirigami.Badge.Type 的取值：Information=0, Positive=1, Warning=2, Error=3。
+ */
+void QmlLoadTest::statusChipMapsSemanticKeys_data()
+{
+    QTest::addColumn<QString>("semanticKey");
+    QTest::addColumn<int>("expectedType");
+
+    QTest::newRow("positive") << QStringLiteral("positive") << 1;
+    QTest::newRow("neutral") << QStringLiteral("neutral") << 2;
+    QTest::newRow("negative") << QStringLiteral("negative") << 3;
+    QTest::newRow("disabled") << QStringLiteral("disabled") << 0;
+    QTest::newRow("unknown key falls back to Information") << QStringLiteral("no-such-semantic") << 0;
+}
+
+void QmlLoadTest::statusChipMapsSemanticKeys()
+{
+    QFETCH(QString, semanticKey);
+    QFETCH(int, expectedType);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/StatusChip.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+
+    QScopedPointer<QObject> chip(component.createWithInitialProperties(
+        {
+            {QStringLiteral("semanticKey"), semanticKey},
+            {QStringLiteral("iconName"), QStringLiteral("media-playback-start")},
+            {QStringLiteral("text"), QStringLiteral("Running")},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!chip.isNull(), "StatusChip failed to instantiate");
+
+    QCOMPARE(chip->property("type").toInt(), expectedType);
+    // 三重编码（§1.6/§1.8）：文字与图标必须同时存在，颜色不是唯一区分手段
+    QCOMPARE(chip->property("text").toString(), QStringLiteral("Running"));
+    QObject *icon = chip->property("icon").value<QObject *>();
+    QVERIFY2(icon, "StatusChip must expose a grouped icon property");
+    QCOMPARE(icon->property("name").toString(), QStringLiteral("media-playback-start"));
+}
+
+/*!
+ * ARCH_V3 §2.1：复制动作只有 CopyButton 一个实现。
+ * 值为空时必须禁用按钮，而不是复制空串。
+ */
+void QmlLoadTest::copyButtonFollowsValueAvailability()
+{
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/CopyButton.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+
+    QScopedPointer<QObject> emptyValue(component.createWithInitialProperties(
+        {
+            {QStringLiteral("value"), QString()},
+            {QStringLiteral("fieldLabel"), QStringLiteral("container ID")},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!emptyValue.isNull());
+    QVERIFY2(!emptyValue->property("enabled").toBool(), "copy button must be disabled when there is no value");
+
+    QClipboard *clipboard = QGuiApplication::clipboard();
+    QVERIFY(clipboard);
+    clipboard->setText(QStringLiteral("pre-existing content"));
+
+    QScopedPointer<QObject> withValue(component.createWithInitialProperties(
+        {
+            {QStringLiteral("value"), QStringLiteral("sha256:0123456789abcdef")},
+            {QStringLiteral("fieldLabel"), QStringLiteral("image ID")},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!withValue.isNull());
+    QVERIFY(withValue->property("enabled").toBool());
+
+    QVERIFY(QMetaObject::invokeMethod(withValue.data(), "clicked"));
+    QCOMPARE(clipboard->text(), QStringLiteral("sha256:0123456789abcdef"));
+}
+
+/*!
+ * ARCH_V2 §33 / ARCH_V3 §2.1：空状态必须区分
+ * 「没有数据」与「被搜索 / 过滤排除」，后者还要给出可操作的出路。
+ */
+void QmlLoadTest::emptyPlaceholderDistinguishesStates()
+{
+    Container container;
+    container.id = QStringLiteral("cid-1");
+    container.name = QStringLiteral("demo");
+    container.image = QStringLiteral("alpine:latest");
+    container.state = ContainerState::Running;
+    container.created = QDateTime::currentDateTimeUtc().addSecs(-600);
+    m_backend->setContainers({container});
+
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickItem *placeholder = childByObjectName(page, QStringLiteral("containersEmptyPlaceholder"));
+    QVERIFY2(placeholder, "containers empty placeholder not found");
+
+    // 有数据、没有搜索条件：不显示占位
+    QCOMPARE(placeholder->property("message").toString(), QString());
+    QVERIFY(!placeholder->property("visible").toBool());
+
+    // 搜索无结果
+    controller->containerList()->setSearchText(QStringLiteral("zzz-no-such-container"));
+    const QString searchMessage = placeholder->property("message").toString();
+    QVERIFY2(!searchMessage.isEmpty(), "a search miss must show the placeholder");
+    QVERIFY2(searchMessage.contains(QStringLiteral("zzz-no-such-container")), qPrintable(searchMessage));
+    QCOMPARE(placeholder->property("actionText").toString(), QStringLiteral("Clear search"));
+
+    // 过滤无结果：文案与动作都必须与「搜索无结果」不同（四种空状态不能混为一谈）
+    controller->containerList()->setSearchText(QString());
+    controller->containerList()->setStateFilter(QStringLiteral("paused"));
+    const QString filterMessage = placeholder->property("message").toString();
+    QVERIFY2(!filterMessage.isEmpty(), "a filter miss must show the placeholder");
+    QVERIFY2(filterMessage != searchMessage, "search miss and filter miss must not share one message");
+    QCOMPARE(placeholder->property("actionText").toString(), QStringLiteral("Show all containers"));
+}
+
+/*!
+ * ARCH_V3 §2.2：容器详情分区。
+ * 切换分区不得改变折叠状态，也不得重新发起 inspect（生命周期只跟页面绑定）。
+ */
+void QmlLoadTest::containerDetailHasSections()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("demo");
+    detail.state = ContainerState::Running;
+    detail.environment = {QStringLiteral("PATH=/usr/bin")};
+    m_backend->setContainerDetail(detail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-1")},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "ContainerDetail failed to instantiate");
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    m_backend->completeRefresh();
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::ContainerDetail), 1);
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY2(tabBar, "detail tab bar not found");
+    QCOMPARE(tabBar->property("count").toInt(), 5);
+
+    QQuickItem *stack = childByObjectName(page, QStringLiteral("detailSectionStack"));
+    QVERIFY2(stack, "detail section stack not found");
+    QCOMPARE(stack->property("currentIndex").toInt(), 0);
+
+    QQuickItem *environment = childByObjectName(page, QStringLiteral("environmentValues"));
+    QVERIFY2(environment, "environment values container not found");
+    QVERIFY2(!environment->isVisible(), "environment must stay collapsed (§40)");
+
+    // 切到「日志」分区：占位必须可见，且不重新 inspect、不改变折叠状态
+    QVERIFY(tabBar->setProperty("currentIndex", 4));
+    QCOMPARE(stack->property("currentIndex").toInt(), 4);
+    QQuickItem *logsPlaceholder = childByObjectName(page, QStringLiteral("logsPlaceholder"));
+    QVERIFY2(logsPlaceholder, "logs placeholder not found");
+    QVERIFY2(!logsPlaceholder->property("message").toString().isEmpty(), "logs tab must explain that logs are not implemented yet");
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::ContainerDetail), 1);
+    QVERIFY2(!environment->isVisible(), "switching sections must not expand environment (§40)");
+}
+
+/*!
+ * ARCH_V3 §2.3：镜像层默认只显示前 5 层，可展开全部（切片属于 model 层职责）。
+ */
+void QmlLoadTest::imageLayersCollapseByDefault()
+{
+    ImageDetail detail;
+    detail.id = QStringLiteral("sha256:aaaa");
+    detail.repoTags = {QStringLiteral("alpine:latest")};
+    for (int i = 0; i < 12; ++i) {
+        detail.layers.append(QStringLiteral("sha256:layer%1").arg(i));
+    }
+    m_backend->setImageDetail(detail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("imageId"), QStringLiteral("sha256:aaaa")},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "ImageDetail failed to instantiate");
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    m_backend->completeRefresh();
+
+    DetailListModel *layers = m_stubKcm->controller()->imageDetail()->layers();
+    QCOMPARE(layers->totalCount(), 12);
+    QCOMPARE(layers->count(), 5);
+    QCOMPARE(layers->limit(), 5);
+
+    QVERIFY(QMetaObject::invokeMethod(page, "toggleLayers"));
+    QCOMPARE(layers->limit(), 0);
+    QCOMPARE(layers->count(), 12);
+
+    QVERIFY(QMetaObject::invokeMethod(page, "toggleLayers"));
+    QCOMPARE(layers->limit(), 5);
+    QCOMPARE(layers->count(), 5);
+}
+
+/*!
+ * ARCH_V3_pre §1.8：键盘导航与无障碍不能因为三期重构而退化。
+ *
+ * 这里断言的是「可聚焦 / 有可访问名」这些机器可查的部分；
+ * 焦点框的实际可见性仍需要人工走查（见 ARCH_V3 §5.3）。
+ */
+void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
+{
+    Container container;
+    container.id = QStringLiteral("cid-1");
+    container.name = QStringLiteral("demo");
+    container.image = QStringLiteral("alpine:latest");
+    container.state = ContainerState::Running;
+    container.created = QDateTime::currentDateTimeUtc().addSecs(-120);
+    m_backend->setContainers({container});
+
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:latest")};
+    image.inUse = true;
+    image.containerCount = 1;
+    m_backend->setImages({image});
+
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(900, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(900);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    for (const QString &viewName : {QStringLiteral("containerView"), QStringLiteral("imageView")}) {
+        QQuickItem *view = childByObjectName(page, viewName);
+        QVERIFY2(view, qPrintable(viewName));
+        QVERIFY2(view->property("activeFocusOnTab").toBool(), qPrintable(viewName + QStringLiteral(" must be reachable with Tab")));
+        QVERIFY2(view->property("keyNavigationEnabled").toBool(), qPrintable(viewName + QStringLiteral(" must support arrow-key navigation")));
+    }
+
+    // 统计卡：颜色之外必须有可访问名（§1.8 三重编码）
+    QQuickItem *tile = childByObjectName(page, QStringLiteral("statTile"));
+    if (tile) {
+        const QString accessibleName = tile->property("Accessible.name").toString();
+        QVERIFY2(!accessibleName.isEmpty(), "stat tiles need an accessible name");
+    }
+}
+
+QTEST_MAIN(QmlLoadTest)
 #include "tst_qml_load.moc"

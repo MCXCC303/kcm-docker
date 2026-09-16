@@ -50,6 +50,12 @@ class StatusController : public QObject
     Q_PROPERTY(QString containersStateKey READ containersStateKey NOTIFY containersStateChanged)
     Q_PROPERTY(QString imagesStateKey READ imagesStateKey NOTIFY imagesStateChanged)
     Q_PROPERTY(QString storageStateKey READ storageStateKey NOTIFY storageStateChanged)
+    /*!
+     * Engine 连接状态的语义与图标（ARCH_V3 §2.1：语义判断属于 model 层，
+     * QML 只把语义 key 翻译成主题颜色，不再自己 switch 状态字符串）。
+     */
+    Q_PROPERTY(QString engineStateSemanticKey READ engineStateSemanticKey NOTIFY engineStateChanged)
+    Q_PROPERTY(QString engineStateIconName READ engineStateIconName NOTIFY engineStateChanged)
 
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString engineError READ engineError NOTIFY engineErrorChanged)
@@ -140,6 +146,15 @@ public:
     QString containersStateKey() const;
     QString imagesStateKey() const;
     QString storageStateKey() const;
+    /*!
+     * Engine 状态的语义 key（positive / neutral / negative / disabled）。
+     *
+     * 注意 Partial 是「已连接，但 /info 概要读不到」——属于降级而非失败，
+     * 因此是 neutral（警告）而不是 negative（错误）。
+     */
+    QString engineStateSemanticKey() const;
+    /*! Engine 状态的图标名（icon theme name）。 */
+    QString engineStateIconName() const;
 
     bool busy() const
     {

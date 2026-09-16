@@ -2,9 +2,13 @@
     SPDX-FileCopyrightText: 2026 kontainer developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Kontainer 首页（ARCH_V2 §5）：Engine 状态 + Overview + Storage + 容器/镜像列表。
+    Kontainer 首页（ARCH_V2 §5 / ARCH_V3 §2）：Engine 状态 + Overview + Storage + 容器/镜像列表。
 
     由 main.qml 放进 StackView 作为根页面；卡片激活时发出信号，由 main.qml 负责导航。
+
+    ARCH_V3 §2.1：本文件不做任何状态语义判断——
+    状态语义（positive/neutral/negative）与图标名全部来自 C++（StatusController / Presentation），
+    这里只负责排版与文案。
 */
 
 import QtQuick
@@ -27,38 +31,41 @@ Kirigami.Page {
     signal containerActivated(string containerId)
     signal imageActivated(string imageId)
 
-    /*! Overview 统计块（纯展示层聚合） */
-    readonly property bool countsReady: controller.engine.countsAvailable
+    /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
     readonly property var tiles: [
         {
             label: i18n("Containers"),
             value: controller.engine.containerTotal,
-            icon: "application-x-executable"
+            icon: "application-x-executable",
+            semanticKey: ""
         },
         {
             label: i18n("Running"),
             value: controller.engine.containersRunning,
             icon: "media-playback-start",
-            accent: Kirigami.Theme.positiveTextColor
+            semanticKey: "positive"
         },
         {
             label: i18n("Paused"),
             value: controller.engine.containersPaused,
             icon: "media-playback-pause",
-            accent: Kirigami.Theme.neutralTextColor
+            semanticKey: "neutral"
         },
         {
             label: i18n("Stopped"),
             value: controller.engine.containersStopped,
             icon: "media-playback-stop",
-            accent: Kirigami.Theme.negativeTextColor
+            semanticKey: "negative"
         },
         {
             label: i18n("Images"),
             value: controller.engine.imageCount,
-            icon: "image-x-generic"
+            icon: "image-x-generic",
+            semanticKey: ""
         }
     ]
+
+    readonly property bool countsReady: controller.engine.countsAvailable
 
     function engineStateText(stateKey: string): string {
         switch (stateKey) {
@@ -73,45 +80,77 @@ Kirigami.Page {
         }
     }
 
-    function engineStateIcon(stateKey: string): string {
-        switch (stateKey) {
-        case "ready":
-        case "refreshing":
-            return "dialog-ok-apply";
-        case "loading":
-            return "chronometer";
-        default:
-            return "dialog-error";
+    /* ------------------------------------------------------------------ */
+    /* 空状态（§33：四种情况必须区分；判定逻辑在页面，呈现交给组件）           */
+    /* ------------------------------------------------------------------ */
+
+    readonly property var containersEmptyState: {
+        if (root.containerList.count > 0 || root.controller.containersStateKey === "error") {
+            return {
+                message: "",
+                actionText: ""
+            };
         }
+        if (root.controller.containers.count === 0) {
+            return {
+                message: i18n("No containers found."),
+                actionText: ""
+            };
+        }
+        if (root.containerList.searchText.length > 0) {
+            return {
+                message: i18nc("@info no container matches the search", "No containers match “%1”.", root.containerList.searchText),
+                actionText: i18n("Clear search")
+            };
+        }
+        return {
+            message: i18n("No containers match the current filter."),
+            actionText: i18n("Show all containers")
+        };
     }
 
-    /* §33：四种空状态必须区分，不能混为一谈 */
-    function containersEmptyText(): string {
-        if (containerList.count > 0 || controller.containersStateKey === "error") {
-            return "";
+    readonly property var imagesEmptyState: {
+        if (root.imageList.count > 0 || root.controller.imagesStateKey === "error") {
+            return {
+                message: "",
+                actionText: ""
+            };
         }
-        if (controller.containers.count === 0) {
-            return i18n("No containers found.");
+        if (root.controller.images.count === 0) {
+            return {
+                message: i18n("No images found."),
+                actionText: ""
+            };
         }
-        if (containerList.searchText.length > 0) {
-            return i18nc("@info no container matches the search", "No containers match “%1”.", containerList.searchText);
+        if (root.imageList.searchText.length > 0) {
+            return {
+                message: i18nc("@info no image matches the search", "No images match “%1”.", root.imageList.searchText),
+                actionText: i18n("Clear search")
+            };
         }
-        return i18n("No containers match the current filter.");
+        return {
+            message: i18n("No images match the current filter."),
+            actionText: i18n("Show all images")
+        };
     }
 
-    function imagesEmptyText(): string {
-        if (imageList.count > 0 || controller.imagesStateKey === "error") {
-            return "";
-        }
-        if (controller.images.count === 0) {
-            return i18n("No images found.");
-        }
-        if (imageList.searchText.length > 0) {
-            return i18nc("@info no image matches the search", "No images match “%1”.", imageList.searchText);
-        }
-        return i18n("No images match the current filter.");
-    }
+    /*!
+        清空当前标签页的搜索与过滤条件。
 
+        注意：用户一旦在输入框里打过字，TextField.text 的声明式绑定就会被内部赋值打断
+        （这是 QQC2 的行为，不是本页的 bug），因此这里必须同时显式清空输入框与下拉框。
+    */
+    function clearCurrentTabFilters() {
+        if (tabBar.currentIndex === 0) {
+            root.containerList.searchText = "";
+            root.containerList.stateFilter = "all";
+        } else {
+            root.imageList.searchText = "";
+            root.imageList.useFilter = "all";
+        }
+        searchField.text = "";
+        filterBox.currentIndex = 0;
+    }
 
     contentItem: ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
@@ -124,36 +163,10 @@ Kirigami.Page {
             Layout.topMargin: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
 
-            Kirigami.Icon {
-                source: root.engineStateIcon(root.controller.engineStateKey)
-                color: {
-                    switch (root.controller.engineStateKey) {
-                    case "ready":
-                    case "refreshing":
-                        return Kirigami.Theme.positiveTextColor;
-                    case "loading":
-                        return Kirigami.Theme.textColor;
-                    default:
-                        return Kirigami.Theme.negativeTextColor;
-                    }
-                }
-                implicitWidth: Kirigami.Units.iconSizes.small
-                implicitHeight: Kirigami.Units.iconSizes.small
-            }
-            QQC2.Label {
+            Components.StatusChip {
+                semanticKey: root.controller.engineStateSemanticKey
+                iconName: root.controller.engineStateIconName
                 text: root.engineStateText(root.controller.engineStateKey)
-                font.bold: true
-                color: {
-                    switch (root.controller.engineStateKey) {
-                    case "ready":
-                    case "refreshing":
-                        return Kirigami.Theme.positiveTextColor;
-                    case "loading":
-                        return Kirigami.Theme.textColor;
-                    default:
-                        return Kirigami.Theme.negativeTextColor;
-                    }
-                }
             }
             QQC2.Label {
                 text: "•"
@@ -169,13 +182,13 @@ Kirigami.Page {
             QQC2.Label {
                 visible: root.controller.updateFailed
                 text: i18n("Update failed")
-                color: Kirigami.Theme.negativeTextColor
+                color: Components.StatusPalette.color("negative")
                 font: Kirigami.Theme.smallFont
             }
             QQC2.Label {
                 visible: root.controller.stale
                 text: i18n("Data is stale")
-                color: Kirigami.Theme.negativeTextColor
+                color: Components.StatusPalette.color("neutral")
                 font: Kirigami.Theme.smallFont
             }
 
@@ -236,9 +249,24 @@ Kirigami.Page {
                 width: overviewScroll.availableWidth
                 spacing: Kirigami.Units.smallSpacing
 
-                Flow {
+                /* 统计卡按窗口宽度重排（§1.2）：宽 5 列 / 中 3 列 / 窄 2 列。
+                   断点用 gridUnit 表达，不写裸像素。 */
+                GridLayout {
+                    id: tileGrid
+
                     Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
+                    columnSpacing: Kirigami.Units.smallSpacing
+                    rowSpacing: Kirigami.Units.smallSpacing
+
+                    columns: {
+                        if (tileGrid.width >= Kirigami.Units.gridUnit * 40) {
+                            return 5;
+                        }
+                        if (tileGrid.width >= Kirigami.Units.gridUnit * 26) {
+                            return 3;
+                        }
+                        return 2;
+                    }
 
                     Repeater {
                         model: root.tiles
@@ -246,10 +274,12 @@ Kirigami.Page {
                         delegate: Components.StatTile {
                             required property var modelData
 
+                            Layout.fillWidth: true
                             label: modelData.label
                             value: root.countsReady ? String(modelData.value) : i18n("—")
                             iconName: modelData.icon
-                            accent: modelData.accent !== undefined ? modelData.accent : Kirigami.Theme.textColor
+                            semanticKey: modelData.semanticKey
+                            tintWhenNonZero: true
                             tooltip: root.countsReady ? "" : i18n("Engine summary is unavailable")
                         }
                     }
@@ -443,12 +473,14 @@ Kirigami.Page {
                     text: i18n("Unable to retrieve the container list: %1", root.controller.containersError)
                 }
 
-                QQC2.Label {
+                Components.EmptyPlaceholder {
+                    objectName: "containersEmptyPlaceholder"
                     Layout.fillWidth: true
-                    visible: root.containersEmptyText().length > 0
-                    text: root.containersEmptyText()
-                    opacity: 0.7
-                    wrapMode: Text.WordWrap
+                    Layout.fillHeight: true
+                    message: root.containersEmptyState.message
+                    actionText: root.containersEmptyState.actionText
+                    actionIconName: "edit-clear"
+                    onActionTriggered: root.clearCurrentTabFilters()
                 }
 
                 ListView {
@@ -457,6 +489,7 @@ Kirigami.Page {
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    visible: root.containersEmptyState.message.length === 0
                     clip: true
                     // 后台刷新时保留旧数据与滚动位置（§32/§34）
                     property real savedContentY: 0
@@ -497,12 +530,14 @@ Kirigami.Page {
                     text: i18n("Unable to retrieve the image list: %1", root.controller.imagesError)
                 }
 
-                QQC2.Label {
+                Components.EmptyPlaceholder {
+                    objectName: "imagesEmptyPlaceholder"
                     Layout.fillWidth: true
-                    visible: root.imagesEmptyText().length > 0
-                    text: root.imagesEmptyText()
-                    opacity: 0.7
-                    wrapMode: Text.WordWrap
+                    Layout.fillHeight: true
+                    message: root.imagesEmptyState.message
+                    actionText: root.imagesEmptyState.actionText
+                    actionIconName: "edit-clear"
+                    onActionTriggered: root.clearCurrentTabFilters()
                 }
 
                 ListView {
@@ -511,6 +546,7 @@ Kirigami.Page {
 
                     Layout.fillWidth: true
                     Layout.fillHeight: true
+                    visible: root.imagesEmptyState.message.length === 0
                     clip: true
                     property real savedContentY: 0
                     model: root.imageList
