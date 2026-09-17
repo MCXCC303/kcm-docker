@@ -39,6 +39,7 @@ private Q_SLOTS:
     void pullsAnImageWhenExplicitlyRequested();
     void readsHistoricalLogsOfAnExistingContainer();
     void readsNetworkList();
+    void authCheckRequestIsWellFormed();
 };
 
 void DockerBackendIntegrationTest::initTestCase()
@@ -313,6 +314,36 @@ void DockerBackendIntegrationTest::readsNetworkList()
     }
     QVERIFY2(predefined >= 3, "bridge/host/none must be recognised as pre-defined");
     qInfo("read %d network(s), %d pre-defined", int(networks.size()), predefined);
+}
+
+/*!
+ * `/auth` 的请求形态（ARCH_V5_V8 §2.6 的实测修正）。
+ *
+ * **只读、且不涉及真实凭据**：用一个明显不存在的账号去问引擎，目的是区分
+ *   - 请求**格式**不对 → 引擎回 400 `invalid X-Registry-Auth ...`（曾经就是这样，导致"每个仓库都校验失败"）
+ *   - 格式对但凭据不对 → 401
+ *   - 格式对但引擎连不上仓库 → 500（超时措辞），我们归类为"仓库不可达"
+ * 因此这里断言的是"**不是**格式错误"，而不是"校验成功"。
+ */
+void DockerBackendIntegrationTest::authCheckRequestIsWellFormed()
+{
+    DockerBackend backend;
+    QSignalSpy checkedSpy(&backend, &DockerBackend::registryAuthChecked);
+
+    RegistryCredential bogus;
+    bogus.serverAddress = QStringLiteral("registry.example.com");
+    bogus.username = QStringLiteral("kontainer-not-a-real-account");
+    bogus.password = QStringLiteral("definitely-not-the-password");
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), bogus);
+    QTRY_VERIFY_WITH_TIMEOUT(checkedSpy.count() > 0, 30000);
+
+    const auto result = checkedSpy.at(0).at(1).value<DockerBackendInterface::AuthCheckResult>();
+    const QString detail = checkedSpy.at(0).at(2).toString();
+    QVERIFY2(!detail.contains(QLatin1String("invalid X-Registry-Auth")),
+             qPrintable(QStringLiteral("the credential payload must be accepted by the engine: ") + detail));
+    QVERIFY2(result != DockerBackendInterface::AuthCheckResult::Failed,
+             qPrintable(QStringLiteral("a well-formed request must not classify as a generic failure: ") + detail));
+    qInfo("auth check result=%d (1=invalid credentials, 2=unreachable)", int(result));
 }
 
 QTEST_GUILESS_MAIN(DockerBackendIntegrationTest)

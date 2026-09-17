@@ -72,6 +72,8 @@ Kirigami.PromptDialog {
         }
     ]
 
-    Accessible.name: dialog.headingText
-    Accessible.description: dialog.questionText
+    // 注意：Accessible 是**附加属性**，只能挂在 Item / Action 上。
+    // 挂在 Kirigami.PromptDialog（不是 Item）上会在运行时报
+    // "Accessible attached property must be attached to an object deriving from Item or Action"，
+    // 而且标题/正文本来就由对话框自己以可访问文本暴露，这里不需要再加。
 }

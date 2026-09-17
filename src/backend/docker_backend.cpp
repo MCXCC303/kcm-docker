@@ -866,6 +866,10 @@ bool looksLikeUnreachableRegistry(const QString &detail)
         QStringLiteral("server misbehaving"),
         QStringLiteral("network is unreachable"),
         QStringLiteral("lookup "),
+        // 实测：仓库不可达时引擎回 500，原文是 context deadline exceeded /
+        // request canceled while waiting for connection（超时措辞，不带 dial tcp）
+        QStringLiteral("context deadline exceeded"),
+        QStringLiteral("awaiting headers"),
     };
     const QString lowered = detail.toLower();
     for (const QString &hint : hints) {
@@ -898,15 +902,30 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
 
     // 没握手时先等版本协商：`/auth` 同样需要版本前缀，否则新后端上的第一次校验会打到不带版本的路径
     withApiVersion(Section::Engine, [this, address, credential] {
-        // 头里的 serveraddress 以调用方给的仓库为准：界面上的"仓库 + 用户名密码"是两个字段，
+        // serveraddress 以调用方给的仓库为准：界面上的"仓库 + 用户名密码"是两个字段，
         // 凭据结构里的同名字段只在参数为空时兜底，避免两者不一致时把凭据发给错误的仓库
         RegistryCredential outgoing = credential;
         outgoing.serverAddress = address;
-        QMap<QByteArray, QByteArray> headers;
-        headers.insert(QByteArrayLiteral("X-Registry-Auth"), RegistryAuth::encode(outgoing));
 
-        // 凭据只在请求头里：query 与请求体都不带它（不进日志、不进 URL）
-        DockerReply *reply = m_client.post(ApiPaths::auth(), QUrlQuery(), authCheckTimeoutMs(), headers);
+        // **凭据放在请求体里**（与 docker CLI 一致）：实测引擎只认 body —— 只发
+        // `X-Registry-Auth` 头、body 为空时它会回 400 `invalid X-Registry-Auth header: invalid JSON: EOF`，
+        // 于是"每个仓库都校验失败"。体里也带服务器地址，避免引擎把它当成别的仓库。
+        QJsonObject payload;
+        payload.insert(QStringLiteral("username"), outgoing.username);
+        if (!outgoing.password.isEmpty()) {
+            payload.insert(QStringLiteral("password"), outgoing.password);
+        }
+        if (!outgoing.identityToken.isEmpty()) {
+            payload.insert(QStringLiteral("identitytoken"), outgoing.identityToken);
+        }
+        payload.insert(QStringLiteral("serveraddress"), RegistryAuth::headerServerAddress(address));
+
+        // 凭据只在请求体里：不进 URL、不进日志（DockerClient 只记录方法与路径）
+        DockerReply *reply = m_client.post(ApiPaths::auth(),
+                                           QUrlQuery(),
+                                           authCheckTimeoutMs(),
+                                           {},
+                                           QJsonDocument(payload).toJson(QJsonDocument::Compact));
         connect(reply, &DockerReply::finished, this, [this, reply, address] {
             const DockerError error = reply->error();
             // 失败时 reply->httpStatus() 是 0（它只在成功路径上被赋值），状态码在错误对象里

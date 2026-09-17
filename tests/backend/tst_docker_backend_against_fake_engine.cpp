@@ -450,7 +450,7 @@ private Q_SLOTS:
     void removeImageSendsForceFlag();
     void mutationWaitsForApiVersionHandshake();
     void concurrentPullsAreIndependent();
-    void authCheckSendsCredentialsOnlyInTheHeader();
+    void authCheckSendsCredentialsInTheRequestBody();
     void authCheckClassifiesFailures();
     void pullSendsCredentialsOnlyWhenPresent();
     void networksAreListedFromTheEngine();
@@ -484,8 +484,11 @@ RegistryCredential sampleCredential()
 } // namespace
 
 /*!
- * 凭据**只能**出现在 `X-Registry-Auth` 头里：不进 URL（query 里没有）、不进请求体。
- * 同时头本身必须是 Docker 认的 base64url(JSON)——假引擎把头原样记下来供断言。
+ * 凭据放在**请求体**里（与 docker CLI 一致），不进 URL。
+ *
+ * 实测教训：只发 `X-Registry-Auth` 头、body 为空时，引擎回
+ * `400 invalid X-Registry-Auth header: invalid JSON: EOF` —— 于是"每个仓库都校验失败"。
+ * 假引擎把请求体原样记下来供断言。
  */
 /*!
  * 私有仓库拉取：凭据只走 `X-Registry-Auth` 头，且 `serveraddress` 必须是**镜像所在仓库**
@@ -683,7 +686,7 @@ void DockerBackendFakeEngineTest::pullSendsCredentialsOnlyWhenPresent()
     QCOMPARE(decoded.serverAddress, QStringLiteral("registry.example.com:5000"));
 }
 
-void DockerBackendFakeEngineTest::authCheckSendsCredentialsOnlyInTheHeader()
+void DockerBackendFakeEngineTest::authCheckSendsCredentialsInTheRequestBody()
 {
     DockerBackend backend;
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
@@ -698,18 +701,13 @@ void DockerBackendFakeEngineTest::authCheckSendsCredentialsOnlyInTheHeader()
     QCOMPARE(request.path, QStringLiteral("/v1.56/auth"));
     QVERIFY2(request.query.isEmpty(), "credentials must never appear in the URL");
     QVERIFY2(!request.headers.contains("s3cret"), "the raw password must never be sent in a header");
-    QVERIFY(request.headers.contains("X-Registry-Auth: "));
 
-    // 头的内容必须能解回同一条凭据（含规范化后的 serveraddress）
-    const QByteArray headerBlock = request.headers;
-    const int headerStart = headerBlock.indexOf("X-Registry-Auth: ") + int(qstrlen("X-Registry-Auth: "));
-    const QByteArray headerValue = headerBlock.mid(headerStart).split('\r').value(0);
-    QString errorKey;
-    const RegistryCredential decoded = RegistryAuth::decode(headerValue, &errorKey);
-    QVERIFY2(errorKey.isEmpty(), qPrintable(errorKey));
-    QCOMPARE(decoded.username, QStringLiteral("alice"));
-    QCOMPARE(decoded.password, QStringLiteral("s3cret"));
-    QCOMPARE(decoded.serverAddress, QStringLiteral("registry.example.com"));
+    // 体里就是 docker CLI 用的那种 JSON（键名与引擎一致）
+    const QJsonObject payload = QJsonDocument::fromJson(request.body).object();
+    QCOMPARE(payload.value(QStringLiteral("username")).toString(), QStringLiteral("alice"));
+    QCOMPARE(payload.value(QStringLiteral("password")).toString(), QStringLiteral("s3cret"));
+    // serveraddress 用调用方给的仓库（不是凭据结构里那个 index.docker.io）
+    QCOMPARE(payload.value(QStringLiteral("serveraddress")).toString(), QStringLiteral("registry.example.com"));
 
     // 结果：成功，且回报的是规范化后的仓库地址
     QCOMPARE(checkedSpy.at(0).at(0).toString(), QStringLiteral("registry.example.com"));
@@ -736,19 +734,26 @@ void DockerBackendFakeEngineTest::authCheckClassifiesFailures()
     QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 2, 10000);
     QCOMPARE(checkedSpy.at(1).at(1).value<AuthResult>(), AuthResult::RegistryUnreachable);
 
+    // 500 且原文是超时措辞（实测：引擎连不上仓库时就这样回）：归到"仓库不可达"
+    m_engine->setPathStatus(QStringLiteral("/auth"), 500,
+                            QByteArrayLiteral("{\"message\":\"Get \\\"https://registry-1.docker.io/v2/\\\": context deadline exceeded\"}"));
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 3, 10000);
+    QCOMPARE(checkedSpy.at(2).at(1).value<AuthResult>(), AuthResult::RegistryUnreachable);
+
     // 500 但看不出网络线索：普通失败（不乱猜）
     m_engine->setPathStatus(QStringLiteral("/auth"), 500, QByteArrayLiteral("{\"message\":\"something else went wrong\"}"));
     backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
-    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 3, 10000);
-    QCOMPARE(checkedSpy.at(2).at(1).value<AuthResult>(), AuthResult::Failed);
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 4, 10000);
+    QCOMPARE(checkedSpy.at(3).at(1).value<AuthResult>(), AuthResult::Failed);
 
     // 参数不全：不发请求，直接给出"凭据不对"
     const int requestsBefore = m_engine->requests().size();
     RegistryCredential incomplete;
     incomplete.serverAddress = QStringLiteral("registry.example.com");
     backend.checkRegistryAuth(QStringLiteral("registry.example.com"), incomplete);
-    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 4, 10000);
-    QCOMPARE(checkedSpy.at(3).at(1).value<AuthResult>(), AuthResult::InvalidCredentials);
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 5, 10000);
+    QCOMPARE(checkedSpy.at(4).at(1).value<AuthResult>(), AuthResult::InvalidCredentials);
     QCOMPARE(m_engine->requests().size(), requestsBefore);
 }
 
