@@ -37,6 +37,8 @@ public:
         QString method;
         QString path;
         QString query;
+        /*! 原始请求头块（`\r\n` 分隔，未含请求行）：认证用例要断言 `X-Registry-Auth` 的内容。 */
+        QByteArray headers;
     };
 
     explicit FakeEngine(QObject *parent = nullptr)
@@ -159,7 +161,8 @@ private:
                     return;
                 }
                 const QString method = QString::fromLatin1(parts.at(0));
-                respond(socket, method, QString::fromLatin1(parts.at(1)));
+                const QByteArray headers = buffer->mid(requestLine.size() + 2, headerEnd - requestLine.size() - 2);
+                respond(socket, method, QString::fromLatin1(parts.at(1)), headers);
             });
             connect(socket, &QLocalSocket::disconnected, socket, &QLocalSocket::deleteLater);
         }
@@ -174,12 +177,12 @@ private:
         return path;
     }
 
-    void respond(QLocalSocket *socket, const QString &method, const QString &rawTarget)
+    void respond(QLocalSocket *socket, const QString &method, const QString &rawTarget, const QByteArray &headers = {})
     {
         const QString path = rawTarget.section(QLatin1Char('?'), 0, 0);
         const QString query = rawTarget.section(QLatin1Char('?'), 1, 1);
         m_counts[path] += 1;
-        m_requests.append({method, path, query});
+        m_requests.append({method, path, query, headers});
         const QString bare = withoutVersionPrefix(path);
 
         if (const auto override = m_overrides.constFind(bare); override != m_overrides.constEnd()) {
@@ -418,10 +421,103 @@ private Q_SLOTS:
     void removeImageSendsForceFlag();
     void mutationWaitsForApiVersionHandshake();
     void concurrentPullsAreIndependent();
+    void authCheckSendsCredentialsOnlyInTheHeader();
+    void authCheckClassifiesFailures();
 
 private:
     FakeEngine *m_engine = nullptr;
 };
+
+/* ============================================================================
+ * 仓库凭据校验（ARCH_V5_V8 §2.6）
+ * ==========================================================================*/
+
+namespace
+{
+using AuthResult = DockerBackendInterface::AuthCheckResult;
+
+RegistryCredential sampleCredential()
+{
+    RegistryCredential credential;
+    credential.serverAddress = QStringLiteral("https://index.docker.io/v1/");
+    credential.username = QStringLiteral("alice");
+    credential.password = QStringLiteral("s3cret");
+    return credential;
+}
+} // namespace
+
+/*!
+ * 凭据**只能**出现在 `X-Registry-Auth` 头里：不进 URL（query 里没有）、不进请求体。
+ * 同时头本身必须是 Docker 认的 base64url(JSON)——假引擎把头原样记下来供断言。
+ */
+void DockerBackendFakeEngineTest::authCheckSendsCredentialsOnlyInTheHeader()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    m_engine->setPathStatus(QStringLiteral("/auth"), 200, QByteArrayLiteral("{\"Status\":\"Login Succeeded\"}"));
+
+    QSignalSpy checkedSpy(&backend, &DockerBackend::registryAuthChecked);
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 1, 10000);
+
+    const FakeEngine::RequestRecord request = m_engine->lastRequest();
+    QCOMPARE(request.method, QStringLiteral("POST"));
+    QCOMPARE(request.path, QStringLiteral("/v1.56/auth"));
+    QVERIFY2(request.query.isEmpty(), "credentials must never appear in the URL");
+    QVERIFY2(!request.headers.contains("s3cret"), "the raw password must never be sent in a header");
+    QVERIFY(request.headers.contains("X-Registry-Auth: "));
+
+    // 头的内容必须能解回同一条凭据（含规范化后的 serveraddress）
+    const QByteArray headerBlock = request.headers;
+    const int headerStart = headerBlock.indexOf("X-Registry-Auth: ") + int(qstrlen("X-Registry-Auth: "));
+    const QByteArray headerValue = headerBlock.mid(headerStart).split('\r').value(0);
+    QString errorKey;
+    const RegistryCredential decoded = RegistryAuth::decode(headerValue, &errorKey);
+    QVERIFY2(errorKey.isEmpty(), qPrintable(errorKey));
+    QCOMPARE(decoded.username, QStringLiteral("alice"));
+    QCOMPARE(decoded.password, QStringLiteral("s3cret"));
+    QCOMPARE(decoded.serverAddress, QStringLiteral("registry.example.com"));
+
+    // 结果：成功，且回报的是规范化后的仓库地址
+    QCOMPARE(checkedSpy.at(0).at(0).toString(), QStringLiteral("registry.example.com"));
+    QCOMPARE(checkedSpy.at(0).at(1).value<AuthResult>(), AuthResult::Succeeded);
+}
+
+void DockerBackendFakeEngineTest::authCheckClassifiesFailures()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    QSignalSpy checkedSpy(&backend, &DockerBackend::registryAuthChecked);
+
+    // 401：用户名/密码不对（引擎原文里可能只有 unauthorized）
+    m_engine->setPathStatus(QStringLiteral("/auth"), 401,
+                            QByteArrayLiteral("{\"message\":\"unauthorized: incorrect username or password\"}"));
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 1, 10000);
+    QCOMPARE(checkedSpy.at(0).at(1).value<AuthResult>(), AuthResult::InvalidCredentials);
+
+    // 500 且原文是网络错误：归到"仓库不可达"（界面要提示查网络/代理，而不是"密码错了"）
+    m_engine->setPathStatus(QStringLiteral("/auth"), 500,
+                            QByteArrayLiteral("{\"message\":\"dial tcp: lookup registry.invalid: no such host\"}"));
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 2, 10000);
+    QCOMPARE(checkedSpy.at(1).at(1).value<AuthResult>(), AuthResult::RegistryUnreachable);
+
+    // 500 但看不出网络线索：普通失败（不乱猜）
+    m_engine->setPathStatus(QStringLiteral("/auth"), 500, QByteArrayLiteral("{\"message\":\"something else went wrong\"}"));
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 3, 10000);
+    QCOMPARE(checkedSpy.at(2).at(1).value<AuthResult>(), AuthResult::Failed);
+
+    // 参数不全：不发请求，直接给出"凭据不对"
+    const int requestsBefore = m_engine->requests().size();
+    RegistryCredential incomplete;
+    incomplete.serverAddress = QStringLiteral("registry.example.com");
+    backend.checkRegistryAuth(QStringLiteral("registry.example.com"), incomplete);
+    QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 4, 10000);
+    QCOMPARE(checkedSpy.at(3).at(1).value<AuthResult>(), AuthResult::InvalidCredentials);
+    QCOMPARE(m_engine->requests().size(), requestsBefore);
+}
 
 void DockerBackendFakeEngineTest::initTestCase()
 {

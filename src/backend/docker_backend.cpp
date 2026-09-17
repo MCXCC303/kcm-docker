@@ -778,6 +778,104 @@ void DockerBackend::removeImage(const QString &id, bool force)
     });
 }
 
+namespace
+{
+/*!
+ * 引擎把"联系不上仓库"包在 5xx 里返回（DNS / 连接被拒 / TLS / 代理 / 超时），
+ * 与"凭据不对"（401/403）在状态码上是分开的，但都可能是 5xx。
+ *
+ * 这是**启发式**：只认引擎（Go）网络栈的稳定措辞，认不出来就归到普通失败，
+ * 不会因为猜错而把"用户名密码错误"说成"仓库不可达"。
+ */
+bool looksLikeUnreachableRegistry(const QString &detail)
+{
+    static const QStringList hints = {
+        QStringLiteral("no such host"),
+        QStringLiteral("dial tcp"),
+        QStringLiteral("connect: connection refused"),
+        QStringLiteral("i/o timeout"),
+        QStringLiteral("tls handshake timeout"),
+        QStringLiteral("proxyconnect"),
+        QStringLiteral("certificate"),
+        QStringLiteral("server misbehaving"),
+        QStringLiteral("network is unreachable"),
+        QStringLiteral("lookup "),
+    };
+    const QString lowered = detail.toLower();
+    for (const QString &hint : hints) {
+        if (lowered.contains(hint)) {
+            return true;
+        }
+    }
+    return false;
+}
+} // namespace
+
+int DockerBackend::authCheckTimeoutMs() const
+{
+    // 引擎要真的去联系仓库：与写操作同一个量级，避免用户干等
+    return mutationTimeoutMs();
+}
+
+void DockerBackend::checkRegistryAuth(const QString &serverAddress, const RegistryCredential &credential)
+{
+    const QString address = RegistryAuth::normalizeServerAddress(serverAddress.isEmpty() ? credential.serverAddress : serverAddress);
+    if (address.isEmpty() || credential.isEmpty()) {
+        // 参数不全就不发请求：既省一次往返，也避免把半个凭据发出去
+        Q_EMIT registryAuthChecked(address, AuthCheckResult::InvalidCredentials, QStringLiteral("incomplete credentials"));
+        return;
+    }
+    if (RegistryAuth::encode(credential).isEmpty()) {
+        Q_EMIT registryAuthChecked(address, AuthCheckResult::InvalidCredentials, QStringLiteral("cannot encode credentials"));
+        return;
+    }
+
+    // 没握手时先等版本协商：`/auth` 同样需要版本前缀，否则新后端上的第一次校验会打到不带版本的路径
+    withApiVersion(Section::Engine, [this, address, credential] {
+        // 头里的 serveraddress 以调用方给的仓库为准：界面上的"仓库 + 用户名密码"是两个字段，
+        // 凭据结构里的同名字段只在参数为空时兜底，避免两者不一致时把凭据发给错误的仓库
+        RegistryCredential outgoing = credential;
+        outgoing.serverAddress = address;
+        QMap<QByteArray, QByteArray> headers;
+        headers.insert(QByteArrayLiteral("X-Registry-Auth"), RegistryAuth::encode(outgoing));
+
+        // 凭据只在请求头里：query 与请求体都不带它（不进日志、不进 URL）
+        DockerReply *reply = m_client.post(ApiPaths::auth(), QUrlQuery(), authCheckTimeoutMs(), headers);
+        connect(reply, &DockerReply::finished, this, [this, reply, address] {
+            const DockerError error = reply->error();
+            // 失败时 reply->httpStatus() 是 0（它只在成功路径上被赋值），状态码在错误对象里
+            const int status = error.httpStatus() > 0 ? error.httpStatus() : reply->httpStatus();
+            reply->deleteLater();
+
+            AuthCheckResult result = AuthCheckResult::Failed;
+            switch (error.kind()) {
+            case DockerError::Kind::None:
+                result = AuthCheckResult::Succeeded;
+                break;
+            case DockerError::Kind::PermissionDenied:
+                // 401/403：用户名、密码或令牌不对
+                result = AuthCheckResult::InvalidCredentials;
+                break;
+            case DockerError::Kind::Timeout:
+            case DockerError::Kind::ConnectionFailed:
+            case DockerError::Kind::DockerUnavailable:
+                result = AuthCheckResult::RegistryUnreachable;
+                break;
+            default:
+                result = (status >= 500 && looksLikeUnreachableRegistry(error.detail())) ? AuthCheckResult::RegistryUnreachable
+                                                                                        : AuthCheckResult::Failed;
+                break;
+            }
+
+            // detail 是引擎原文：只用于日志与"技术细节"，不当作用户文案
+            if (result != AuthCheckResult::Succeeded) {
+                qCWarning(kontainerApi) << "registry auth check failed for" << address << "result" << int(result) << "status" << status;
+            }
+            Q_EMIT registryAuthChecked(address, result, error.detail());
+        });
+    });
+}
+
 void DockerBackend::pullImage(const QString &reference)
 {
     const QString targetKey = OperationTarget::image(ImageReference::normalized(reference));

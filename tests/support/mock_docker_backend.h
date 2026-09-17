@@ -102,6 +102,26 @@ public:
     void cancelImagePull(const QString &reference) override;
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
+    void checkRegistryAuth(const QString &serverAddress, const Kontainer::RegistryCredential &credential) override;
+
+    /* --- 认证校验的注入与观察（ARCH_V5_V8 §2.6） --- */
+
+    /*! 下线一次校验的结果（默认成功）。 */
+    void setAuthCheckResult(AuthCheckResult result, const QString &detail = {});
+    /*! 把已排队的校验结果发出去（模拟引擎在那之后才回应）。 */
+    void completeAuthCheck();
+    QString lastAuthServerAddress() const
+    {
+        return m_lastAuthServerAddress;
+    }
+    RegistryCredential lastAuthCredential() const
+    {
+        return m_lastAuthCredential;
+    }
+    int authCheckCount() const
+    {
+        return m_authCheckCount;
+    }
     bool isLoading() const override;
     bool isRefreshingFastData() const override;
     QString endpointDisplayName() const override;
@@ -126,6 +146,12 @@ private:
     ContainerStats m_containerStats;
     QString m_endpointName = QStringLiteral("unix:///mock/docker.sock");
     QSet<QString> m_statsWanted;
+    AuthCheckResult m_authCheckResult = AuthCheckResult::Succeeded;
+    QString m_authCheckDetail;
+    bool m_authCheckPending = false;
+    QString m_lastAuthServerAddress;
+    RegistryCredential m_lastAuthCredential;
+    int m_authCheckCount = 0;
 
     bool m_loading = false;
     QHash<int, bool> m_pending;

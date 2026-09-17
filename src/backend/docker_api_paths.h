@@ -83,6 +83,18 @@ inline QString imageCreate()
     return QStringLiteral("/images/create");
 }
 /*!
+ * 校验仓库凭据（`POST /auth`，ARCH_V5_V8 §2.6）。
+ *
+ * 凭据走 `X-Registry-Auth` 头：本机 API 1.56 实测，请求畸形时引擎回的是
+ * `invalid X-Registry-Auth header: …`，说明它读的是头（而不是 body）。
+ * 因此这里既不带 query 也不带请求体——凭据绝不出现在 URL 里。
+ */
+inline QString auth()
+{
+    return QStringLiteral("/auth");
+}
+
+/*!
  * 删除镜像。
  *
  * `name` 可以是 `<repo>:<tag>`（只删该标签）或镜像 ID（删整个镜像，多标签时引擎返回 409）。

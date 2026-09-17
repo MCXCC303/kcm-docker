@@ -7,6 +7,7 @@
 
 #include "backend/docker_endpoint.h"
 #include "backend/docker_error.h"
+#include "backend/registry_auth.h"
 #include "domain/container.h"
 #include "domain/container_detail.h"
 #include "domain/container_stats.h"
@@ -78,6 +79,23 @@ public:
     };
     Q_ENUM(Mutation)
 
+    /*!
+     * 仓库凭据校验的结果（ARCH_V5_V8 §2.6）。
+     *
+     * 分四类而不是"成功/失败"：界面要给出的下一步完全不同——
+     * 凭据错让人重填，仓库不可达让人查网络/代理，引擎不可用则不是用户能修的。
+     */
+    enum class AuthCheckResult {
+        Succeeded,
+        /*! 401/403：用户名、密码或令牌不对。 */
+        InvalidCredentials,
+        /*! 引擎联系不上仓库（DNS / 连接被拒 / TLS / 代理 / 超时）。 */
+        RegistryUnreachable,
+        /*! 其他失败（引擎自身 5xx、响应无法解析等）。 */
+        Failed,
+    };
+    Q_ENUM(AuthCheckResult)
+
     /*! 取消不是错误，因此结果不能只看 DockerError（ARCH_V4 §2.2.1）。 */
     enum class MutationOutcome {
         Succeeded,
@@ -139,6 +157,16 @@ public:
     /*! `force=true` 用于多标签镜像的强制删除（引擎在 409 时要求）。 */
     virtual void removeImage(const QString &id, bool force) = 0;
 
+    /*!
+     * 校验一条仓库凭据（`POST /auth`）。
+     *
+     * 凭据**只走请求头**、只用于这一次请求：不落盘、不进日志、不进错误文案。
+     * `serverAddress` 是"要校验哪个仓库"，它决定头里的 `serveraddress` 字段
+     * （凭据结构里的同名字段只在参数为空时兜底）。
+     * 结果经 `registryAuthChecked()` 回来（异步）。
+     */
+    virtual void checkRegistryAuth(const QString &serverAddress, const Kontainer::RegistryCredential &credential) = 0;
+
     /*! 当前端点：权限门（DockerCapabilities）据此判断可写性。 */
     virtual DockerEndpoint endpoint() const = 0;
 
@@ -185,6 +213,16 @@ Q_SIGNALS:
                           const Kontainer::DockerError &error);
     /*! 拉取进度（引擎每报告一行就聚合一次）。 */
     void imagePullProgress(const Kontainer::ImagePullProgress &progress);
+
+    /*!
+     * 仓库凭据校验的结果。
+     *
+     * `detail` 是引擎原文，只用于日志与"技术细节"（可能含仓库返回的文本），
+     * 不当作用户文案——界面按 `result` 取自己的文案。
+     */
+    void registryAuthChecked(const QString &serverAddress,
+                             Kontainer::DockerBackendInterface::AuthCheckResult result,
+                             const QString &detail);
 };
 
 } // namespace Kontainer

@@ -224,6 +224,31 @@ void MockDockerBackend::removeImage(const QString &id, bool force)
     m_mutationCalls.append({Mutation::RemoveImage, QStringLiteral("image:") + id, force});
 }
 
+void MockDockerBackend::checkRegistryAuth(const QString &serverAddress, const RegistryCredential &credential)
+{
+    ++m_authCheckCount;
+    m_lastAuthServerAddress = serverAddress;
+    m_lastAuthCredential = credential;
+    // 不立即回应：真实的 /auth 要等引擎去联系仓库，测试用 completeAuthCheck() 决定时序
+    if (m_authCheckResult == AuthCheckResult::Succeeded) {
+        completeAuthCheck();
+        return;
+    }
+    m_authCheckPending = true;
+}
+
+void MockDockerBackend::setAuthCheckResult(AuthCheckResult result, const QString &detail)
+{
+    m_authCheckResult = result;
+    m_authCheckDetail = detail;
+}
+
+void MockDockerBackend::completeAuthCheck()
+{
+    m_authCheckPending = false;
+    Q_EMIT registryAuthChecked(m_lastAuthServerAddress, m_authCheckResult, m_authCheckDetail);
+}
+
 void MockDockerBackend::completeRefresh()
 {
     const QList<Section> sections = {Section::Engine,

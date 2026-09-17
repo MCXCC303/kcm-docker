@@ -73,6 +73,8 @@ public:
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
 
+    void checkRegistryAuth(const QString &serverAddress, const Kontainer::RegistryCredential &credential) override;
+
     bool isLoading() const override;
     bool isRefreshingFastData() const override;
     QString endpointDisplayName() const override;
@@ -109,6 +111,10 @@ public:
 
 private:
     using ReadyCallback = std::function<void()>;
+
+    /*! `/auth` 的超时（引擎要联系仓库，与写操作同量级）。 */
+    int authCheckTimeoutMs() const;
+
 
     /* --- 镜像拉取（流式，可并发，ARCH_V4 §2.4） --- */
 
