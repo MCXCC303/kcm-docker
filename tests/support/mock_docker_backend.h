@@ -108,6 +108,16 @@ public:
 
     /*! 下线一次校验的结果（默认成功）。 */
     void setAuthCheckResult(AuthCheckResult result, const QString &detail = {});
+    /*!
+     * 是否延迟回应校验（默认 false = 立即回应）。
+     *
+     * 只有需要观察"校验进行中"的用例才打开它，否则每个用例都要记得补一次
+     * `completeAuthCheck()`，很容易写出假通过的测试。
+     */
+    void setAuthCheckDeferred(bool deferred)
+    {
+        m_authCheckDeferred = deferred;
+    }
     /*! 把已排队的校验结果发出去（模拟引擎在那之后才回应）。 */
     void completeAuthCheck();
     QString lastAuthServerAddress() const
@@ -154,6 +164,7 @@ private:
     AuthCheckResult m_authCheckResult = AuthCheckResult::Succeeded;
     QString m_authCheckDetail;
     bool m_authCheckPending = false;
+    bool m_authCheckDeferred = false;
     QString m_lastAuthServerAddress;
     RegistryCredential m_lastAuthCredential;
     int m_authCheckCount = 0;

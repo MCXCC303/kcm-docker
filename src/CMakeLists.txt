@@ -113,6 +113,10 @@ add_library(kontainer_core STATIC
     model/port_mapping_model.h
     model/presentation.cpp
     model/presentation.h
+    model/registry_auth_controller.cpp
+    model/registry_auth_controller.h
+    model/registry_credential_model.cpp
+    model/registry_credential_model.h
     model/qml_registration.cpp
     model/qml_registration.h
     model/refresh_scheduler.cpp

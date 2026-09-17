@@ -230,8 +230,8 @@ void MockDockerBackend::checkRegistryAuth(const QString &serverAddress, const Re
     ++m_authCheckCount;
     m_lastAuthServerAddress = serverAddress;
     m_lastAuthCredential = credential;
-    // 不立即回应：真实的 /auth 要等引擎去联系仓库，测试用 completeAuthCheck() 决定时序
-    if (m_authCheckResult == AuthCheckResult::Succeeded) {
+    // 默认立即回应；需要观察"进行中"的用例用 setAuthCheckDeferred(true) 自己控制时序
+    if (!m_authCheckDeferred) {
         completeAuthCheck();
         return;
     }

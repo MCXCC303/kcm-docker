@@ -180,6 +180,13 @@ void CredentialStoreTest::writeFailuresAreReported()
     nameless.serverAddress = QStringLiteral("registry.example.com");
     QVERIFY(!store.store(nameless, &errorKey));
     QCOMPARE(errorKey, QStringLiteral("noCredentials"));
+
+    // 只有用户名没有密码也不算：存进去只会得到一条"看起来有、其实用不了"的条目
+    RegistryCredential noPassword;
+    noPassword.serverAddress = QStringLiteral("registry.example.com");
+    noPassword.username = QStringLiteral("alice");
+    QVERIFY(!store.store(noPassword, &errorKey));
+    QCOMPARE(errorKey, QStringLiteral("noCredentials"));
     QVERIFY(!store.remove(QString(), &errorKey));
     QCOMPARE(errorKey, QStringLiteral("invalidServerAddress"));
 }

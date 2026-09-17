@@ -26,9 +26,21 @@ struct RegistryCredential {
     /*! 令牌登录（例如 CI 里发的 identity token）：给了它就不再发送用户名密码。 */
     QString identityToken;
 
+    /*!
+     * 是不是一条**完整**的凭据。
+     *
+     * 只有用户名没有密码不算：那既不能登录（引擎会 401），也不该被存进钱包
+     * （用户下次会看到一条"看起来有、其实用不了"的条目）。
+     */
     bool isEmpty() const
     {
-        return serverAddress.isEmpty() || (username.isEmpty() && identityToken.isEmpty());
+        if (serverAddress.isEmpty()) {
+            return true;
+        }
+        if (!identityToken.isEmpty()) {
+            return false;
+        }
+        return username.isEmpty() || password.isEmpty();
     }
     /*! 是否用令牌登录。 */
     bool usesIdentityToken() const
