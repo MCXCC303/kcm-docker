@@ -91,6 +91,7 @@ private Q_SLOTS:
     void instantiatesPages();
     void configPageEditorsWriteThroughToTheController();
     void configPageWordingAndLocksPerScope();
+    void topologyConnectionColorsAreStablePerContainer();
     void sensitiveSectionsAreCollapsedByDefault();
     void delegateActivationIsWired();
     void statusChipMapsSemanticKeys_data();
@@ -483,6 +484,38 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
     QVERIFY(systemHint->property("visible").toBool());
     QVERIFY2(systemHint->property("text").toString().contains(QStringLiteral("belongs to the system")),
              qPrintable(systemHint->property("text").toString()));
+}
+
+/*!
+ * 拓扑连线颜色必须"跟容器走"：同一个容器（同一份端口映射）永远得到同一组颜色，
+ * 不同容器则应换一组。颜色是装饰，但它一旦随机，用户会以为"这个容器变了"。
+ */
+void QmlLoadTest::topologyConnectionColorsAreStablePerContainer()
+{
+    const QString componentsPath = QStringLiteral("file://") + QStringLiteral(KONTAINER_SOURCE_DIR) + QStringLiteral("/src/ui/components");
+
+    // 直接问色板：同一个种子两次求值必须一致，不同种子（不同映射）应当能取到不同色位
+    QQmlComponent component(m_engine.get());
+    component.setData(QStringLiteral("import QtQuick\n"
+                                     "import \"%1\" as C\n"
+                                     "QtObject {\n"
+                                     "    property color sameSeedAgain: C.ChartPalette.connectionColor('cid-1|3000/tcp|0.0.0.0:20000')\n"
+                                     "    property color first: C.ChartPalette.connectionColor('cid-1|3000/tcp|0.0.0.0:20000')\n"
+                                     "    property color other: C.ChartPalette.connectionColor('cid-1|3001/tcp|0.0.0.0:20001')\n"
+                                     "    property color emptySeed: C.ChartPalette.connectionColor('')\n"
+                                     "}\n")
+                                     .arg(componentsPath)
+                                     .toUtf8(),
+                                 QUrl());
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> probe(component.create());
+    QVERIFY(!probe.isNull());
+
+    QCOMPARE(probe->property("sameSeedAgain").value<QColor>(), probe->property("first").value<QColor>());
+    QVERIFY2(probe->property("first").value<QColor>() != probe->property("other").value<QColor>(),
+             "different mappings of the same container should be able to differ");
+    // 还没拿到种子时退回中性色，而不是抛错或变成透明
+    QVERIFY(probe->property("emptySeed").value<QColor>().isValid());
 }
 
 void QmlLoadTest::loadsAllQmlFiles_data()
@@ -1747,11 +1780,24 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     }
 
     // 连线层只是装饰（QML 里标了 Accessible.ignored）：这里断言「信息不在图形里」——
-    // 每行的两侧芯片都必须是真实文本，屏幕阅读器与键盘用户完全不依赖连线
-    QQuickItem *links = childByObjectName(page, QStringLiteral("portTopologyLinks"));
-    QVERIFY2(links, "link layer not found");
-    QCOMPARE(links->width(), topology->width());
-    QCOMPARE(links->height(), topology->height());
+    // 每行的两侧芯片都必须是真实文本，屏幕阅读器与键盘用户完全不依赖连线。
+    // 连线现在是每行一张小 Canvas（颜色按"容器 id + 该映射自身"取，逐行可区分）
+    QSet<QString> linkColors;
+    int linkLayers = 0;
+    std::function<void(QQuickItem *)> collectLinks = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            if (child->objectName() == QLatin1String("portMappingLink")) {
+                ++linkLayers;
+                QCOMPARE(child->width(), child->parentItem()->width());
+                QCOMPARE(child->height(), child->parentItem()->height());
+                linkColors.insert(child->property("linkColor").value<QColor>().name());
+            }
+            collectLinks(child);
+        }
+    };
+    collectLinks(topology);
+    QCOMPARE(linkLayers, 3);
+    QVERIFY2(linkColors.size() >= 2, "links of different mappings must be distinguishable");
 
     int nonEmptyChips = 0;
     std::function<void(QQuickItem *)> checkText = [&](QQuickItem *item) {

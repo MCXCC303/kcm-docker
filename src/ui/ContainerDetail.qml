@@ -591,6 +591,8 @@ KCM.AbstractKCM {
                         model: page.controller.publishedPorts
                         containerLabel: page.controller.name.length > 0 ? page.controller.name : i18n("Container")
                         hostLabel: page.engineHostName
+                        // 同一个容器永远同色：种子就是容器 id（ARCH_V4 §2.1.2）
+                        colorSeed: page.controller.containerId
                     }
 
                     /* 只 EXPOSE、没有映射到宿主的端口：没有宿主端点，因此不画线 */

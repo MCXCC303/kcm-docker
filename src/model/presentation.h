@@ -25,6 +25,18 @@ class Presentation : public QObject
 public:
     explicit Presentation(QObject *parent = nullptr);
 
+    /*!
+     * 由种子字符串取一个稳定的调色板下标（端口拓扑连线用）。
+     *
+     * 用途：让"同一个容器"的节点图连线颜色始终一致（ARCH_V4 §2.1.2 的观感约定）——
+     * 种子一般是容器 id，刷新、重开页面、换主题都不会变。颜色本身不承载语义
+     * （两端芯片的文字才是信息），因此只要求稳定、分布均匀、不要求可读性含义。
+     *
+     * 算法：FNV-1a（32 位）后取模，纯函数、跨平台一致，且不会随 Qt 版本变化。
+     * `paletteSize <= 0` 或种子为空时返回 0。
+     */
+    Q_INVOKABLE int connectionColorIndex(const QString &seed, int paletteSize) const;
+
     /*! 状态 + 健康 → 语义色 key：positive / neutral / negative / disabled。 */
     Q_INVOKABLE QString stateSemanticKey(const QString &stateKey, const QString &healthKey) const;
 

@@ -4,12 +4,16 @@
 
     端口映射拓扑（ARCH_V4 §2.1.2）。
 
-    形态：左列容器端口、右列宿主绑定，中间是连线，两列之上各有一个节点标题
-    （容器名 / 宿主主机名）。连线只是**装饰**——
+    形态：左列容器端口、右列宿主绑定，中间是一条**带端点圆点的彩色连线**，
+    两列之上各有一个节点标题（容器名 / 宿主主机名）。连线只是**装饰**——
 
       - 全部信息都写在芯片的文字里（`80/tcp` / `0.0.0.0:8080`）
       - 连线层 `Accessible.ignored`，键盘与屏幕阅读器完全不需要它
       - 未发布的端口没有宿主端点，因此不画线，由页面单独成组呈现
+
+    连线颜色由 `colorSeed`（容器 id）决定，同一个容器永远同色（见
+    `ChartPalette.connectionColor`）：颜色不表达任何语义，只让"同一个容器的图"
+    看起来是一体的；端口号与绑定地址由两侧芯片的文字承载，颜色不是唯一区分手段。
 
     为什么几何全部由 index 推导（而不是读取芯片的实际位置）：
     读测量值会引入「先测量 → 再布局 → 再画线」的一帧延迟，
@@ -38,6 +42,16 @@ Item {
     required property string containerLabel
     /*! 宿主节点标题（通常是 daemon 报告的宿主主机名）。 */
     required property string hostLabel
+    /*!
+     * 连线颜色的种子（通常传容器 id）。
+     *
+     * 同一个种子永远得到同一种颜色，因此刷新页面、重新打开详情、切换主题时，
+     * 同一个容器的拓扑不会变色。
+     */
+    property string colorSeed
+
+    /*! 本容器拓扑的连线颜色（由 `colorSeed` 决定）。 */
+    readonly property color connectionColor: Local.ChartPalette.connectionColor(topology.colorSeed)
 
     objectName: "portTopology"
 
@@ -49,52 +63,6 @@ Item {
     readonly property real chipColumnWidth: Math.ceil(Kirigami.Units.gridUnit * 9)
 
     implicitHeight: headerHeight + model.count * rowHeight
-
-    /* ---------- 连线层（先画，位于芯片之下） ---------- */
-    Canvas {
-        id: linkLayer
-
-        objectName: "portTopologyLinks"
-
-        anchors.fill: parent
-        // 纯装饰：不承载任何信息，也不参与键盘导航
-        Accessible.ignored: true
-
-        readonly property color linkColor: Local.ChartPalette.topologyLink
-
-        onLinkColorChanged: requestPaint()
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
-
-        Connections {
-            target: topology.model
-            function onCountChanged() {
-                linkLayer.requestPaint();
-            }
-        }
-
-        onPaint: {
-            const ctx = getContext("2d");
-            ctx.reset();
-            ctx.strokeStyle = linkLayer.linkColor;
-            ctx.lineWidth = Math.max(1, Math.round(Kirigami.Units.smallSpacing / 4) / 2);
-            ctx.lineCap = "round";
-
-            const left = topology.chipColumnWidth;
-            const right = linkLayer.width - topology.chipColumnWidth;
-            if (right <= left) {
-                return;
-            }
-
-            for (let row = 0; row < topology.model.count; ++row) {
-                const y = topology.headerHeight + row * topology.rowHeight + topology.rowHeight / 2;
-                ctx.beginPath();
-                ctx.moveTo(left, y);
-                ctx.lineTo(right, y);
-                ctx.stroke();
-            }
-        }
-    }
 
     /* ---------- 两列的节点标题 ---------- */
     RowLayout {
@@ -176,6 +144,8 @@ Item {
         model: topology.model
 
         delegate: Item {
+            id: row
+
             required property int index
             required property string containerChipText
             required property string hostChipText
@@ -184,6 +154,73 @@ Item {
             width: topology.width
             height: topology.rowHeight
             y: topology.headerHeight + index * topology.rowHeight
+
+            Canvas {
+                id: link
+
+                objectName: "portMappingLink"
+
+                anchors.fill: parent
+                Accessible.ignored: true
+
+                /*!
+                 * 这一行连线的颜色。
+                 *
+                 * 种子 = 容器 id + 这条映射自己的字段（端口 / 协议 / 绑定地址），
+                 * 因此同一个容器、同一条映射永远同色（刷新、重开页面都不变），
+                 * 同一容器内的多条映射又能彼此区分。颜色本身不承载语义：
+                 * 它是纯装饰（`Accessible.ignored`），信息在两侧芯片的文字里。
+                 */
+                readonly property color linkColor: Local.ChartPalette.connectionColor(
+                    topology.colorSeed + "|" + row.containerChipText + "|" + row.hostChipText)
+
+                readonly property real lineWidth: Math.max(2, Math.round(Kirigami.Units.gridUnit * 0.28))
+                readonly property real dotRadius: lineWidth * 1.15
+
+                onLinkColorChanged: requestPaint()
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.reset();
+
+                    const left = topology.chipColumnWidth;
+                    const right = link.width - topology.chipColumnWidth;
+                    const gap = Kirigami.Units.smallSpacing;
+                    const from = left + gap + link.dotRadius;
+                    const to = right - gap - link.dotRadius;
+                    if (to <= from) {
+                        return;
+                    }
+
+                    const y = link.height / 2;
+                    ctx.strokeStyle = link.linkColor;
+                    ctx.fillStyle = link.linkColor;
+                    ctx.lineWidth = link.lineWidth;
+                    ctx.lineCap = "round";
+
+                    ctx.beginPath();
+                    ctx.moveTo(from, y);
+                    ctx.lineTo(to, y);
+                    ctx.stroke();
+
+                    // 端点画成"插座"：外圈连线色、中心掏空成背景色。
+                    // Canvas 没有挖洞的合成操作，用背景色覆盖是唯一稳定做法
+                    // （背景色来自主题，不硬编码 RGB）
+                    for (const x of [from, to]) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, link.dotRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.fillStyle = Kirigami.Theme.backgroundColor;
+                    for (const x of [from, to]) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, link.dotRadius * 0.42, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            }
 
             Local.FieldChip {
                 objectName: "portContainerChip"

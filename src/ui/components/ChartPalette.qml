@@ -41,6 +41,7 @@ pragma Singleton
 import QtQuick
 
 import org.kde.kirigami as Kirigami
+import org.kde.kontainer as Kontainer
 
 QtObject {
     /*!
@@ -88,11 +89,38 @@ QtObject {
     /* ---------------- 端口映射拓扑（ARCH_V4 §2.1.2） ---------------- */
 
     /*!
-        拓扑连线颜色。
+        拓扑连线的中性色（种子为空时的兜底）。
         这是**结构性图形**，不是数据序列也不是状态：因此既不用序列色也不用状态色，
         而是单独取一组中性色，并对两种配色都保证与背景的对比度（§1.8 / AA）。
     */
     readonly property color topologyLink: darkScheme ? "#9aa4ad" : "#4a545e"
+
+    /*!
+        拓扑连线的可选颜色（一条连线一种，见 `connectionColor()`）。
+
+        选色要求：彼此可区分、与两种主题背景都保持 ≥ 3:1 对比度，
+        并且**不表达任何语义**——连线颜色只用来"让同一个容器的图看起来是一体的"，
+        端口与绑定的文字才是信息（§1.1：颜色不能是唯一区分手段）。
+        因此这里刻意避开 StatusPalette 的红/黄/绿语义区间，用低饱和的中间色相。
+    */
+    readonly property var topologyConnectionColors: darkScheme
+        ? ["#d98b8b", "#d9b06a", "#8fc98f", "#7fc4c4", "#8fb3e0", "#b79cd9"]
+        : ["#a4504f", "#8a6a1f", "#3f6b3f", "#2f6b6b", "#33557f", "#5c4a80"]
+
+    /*!
+        由种子取连线颜色：同一个种子永远得到同一种颜色。
+
+        种子一般是容器 id（由 `Presentation::connectionColorIndex` 做 FNV-1a 取模），
+        因此刷新、重开页面、切换主题都不会让同一个容器的连线变色——
+        主题切换时取的是对应主题的那一组色值。
+    */
+    function connectionColor(seed: string): color {
+        if (!seed) {
+            return topologyLink;
+        }
+        const palette = topologyConnectionColors;
+        return palette[Kontainer.Presentation.connectionColorIndex(seed, palette.length)];
+    }
 
     /*! 拓扑节点（容器 / 宿主）的背景与边框。 */
     readonly property color topologyNodeBackground: darkScheme ? "#31363b" : "#e6e9ec"

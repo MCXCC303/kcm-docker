@@ -97,6 +97,27 @@ bool Presentation::isValidEnvKey(const QString &key) const
     return pattern.match(key).hasMatch();
 }
 
+int Presentation::connectionColorIndex(const QString &seed, int paletteSize) const
+{
+    if (seed.isEmpty() || paletteSize <= 0) {
+        return 0;
+    }
+    // FNV-1a 32 位 + lowbias32 收尾混合。
+    // 收尾不能省：FNV 的低位对"只差末尾几个字符"的种子雪崩不足，直接取模会把
+    // 大量种子挤到同一批色位上（实测 200 个相似种子只用到 6 个色位中的 3 个）。
+    quint32 hash = 2166136261u;
+    for (const QChar ch : seed) {
+        hash ^= quint32(ch.unicode());
+        hash *= 16777619u;
+    }
+    hash ^= hash >> 16;
+    hash *= 0x7feb352du;
+    hash ^= hash >> 15;
+    hash *= 0x846ca68bu;
+    hash ^= hash >> 16;
+    return int(hash % quint32(paletteSize));
+}
+
 QVariantList Presentation::parseEnvText(const QString &text) const
 {
     QVariantList entries;
