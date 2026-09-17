@@ -34,6 +34,8 @@ add_library(kontainer_core STATIC
     backend/http/json_line_reader.h
     backend/privileged_client.h
     backend/credential_store.cpp
+    backend/docker_cli_auth_importer.cpp
+    backend/docker_cli_auth_importer.h
     backend/credential_store.h
     backend/kwallet_credential_store.cpp
     backend/kwallet_credential_store.h
