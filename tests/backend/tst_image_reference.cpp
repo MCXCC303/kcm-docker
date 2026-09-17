@@ -1,0 +1,143 @@
+/*
+    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "domain/image_reference.h"
+
+#include <QtTest>
+
+using namespace Kontainer;
+
+/*!
+ * 镜像引用解析（ARCH_V4 §2.4 / §5.1）。
+ *
+ * 这个解析有两个消费者：backend 用它拼 `fromImage` / `tag`，
+ * QML 用它做提交前校验。因此用例同时覆盖「必须接受」与「必须拒绝」两侧。
+ */
+class ImageReferenceTest : public QObject
+{
+    Q_OBJECT
+
+private Q_SLOTS:
+    void acceptsCommonForms_data();
+    void acceptsCommonForms();
+    void rejectsInvalidInput_data();
+    void rejectsInvalidInput();
+    void registryPortIsNotATag();
+    void digestSkipsTagNormalisation();
+    void shortFormDropsRegistryOnly();
+    void trimsSurroundingWhitespace();
+};
+
+void ImageReferenceTest::acceptsCommonForms_data()
+{
+    QTest::addColumn<QString>("reference");
+    QTest::addColumn<QString>("repository");
+    QTest::addColumn<QString>("tag");
+    QTest::addColumn<QString>("registry");
+
+    QTest::newRow("bare name") << QStringLiteral("alpine") << QStringLiteral("alpine") << QStringLiteral("latest") << QString();
+    QTest::newRow("name with tag") << QStringLiteral("alpine:3.19") << QStringLiteral("alpine") << QStringLiteral("3.19") << QString();
+    QTest::newRow("namespaced") << QStringLiteral("library/alpine") << QStringLiteral("library/alpine") << QStringLiteral("latest") << QString();
+    QTest::newRow("namespaced with tag")
+        << QStringLiteral("library/alpine:3.19") << QStringLiteral("library/alpine") << QStringLiteral("3.19") << QString();
+    QTest::newRow("registry host")
+        << QStringLiteral("registry.example.com/team/app:1.2.3") << QStringLiteral("registry.example.com/team/app") << QStringLiteral("1.2.3")
+        << QStringLiteral("registry.example.com");
+    QTest::newRow("registry with port")
+        << QStringLiteral("registry:5000/team/app:1.0") << QStringLiteral("registry:5000/team/app") << QStringLiteral("1.0")
+        << QStringLiteral("registry:5000");
+    QTest::newRow("localhost") << QStringLiteral("localhost/app") << QStringLiteral("localhost/app") << QStringLiteral("latest")
+                               << QStringLiteral("localhost");
+    QTest::newRow("tag with dash and dot") << QStringLiteral("app:1.0-rc.1") << QStringLiteral("app") << QStringLiteral("1.0-rc.1") << QString();
+}
+
+void ImageReferenceTest::acceptsCommonForms()
+{
+    QFETCH(QString, reference);
+    QFETCH(QString, repository);
+    QFETCH(QString, tag);
+    QFETCH(QString, registry);
+
+    const auto parts = ImageReference::parse(reference);
+    QVERIFY2(parts.has_value(), qPrintable(reference));
+    QCOMPARE(parts->repository, repository);
+    QCOMPARE(parts->tag, tag);
+    QCOMPARE(parts->registry, registry);
+    QVERIFY(ImageReference::isValid(reference));
+    // fromImage 不带 tag（tag 走独立参数），digest 才带 @
+    QCOMPARE(parts->fromImage(), repository);
+}
+
+void ImageReferenceTest::rejectsInvalidInput_data()
+{
+    QTest::addColumn<QString>("reference");
+
+    QTest::newRow("empty") << QString();
+    QTest::newRow("only spaces") << QStringLiteral("   ");
+    QTest::newRow("inner space") << QStringLiteral("alpine 3.19");
+    QTest::newRow("url") << QStringLiteral("https://registry.example.com/app");
+    QTest::newRow("shell glob") << QStringLiteral("alpine*");
+    QTest::newRow("uppercase repo") << QStringLiteral("Alpine");
+    QTest::newRow("empty tag") << QStringLiteral("alpine:");
+    QTest::newRow("tag with space") << QStringLiteral("alpine:3 19");
+    QTest::newRow("tag too long") << QStringLiteral("alpine:") + QString(200, QLatin1Char('a'));
+    QTest::newRow("leading slash") << QStringLiteral("/alpine");
+    QTest::newRow("empty digest") << QStringLiteral("alpine@");
+    QTest::newRow("short digest") << QStringLiteral("alpine@sha256:abcd");
+}
+
+void ImageReferenceTest::rejectsInvalidInput()
+{
+    QFETCH(QString, reference);
+    QVERIFY2(!ImageReference::isValid(reference), qPrintable(reference));
+    QVERIFY(!ImageReference::parse(reference).has_value());
+    // 归一化对非法输入不抛异常、不静默改写
+    QCOMPARE(ImageReference::normalized(reference), reference.trimmed());
+}
+
+void ImageReferenceTest::registryPortIsNotATag()
+{
+    const auto parts = ImageReference::parse(QStringLiteral("registry:5000/app"));
+    QVERIFY(parts.has_value());
+    QCOMPARE(parts->registry, QStringLiteral("registry:5000"));
+    QCOMPARE(parts->repository, QStringLiteral("registry:5000/app"));
+    QCOMPARE(parts->tag, QStringLiteral("latest"));
+}
+
+void ImageReferenceTest::digestSkipsTagNormalisation()
+{
+    const QString reference = QStringLiteral("alpine@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    const auto parts = ImageReference::parse(reference);
+    QVERIFY(parts.has_value());
+    QCOMPARE(parts->tag, QString());
+    QCOMPARE(parts->repository, QStringLiteral("alpine"));
+    QVERIFY(!parts->digest.isEmpty());
+    // digest 形式必须原样出现在 fromImage 里，且不补 latest
+    QCOMPARE(parts->fromImage(), reference);
+    QCOMPARE(ImageReference::normalized(reference), reference);
+}
+
+void ImageReferenceTest::shortFormDropsRegistryOnly()
+{
+    QCOMPARE(ImageReference::shortForm(QStringLiteral("registry.example.com:5000/team/app:1.0")), QStringLiteral("team/app:1.0"));
+    QCOMPARE(ImageReference::shortForm(QStringLiteral("library/alpine:3.19")), QStringLiteral("library/alpine:3.19"));
+    QCOMPARE(ImageReference::shortForm(QStringLiteral("alpine:3.19")), QStringLiteral("alpine:3.19"));
+}
+
+/*!
+ * 粘贴输入常常带首尾空格：解析会 trim，因此这种输入算合法
+ * （但内部空白仍然非法——那通常是拼错了）。
+ */
+void ImageReferenceTest::trimsSurroundingWhitespace()
+{
+    QVERIFY(ImageReference::isValid(QStringLiteral("  alpine:3.19  ")));
+    QCOMPARE(ImageReference::normalized(QStringLiteral(" alpine ")), QStringLiteral("alpine:latest"));
+    QCOMPARE(ImageReference::parse(QStringLiteral(" alpine "))->tag, QStringLiteral("latest"));
+    QVERIFY(!ImageReference::isValid(QStringLiteral("alpine :3.19")));
+}
+
+QTEST_GUILESS_MAIN(ImageReferenceTest)
+
+#include "tst_image_reference.moc"

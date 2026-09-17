@@ -27,6 +27,9 @@ DockerError DockerError::fromHttpStatus(int status, const QString &apiMessage)
         error.m_kind = Kind::PermissionDenied;
     } else if (status == 404) {
         error.m_kind = Kind::NotFound;
+    } else if (status == 409) {
+        // 与当前状态冲突：容器正在运行不能删除、镜像被容器引用、名称冲突（ARCH_V4 §2.2.2）
+        error.m_kind = Kind::Conflict;
     } else if (status >= 500) {
         error.m_kind = Kind::EngineError;
     } else if (status >= 400) {

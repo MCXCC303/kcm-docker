@@ -1,0 +1,321 @@
+/*
+    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "backend/docker_endpoint.h"
+#include "i18n.h"
+#include "model/operation_controller.h"
+#include "support/mock_docker_backend.h"
+
+#include <QFile>
+#include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QtTest>
+
+using namespace Kontainer;
+using Mutation = DockerBackendInterface::Mutation;
+using MutationOutcome = DockerBackendInterface::MutationOutcome;
+
+/*!
+ * 写操作编排（ARCH_V4 §2.2.4 / §5.1）。
+ *
+ * 这里验证的是「上层规则」：准入、串行、结果通道、写后即读、权限降级。
+ * 请求本身长什么样由 backend 的契约测试负责（tst_docker_backend_against_fake_engine）。
+ */
+class OperationControllerTest : public QObject
+{
+    Q_OBJECT
+
+private Q_SLOTS:
+    void initTestCase();
+    void init();
+
+    /* 权限门 */
+    void writableEndpointAllowsOperations();
+    void nonWritableEndpointHidesOperations();
+    void enginePermissionDenialDegradesSessionToReadOnly();
+
+    /* 串行与忙碌态 */
+    void sameTargetIsSerialised();
+    void differentTargetsRunInParallel();
+    void secondPullIsRefusedWhilePulling();
+
+    /* 结果通道 */
+    void successRefreshesAffectedDataSets();
+    void unchangedIsReportedAsSuccess();
+    void failureCarriesCategoryAndEngineDetail();
+    void removalEmitsNavigationSignal();
+    void dismissClearsResult();
+
+    /* 拉取 */
+    void pullReportsProgressAndClearsOnFinish();
+    void cancelDelegatesToBackend();
+    void invalidReferenceIsRejectedBeforeBackend();
+
+private:
+    QString writableSocketPath();
+
+    QTemporaryDir m_dir;
+    MockDockerBackend *m_backend = nullptr;
+    OperationController *m_operations = nullptr;
+};
+
+void OperationControllerTest::initTestCase()
+{
+    setupTranslationDomain();
+    qRegisterMetaType<Kontainer::DockerError>("Kontainer::DockerError");
+    qRegisterMetaType<Kontainer::ImagePullProgress>("Kontainer::ImagePullProgress");
+    qRegisterMetaType<Kontainer::DockerBackendInterface::Mutation>("Kontainer::DockerBackendInterface::Mutation");
+    qRegisterMetaType<Kontainer::DockerBackendInterface::MutationOutcome>("Kontainer::DockerBackendInterface::MutationOutcome");
+}
+
+void OperationControllerTest::init()
+{
+    delete m_operations;
+    delete m_backend;
+    m_backend = new MockDockerBackend(this);
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_operations = new OperationController(m_backend, this);
+}
+
+QString OperationControllerTest::writableSocketPath()
+{
+    if (!m_dir.isValid()) {
+        return {};
+    }
+    const QString path = m_dir.path() + QStringLiteral("/docker.sock");
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write("x");
+        file.close();
+    }
+    QFile::setPermissions(path, QFile::ReadOwner | QFile::WriteOwner);
+    return path;
+}
+
+void OperationControllerTest::writableEndpointAllowsOperations()
+{
+    QVERIFY(m_operations->writeAllowed());
+    QCOMPARE(m_operations->writeAccessKey(), QStringLiteral("allowed"));
+    QVERIFY(m_operations->writeAccessText().isEmpty());
+
+    m_operations->startContainer(QStringLiteral("abc"));
+    QCOMPARE(m_backend->mutationCount(Mutation::StartContainer), 1);
+    QVERIFY(m_operations->busy());
+}
+
+void OperationControllerTest::nonWritableEndpointHidesOperations()
+{
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(m_dir.path() + QStringLiteral("/missing.sock")));
+    m_operations->refreshWriteAccess();
+
+    QVERIFY(!m_operations->writeAllowed());
+    QCOMPARE(m_operations->writeAccessKey(), QStringLiteral("denied"));
+    QVERIFY2(!m_operations->writeAccessText().isEmpty(), "read-only mode must explain itself");
+
+    // 界面本应隐藏写入口；即使被调用，也必须拒绝且不产生 backend 请求
+    m_operations->startContainer(QStringLiteral("abc"));
+    QCOMPARE(m_backend->mutationCount(Mutation::StartContainer), 0);
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+}
+
+void OperationControllerTest::enginePermissionDenialDegradesSessionToReadOnly()
+{
+    QVERIFY(m_operations->writeAllowed());
+
+    m_operations->startContainer(QStringLiteral("abc"));
+    m_backend->completeMutations(MutationOutcome::Failed, DockerError(DockerError::Kind::PermissionDenied, QStringLiteral("access denied"), 403));
+
+    // 降级是本次会话的最终状态：不再出现写入口，也不可恢复
+    QVERIFY(!m_operations->writeAllowed());
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+    QCOMPARE(m_operations->resultCategoryKey(), QStringLiteral("userActionable"));
+    QVERIFY(!m_operations->writeAccessText().isEmpty());
+
+    // refreshWriteAccess() 不能把降级撤销（socket 明明是可写的）
+    m_operations->refreshWriteAccess();
+    QVERIFY(!m_operations->writeAllowed());
+
+    m_operations->stopContainer(QStringLiteral("abc"));
+    QCOMPARE(m_backend->mutationCount(Mutation::StopContainer), 0);
+}
+
+void OperationControllerTest::sameTargetIsSerialised()
+{
+    QSignalSpy stateSpy(m_operations, &OperationController::stateChanged);
+
+    m_operations->startContainer(QStringLiteral("abc"));
+    QCOMPARE(m_operations->activeCount(), 1);
+    QVERIFY(m_operations->isTargetBusy(QStringLiteral("container:abc")));
+
+    // 同一目标再来一次：拒绝，且不产生第二个请求
+    m_operations->restartContainer(QStringLiteral("abc"));
+    QCOMPARE(m_backend->mutationCount(Mutation::RestartContainer), 0);
+    QCOMPARE(m_operations->resultCategoryKey(), QStringLiteral("userActionable"));
+    QVERIFY(stateSpy.count() >= 1);
+
+    m_backend->completeMutations();
+    QVERIFY(!m_operations->busy());
+    QVERIFY(!m_operations->isTargetBusy(QStringLiteral("container:abc")));
+}
+
+void OperationControllerTest::differentTargetsRunInParallel()
+{
+    m_operations->startContainer(QStringLiteral("abc"));
+    m_operations->startContainer(QStringLiteral("def"));
+    QCOMPARE(m_operations->activeCount(), 2);
+    QCOMPARE(m_backend->mutationCount(Mutation::StartContainer), 2);
+    QVERIFY(m_operations->isTargetBusy(QStringLiteral("container:abc")));
+    QVERIFY(m_operations->isTargetBusy(QStringLiteral("container:def")));
+
+    m_backend->completeMutations();
+    QVERIFY(!m_operations->busy());
+}
+
+void OperationControllerTest::secondPullIsRefusedWhilePulling()
+{
+    m_operations->pullImage(QStringLiteral("alpine:3.19"));
+    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 1);
+    QVERIFY(m_operations->pulling());
+
+    m_operations->pullImage(QStringLiteral("busybox:latest"));
+    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 1);
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+
+    m_backend->completeMutations();
+    QVERIFY(!m_operations->pulling());
+}
+
+void OperationControllerTest::successRefreshesAffectedDataSets()
+{
+    const int containersBefore = m_backend->refreshCount(DockerBackendInterface::Section::Containers);
+    const int storageBefore = m_backend->refreshCount(DockerBackendInterface::Section::Storage);
+    const int imagesBefore = m_backend->refreshCount(DockerBackendInterface::Section::Images);
+
+    m_operations->startContainer(QStringLiteral("abc"));
+    m_backend->completeMutations();
+
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("success"));
+    QVERIFY(!m_operations->resultText().isEmpty());
+    // 写后即读：容器列表与存储占用必须立刻刷新
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Containers), containersBefore + 1);
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Storage), storageBefore + 1);
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Images), imagesBefore);
+}
+
+void OperationControllerTest::unchangedIsReportedAsSuccess()
+{
+    m_operations->stopContainer(QStringLiteral("abc"));
+    m_backend->completeMutations(MutationOutcome::Unchanged);
+
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("unchanged"));
+    QVERIFY(!m_operations->resultText().isEmpty());
+    QCOMPARE(m_operations->resultCategoryKey(), QStringLiteral("none"));
+}
+
+void OperationControllerTest::failureCarriesCategoryAndEngineDetail()
+{
+    m_operations->removeContainer(QStringLiteral("abc"));
+    m_backend->completeMutations(MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::Conflict,
+                                             QStringLiteral("You cannot remove a running container abc. Stop the container before attempting removal"),
+                                             409));
+
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+    QCOMPARE(m_operations->resultCategoryKey(), QStringLiteral("userActionable"));
+    // 引擎原文必须能拿到：文案是摘要，detail 才是「为什么」
+    QVERIFY(m_operations->resultDetailText().contains(QStringLiteral("running container")));
+    // 409 不是权限问题：不能因为一次冲突就降级为只读
+    QVERIFY(m_operations->writeAllowed());
+}
+
+void OperationControllerTest::removalEmitsNavigationSignal()
+{
+    QSignalSpy removedSpy(m_operations, &OperationController::containerRemoved);
+    QSignalSpy stateSpy(m_operations, &OperationController::containerStateChanged);
+
+    m_operations->removeContainer(QStringLiteral("abc"));
+    m_backend->completeMutations();
+    QCOMPARE(removedSpy.count(), 1);
+    QCOMPARE(removedSpy.at(0).at(0).toString(), QStringLiteral("abc"));
+    QCOMPARE(stateSpy.count(), 0);
+
+    m_operations->startContainer(QStringLiteral("def"));
+    m_backend->completeMutations();
+    QCOMPARE(stateSpy.count(), 1);
+    QCOMPARE(stateSpy.at(0).at(0).toString(), QStringLiteral("def"));
+}
+
+void OperationControllerTest::dismissClearsResult()
+{
+    m_operations->startContainer(QStringLiteral("abc"));
+    m_backend->completeMutations();
+    QVERIFY(!m_operations->resultText().isEmpty());
+
+    m_operations->dismissResult();
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("none"));
+    QVERIFY(m_operations->resultText().isEmpty());
+}
+
+void OperationControllerTest::pullReportsProgressAndClearsOnFinish()
+{
+    QSignalSpy pullSpy(m_operations, &OperationController::pullChanged);
+    m_operations->pullImage(QStringLiteral("alpine"));
+    QVERIFY(m_operations->pulling());
+    // 归一化后的引用（缺 tag → latest）才是用户看到的目标
+    QCOMPARE(m_operations->pullReference(), QStringLiteral("alpine:latest"));
+    QVERIFY(!m_operations->pullProgressKnown());
+
+    ImagePullProgress progress;
+    progress.reference = QStringLiteral("alpine:latest");
+    progress.phase = ImagePullProgress::Phase::Downloading;
+    progress.statusText = QStringLiteral("Downloading");
+    progress.currentBytes = 30;
+    progress.totalBytes = 100;
+    progress.totalLayers = 2;
+    progress.completedLayers = 1;
+    m_backend->emitPullProgress(progress);
+
+    QVERIFY(m_operations->pullProgressKnown());
+    QCOMPARE(m_operations->pullProgress(), 0.3);
+    QCOMPARE(m_operations->pullStatusText(), QStringLiteral("Downloading"));
+    QCOMPARE(m_operations->pullTotalLayers(), 2);
+    QVERIFY(pullSpy.count() >= 2);
+
+    m_backend->completeMutations();
+    QVERIFY(!m_operations->pulling());
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("success"));
+    QVERIFY(m_operations->resultText().contains(QStringLiteral("alpine:latest")));
+}
+
+void OperationControllerTest::cancelDelegatesToBackend()
+{
+    m_operations->pullImage(QStringLiteral("alpine"));
+    m_operations->cancelPull();
+    QVERIFY(m_backend->pullCancelled());
+
+    m_backend->completeMutations(MutationOutcome::Cancelled);
+    QVERIFY(!m_operations->pulling());
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("cancelled"));
+    QVERIFY(!m_operations->resultText().isEmpty());
+    // 取消不是错误：不产生错误样式，也不影响写权限
+    QCOMPARE(m_operations->resultCategoryKey(), QStringLiteral("none"));
+    QVERIFY(m_operations->writeAllowed());
+}
+
+void OperationControllerTest::invalidReferenceIsRejectedBeforeBackend()
+{
+    m_operations->pullImage(QStringLiteral("alpine 3.19"));
+    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 0);
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+    QVERIFY(!m_operations->pulling());
+
+    QVERIFY(m_operations->isValidImageReference(QStringLiteral("alpine")));
+    QVERIFY(!m_operations->isValidImageReference(QString()));
+    QCOMPARE(m_operations->normalizedImageReference(QStringLiteral("alpine")), QStringLiteral("alpine:latest"));
+}
+
+QTEST_MAIN(OperationControllerTest)
+
+#include "tst_operation_controller.moc"

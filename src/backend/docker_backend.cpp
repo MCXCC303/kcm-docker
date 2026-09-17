@@ -5,15 +5,22 @@
 
 #include "backend/docker_backend.h"
 
+#include "backend/docker_api_paths.h"
+
 #include "dto/container_dto.h"
 #include "dto/container_inspect_dto.h"
 #include "dto/image_dto.h"
 #include "dto/image_inspect_dto.h"
+#include "dto/image_pull_dto.h"
 #include "dto/stats_dto.h"
 #include "dto/storage_dto.h"
+#include "domain/image_reference.h"
 #include "logging.h"
+#include "refresh_policy.h"
 
 #include <QUrlQuery>
+
+#include <chrono>
 
 namespace Kontainer
 {
@@ -110,7 +117,7 @@ void DockerBackend::refreshEngine()
 
 void DockerBackend::startPing()
 {
-    DockerReply *reply = m_client.getUnversioned(QStringLiteral("/_ping"));
+    DockerReply *reply = m_client.getUnversioned(ApiPaths::ping());
     connect(reply, &DockerReply::finished, this, [this, reply] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -126,7 +133,7 @@ void DockerBackend::startPing()
 
 void DockerBackend::startVersionRequest()
 {
-    DockerReply *reply = m_client.getUnversioned(QStringLiteral("/version"));
+    DockerReply *reply = m_client.getUnversioned(ApiPaths::version());
     connect(reply, &DockerReply::finished, this, [this, reply] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -179,7 +186,7 @@ void DockerBackend::startVersionRequest()
 
 void DockerBackend::startInfoRequest()
 {
-    DockerReply *reply = m_client.get(QStringLiteral("/info"));
+    DockerReply *reply = m_client.get(ApiPaths::info());
     connect(reply, &DockerReply::finished, this, [this, reply] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -283,6 +290,16 @@ void DockerBackend::flushReadyCallbacks(const DockerError &error)
             callback();
         }
     }
+
+    // 等待握手的写操作：成功则执行，失败则作为 mutation 失败上报
+    const QList<PendingMutation> mutations = std::exchange(m_pendingMutations, {});
+    for (const PendingMutation &pending : mutations) {
+        if (error.isError()) {
+            emitMutationFinished(pending.mutation, pending.targetKey, MutationOutcome::Failed, error);
+        } else {
+            pending.run();
+        }
+    }
 }
 
 void DockerBackend::failSection(Section section, const DockerError &error)
@@ -345,7 +362,7 @@ void DockerBackend::startContainersRequest()
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("all"), QStringLiteral("true"));
 
-    DockerReply *reply = m_client.get(QStringLiteral("/containers/json"), query);
+    DockerReply *reply = m_client.get(ApiPaths::containersJson(), query);
     connect(reply, &DockerReply::finished, this, [this, reply] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -390,7 +407,7 @@ void DockerBackend::refreshImages()
 
 void DockerBackend::startImagesRequest()
 {
-    DockerReply *reply = m_client.get(QStringLiteral("/images/json"));
+    DockerReply *reply = m_client.get(ApiPaths::imagesJson());
     connect(reply, &DockerReply::finished, this, [this, reply] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -437,7 +454,7 @@ void DockerBackend::refreshStorageUsage()
 
 void DockerBackend::startStorageRequest()
 {
-    DockerReply *reply = m_client.get(QStringLiteral("/system/df"));
+    DockerReply *reply = m_client.get(ApiPaths::systemDf());
     connect(reply, &DockerReply::finished, this, [this, reply] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -478,7 +495,7 @@ void DockerBackend::inspectContainer(const QString &id)
 
 void DockerBackend::startContainerInspectRequest(const QString &id)
 {
-    DockerReply *reply = m_client.get(QStringLiteral("/containers/%1/json").arg(id));
+    DockerReply *reply = m_client.get(ApiPaths::containerInspect(id));
     connect(reply, &DockerReply::finished, this, [this, reply, id] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -519,7 +536,7 @@ void DockerBackend::inspectImage(const QString &id)
 
 void DockerBackend::startImageInspectRequest(const QString &id)
 {
-    DockerReply *reply = m_client.get(QStringLiteral("/images/%1/json").arg(id));
+    DockerReply *reply = m_client.get(ApiPaths::imageInspect(id));
     connect(reply, &DockerReply::finished, this, [this, reply, id] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -570,7 +587,7 @@ void DockerBackend::startStatsRequest(const QString &id)
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("stream"), QStringLiteral("false"));
 
-    DockerReply *reply = m_client.get(QStringLiteral("/containers/%1/stats").arg(id), query);
+    DockerReply *reply = m_client.get(ApiPaths::containerStats(id), query);
     connect(reply, &DockerReply::finished, this, [this, reply, id] {
         const bool failed = reply->state() != DockerReply::State::Succeeded;
         const DockerError error = reply->error();
@@ -598,6 +615,355 @@ void DockerBackend::startStatsRequest(const QString &id)
         m_containerStats = containerStatsFromDto(*dto);
         Q_EMIT containerStatsUpdated();
     });
+}
+
+/* ============================================================================
+ * 写操作（ARCH_V4 §2.2.4 / §2.3 / §2.4）
+ * ==========================================================================*/
+
+namespace
+{
+
+int mutationTimeoutMs()
+{
+    return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kMutationTimeout).count());
+}
+
+int pullIdleTimeoutMs()
+{
+    return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kPullIdleTimeout).count());
+}
+
+const char *mutationName(DockerBackendInterface::Mutation mutation)
+{
+    switch (mutation) {
+    case DockerBackendInterface::Mutation::StartContainer:
+        return "start-container";
+    case DockerBackendInterface::Mutation::StopContainer:
+        return "stop-container";
+    case DockerBackendInterface::Mutation::RestartContainer:
+        return "restart-container";
+    case DockerBackendInterface::Mutation::RemoveContainer:
+        return "remove-container";
+    case DockerBackendInterface::Mutation::PullImage:
+        return "pull-image";
+    case DockerBackendInterface::Mutation::RemoveImage:
+        return "remove-image";
+    }
+    return "mutation";
+}
+
+bool mutationUsesDelete(DockerBackendInterface::Mutation mutation)
+{
+    return mutation == DockerBackendInterface::Mutation::RemoveContainer || mutation == DockerBackendInterface::Mutation::RemoveImage;
+}
+
+DockerBackendInterface::MutationOutcome outcomeFor(DockerReply *reply)
+{
+    using Outcome = DockerBackendInterface::MutationOutcome;
+    switch (reply->state()) {
+    case DockerReply::State::Succeeded:
+        // 304 是引擎对 start（已运行）/ stop（已停止）的「已处于目标状态」语义
+        return reply->httpStatus() == 304 ? Outcome::Unchanged : Outcome::Succeeded;
+    case DockerReply::State::Cancelled:
+        return Outcome::Cancelled;
+    case DockerReply::State::Failed:
+    case DockerReply::State::Pending:
+        return Outcome::Failed;
+    }
+    return Outcome::Failed;
+}
+
+} // namespace
+
+DockerEndpoint DockerBackend::endpoint() const
+{
+    return m_client.endpoint();
+}
+
+void DockerBackend::emitMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error)
+{
+    // 只记录操作、目标 key 与结果：不记录请求体、响应体或挂载路径（ARCH_V1 §27 / ARCH_V2 §40）
+    qCDebug(kontainerBackend) << "mutation" << mutationName(mutation) << targetKey
+                              << (outcome == MutationOutcome::Succeeded     ? "succeeded"
+                                      : outcome == MutationOutcome::Unchanged ? "unchanged"
+                                      : outcome == MutationOutcome::Cancelled ? "cancelled"
+                                                                              : "failed");
+    Q_EMIT mutationFinished(mutation, targetKey, outcome, error);
+}
+
+void DockerBackend::runMutation(Mutation mutation, const QString &targetKey, ReadyCallback run)
+{
+    if (m_client.hasApiVersion()) {
+        run();
+        return;
+    }
+    // 还没握手：排队等版本协商结束（写请求同样需要版本前缀）
+    m_pendingMutations.append({mutation, targetKey, std::move(run)});
+    if (!m_handshakeInFlight) {
+        m_handshakeInFlight = true;
+        m_engineInFlight = true;
+        updateLoading();
+        startPing();
+    }
+}
+
+void DockerBackend::runContainerMutation(Mutation mutation, const QString &id, const QString &apiPath, const QUrlQuery &query)
+{
+    const QString targetKey = OperationTarget::container(id);
+    runMutation(mutation, targetKey, [this, mutation, targetKey, apiPath, query] {
+        DockerReply *reply = mutationUsesDelete(mutation) ? m_client.del(apiPath, query, mutationTimeoutMs())
+                                                          : m_client.post(apiPath, query, mutationTimeoutMs());
+        connect(reply, &DockerReply::finished, this, [this, reply, mutation, targetKey] {
+            const DockerError error = reply->error();
+            const MutationOutcome outcome = outcomeFor(reply);
+            reply->deleteLater();
+            emitMutationFinished(mutation, targetKey, outcome, error);
+        });
+    });
+}
+
+void DockerBackend::startContainer(const QString &id)
+{
+    runContainerMutation(Mutation::StartContainer, id, ApiPaths::containerStart(id), QUrlQuery());
+}
+
+void DockerBackend::stopContainer(const QString &id)
+{
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("t"), QString::number(RefreshPolicy::kStopTimeoutSeconds));
+    runContainerMutation(Mutation::StopContainer, id, ApiPaths::containerStop(id), query);
+}
+
+void DockerBackend::restartContainer(const QString &id)
+{
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("t"), QString::number(RefreshPolicy::kStopTimeoutSeconds));
+    // restart 对已停止的容器会直接启动，因此没有 304 语义
+    runContainerMutation(Mutation::RestartContainer, id, ApiPaths::containerRestart(id), query);
+}
+
+void DockerBackend::removeContainer(const QString &id)
+{
+    // 不带 v（保留匿名卷与命名卷）、不带 force（运行中的容器必须由引擎拒绝）
+    runContainerMutation(Mutation::RemoveContainer, id, ApiPaths::containerRemove(id), QUrlQuery());
+}
+
+void DockerBackend::removeImage(const QString &id, bool force)
+{
+    const QString targetKey = OperationTarget::image(id);
+    runMutation(Mutation::RemoveImage, targetKey, [this, id, force, targetKey] {
+        QUrlQuery query;
+        query.addQueryItem(QStringLiteral("force"), force ? QStringLiteral("true") : QStringLiteral("false"));
+
+        DockerReply *reply = m_client.del(ApiPaths::imageRemove(id), query, mutationTimeoutMs());
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerError error = reply->error();
+            const MutationOutcome outcome = outcomeFor(reply);
+            reply->deleteLater();
+            emitMutationFinished(Mutation::RemoveImage, targetKey, outcome, error);
+        });
+    });
+}
+
+void DockerBackend::clearPullState()
+{
+    m_pullReader.reset();
+    m_pullLayers.clear();
+    m_pullProgress = ImagePullProgress();
+    m_pullFailed = false;
+}
+
+void DockerBackend::pullImage(const QString &reference)
+{
+    const QString targetKey = OperationTarget::image(reference);
+
+    // 同一时刻只允许一个拉取：第二个请求直接以失败结束，由上层给出文案
+    if (m_pullReply) {
+        emitMutationFinished(Mutation::PullImage,
+                             targetKey,
+                             MutationOutcome::Failed,
+                             DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("an image pull is already running")));
+        return;
+    }
+
+    if (!ImageReference::isValid(reference)) {
+        emitMutationFinished(Mutation::PullImage,
+                             targetKey,
+                             MutationOutcome::Failed,
+                             DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("invalid image reference")));
+        return;
+    }
+
+    runMutation(Mutation::PullImage, targetKey, [this, reference, targetKey] {
+        startPullRequest(reference, targetKey);
+    });
+}
+
+void DockerBackend::startPullRequest(const QString &reference, const QString &targetKey)
+{
+    const auto parts = ImageReference::parse(reference);
+    if (!parts) {
+        emitMutationFinished(Mutation::PullImage,
+                             targetKey,
+                             MutationOutcome::Failed,
+                             DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("invalid image reference")));
+        return;
+    }
+
+    clearPullState();
+    m_pullProgress.reference = ImageReference::normalized(reference);
+
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("fromImage"), parts->fromImage());
+    if (!parts->tag.isEmpty()) {
+        query.addQueryItem(QStringLiteral("tag"), parts->tag);
+    }
+
+    m_pullReply = m_client.postStream(ApiPaths::imageCreate(), query, pullIdleTimeoutMs());
+    DockerReply *reply = m_pullReply;
+
+    connect(reply, &DockerReply::streamStarted, this, [this, reply] {
+        // 4xx/5xx 由 finished 统一处理；这里只让 UI 立刻知道「开始了」
+        if (reply->httpStatus() >= 400) {
+            return;
+        }
+        Q_EMIT imagePullProgress(m_pullProgress);
+    });
+
+    connect(reply, &DockerReply::bodyChunk, this, [this, reply] {
+        if (reply->httpStatus() >= 400) {
+            return;
+        }
+        const QList<QJsonObject> lines = m_pullReader.feed(reply->takeBody());
+        for (const QJsonObject &line : lines) {
+            // 订阅者可能在 imagePullProgress 里同步取消（用户点了取消）：
+            // 取消后不要再继续喂进度，否则会往已经被清空的状态里写数据
+            if (reply->isFinished()) {
+                return;
+            }
+            handlePullLine(line);
+        }
+    });
+
+    connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+        const DockerReply::State state = reply->state();
+        const DockerError error = reply->error();
+
+        // 收尾：最后一行可能没有换行符
+        if (state != DockerReply::State::Cancelled) {
+            const QList<QJsonObject> tail = m_pullReader.finish();
+            for (const QJsonObject &line : tail) {
+                handlePullLine(line);
+            }
+        }
+
+        if (m_pullReader.malformedLines() > 0 || m_pullReader.droppedLines() > 0) {
+            qCWarning(kontainerBackend) << "image pull stream had" << m_pullReader.malformedLines() << "malformed and"
+                                        << m_pullReader.droppedLines() << "dropped lines";
+        }
+
+        m_pullReply = nullptr;
+        reply->deleteLater();
+
+        if (state == DockerReply::State::Cancelled) {
+            clearPullState();
+            emitMutationFinished(Mutation::PullImage, targetKey, MutationOutcome::Cancelled, DockerError());
+            return;
+        }
+        if (state != DockerReply::State::Succeeded) {
+            clearPullState();
+            emitMutationFinished(Mutation::PullImage, targetKey, MutationOutcome::Failed, error);
+            return;
+        }
+        if (m_pullFailed) {
+            // 流内的 error 行才是真正的失败原因（此时 HTTP 状态是 200）
+            const QString message = m_pullProgress.errorText;
+            clearPullState();
+            emitMutationFinished(Mutation::PullImage,
+                                 targetKey,
+                                 MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::EngineError, message));
+            return;
+        }
+
+        m_pullProgress.phase = ImagePullProgress::Phase::Complete;
+        if (m_pullProgress.totalBytes > 0) {
+            m_pullProgress.currentBytes = m_pullProgress.totalBytes;
+        }
+        Q_EMIT imagePullProgress(m_pullProgress);
+
+        clearPullState();
+        emitMutationFinished(Mutation::PullImage, targetKey, MutationOutcome::Succeeded, DockerError());
+    });
+}
+
+void DockerBackend::cancelImagePull()
+{
+    if (m_pullReply) {
+        qCDebug(kontainerBackend) << "cancelling image pull";
+        m_pullReply->cancel();
+    }
+}
+
+void DockerBackend::handlePullLine(const QJsonObject &object)
+{
+    const DockerImagePullLineDTO line = DockerImagePullLineDTO::fromJson(object);
+
+    if (!line.error.isEmpty()) {
+        m_pullFailed = true;
+        m_pullProgress.phase = ImagePullProgress::Phase::Failed;
+        m_pullProgress.errorText = line.error;
+        Q_EMIT imagePullProgress(m_pullProgress);
+        return;
+    }
+
+    if (!line.status.isEmpty()) {
+        // status 是引擎原文（"Downloading"、"Pull complete"…），按数据显示，不翻译
+        m_pullProgress.statusText = line.status;
+        const ImagePullProgress::Phase phase = DockerImagePullLineDTO::phaseForStatus(line.status);
+        if (phase != ImagePullProgress::Phase::Waiting) {
+            m_pullProgress.phase = phase;
+        }
+    }
+    if (!line.id.isEmpty()) {
+        m_pullProgress.layerId = line.id;
+        // "Pulling from <repo>" 这类行也带 id（那是 tag，不是层），不能算进层数
+        if (line.isLayerStatus()) {
+            PullLayerState &layer = m_pullLayers[line.id];
+            if (line.hasProgress) {
+                layer.current = line.current;
+                layer.total = line.total;
+            }
+            if (line.layerFinished()) {
+                layer.complete = true;
+                if (layer.total > 0) {
+                    layer.current = layer.total;
+                }
+            }
+        }
+    }
+
+    updatePullTotals();
+    Q_EMIT imagePullProgress(m_pullProgress);
+}
+
+void DockerBackend::updatePullTotals()
+{
+    qint64 current = 0;
+    qint64 total = 0;
+    int completed = 0;
+    for (auto it = m_pullLayers.constBegin(); it != m_pullLayers.constEnd(); ++it) {
+        current += it->current;
+        total += it->total;
+        if (it->complete) {
+            ++completed;
+        }
+    }
+    m_pullProgress.currentBytes = current;
+    m_pullProgress.totalBytes = total;
+    m_pullProgress.completedLayers = completed;
+    m_pullProgress.totalLayers = m_pullLayers.size();
 }
 
 } // namespace Kontainer

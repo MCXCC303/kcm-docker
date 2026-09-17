@@ -144,6 +144,14 @@ void ContainerDetailController::refresh()
     m_backend->inspectContainer(m_containerId);
 }
 
+void ContainerDetailController::reload()
+{
+    if (m_containerId.isEmpty()) {
+        return;
+    }
+    m_backend->inspectContainer(m_containerId);
+}
+
 void ContainerDetailController::onDetailUpdated()
 {
     const ContainerDetail detail = m_backend->containerDetail();

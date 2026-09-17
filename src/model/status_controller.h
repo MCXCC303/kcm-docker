@@ -12,6 +12,7 @@
 #include "model/engine_status.h"
 #include "model/image_detail_controller.h"
 #include "model/image_filter_model.h"
+#include "model/operation_controller.h"
 #include "model/image_model.h"
 #include "model/refresh_scheduler.h"
 #include "model/storage_status.h"
@@ -91,6 +92,8 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::ImageFilterModel *imageList READ imageList CONSTANT)
     Q_PROPERTY(Kontainer::ContainerDetailController *containerDetail READ containerDetail CONSTANT)
     Q_PROPERTY(Kontainer::ImageDetailController *imageDetail READ imageDetail CONSTANT)
+    /*! 写操作编排与结果通道（ARCH_V4 §2.2.4）。 */
+    Q_PROPERTY(Kontainer::OperationController *operations READ operations CONSTANT)
 
 public:
     /*! 整页状态：Idle / Loading / Ready / Error（§14）。 */
@@ -228,6 +231,10 @@ public:
     {
         return m_imageDetail;
     }
+    OperationController *operations() const
+    {
+        return m_operations;
+    }
     RefreshScheduler *scheduler() const
     {
         return m_scheduler;
@@ -287,6 +294,7 @@ private:
     ImageFilterModel *m_imageFilter = nullptr;
     ContainerDetailController *m_containerDetail = nullptr;
     ImageDetailController *m_imageDetail = nullptr;
+    OperationController *m_operations = nullptr;
 
     State m_state = State::Idle;
     EngineState m_engineState = EngineState::Loading;

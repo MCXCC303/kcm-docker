@@ -6,10 +6,13 @@ add_library(kontainer_core STATIC
 
     backend/docker_api_version.cpp
     backend/docker_api_version.h
+    backend/docker_api_paths.h
     backend/docker_backend.cpp
     backend/docker_backend.h
     backend/docker_backend_interface.cpp
     backend/docker_backend_interface.h
+    backend/docker_capabilities.cpp
+    backend/docker_capabilities.h
     backend/docker_client.cpp
     backend/docker_client.h
     backend/docker_endpoint.cpp
@@ -18,6 +21,8 @@ add_library(kontainer_core STATIC
     backend/docker_error.h
     backend/http/http_response_parser.cpp
     backend/http/http_response_parser.h
+    backend/http/json_line_reader.cpp
+    backend/http/json_line_reader.h
 
     dto/container_dto.cpp
     dto/container_dto.h
@@ -29,6 +34,8 @@ add_library(kontainer_core STATIC
     dto/image_dto.h
     dto/image_inspect_dto.cpp
     dto/image_inspect_dto.h
+    dto/image_pull_dto.cpp
+    dto/image_pull_dto.h
     dto/json_helpers.h
     dto/stats_dto.cpp
     dto/stats_dto.h
@@ -45,6 +52,9 @@ add_library(kontainer_core STATIC
     domain/image.h
     domain/image_detail.cpp
     domain/image_detail.h
+    domain/image_pull_progress.h
+    domain/image_reference.cpp
+    domain/image_reference.h
     domain/storage_usage.cpp
     domain/storage_usage.h
 
@@ -71,6 +81,8 @@ add_library(kontainer_core STATIC
     model/image_model.h
     model/metrics_model.cpp
     model/metrics_model.h
+    model/operation_controller.cpp
+    model/operation_controller.h
     model/presentation.cpp
     model/presentation.h
     model/qml_registration.cpp

@@ -15,6 +15,7 @@
 #include "model/image_filter_model.h"
 #include "model/image_model.h"
 #include "model/metrics_model.h"
+#include "model/operation_controller.h"
 #include "model/presentation.h"
 #include "model/status_controller.h"
 #include "model/storage_status.h"
@@ -37,6 +38,7 @@ void registerKontainerQmlTypes()
     qmlRegisterUncreatableType<DetailListModel>("org.kde.kontainer", 1, 0, "DetailListModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<MetricsModel>("org.kde.kontainer", 1, 0, "MetricsModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<ContainerDetailController>("org.kde.kontainer", 1, 0, "ContainerDetailController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<OperationController>("org.kde.kontainer", 1, 0, "OperationController", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<ImageDetailController>("org.kde.kontainer", 1, 0, "ImageDetailController", QStringLiteral("Provided by the KCM"));
 
     qmlRegisterSingletonType<Format>("org.kde.kontainer", 1, 0, "Format", [](QQmlEngine *, QJSEngine *) -> QObject * {

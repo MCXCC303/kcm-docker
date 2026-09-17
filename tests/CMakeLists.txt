@@ -22,6 +22,9 @@ function(kontainer_add_test name source)
 endfunction()
 
 kontainer_add_test(tst_http_response_parser backend/tst_http_response_parser.cpp)
+kontainer_add_test(tst_json_line_reader backend/tst_json_line_reader.cpp)
+kontainer_add_test(tst_docker_capabilities backend/tst_docker_capabilities.cpp)
+kontainer_add_test(tst_image_reference backend/tst_image_reference.cpp)
 kontainer_add_test(tst_dto_parsers backend/tst_dto_parsers.cpp)
 kontainer_add_test(tst_error_mapping backend/tst_error_mapping.cpp)
 kontainer_add_test(tst_api_version backend/tst_api_version.cpp)
@@ -33,6 +36,7 @@ kontainer_add_test(tst_metrics model/tst_metrics.cpp)
 kontainer_add_test(tst_detail_controllers model/tst_detail_controllers.cpp)
 kontainer_add_test(tst_format model/tst_format.cpp)
 kontainer_add_test(tst_status_controller model/tst_status_controller.cpp)
+kontainer_add_test(tst_operation_controller model/tst_operation_controller.cpp)
 kontainer_add_test(tst_qml_load ui/tst_qml_load.cpp)
 
 # 从 qrc 加载界面（与插件运行时的加载路径完全一致）。

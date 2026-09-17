@@ -128,6 +128,86 @@ bool MockDockerBackend::isSamplingStats(const QString &id) const
     return m_statsWanted.contains(id);
 }
 
+void MockDockerBackend::setEndpoint(const DockerEndpoint &endpoint)
+{
+    m_endpoint = endpoint;
+    Q_EMIT loadingChanged(); // 让依赖 endpoint 的绑定有机会刷新
+}
+
+DockerEndpoint MockDockerBackend::endpoint() const
+{
+    return m_endpoint;
+}
+
+int MockDockerBackend::mutationCount(Mutation mutation) const
+{
+    int count = 0;
+    for (const MutationCall &call : m_mutationCalls) {
+        if (call.mutation == mutation) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+QString MockDockerBackend::lastMutationTarget(Mutation mutation) const
+{
+    for (int i = m_mutationCalls.size() - 1; i >= 0; --i) {
+        if (m_mutationCalls.at(i).mutation == mutation) {
+            return m_mutationCalls.at(i).targetKey;
+        }
+    }
+    return {};
+}
+
+void MockDockerBackend::completeMutations(MutationOutcome outcome, const DockerError &error)
+{
+    const QList<MutationCall> calls = std::exchange(m_mutationCalls, {});
+    for (const MutationCall &call : calls) {
+        Q_EMIT mutationFinished(call.mutation, call.targetKey, outcome, error);
+    }
+}
+
+void MockDockerBackend::emitPullProgress(const ImagePullProgress &progress)
+{
+    Q_EMIT imagePullProgress(progress);
+}
+
+void MockDockerBackend::startContainer(const QString &id)
+{
+    m_mutationCalls.append({Mutation::StartContainer, QStringLiteral("container:") + id, false});
+}
+
+void MockDockerBackend::stopContainer(const QString &id)
+{
+    m_mutationCalls.append({Mutation::StopContainer, QStringLiteral("container:") + id, false});
+}
+
+void MockDockerBackend::restartContainer(const QString &id)
+{
+    m_mutationCalls.append({Mutation::RestartContainer, QStringLiteral("container:") + id, false});
+}
+
+void MockDockerBackend::removeContainer(const QString &id)
+{
+    m_mutationCalls.append({Mutation::RemoveContainer, QStringLiteral("container:") + id, false});
+}
+
+void MockDockerBackend::pullImage(const QString &reference)
+{
+    m_mutationCalls.append({Mutation::PullImage, QStringLiteral("image:") + reference, false});
+}
+
+void MockDockerBackend::cancelImagePull()
+{
+    m_pullCancelled = true;
+}
+
+void MockDockerBackend::removeImage(const QString &id, bool force)
+{
+    m_mutationCalls.append({Mutation::RemoveImage, QStringLiteral("image:") + id, force});
+}
+
 void MockDockerBackend::completeRefresh()
 {
     const QList<Section> sections = {Section::Engine,

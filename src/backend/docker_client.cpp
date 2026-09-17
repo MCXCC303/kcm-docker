@@ -20,14 +20,30 @@ namespace Kontainer
 namespace
 {
 constexpr int minimumTimeoutMs = 1000;
+
+const char *methodName(DockerReply::Method method)
+{
+    switch (method) {
+    case DockerReply::Method::Get:
+        return "GET";
+    case DockerReply::Method::Post:
+        return "POST";
+    case DockerReply::Method::Delete:
+        return "DELETE";
+    }
+    return "GET";
 }
 
-DockerReply::DockerReply(DockerEndpoint endpoint, QString path, QUrlQuery query, int timeoutMs, QObject *parent)
+bool methodSendsBody(DockerReply::Method method)
+{
+    return method == DockerReply::Method::Post || method == DockerReply::Method::Delete;
+}
+} // namespace
+
+DockerReply::DockerReply(DockerEndpoint endpoint, Request request, QObject *parent)
     : QObject(parent)
     , m_endpoint(std::move(endpoint))
-    , m_path(std::move(path))
-    , m_query(std::move(query))
-    , m_timeoutMs(timeoutMs)
+    , m_request(std::move(request))
 {
     m_parser = std::make_unique<HttpResponseParser>();
     m_socket = new QLocalSocket(this);
@@ -56,7 +72,7 @@ void DockerReply::start()
                               QStringLiteral("socket %1 does not exist").arg(m_endpoint.socketPath())));
         return;
     }
-    m_timer->start(m_timeoutMs);
+    m_timer->start(m_request.timeoutMs);
     m_socket->connectToServer(m_endpoint.socketPath());
 }
 
@@ -74,14 +90,20 @@ void DockerReply::onConnected()
     }
 
     QByteArray request;
-    request += "GET " + m_path.toUtf8();
-    if (!m_query.isEmpty()) {
-        request += "?" + m_query.toString(QUrl::FullyEncoded).toUtf8();
+    request += methodName(m_request.method);
+    request += ' ';
+    request += m_request.path.toUtf8();
+    if (!m_request.query.isEmpty()) {
+        request += "?" + m_request.query.toString(QUrl::FullyEncoded).toUtf8();
     }
     request += " HTTP/1.1\r\n";
     request += "Host: docker\r\n";
     request += "Accept: application/json\r\n";
     request += "User-Agent: kontainer/" KONTAINER_VERSION "\r\n";
+    if (methodSendsBody(m_request.method)) {
+        // 四期的写操作都没有请求体；显式声明长度比留空更稳妥
+        request += "Content-Length: 0\r\n";
+    }
     request += "Connection: close\r\n\r\n";
 
     m_socket->write(request);
@@ -94,6 +116,19 @@ void DockerReply::onReadyRead()
         return;
     }
     m_parser->feed(m_socket->readAll());
+
+    notifyStreamStarted();
+
+    // 流式响应：超时语义是「多久没有新数据」，每次收到数据就重新计时
+    if (m_request.streaming) {
+        m_timer->start(m_request.timeoutMs);
+    }
+
+    if (m_parser->body().size() != m_seenBodyBytes) {
+        m_seenBodyBytes = m_parser->body().size();
+        Q_EMIT bodyChunk();
+    }
+
     processBuffer();
 }
 
@@ -104,10 +139,24 @@ void DockerReply::onDisconnected()
     }
     // Connection: close 的正常结束路径
     m_parser->finishInput();
+    notifyStreamStarted();
+    if (m_parser->body().size() != m_seenBodyBytes) {
+        m_seenBodyBytes = m_parser->body().size();
+        Q_EMIT bodyChunk();
+    }
     processBuffer();
     if (!isFinished()) {
         fail(DockerError(DockerError::Kind::InvalidResponse, m_parser->errorString()));
     }
+}
+
+void DockerReply::notifyStreamStarted()
+{
+    if (m_streamStarted || m_parser->statusCode() == 0) {
+        return;
+    }
+    m_streamStarted = true;
+    Q_EMIT streamStarted();
 }
 
 void DockerReply::processBuffer()
@@ -125,7 +174,9 @@ void DockerReply::processBuffer()
 
     const int status = m_parser->statusCode();
     const QByteArray body = m_parser->body();
-    if (status >= 200 && status < 300) {
+    // 304 只可能来自 start（已运行）/ stop（已停止）：那是「已处于目标状态」，
+    // 属于成功语义，由 backend 落成 MutationOutcome::Unchanged（ARCH_V4 §2.2.1）。
+    if ((status >= 200 && status < 300) || status == 304) {
         succeed(status, body);
     } else {
         fail(errorFromResponse(status, body));
@@ -168,8 +219,18 @@ void DockerReply::onTimeout()
     if (isFinished()) {
         return;
     }
+    if (m_request.streaming) {
+        fail(DockerError(DockerError::Kind::Timeout,
+                         QStringLiteral("no data within %1 ms").arg(m_request.timeoutMs)));
+        return;
+    }
     fail(DockerError(DockerError::Kind::Timeout,
-                     QStringLiteral("no response within %1 ms").arg(m_timeoutMs)));
+                     QStringLiteral("no response within %1 ms").arg(m_request.timeoutMs)));
+}
+
+QByteArray DockerReply::takeBody()
+{
+    return m_parser->takeBody();
 }
 
 void DockerReply::succeed(int httpStatus, QByteArray body)
@@ -191,6 +252,19 @@ void DockerReply::fail(const DockerError &error)
     Q_EMIT finished();
 }
 
+void DockerReply::cancel()
+{
+    if (isFinished()) {
+        return;
+    }
+    // 先落状态再 abort：abort() 会同步触发 disconnected/errorOccurred，
+    // 那些回调看到「已经结束」才会正确退出（否则会先 succeed() 再发第二次 finished()）
+    m_state = State::Cancelled;
+    m_timer->stop();
+    m_socket->abort();
+    Q_EMIT finished();
+}
+
 DockerClient::DockerClient(QObject *parent)
     : QObject(parent)
 {
@@ -205,23 +279,48 @@ void DockerClient::setTimeoutMs(int timeoutMs)
 
 DockerReply *DockerClient::getUnversioned(const QString &apiPath)
 {
-    return startRequest(apiPath, QUrlQuery());
+    return request(DockerReply::Method::Get, apiPath, QUrlQuery(), m_timeoutMs, false);
 }
 
 DockerReply *DockerClient::get(const QString &apiPath, const QUrlQuery &query)
+{
+    return request(DockerReply::Method::Get, apiPath, query, m_timeoutMs, false);
+}
+
+DockerReply *DockerClient::post(const QString &apiPath, const QUrlQuery &query, int timeoutMs)
+{
+    return request(DockerReply::Method::Post, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false);
+}
+
+DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, int timeoutMs)
+{
+    return request(DockerReply::Method::Delete, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false);
+}
+
+DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs)
+{
+    return request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true);
+}
+
+DockerReply *DockerClient::request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming)
 {
     QString path = apiPath;
     if (m_apiVersion.isValid()) {
         path = QLatin1Char('/') + m_apiVersion.pathPrefix() + apiPath;
     }
-    return startRequest(path, query);
-}
 
-DockerReply *DockerClient::startRequest(const QString &path, const QUrlQuery &query)
-{
-    // 只记录方法与路径：不记录 header、payload 或响应体（ARCH_V1 §27）
-    qCDebug(kontainerApi) << "GET" << path;
-    auto *reply = new DockerReply(m_endpoint, path, query, m_timeoutMs, this);
+    // 只记录方法与路径：不记录 header、payload、query 或响应体（ARCH_V1 §27）。
+    // query 里可能含镜像引用等用户数据，因此不进日志。
+    qCDebug(kontainerApi) << methodName(method) << path;
+
+    DockerReply::Request request;
+    request.method = method;
+    request.path = path;
+    request.query = query;
+    request.timeoutMs = std::max(minimumTimeoutMs, timeoutMs);
+    request.streaming = streaming;
+
+    auto *reply = new DockerReply(m_endpoint, request, this);
     reply->start();
     return reply;
 }

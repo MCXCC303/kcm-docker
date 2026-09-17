@@ -34,6 +34,7 @@ StatusController::StatusController(DockerBackendInterface *backend, QObject *par
     , m_imageFilter(new ImageFilterModel(this))
     , m_containerDetail(new ContainerDetailController(backend, this))
     , m_imageDetail(new ImageDetailController(backend, this))
+    , m_operations(new OperationController(backend, this))
 {
     Q_ASSERT(m_backend);
     // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
@@ -50,6 +51,14 @@ StatusController::StatusController(DockerBackendInterface *backend, QObject *par
     connect(m_backend, &DockerBackendInterface::sectionFailed, this, &StatusController::onSectionFailed);
     connect(m_scheduler, &RefreshScheduler::stateChanged, this, &StatusController::refreshStateChanged);
     connect(m_scheduler, &RefreshScheduler::autoRefreshEnabledChanged, this, &StatusController::autoRefreshEnabledChanged);
+
+    // 写后即读（ARCH_V4 §2.2.4）：操作成功后让打开着的详情页静默重读，
+    // 否则状态徽标与资源分区要等到下一次 30 秒复核才会跟上
+    connect(m_operations, &OperationController::containerStateChanged, this, [this](const QString &id) {
+        if (m_containerDetail->containerId() == id) {
+            m_containerDetail->reload();
+        }
+    });
 }
 
 StatusController::~StatusController() = default;

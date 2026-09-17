@@ -35,6 +35,24 @@ inline constexpr std::chrono::seconds kDetailRefreshInterval{30};
 /*! 单次 HTTP 请求超时（Docker socket 本地调用，10 秒足够）。 */
 inline constexpr std::chrono::seconds kRequestTimeout{10};
 
+/*!
+ * 写操作（start / stop / restart / remove / 删除镜像）的超时（ARCH_V4 §2.2.1）。
+ * 比只读请求宽：引擎可能需要先做 cgroup / 文件系统操作。
+ */
+inline constexpr std::chrono::seconds kMutationTimeout{30};
+
+/*!
+ * `POST /containers/{id}/stop?t=` 的等待秒数：先礼貌地终止，超时才强杀。
+ * 这个值由 backend 统一决定，不由 UI 传（ARCH_V4 §2.3）。
+ */
+inline constexpr int kStopTimeoutSeconds{10};
+
+/*!
+ * 流式请求（镜像拉取）的静默超时：多久没有新数据就算卡死。
+ * 拉取本身可以合法地跑很久，因此不能设总时长上限。
+ */
+inline constexpr std::chrono::seconds kPullIdleTimeout{60};
+
 /*! 资源采样连续失败多少次后停止轮询（容器可能已经停止）。 */
 inline constexpr int kMaxConsecutiveStatsFailures{3};
 

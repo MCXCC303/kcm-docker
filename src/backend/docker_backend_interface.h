@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include "backend/docker_endpoint.h"
 #include "backend/docker_error.h"
 #include "domain/container.h"
 #include "domain/container_detail.h"
@@ -12,6 +13,7 @@
 #include "domain/engine_info.h"
 #include "domain/image.h"
 #include "domain/image_detail.h"
+#include "domain/image_pull_progress.h"
 #include "domain/storage_usage.h"
 
 #include <QList>
@@ -20,6 +22,24 @@
 
 namespace Kontainer
 {
+
+/*!
+ * 写操作目标 key 的唯一构造点（ARCH_V4 §2.2.4）。
+ *
+ * backend 与 model 必须用同一套前缀：界面用 `isTargetBusy(key)` 判断某个对象
+ * 是否有操作在途，两边拼法一旦分叉，忙碌态就会静默失效。
+ */
+namespace OperationTarget
+{
+inline QString container(const QString &id)
+{
+    return QStringLiteral("container:") + id;
+}
+inline QString image(const QString &reference)
+{
+    return QStringLiteral("image:") + reference;
+}
+} // namespace OperationTarget
 
 /*!
  * Backend 抽象（ARCH_V1 §30 / ARCH_V2 §42）。
@@ -47,6 +67,27 @@ public:
     };
     Q_ENUM(Section)
 
+    /*! 写操作（ARCH_V4 §2.2.4 / §2.3 / §2.4）。 */
+    enum class Mutation {
+        StartContainer,
+        StopContainer,
+        RestartContainer,
+        RemoveContainer,
+        PullImage,
+        RemoveImage,
+    };
+    Q_ENUM(Mutation)
+
+    /*! 取消不是错误，因此结果不能只看 DockerError（ARCH_V4 §2.2.1）。 */
+    enum class MutationOutcome {
+        Succeeded,
+        /*! 引擎返回 304：已经处于目标状态（重复 start / stop）。 */
+        Unchanged,
+        Failed,
+        Cancelled,
+    };
+    Q_ENUM(MutationOutcome)
+
     explicit DockerBackendInterface(QObject *parent = nullptr);
     ~DockerBackendInterface() override;
 
@@ -71,6 +112,27 @@ public:
      * 这只结束本地请求生命周期，不属于 Docker mutation。
      */
     virtual void stopContainerStats(const QString &id) = 0;
+
+    /* --- 写操作（ARCH_V4 §2.2.4） ---------------------------------------------
+     *
+     * 表达「我要改变什么」，不表达 HTTP 细节；调用方是 OperationController，
+     * QML 永远不直接调这些方法（ARCH_V4 §1.5 的咽喉点约束）。
+     * 每个操作恰好发一次 mutationFinished()；拉取额外发若干次 imagePullProgress()。
+     */
+    virtual void startContainer(const QString &id) = 0;
+    /*! `t` 由实现统一取 RefreshPolicy::kStopTimeoutSeconds，不由 UI 传。 */
+    virtual void stopContainer(const QString &id) = 0;
+    virtual void restartContainer(const QString &id) = 0;
+    /*! 删除容器；不带 `v`（不删卷）、不带 `force`（运行中必须由引擎拒绝）。 */
+    virtual void removeContainer(const QString &id) = 0;
+    virtual void pullImage(const QString &reference) = 0;
+    /*! 取消在途拉取；没有在途拉取时是空操作。 */
+    virtual void cancelImagePull() = 0;
+    /*! `force=true` 用于多标签镜像的强制删除（引擎在 409 时要求）。 */
+    virtual void removeImage(const QString &id, bool force) = 0;
+
+    /*! 当前端点：权限门（DockerCapabilities）据此判断可写性。 */
+    virtual DockerEndpoint endpoint() const = 0;
 
     /*! 是否有请求在途。 */
     virtual bool isLoading() const = 0;
@@ -104,6 +166,17 @@ Q_SIGNALS:
     void loadingChanged();
     /*! 某个数据集的失败；任何后端失败都必须是可观察的（ARCH_V1 §23.1）。 */
     void sectionFailed(Kontainer::DockerBackendInterface::Section section, const Kontainer::DockerError &error);
+
+    /*!
+     * 一次写操作的结束（成功 / 失败 / 被取消）。
+     * `targetKey` 与 OperationController 的 targetKey 同构：`container:<id>` / `image:<ref>`。
+     */
+    void mutationFinished(Kontainer::DockerBackendInterface::Mutation mutation,
+                          const QString &targetKey,
+                          Kontainer::DockerBackendInterface::MutationOutcome outcome,
+                          const Kontainer::DockerError &error);
+    /*! 拉取进度（引擎每报告一行就聚合一次）。 */
+    void imagePullProgress(const Kontainer::ImagePullProgress &progress);
 };
 
 } // namespace Kontainer

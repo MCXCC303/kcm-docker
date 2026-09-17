@@ -30,6 +30,9 @@ public:
         Timeout, /*!< 请求超时 */
         ApiVersionMismatch, /*!< 客户端与服务端 API 版本无交集 */
         NotFound, /*!< HTTP 404 */
+        Conflict, /*!< HTTP 409：与当前状态冲突（容器在运行 / 镜像被引用 / 名称冲突） */
+        /*! 请求根本没有发出：前置条件不满足（重复拉取、非法输入等）。 */
+        PreconditionFailed,
         HttpError, /*!< 其他 4xx */
         EngineError, /*!< 5xx */
         InvalidResponse, /*!< 不是合法 HTTP 响应 */

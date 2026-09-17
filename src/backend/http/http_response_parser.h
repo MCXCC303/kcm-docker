@@ -68,6 +68,13 @@ public:
     {
         return m_body;
     }
+    /*!
+     * 取走尚未被消费的响应体增量（ARCH_V4 §2.2.1）。
+     *
+     * `body()` 的全量语义不变；本方法只把「已取走」的位置向前推进，
+     * 供流式响应（镜像拉取进度）边收边解析。非流式调用方完全不需要它。
+     */
+    QByteArray takeBody();
     QString errorString() const
     {
         return m_errorString;
@@ -89,6 +96,8 @@ private:
 
     QByteArray m_buffer;
     QByteArray m_body;
+    /*! 已被 takeBody() 取走的字节数（body() 仍然返回全量）。 */
+    qsizetype m_bodyConsumed = 0;
     QList<QPair<QByteArray, QByteArray>> m_headers;
 
     qint64 m_expectedBody = 0;

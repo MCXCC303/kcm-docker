@@ -223,6 +223,13 @@ public Q_SLOTS:
     void stop();
     /*! 详情加载失败后的重试（§31）。 */
     void refresh();
+    /*!
+     * 静默重读（ARCH_V4 §2.2.4「写后即读」）。
+     *
+     * 写操作成功后调用：不把页面打回 loading（否则会闪一下「正在加载」），
+     * 只重新 inspect 一次，让状态徽标、资源分区与统计采样跟着切换。
+     */
+    void reload();
 
 Q_SIGNALS:
     void containerIdChanged();

@@ -36,10 +36,35 @@ public:
     void setImageDetail(const ImageDetail &detail);
     void setContainerStats(const ContainerStats &stats);
     void setEndpointName(const QString &name);
+    /*! 权限门（DockerCapabilities）会读这个 endpoint；测试用它构造可写 / 不可写场景。 */
+    void setEndpoint(const DockerEndpoint &endpoint);
 
     /*! 让指定 dataset 的下一次刷新失败。 */
     void setNextFailure(Section section, const DockerError &error);
     void clearFailures();
+
+    /* --- 写操作（ARCH_V4 §2.2.4） --- */
+    struct MutationCall {
+        Mutation mutation = Mutation::StartContainer;
+        QString targetKey;
+        /*! 删除镜像时的 force 标记。 */
+        bool force = false;
+    };
+    /*! 已发出但还没结束的写操作。 */
+    QList<MutationCall> mutationCalls() const
+    {
+        return m_mutationCalls;
+    }
+    int mutationCount(Mutation mutation) const;
+    QString lastMutationTarget(Mutation mutation) const;
+    bool pullCancelled() const
+    {
+        return m_pullCancelled;
+    }
+    /*! 结束全部在途写操作（默认成功）；可指定结果与错误。 */
+    void completeMutations(MutationOutcome outcome = MutationOutcome::Succeeded, const DockerError &error = DockerError());
+    /*! 模拟引擎推送一条拉取进度。 */
+    void emitPullProgress(const ImagePullProgress &progress);
 
     /*! 结束当前这一轮刷新：发出 *Updated / sectionFailed / loadingChanged。 */
     void completeRefresh();
@@ -60,6 +85,15 @@ public:
     void inspectImage(const QString &id) override;
     void requestContainerStats(const QString &id) override;
     void stopContainerStats(const QString &id) override;
+
+    DockerEndpoint endpoint() const override;
+    void startContainer(const QString &id) override;
+    void stopContainer(const QString &id) override;
+    void restartContainer(const QString &id) override;
+    void removeContainer(const QString &id) override;
+    void pullImage(const QString &reference) override;
+    void cancelImagePull() override;
+    void removeImage(const QString &id, bool force) override;
     bool isLoading() const override;
     bool isRefreshingFastData() const override;
     QString endpointDisplayName() const override;
@@ -89,6 +123,10 @@ private:
     QHash<int, bool> m_pending;
     QHash<int, DockerError> m_failures;
     QHash<int, int> m_refreshCounts;
+
+    DockerEndpoint m_endpoint;
+    QList<MutationCall> m_mutationCalls;
+    bool m_pullCancelled = false;
 };
 
 } // namespace Kontainer

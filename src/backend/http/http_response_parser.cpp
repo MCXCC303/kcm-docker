@@ -20,12 +20,23 @@ void HttpResponseParser::reset()
     m_bodyMode = BodyMode::None;
     m_buffer.clear();
     m_body.clear();
+    m_bodyConsumed = 0;
     m_headers.clear();
     m_expectedBody = 0;
     m_chunkRemaining = 0;
     m_statusCode = 0;
     m_reasonPhrase.clear();
     m_errorString.clear();
+}
+
+QByteArray HttpResponseParser::takeBody()
+{
+    if (m_bodyConsumed >= m_body.size()) {
+        return {};
+    }
+    const QByteArray delta = m_body.mid(m_bodyConsumed);
+    m_bodyConsumed = m_body.size();
+    return delta;
 }
 
 void HttpResponseParser::feed(const QByteArray &data)
