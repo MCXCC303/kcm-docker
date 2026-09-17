@@ -656,6 +656,36 @@ int main(int argc, char **argv)
     // 否则截图上会停在"还没有数据"的中间态（真实环境里刷新是异步完成的）
     backend->completeRefresh();
 
+    // KONTAINER_RENDER_REMOVE_NETWORK=1：打开删除网络的确认对话框（复核后果说明）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_REMOVE_NETWORK")) {
+        QObject *removeDialog = item->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
+        if (removeDialog) {
+            QMetaObject::invokeMethod(removeDialog, "open");
+        }
+    }
+
+    // KONTAINER_RENDER_CREATE_NETWORK=1：打开创建网络对话框（复核表单排版与校验提示）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CREATE_NETWORK")) {
+        QQuickItem *createButton = nullptr;
+        std::function<void(QQuickItem *)> walkCreate = [&](QQuickItem *node) {
+            if (!node || createButton) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("createNetworkEntryButton")) {
+                createButton = node;
+                return;
+            }
+            const QList<QQuickItem *> children = node->childItems();
+            for (QQuickItem *child : children) {
+                walkCreate(child);
+            }
+        };
+        walkCreate(item);
+        if (createButton) {
+            QMetaObject::invokeMethod(createButton, "clicked");
+        }
+    }
+
     // KONTAINER_RENDER_LOGS=1：往日志控制台灌一些输出（复核等宽控制台与状态条）
     if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LOGS")) {
         QList<Kontainer::LogLine> lines;

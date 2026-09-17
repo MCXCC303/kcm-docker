@@ -30,11 +30,31 @@ Kirigami.Page {
     /*! 跳到成员容器的详情（由 main.qml 负责导航）。 */
     signal containerRequested(string containerId)
 
+    readonly property var operations: kcm.controller.operations
+    /*!
+     * 这是不是 daemon 预定义网络（`bridge` / `host` / `none`）。
+     *
+     * 预定义网络删不掉：daemon 会回 403 `is a pre-defined network`。界面上**不出现**
+     * 删除入口，并在页面里说明原因——不让用户点到最后才失败（§3.2/§3.3）。
+     */
+    readonly property bool removable: page.controller.valid && !page.controller.predefined
+    /*! 删除会不会影响已连接的容器（确认文案要写清楚）。 */
+    readonly property int connectedCount: page.controller.memberCount
+
     objectName: "networkDetailPage"
 
     Component.onCompleted: page.controller.setNetworkId(page.networkId)
 
     actions: [
+        Kirigami.Action {
+            objectName: "removeNetworkAction"
+            text: i18n("Remove network…")
+            icon.name: "edit-delete"
+            // 内置网络、没有写权限、或有操作在途时不出现/不可用
+            visible: page.removable && page.operations.writeAllowed
+            enabled: !page.operations.isTargetBusy("network:" + page.networkId)
+            onTriggered: removeNetworkDialog.open()
+        },
         Kirigami.Action {
             text: i18n("Back")
             icon.name: "go-previous"
@@ -247,6 +267,24 @@ Kirigami.Page {
                     Layout.fillHeight: true
                 }
             }
+        }
+    }
+
+    Components.ConfirmDialog {
+        id: removeNetworkDialog
+
+        objectName: "removeNetworkDialog"
+        headingText: i18n("Remove network")
+        questionText: i18n("Remove the network “%1”?", page.controller.name)
+        // 后果说明是必填：连着的容器会失去这个网络（这正是用户需要知道的）
+        consequenceText: page.connectedCount > 0
+            ? i18ncp("@info network removal consequence", "One connected container loses this network.", "%1 connected containers lose this network.", page.connectedCount)
+            : i18n("No container is connected to this network.")
+        acceptText: i18n("Remove")
+        destructive: true
+        onConfirmed: {
+            page.operations.removeNetwork(page.networkId, page.controller.name);
+            page.closeRequested();
         }
     }
 }

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 03:32+0800\n"
+"POT-Creation-Date: 2026-09-18 03:46+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -184,14 +184,14 @@ msgstr ""
 
 #: src/model/operation_controller.cpp:187
 #: src/model/operation_controller.cpp:290
-#: src/model/operation_controller.cpp:364
-#: src/model/operation_controller.cpp:406
+#: src/model/operation_controller.cpp:394
+#: src/model/operation_controller.cpp:436
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr ""
 
 #: src/model/operation_controller.cpp:192
-#: src/model/operation_controller.cpp:388
-#: src/model/operation_controller.cpp:414
+#: src/model/operation_controller.cpp:418
+#: src/model/operation_controller.cpp:444
 msgid "Another operation on this object is still running."
 msgstr ""
 
@@ -223,94 +223,94 @@ msgstr ""
 msgid "This image is already being pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:338
+#: src/model/operation_controller.cpp:368
 msgid "The network was not created because the name is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:343
+#: src/model/operation_controller.cpp:373
 msgid "The network was not created because the subnet is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:348
+#: src/model/operation_controller.cpp:378
 msgid "The network was not created because the gateway is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:356
+#: src/model/operation_controller.cpp:386
 msgid "The network was not created because the name is already in use."
 msgstr ""
 
-#: src/model/operation_controller.cpp:364
+#: src/model/operation_controller.cpp:394
 msgid "creating the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:406
+#: src/model/operation_controller.cpp:436
 msgid "removing the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:499
+#: src/model/operation_controller.cpp:529
 msgid "removing the image"
 msgstr ""
 
-#: src/model/operation_controller.cpp:580
+#: src/model/operation_controller.cpp:610
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:580
+#: src/model/operation_controller.cpp:610
 msgid "Operation cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:641
+#: src/model/operation_controller.cpp:671
 msgid "Container started."
 msgstr ""
 
-#: src/model/operation_controller.cpp:643
+#: src/model/operation_controller.cpp:673
 msgid "Container stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:645
+#: src/model/operation_controller.cpp:675
 msgid "Container restarted."
 msgstr ""
 
-#: src/model/operation_controller.cpp:647
+#: src/model/operation_controller.cpp:677
 msgid "Container removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:650
+#: src/model/operation_controller.cpp:680
 msgid "Image pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:653
+#: src/model/operation_controller.cpp:683
 msgid "Image removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:656
+#: src/model/operation_controller.cpp:686
 msgid "Network created: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:659
+#: src/model/operation_controller.cpp:689
 msgid "Network removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:661
+#: src/model/operation_controller.cpp:691
 msgid "Done."
 msgstr ""
 
-#: src/model/operation_controller.cpp:669
+#: src/model/operation_controller.cpp:699
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr ""
 
-#: src/model/operation_controller.cpp:679
+#: src/model/operation_controller.cpp:709
 msgid "The container is already running."
 msgstr ""
 
-#: src/model/operation_controller.cpp:681
+#: src/model/operation_controller.cpp:711
 msgid "The container is already stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:683
+#: src/model/operation_controller.cpp:713
 msgid "Nothing to do: the object is already in the requested state."
 msgstr ""
 
@@ -332,6 +332,7 @@ msgid "IPv6"
 msgstr ""
 
 #: src/model/container_detail_controller.cpp:242
+#: src/ui/components/CreateNetworkDialog.qml:160
 msgid "Gateway"
 msgstr ""
 
@@ -365,8 +366,8 @@ msgstr ""
 #: src/ui/components/CopyableText.qml:50 src/ui/components/StorageBar.qml:85
 #: src/ui/StorageView.qml:33 src/ui/ResourceView.qml:34
 #: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
-#: src/ui/MainPage.qml:335 src/ui/NetworkDetail.qml:135
-#: src/ui/NetworkDetail.qml:141
+#: src/ui/MainPage.qml:335 src/ui/NetworkDetail.qml:155
+#: src/ui/NetworkDetail.qml:161
 msgid "—"
 msgstr ""
 
@@ -377,7 +378,7 @@ msgstr ""
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:359
 #: src/ui/ContainerDetail.qml:189 src/ui/MainPage.qml:44
-#: src/ui/MainPage.qml:733
+#: src/ui/MainPage.qml:745
 msgid "Containers"
 msgstr ""
 
@@ -519,7 +520,7 @@ msgstr ""
 
 #: src/ui/components/KeyValueListEditor.qml:131
 #: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:286
-#: src/ui/RegistryAuthPage.qml:406
+#: src/ui/RegistryAuthPage.qml:406 src/ui/NetworkDetail.qml:283
 msgid "Remove"
 msgstr ""
 
@@ -689,6 +690,79 @@ msgstr ""
 msgid "Logs are read only while this tab is open."
 msgstr ""
 
+#: src/ui/components/CreateNetworkDialog.qml:34
+msgid "Create network"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:42
+msgid "Enter a name for the network."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:44
+msgid ""
+"Use letters, digits, underscore, dot or dash, and do not start with a "
+"separator."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:46
+msgid "A network with this name already exists."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:48
+msgid "Enter a subnet in CIDR form, for example 172.30.0.0/16."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:50
+msgid "A gateway needs a subnet to belong to."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:52
+msgid "Enter a valid gateway address inside the subnet."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:125
+msgid ""
+"Only bridge networks can be created here. Use the docker CLI for overlay, "
+"macvlan or ipvlan."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:136
+#: src/ui/components/CreateNetworkDialog.qml:137
+msgid "Network name"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:150
+msgid "Subnet (optional, for example 172.30.0.0/16)"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:151
+msgid "Subnet"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:159
+msgid "Gateway (optional)"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:167
+msgid "Leave the subnet empty to let Docker pick one."
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:177
+msgid "Internal network (no external access)"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:184
+msgid "Allow containers to be attached at runtime"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
+msgid "Labels"
+msgstr ""
+
+#: src/ui/components/CreateNetworkDialog.qml:205
+msgid "Create"
+msgstr ""
+
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr ""
@@ -762,7 +836,7 @@ msgstr ""
 
 #: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:236 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
-#: src/ui/NetworkDetail.qml:39
+#: src/ui/NetworkDetail.qml:59
 msgid "Back"
 msgstr ""
 
@@ -799,7 +873,7 @@ msgid "Image ID:"
 msgstr ""
 
 #: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:346
-#: src/ui/NetworkDetail.qml:146
+#: src/ui/NetworkDetail.qml:166
 msgid "Created:"
 msgstr ""
 
@@ -912,7 +986,7 @@ msgstr ""
 msgid "IPv6:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:77 src/ui/NetworkDetail.qml:140
+#: src/ui/ContainerDetail.qml:77 src/ui/NetworkDetail.qml:160
 msgid "Gateway:"
 msgstr ""
 
@@ -1024,7 +1098,7 @@ msgid "OOM killed:"
 msgstr ""
 
 #: src/ui/ContainerDetail.qml:387 src/ui/DaemonConfigPage.qml:92
-#: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:152
+#: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:172
 msgid "Yes"
 msgstr ""
 
@@ -1458,60 +1532,64 @@ msgstr ""
 msgid "Search by name, ID, driver or subnet…"
 msgstr ""
 
-#: src/ui/MainPage.qml:715
+#: src/ui/MainPage.qml:712
+msgid "Create network…"
+msgstr ""
+
+#: src/ui/MainPage.qml:727
 msgid "All networks"
 msgstr ""
 
-#: src/ui/MainPage.qml:716
+#: src/ui/MainPage.qml:728
 msgid "Built-in"
 msgstr ""
 
-#: src/ui/MainPage.qml:717
+#: src/ui/MainPage.qml:729
 msgid "User-defined"
 msgstr ""
 
-#: src/ui/MainPage.qml:730
+#: src/ui/MainPage.qml:742
 msgid "Name"
 msgstr ""
 
-#: src/ui/MainPage.qml:731
+#: src/ui/MainPage.qml:743
 msgid "Driver"
 msgstr ""
 
-#: src/ui/MainPage.qml:732
+#: src/ui/MainPage.qml:744
 msgid "Scope"
 msgstr ""
 
-#: src/ui/MainPage.qml:745
+#: src/ui/MainPage.qml:757
 msgid "No network matches the current search or filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:746
+#: src/ui/MainPage.qml:758
 msgid "No networks found."
 msgstr ""
 
-#: src/ui/MainPage.qml:748
+#: src/ui/MainPage.qml:760
 msgid "Clear the search field or switch the filter back to “All networks”."
 msgstr ""
 
-#: src/ui/MainPage.qml:750
+#: src/ui/MainPage.qml:762
 msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr ""
 
-#: src/ui/MainPage.qml:752
+#: src/ui/MainPage.qml:764
 msgid "Clear filters"
 msgstr ""
 
-#: src/ui/MainPage.qml:795
+#: src/ui/MainPage.qml:807
 msgid "User configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:802
+#: src/ui/MainPage.qml:814
 msgid "System configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:809
+#: src/ui/MainPage.qml:821
 msgid ""
 "Registry mirrors and other daemon settings. The system configuration needs "
 "administrator rights."
@@ -1538,7 +1616,7 @@ msgid "Writable by the current user"
 msgstr ""
 
 #: src/ui/DaemonConfigPage.qml:92 src/ui/DaemonConfigPage.qml:96
-#: src/ui/NetworkDetail.qml:152
+#: src/ui/NetworkDetail.qml:172
 msgid "No"
 msgstr ""
 
@@ -2034,16 +2112,16 @@ msgstr ""
 msgid "Network %1"
 msgstr ""
 
-#: src/ui/NetworkCard.qml:83 src/ui/NetworkDetail.qml:94
+#: src/ui/NetworkCard.qml:83 src/ui/NetworkDetail.qml:114
 msgid "built-in"
 msgstr ""
 
-#: src/ui/NetworkCard.qml:90 src/ui/NetworkDetail.qml:100
+#: src/ui/NetworkCard.qml:90 src/ui/NetworkDetail.qml:120
 msgid "internal"
 msgstr ""
 
 #: src/ui/NetworkCard.qml:101 src/ui/NetworkCard.qml:127
-#: src/ui/NetworkDetail.qml:125
+#: src/ui/NetworkDetail.qml:145
 msgid "network ID"
 msgstr ""
 
@@ -2054,39 +2132,54 @@ msgid_plural "%1 containers"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/NetworkDetail.qml:54
+#: src/ui/NetworkDetail.qml:51
+msgid "Remove network…"
+msgstr ""
+
+#: src/ui/NetworkDetail.qml:74
 msgid "This network no longer exists."
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:72
+#: src/ui/NetworkDetail.qml:92
 msgid "Network"
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:113
+#: src/ui/NetworkDetail.qml:133
 msgid "This network is built into Docker and cannot be removed."
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:134
+#: src/ui/NetworkDetail.qml:154
 msgid "Subnet:"
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:151
+#: src/ui/NetworkDetail.qml:171
 msgid "Attachable:"
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:160
+#: src/ui/NetworkDetail.qml:180
 msgctxt "@title:section network members"
 msgid "Connected containers"
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:166
+#: src/ui/NetworkDetail.qml:186 src/ui/NetworkDetail.qml:282
 msgid "No container is connected to this network."
 msgstr ""
 
-#: src/ui/NetworkDetail.qml:225
-msgid "Labels"
-msgstr ""
-
-#: src/ui/NetworkDetail.qml:237
+#: src/ui/NetworkDetail.qml:257
 msgid "Driver options"
 msgstr ""
+
+#: src/ui/NetworkDetail.qml:277
+msgid "Remove network"
+msgstr ""
+
+#: src/ui/NetworkDetail.qml:278
+msgid "Remove the network “%1”?"
+msgstr ""
+
+#: src/ui/NetworkDetail.qml:281
+msgctxt "@info network removal consequence"
+msgid "One connected container loses this network."
+msgid_plural "%1 connected containers lose this network."
+msgstr[0] ""
+msgstr[1] ""

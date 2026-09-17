@@ -705,6 +705,18 @@ Kirigami.Page {
                         onTextChanged: root.networkList.searchText = text
                     }
 
+                    // 创建网络（六期 §3.3）：只读模式不出现入口，而不是禁用后静默
+                    QQC2.Button {
+                        objectName: "createNetworkEntryButton"
+                        visible: root.operations.writeAllowed
+                        text: i18n("Create network…")
+                        icon.name: "list-add"
+                        onClicked: {
+                            createNetworkDialog.reset();
+                            createNetworkDialog.open();
+                        }
+                    }
+
                     QQC2.ComboBox {
                         id: networkOriginCombo
 
@@ -828,6 +840,11 @@ Kirigami.Page {
     }
 
     /* 拉取镜像对话框（进度与取消也在这里） */
+    Components.CreateNetworkDialog {
+        id: createNetworkDialog
+        operations: root.operations
+    }
+
     Components.PullImageDialog {
         id: pullDialog
         operations: root.operations

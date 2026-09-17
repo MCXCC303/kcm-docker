@@ -325,6 +325,36 @@ void OperationController::setCredentialStore(CredentialStore *store)
     m_credentialStore = store;
 }
 
+QString OperationController::networkNameError(const QString &name) const
+{
+    return validateNetworkName(name);
+}
+
+QString OperationController::subnetError(const QString &subnet) const
+{
+    return validateSubnet(subnet);
+}
+
+QString OperationController::gatewayError(const QString &gateway, const QString &subnet) const
+{
+    return validateGateway(gateway, subnet);
+}
+
+bool OperationController::networkNameTaken(const QString &name) const
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        return false;
+    }
+    const QList<Network> networks = m_backend->networks();
+    for (const Network &network : networks) {
+        if (network.name.compare(trimmed, Qt::CaseInsensitive) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool OperationController::createNetwork(const QString &name,
                                         const QString &subnet,
                                         const QString &gateway,

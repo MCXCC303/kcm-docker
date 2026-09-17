@@ -37,6 +37,21 @@ using MutationOutcome = DockerBackendInterface::MutationOutcome;
 
 namespace
 {
+
+/*! 造一个当前进程可写的 socket 文件：权限门据此判定允许写。 */
+QString writableSocketPath()
+{
+    static QTemporaryDir dir;
+    const QString path = dir.path() + QStringLiteral("/docker.sock");
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write("x");
+        file.close();
+    }
+    QFile::setPermissions(path, QFile::ReadOwner | QFile::WriteOwner);
+    return path;
+}
+
 /*! 在已经实例化的页面里按 objectName 找控件（页面没有窗口，直接遍历子对象即可）。 */
 /*! 列表编辑器当前的行数（读它内部 Repeater 的 count）。 */
 int repeaterCount(QQuickItem *editor)
@@ -95,6 +110,8 @@ private Q_SLOTS:
     void topologyConnectionColorsAreStablePerContainer();
     void registryAuthPageReflectsWalletAndStoredCredentials();
     void networksTabListsAndOpensDetails();
+    void createNetworkDialogValidatesBeforeSubmitting();
+    void networkRemovalIsHiddenForBuiltInNetworks();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -790,6 +807,157 @@ void QmlLoadTest::networkDetailShowsMembersAndJumpsToContainers()
     QCOMPARE(m_stubKcm->controller()->networkDetail()->options()->count(), 1);
 }
 
+/*!
+ * 创建网络对话框（ARCH_V5_V8 §3.3）：校验在提交前发生，非法输入一个请求都不发。
+ */
+void QmlLoadTest::createNetworkDialogValidatesBeforeSubmitting()
+{
+    // 提交要走写权限门：先把 endpoint 指到一个当前进程可写的 socket
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    QList<Network> networks;
+    Network bridge;
+    bridge.id = QString(64, QLatin1Char('b'));
+    bridge.name = QStringLiteral("bridge");
+    bridge.driver = QStringLiteral("bridge");
+    networks.append(bridge);
+    m_backend->setNetworks(networks);
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/CreateNetworkDialog.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    QScopedPointer<QObject> dialog(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!dialog.isNull(), qPrintable(component.errorString()));
+
+    QQuickItem *nameField = findItemByName(dialog.data(), QStringLiteral("networkNameField"));
+    QQuickItem *subnetField = findItemByName(dialog.data(), QStringLiteral("networkSubnetField"));
+    QQuickItem *gatewayField = findItemByName(dialog.data(), QStringLiteral("networkGatewayField"));
+    QVERIFY(nameField && subnetField && gatewayField);
+    QVERIFY2(!dialog->property("canSubmit").toBool(), "an empty name must not be submittable");
+
+    // 非法名称：就地说明原因，且不能提交
+    nameField->setProperty("text", QStringLiteral("my net"));
+    QCOMPARE(dialog->property("currentError").toString(), QStringLiteral("nameInvalid"));
+    QVERIFY(!dialog->property("canSubmit").toBool());
+    // 对话内容在 Kirigami.Dialog 里可能有两份实例（弹层与管理器各一），
+    // 因此不去断言某一份实例的可见性，而是直接断言"这个 key 有对应文案"
+    QString message;
+    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "messageFor", Q_RETURN_ARG(QString, message),
+                                      Q_ARG(QString, QStringLiteral("nameInvalid"))));
+    QVERIFY2(!message.isEmpty(), "every validation key must have user-facing text");
+
+    // 与现有网络重名
+    nameField->setProperty("text", QStringLiteral("Bridge"));
+    QCOMPARE(dialog->property("currentError").toString(), QStringLiteral("nameInUse"));
+
+    // 网关没有子网
+    nameField->setProperty("text", QStringLiteral("app_net"));
+    gatewayField->setProperty("text", QStringLiteral("172.30.0.1"));
+    QCOMPARE(dialog->property("currentError").toString(), QStringLiteral("gatewayNeedsSubnet"));
+
+    // 合法输入：可以提交，并且真的发出请求
+    subnetField->setProperty("text", QStringLiteral("172.30.0.0/16"));
+    QCOMPARE(dialog->property("currentError").toString(), QString());
+    QVERIFY(dialog->property("canSubmit").toBool());
+
+    QSignalSpy createdSpy(dialog.data(), SIGNAL(created(QString)));
+    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "submit"));
+    QTRY_COMPARE(createdSpy.count(), 1);
+    QCOMPARE(m_backend->lastNetworkCreate().name, QStringLiteral("app_net"));
+    QCOMPARE(m_backend->lastNetworkCreate().subnet, QStringLiteral("172.30.0.0/16"));
+    QCOMPARE(m_backend->lastNetworkCreate().driver, QStringLiteral("bridge"));
+}
+
+/*!
+ * 删除入口的可见性（ARCH_V5_V8 §3.2/§3.3）：
+ * 内置网络**没有**删除入口（daemon 会回 403），只读模式同样不出现。
+ */
+void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
+{
+    QList<Network> networks;
+    Network builtin;
+    builtin.id = QString(64, QLatin1Char('b'));
+    builtin.name = QStringLiteral("bridge");
+    builtin.driver = QStringLiteral("bridge");
+    networks.append(builtin);
+    Network custom;
+    custom.id = QString(64, QLatin1Char('a'));
+    custom.name = QStringLiteral("app_default");
+    custom.driver = QStringLiteral("bridge");
+    custom.ipamConfigs.append({QStringLiteral("172.18.0.0/16"), QStringLiteral("172.18.0.1")});
+    NetworkMember member;
+    member.containerId = QString(64, QLatin1Char('1'));
+    member.name = QStringLiteral("app");
+    member.ipv4Address = QStringLiteral("172.18.0.2");
+    custom.members.append(member);
+    NetworkMember second = member;
+    second.containerId = QString(64, QLatin1Char('2'));
+    second.name = QStringLiteral("worker");
+    second.ipv4Address = QStringLiteral("172.18.0.3");
+    custom.members.append(second);
+    networks.append(custom);
+    m_backend->setNetworks(networks);
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    const auto loadPage = [this](const QString &networkId) {
+        auto component = std::make_unique<QQmlComponent>(m_engine.get(),
+                                                        QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/NetworkDetail.qml")));
+        if (component->isError()) {
+            return std::unique_ptr<QObject>();
+        }
+        QVariantMap initial;
+        initial.insert(QStringLiteral("networkId"), networkId);
+        return std::unique_ptr<QObject>(component->createWithInitialProperties(initial, m_engine->rootContext()));
+    };
+
+    // 内置网络：没有删除动作
+    std::unique_ptr<QObject> builtinObject = loadPage(builtin.id);
+    QVERIFY(builtinObject);
+    auto *builtinPage = qobject_cast<QQuickItem *>(builtinObject.get());
+    QVERIFY(builtinPage);
+    QQuickItem *notice = childByObjectName(builtinPage, QStringLiteral("networkPredefinedNotice"));
+    QVERIFY(notice);
+    QVERIFY2(notice->property("visible").toBool(), "the reason why it cannot be removed must be shown");
+    // Kirigami.Action 不是 QQuickItem：按对象名在对象树里找（否则这条断言会假通过）
+    QObject *removeAction = builtinPage->findChild<QObject *>(QStringLiteral("removeNetworkAction"));
+    QVERIFY2(removeAction, "the action must exist so that its visibility can be asserted");
+    QVERIFY2(!removeAction->property("visible").toBool(), "a built-in network must not offer a remove action");
+
+    // 自定义网络：有删除动作，且确认文案里写明"已连接的容器会失去该网络"
+    std::unique_ptr<QObject> customObject = loadPage(custom.id);
+    QVERIFY(customObject);
+    auto *customPage = qobject_cast<QQuickItem *>(customObject.get());
+    QVERIFY(customPage);
+    // Kirigami.Dialog 不是 QQuickItem：按对象名在对象树里找
+    QObject *removeDialog = customPage->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
+    QVERIFY2(removeDialog, "a user-defined network must offer a removal dialog");
+    const QString consequence = removeDialog->property("consequenceText").toString();
+    QVERIFY2(!consequence.isEmpty(), "the removal dialog must always carry a consequence");
+    // 两个成员 → 复数文案，且带上数量（用户必须知道会影响几个容器）
+    QVERIFY2(consequence.contains(QStringLiteral("2")), qPrintable(consequence));
+
+    // 只读模式：创建入口整体不出现（不是禁用后静默）
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(!m_stubKcm->controller()->operations()->writeAllowed());
+    QQmlComponent mainComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QVERIFY2(!mainComponent.isError(), qPrintable(mainComponent.errorString()));
+    QScopedPointer<QObject> mainObject(mainComponent.create(m_engine->rootContext()));
+    auto *mainPage = qobject_cast<QQuickItem *>(mainObject.data());
+    QVERIFY(mainPage);
+    QQuickItem *tabBar = childByObjectName(mainPage, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 2));
+    QQuickItem *createButton = childByObjectName(mainPage, QStringLiteral("createNetworkEntryButton"));
+    QVERIFY(createButton);
+    QVERIFY2(!createButton->property("visible").toBool(), "read-only mode must hide the create entry");
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -830,6 +998,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/KeyValueListEditor.qml"),
         QStringLiteral("components/RegistryLoginDialog.qml"),
         QStringLiteral("components/LogConsole.qml"),
+        QStringLiteral("components/CreateNetworkDialog.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
@@ -1297,20 +1466,6 @@ void QmlLoadTest::autoRefreshActionControlsTheScheduler()
 
 namespace
 {
-
-/*! 造一个当前进程可写的 socket 文件：权限门据此判定允许写。 */
-QString writableSocketPath()
-{
-    static QTemporaryDir dir;
-    const QString path = dir.path() + QStringLiteral("/docker.sock");
-    QFile file(path);
-    if (file.open(QIODevice::WriteOnly)) {
-        file.write("x");
-        file.close();
-    }
-    QFile::setPermissions(path, QFile::ReadOwner | QFile::WriteOwner);
-    return path;
-}
 
 } // namespace
 

@@ -144,6 +144,18 @@ public:
     /*! 关掉结果提示（用户已读）。 */
     Q_INVOKABLE void dismissResult();
 
+    /*!
+     * 网络字段校验（六期 §3.3）：返回稳定的错误 key，空字符串 = 通过。
+     *
+     * 与镜像引用校验同一个模式：QML 在提交前调用它做**实时**校验，
+     * 控制器在提交时**再校验一次**（界面不是安全边界）。
+     */
+    Q_INVOKABLE QString networkNameError(const QString &name) const;
+    Q_INVOKABLE QString subnetError(const QString &subnet) const;
+    Q_INVOKABLE QString gatewayError(const QString &gateway, const QString &subnet) const;
+    /*! 名称是否与现有网络重名（大小写不敏感，与 daemon 一致）。 */
+    Q_INVOKABLE bool networkNameTaken(const QString &name) const;
+
     /*! 引用校验与归一化（QML 在提交前调用，非法输入不发往引擎）。 */
     Q_INVOKABLE bool isValidImageReference(const QString &reference) const;
     Q_INVOKABLE QString normalizedImageReference(const QString &reference) const;
