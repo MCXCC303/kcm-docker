@@ -35,6 +35,8 @@ add_library(kontainer_core STATIC
     backend/privileged_client.h
     backend/credential_store.cpp
     backend/docker_cli_auth_importer.cpp
+    backend/log_frame_reader.cpp
+    backend/log_frame_reader.h
     backend/docker_cli_auth_importer.h
     backend/credential_store.h
     backend/kwallet_credential_store.cpp
