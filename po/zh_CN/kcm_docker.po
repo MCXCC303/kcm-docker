@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.6.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 05:39+0800\n"
+"POT-Creation-Date: 2026-09-18 05:44+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -66,20 +66,20 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:98 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:101 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:101
+#: src/model/status_controller.cpp:104
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:104
+#: src/model/status_controller.cpp:107
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:613
+#: src/model/status_controller.cpp:616
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -467,6 +467,78 @@ msgstr "不到一分钟"
 msgctxt "@info elapsed time less than one minute"
 msgid "less than a minute"
 msgstr "不到一分钟"
+
+#: src/model/create_container_controller.cpp:669 src/ui/ImageDetail.qml:110
+msgid "Image"
+msgstr "镜像"
+
+#: src/model/create_container_controller.cpp:670 src/ui/MainPage.qml:775
+#: src/ui/MainPage.qml:878
+msgid "Name"
+msgstr "名称"
+
+#: src/model/create_container_controller.cpp:672 src/ui/NetworkDetail.qml:92
+msgid "Network"
+msgstr "网络"
+
+#: src/model/create_container_controller.cpp:675
+msgid "Restart policy"
+msgstr "重启策略"
+
+#: src/model/create_container_controller.cpp:685
+msgid "random"
+msgstr "随机"
+
+#: src/model/create_container_controller.cpp:687
+msgid "Ports"
+msgstr "端口"
+
+#: src/model/create_container_controller.cpp:698
+msgid "Mounts"
+msgstr "挂载"
+
+#: src/model/create_container_controller.cpp:710
+msgid "Environment variables"
+msgstr "环境变量"
+
+#: src/model/create_container_controller.cpp:713
+#: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
+#: src/ui/VolumeDetail.qml:181
+msgid "Labels"
+msgstr "标签"
+
+#: src/model/create_container_controller.cpp:713
+msgid "%1 label"
+msgid_plural "%1 labels"
+msgstr[0] "%1 个标签"
+
+#: src/model/create_container_controller.cpp:716
+msgid "Memory limit"
+msgstr "内存上限"
+
+#: src/model/create_container_controller.cpp:719
+msgid "CPU limit"
+msgstr "CPU 上限"
+
+#: src/model/create_container_controller.cpp:722
+msgid "Privileged"
+msgstr "特权模式"
+
+#: src/model/create_container_controller.cpp:722
+msgid "Yes (equivalent to root on the host)"
+msgstr "是（等同宿主 root）"
+
+#: src/model/create_container_controller.cpp:724
+msgid "After creating"
+msgstr "创建后"
+
+#: src/model/create_container_controller.cpp:724
+msgid "Start the container"
+msgstr "启动容器"
+
+#: src/model/create_container_controller.cpp:724
+msgid "Leave it stopped"
+msgstr "保持停止"
 
 #: src/ui/components/CollapsibleSection.qml:71
 msgid "hidden by default"
@@ -877,11 +949,6 @@ msgstr "内部网络（无外部访问）"
 msgid "Allow containers to be attached at runtime"
 msgstr "允许容器在运行时加入"
 
-#: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181
-msgid "Labels"
-msgstr "标签"
-
 #: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:940
 msgid "Create"
 msgstr "创建"
@@ -939,10 +1006,6 @@ msgstr "重试"
 #: src/ui/StorageView.qml:88
 msgid "Total"
 msgstr "合计"
-
-#: src/ui/ImageDetail.qml:110
-msgid "Image"
-msgstr "镜像"
 
 #: src/ui/ImageDetail.qml:129
 msgid "Loading image details…"
@@ -1726,10 +1789,6 @@ msgstr "内置"
 msgid "User-defined"
 msgstr "自建"
 
-#: src/ui/MainPage.qml:775 src/ui/MainPage.qml:878
-msgid "Name"
-msgstr "名称"
-
 #: src/ui/MainPage.qml:776 src/ui/MainPage.qml:879
 msgid "Driver"
 msgstr "驱动"
@@ -2405,10 +2464,6 @@ msgstr "删除网络…"
 msgid "This network no longer exists."
 msgstr "这个网络已经不存在了。"
 
-#: src/ui/NetworkDetail.qml:92
-msgid "Network"
-msgstr "网络"
-
 #: src/ui/NetworkDetail.qml:133
 msgid "This network is built into Docker and cannot be removed."
 msgstr "这是 Docker 内置的网络，无法删除。"
@@ -2520,9 +2575,6 @@ msgstr "数据卷及其中的数据都会被删除，且无法撤销。"
 
 #~ msgid "Cancel pull"
 #~ msgstr "取消拉取"
-
-#~ msgid "Ports"
-#~ msgstr "端口"
 
 #~ msgid "not published"
 #~ msgstr "未发布"

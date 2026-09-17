@@ -21,6 +21,8 @@
 #include "model/network_filter_model.h"
 #include "model/network_detail_controller.h"
 #include "model/network_model.h"
+#include "model/create_container_controller.h"
+#include "model/mount_preset_store.h"
 #include "model/volume_detail_controller.h"
 #include "model/volume_filter_model.h"
 #include "model/volume_model.h"
@@ -102,6 +104,10 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::VolumeFilterModel *volumeList READ volumeList CONSTANT)
     /*! 数据卷详情（选中一个卷后读它的标签与驱动选项）。 */
     Q_PROPERTY(Kontainer::VolumeDetailController *volumeDetail READ volumeDetail CONSTANT)
+    /*! 创建容器向导的状态与校验（七期 §4.4）。 */
+    Q_PROPERTY(Kontainer::CreateContainerController *createContainer READ createContainer CONSTANT)
+    /*! 挂载预设（七期 §4.1）：界面上可增删改与"从容器保存"。 */
+    Q_PROPERTY(Kontainer::MountPresetStore *mountPresets READ mountPresets CONSTANT)
     /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
     Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
@@ -313,6 +319,14 @@ public:
     {
         return m_volumeDetail;
     }
+    CreateContainerController *createContainer() const
+    {
+        return m_createContainer;
+    }
+    MountPresetStore *mountPresets() const
+    {
+        return m_mountPresets;
+    }
     ContainerDetailController *containerDetail() const
     {
         return m_containerDetail;
@@ -428,6 +442,8 @@ private:
     VolumeModel *m_volumeModel = nullptr;
     VolumeFilterModel *m_volumeFilter = nullptr;
     VolumeDetailController *m_volumeDetail = nullptr;
+    MountPresetStore *m_mountPresets = nullptr;
+    CreateContainerController *m_createContainer = nullptr;
     ListState m_volumesState = ListState::Idle;
     QString m_volumesError;
     bool m_volumesOk = false;

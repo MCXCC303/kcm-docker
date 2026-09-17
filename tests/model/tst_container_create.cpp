@@ -3,8 +3,12 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include "domain/container.h"
 #include "domain/container_create_request.h"
+#include "model/create_container_controller.h"
 #include "model/mount_preset_store.h"
+#include "model/operation_controller.h"
+#include "support/mock_docker_backend.h"
 #include "i18n.h"
 
 #include <QJsonArray>
@@ -35,6 +39,8 @@ private Q_SLOTS:
     void tmpfsGoesToTmpfsNotBinds();
     void validatesNamesPathsKeysAndLimits();
     void presetStorePersistsAndOrders();
+    void wizardGatesSteps();
+    void wizardBuildsTheRequestAndSubmits();
     void presetStoreDeduplicatesAndTrimsRecents();
 };
 
@@ -270,6 +276,177 @@ void ContainerCreateTest::presetStoreDeduplicatesAndTrimsRecents()
     }
     QCOMPARE(store.count(), MountPresetStore::kMaxRecent);
     QVERIFY2(store.presets().first().id == favoriteId, "a favourite must survive trimming");
+}
+
+/*!
+ * 向导的分步校验（ARCH_V5_V8 §4.3）：每一步都不许带着问题往下走。
+ */
+void ContainerCreateTest::wizardGatesSteps()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MockDockerBackend backend;
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:3.19")};
+    backend.setImages({image});
+    Container existing;
+    existing.id = QStringLiteral("existing");
+    existing.name = QStringLiteral("web");
+    existing.image = QStringLiteral("alpine:3.19");
+    existing.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
+    backend.setContainers({existing});
+    OperationController operations(&backend);
+    backend.setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
+    operations.refreshWriteAccess();
+
+    CreateContainerController wizard(&operations, &presets, &backend);
+    QCOMPARE(CreateContainerController::stepKeys().size(), 7);
+    QCOMPARE(wizard.stepKey(), QStringLiteral("image"));
+    QCOMPARE(wizard.stepCount(), 7);
+
+    // ① 镜像：先要求填，再要求本地存在（除非勾了"先拉取"）
+    QVERIFY(!wizard.nextStep());
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("imageRequired"));
+    wizard.setImage(QStringLiteral("busybox:latest"));
+    QVERIFY(!wizard.nextStep());
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("imageNotLocal"));
+    wizard.setPullIfMissing(true);
+    QVERIFY(wizard.nextStep());
+    QCOMPARE(wizard.stepKey(), QStringLiteral("basics"));
+
+    // ② 基础：名称规则 + 重名
+    wizard.setName(QStringLiteral("bad name"));
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("nameInvalid"));
+    wizard.setName(QStringLiteral("WEB"));
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("nameInUse"));
+    wizard.setName(QStringLiteral("worker"));
+    QVERIFY(wizard.nextStep());
+
+    // ③ 端口：容器端口必填、宿主端口不能冲突（0 = 随机，不冲突）
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 0},
+                                     {QStringLiteral("hostPort"), 0}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portRequired"));
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80},
+                                     {QStringLiteral("hostPort"), 8080}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portInUse"));
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80},
+                                     {QStringLiteral("hostPort"), 0}}});
+    QVERIFY(wizard.nextStep());
+
+    // ④ 环境与标签：键名规则
+    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("1BAD")},
+                                            {QStringLiteral("value"), QStringLiteral("x")}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("keyInvalid"));
+    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("GOOD")},
+                                            {QStringLiteral("value"), QStringLiteral("x")}}});
+    QVERIFY(wizard.nextStep());
+
+    // ⑤ 挂载：目标必须绝对、不能重复；来源格式要被校验（bind 必须绝对）
+    wizard.setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
+                                      {QStringLiteral("source"), QStringLiteral("relative")},
+                                      {QStringLiteral("destination"), QStringLiteral("/data")}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("sourceNotAbsolute"));
+    wizard.setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
+                                      {QStringLiteral("source"), QStringLiteral("/srv/data")},
+                                      {QStringLiteral("destination"), QStringLiteral("data")}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("pathNotAbsolute"));
+    wizard.setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
+                                      {QStringLiteral("source"), QStringLiteral("/srv/data")},
+                                      {QStringLiteral("destination"), QStringLiteral("/data")}},
+                         QVariantMap {{QStringLiteral("type"), QStringLiteral("volume")},
+                                      {QStringLiteral("source"), QStringLiteral("cache")},
+                                      {QStringLiteral("destination"), QStringLiteral("/data")}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("destinationDuplicate"));
+    wizard.setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
+                                      {QStringLiteral("source"), QStringLiteral("/srv/data")},
+                                      {QStringLiteral("destination"), QStringLiteral("/data")}}});
+    QVERIFY(wizard.nextStep());
+
+    // ⑥ 资源：内存下限与 CPU 非负
+    wizard.setMemoryLimitBytes(1024);
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("memoryTooSmall"));
+    wizard.setMemoryLimitBytes(0);
+    wizard.setCpus(-1.0);
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("cpusNegative"));
+    wizard.setCpus(0.0);
+    QVERIFY(wizard.nextStep());
+
+    // ⑦ 总览：不能越级跳过来，也不能在总览上再"下一步"
+    QCOMPARE(wizard.stepKey(), QStringLiteral("summary"));
+    QVERIFY(wizard.onSummary());
+    QVERIFY(!wizard.nextStep());
+    // 往回跳随时可以（用户要能改前面的选择）
+    QVERIFY(wizard.goToStep(QStringLiteral("ports")));
+    QCOMPARE(wizard.stepKey(), QStringLiteral("ports"));
+    // 往前跳则要逐步通过校验：总览不能从"还没填完"的地方直接到达
+    wizard.setImage(QString());
+    wizard.goToStep(QStringLiteral("image"));
+    QVERIFY2(!wizard.goToStep(QStringLiteral("summary")), "the wizard must not skip unfilled steps");
+}
+
+/*!
+ * 总览内容与提交（§4.4/§4.6）：环境变量只列键名，提交时把表单交给控制器。
+ */
+void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    const QString presetId = presets.add(QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("bind"), true, QStringLiteral("数据"));
+    QVERIFY(!presetId.isEmpty());
+
+    MockDockerBackend backend;
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:3.19")};
+    backend.setImages({image});
+    OperationController operations(&backend);
+    backend.setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
+    operations.refreshWriteAccess();
+
+    CreateContainerController wizard(&operations, &presets, &backend);
+    wizard.reset(QStringLiteral("alpine:3.19"));
+    QCOMPARE(wizard.image(), QStringLiteral("alpine:3.19"));
+    QCOMPARE(wizard.stepKey(), QStringLiteral("image"));
+    QVERIFY(wizard.nextStep());
+    wizard.setName(QStringLiteral("worker"));
+    wizard.setNetwork(QStringLiteral("app_default"));
+    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("SECRET_TOKEN")},
+                                            {QStringLiteral("value"), QStringLiteral("super-secret")}}});
+    wizard.setStartAfterCreate(true);
+    QVERIFY(wizard.nextStep()); // ports（无端口）
+    QVERIFY(wizard.nextStep()); // environment
+    QVERIFY(wizard.nextStep()); // mounts
+
+    // 从预设快速添加（已存在的不会重复加）
+    QVERIFY(wizard.addMountFromPreset(presetId));
+    QVERIFY(!wizard.addMountFromPreset(presetId));
+    QCOMPARE(wizard.mountRows().size(), 1);
+    QVERIFY(wizard.presets().size() >= 1);
+
+    QVERIFY(wizard.nextStep()); // resources
+    QVERIFY(wizard.nextStep()); // summary
+
+    // 总览：环境变量**只列键名**（值可能是密码）
+    const QVariantList rows = wizard.summary();
+    QStringList labels;
+    QStringList values;
+    for (const QVariant &entry : rows) {
+        labels.append(entry.toMap().value(QStringLiteral("label")).toString());
+        values.append(entry.toMap().value(QStringLiteral("value")).toString());
+    }
+    QVERIFY(labels.contains(QStringLiteral("Image")));
+    QVERIFY(labels.contains(QStringLiteral("Network")));
+    QVERIFY(labels.contains(QStringLiteral("Environment variables")));
+    QVERIFY2(!values.join(QStringLiteral("|")).contains(QStringLiteral("super-secret")),
+             "secret environment values must never appear in the summary");
+    QVERIFY(values.join(QStringLiteral("|")).contains(QStringLiteral("SECRET_TOKEN")));
+
+    // 提交：写权限门在控制器里（这里是只读 endpoint），因此先换一个可写的
+    QVERIFY(!wizard.submit());
+    QVERIFY(!operations.resultText().isEmpty());
 }
 
 QTEST_MAIN(ContainerCreateTest)

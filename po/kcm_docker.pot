@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 05:39+0800\n"
+"POT-Creation-Date: 2026-09-18 05:44+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -72,20 +72,20 @@ msgstr ""
 msgid "Unhealthy"
 msgstr ""
 
-#: src/model/status_controller.cpp:98 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:101 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr ""
 
-#: src/model/status_controller.cpp:101
+#: src/model/status_controller.cpp:104
 msgid "The host path is not a directory."
 msgstr ""
 
-#: src/model/status_controller.cpp:104
+#: src/model/status_controller.cpp:107
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr ""
 
-#: src/model/status_controller.cpp:613
+#: src/model/status_controller.cpp:616
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
@@ -468,6 +468,79 @@ msgstr ""
 #: src/model/format.cpp:38
 msgctxt "@info elapsed time less than one minute"
 msgid "less than a minute"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:669 src/ui/ImageDetail.qml:110
+msgid "Image"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:670 src/ui/MainPage.qml:775
+#: src/ui/MainPage.qml:878
+msgid "Name"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:672 src/ui/NetworkDetail.qml:92
+msgid "Network"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:675
+msgid "Restart policy"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:685
+msgid "random"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:687
+msgid "Ports"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:698
+msgid "Mounts"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:710
+msgid "Environment variables"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:713
+#: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
+#: src/ui/VolumeDetail.qml:181
+msgid "Labels"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:713
+msgid "%1 label"
+msgid_plural "%1 labels"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/model/create_container_controller.cpp:716
+msgid "Memory limit"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:719
+msgid "CPU limit"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:722
+msgid "Privileged"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:722
+msgid "Yes (equivalent to root on the host)"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:724
+msgid "After creating"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:724
+msgid "Start the container"
+msgstr ""
+
+#: src/model/create_container_controller.cpp:724
+msgid "Leave it stopped"
 msgstr ""
 
 #: src/ui/components/CollapsibleSection.qml:71
@@ -877,11 +950,6 @@ msgstr ""
 msgid "Allow containers to be attached at runtime"
 msgstr ""
 
-#: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181
-msgid "Labels"
-msgstr ""
-
 #: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:940
 msgid "Create"
 msgstr ""
@@ -939,10 +1007,6 @@ msgstr ""
 
 #: src/ui/StorageView.qml:88
 msgid "Total"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:110
-msgid "Image"
 msgstr ""
 
 #: src/ui/ImageDetail.qml:129
@@ -1737,10 +1801,6 @@ msgstr ""
 msgid "User-defined"
 msgstr ""
 
-#: src/ui/MainPage.qml:775 src/ui/MainPage.qml:878
-msgid "Name"
-msgstr ""
-
 #: src/ui/MainPage.qml:776 src/ui/MainPage.qml:879
 msgid "Driver"
 msgstr ""
@@ -2400,10 +2460,6 @@ msgstr ""
 
 #: src/ui/NetworkDetail.qml:74
 msgid "This network no longer exists."
-msgstr ""
-
-#: src/ui/NetworkDetail.qml:92
-msgid "Network"
 msgstr ""
 
 #: src/ui/NetworkDetail.qml:133
