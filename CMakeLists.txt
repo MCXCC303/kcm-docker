@@ -81,6 +81,7 @@ set(KONTAINER_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/NetworkDetail.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/VolumeCard.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/VolumeDetail.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/CreateContainer.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/StorageView.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ResourceView.qml"
     # QML 单例（qmldir 里声明的两个色板）也必须在这里列出，

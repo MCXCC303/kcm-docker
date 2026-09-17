@@ -40,6 +40,8 @@ Kirigami.Page {
     signal networkActivated(string networkId)
     /*! 打开数据卷详情（六期 §3.5）。 */
     signal volumeActivated(string volumeName)
+    /*! 打开创建容器向导（七期 §4.4）；presetImage 为空表示从零开始。 */
+    signal createContainerRequested(string presetImage)
 
     /*! 数据卷页的内联面板（创建 / 清理）。 */
     property bool volumeCreatePanelOpen: false
@@ -551,6 +553,15 @@ Kirigami.Page {
                 }
                 Component.onCompleted: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
                 onModelChanged: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
+            }
+
+            // 创建容器（七期 §4.4）：只读模式不出现入口
+            QQC2.Button {
+                objectName: "createContainerEntryButton"
+                visible: tabBar.currentIndex === 0 && root.operations.writeAllowed
+                text: i18n("Create container…")
+                icon.name: "list-add"
+                onClicked: root.createContainerRequested("")
             }
 
             // 仓库登录（ARCH_V5_V8 §2.7）：私有仓库拉取前先登录

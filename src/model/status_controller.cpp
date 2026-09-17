@@ -41,9 +41,6 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_volumeModel(new VolumeModel(this))
     , m_volumeFilter(new VolumeFilterModel(this))
     , m_volumeDetail(new VolumeDetailController(backend, this))
-    // 挂载预设是"这个工具的数据"（~/.config/kontainerrc），不是系统设置（§1.5.3）
-    , m_mountPresets(new MountPresetStore({}, this))
-    , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, this))
     , m_networkModel(new NetworkModel(this))
     , m_networkFilter(new NetworkFilterModel(this))
     , m_networkDetail(new NetworkDetailController(backend, this))
@@ -52,6 +49,9 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
+    // 挂载预设是"这个工具的数据"（~/.config/kontainerrc），不是系统设置（§1.5.3）
+    , m_mountPresets(new MountPresetStore({}, this))
+    , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, this))
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))

@@ -442,8 +442,6 @@ private:
     VolumeModel *m_volumeModel = nullptr;
     VolumeFilterModel *m_volumeFilter = nullptr;
     VolumeDetailController *m_volumeDetail = nullptr;
-    MountPresetStore *m_mountPresets = nullptr;
-    CreateContainerController *m_createContainer = nullptr;
     ListState m_volumesState = ListState::Idle;
     QString m_volumesError;
     bool m_volumesOk = false;
@@ -460,6 +458,10 @@ private:
     ContainerDetailController *m_containerDetail = nullptr;
     ImageDetailController *m_imageDetail = nullptr;
     OperationController *m_operations = nullptr;
+    /* 注意：这两个依赖 m_operations，**必须**声明在它后面——
+       成员初始化顺序按声明顺序走，放在前面会让向导拿到还没构造的 OperationController。 */
+    MountPresetStore *m_mountPresets = nullptr;
+    CreateContainerController *m_createContainer = nullptr;
     HostPathService *m_hostPaths = nullptr;
     DaemonConfigController *m_daemonConfigUser = nullptr;
     DaemonConfigController *m_daemonConfigSystem = nullptr;

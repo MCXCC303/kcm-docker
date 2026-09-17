@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.6.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 05:44+0800\n"
+"POT-Creation-Date: 2026-09-18 06:03+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -20,11 +20,11 @@ msgstr "未选择镜像。"
 msgid "Created"
 msgstr "已创建"
 
-#: src/model/state_text.cpp:19 src/ui/MainPage.qml:474
+#: src/model/state_text.cpp:19 src/ui/MainPage.qml:476
 msgid "Restarting"
 msgstr "重启中"
 
-#: src/model/state_text.cpp:21 src/ui/MainPage.qml:72 src/ui/MainPage.qml:462
+#: src/model/state_text.cpp:21 src/ui/MainPage.qml:74 src/ui/MainPage.qml:464
 msgid "Running"
 msgstr "运行中"
 
@@ -32,7 +32,7 @@ msgstr "运行中"
 msgid "Removing"
 msgstr "删除中"
 
-#: src/model/state_text.cpp:25 src/ui/MainPage.qml:78 src/ui/MainPage.qml:466
+#: src/model/state_text.cpp:25 src/ui/MainPage.qml:80 src/ui/MainPage.qml:468
 msgid "Paused"
 msgstr "已暂停"
 
@@ -40,11 +40,11 @@ msgstr "已暂停"
 msgid "Exited"
 msgstr "已退出"
 
-#: src/model/state_text.cpp:29 src/ui/MainPage.qml:478
+#: src/model/state_text.cpp:29 src/ui/MainPage.qml:480
 msgid "Dead"
 msgstr "已失效"
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:401
+#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:403
 #: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
 #: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -468,75 +468,77 @@ msgctxt "@info elapsed time less than one minute"
 msgid "less than a minute"
 msgstr "不到一分钟"
 
-#: src/model/create_container_controller.cpp:669 src/ui/ImageDetail.qml:110
+#: src/model/create_container_controller.cpp:740 src/ui/ImageDetail.qml:112
+#: src/ui/CreateContainer.qml:45
 msgid "Image"
 msgstr "镜像"
 
-#: src/model/create_container_controller.cpp:670 src/ui/MainPage.qml:775
-#: src/ui/MainPage.qml:878
+#: src/model/create_container_controller.cpp:741 src/ui/MainPage.qml:786
+#: src/ui/MainPage.qml:889
 msgid "Name"
 msgstr "名称"
 
-#: src/model/create_container_controller.cpp:672 src/ui/NetworkDetail.qml:92
+#: src/model/create_container_controller.cpp:743 src/ui/NetworkDetail.qml:92
 msgid "Network"
 msgstr "网络"
 
-#: src/model/create_container_controller.cpp:675
+#: src/model/create_container_controller.cpp:746
 msgid "Restart policy"
 msgstr "重启策略"
 
-#: src/model/create_container_controller.cpp:685
+#: src/model/create_container_controller.cpp:756
 msgid "random"
 msgstr "随机"
 
-#: src/model/create_container_controller.cpp:687
+#: src/model/create_container_controller.cpp:758 src/ui/CreateContainer.qml:49
 msgid "Ports"
 msgstr "端口"
 
-#: src/model/create_container_controller.cpp:698
+#: src/model/create_container_controller.cpp:769 src/ui/CreateContainer.qml:53
+#: src/ui/CreateContainer.qml:496
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/model/create_container_controller.cpp:710
+#: src/model/create_container_controller.cpp:781 src/ui/CreateContainer.qml:458
 msgid "Environment variables"
 msgstr "环境变量"
 
-#: src/model/create_container_controller.cpp:713
+#: src/model/create_container_controller.cpp:784
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181
+#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:475
 msgid "Labels"
 msgstr "标签"
 
-#: src/model/create_container_controller.cpp:713
+#: src/model/create_container_controller.cpp:784
 msgid "%1 label"
 msgid_plural "%1 labels"
 msgstr[0] "%1 个标签"
 
-#: src/model/create_container_controller.cpp:716
+#: src/model/create_container_controller.cpp:787
 msgid "Memory limit"
 msgstr "内存上限"
 
-#: src/model/create_container_controller.cpp:719
+#: src/model/create_container_controller.cpp:790
 msgid "CPU limit"
 msgstr "CPU 上限"
 
-#: src/model/create_container_controller.cpp:722
+#: src/model/create_container_controller.cpp:793
 msgid "Privileged"
 msgstr "特权模式"
 
-#: src/model/create_container_controller.cpp:722
+#: src/model/create_container_controller.cpp:793
 msgid "Yes (equivalent to root on the host)"
 msgstr "是（等同宿主 root）"
 
-#: src/model/create_container_controller.cpp:724
+#: src/model/create_container_controller.cpp:795
 msgid "After creating"
 msgstr "创建后"
 
-#: src/model/create_container_controller.cpp:724
+#: src/model/create_container_controller.cpp:795
 msgid "Start the container"
 msgstr "启动容器"
 
-#: src/model/create_container_controller.cpp:724
+#: src/model/create_container_controller.cpp:795
 msgid "Leave it stopped"
 msgstr "保持停止"
 
@@ -556,20 +558,20 @@ msgstr "复制"
 #: src/ui/components/CopyableText.qml:50 src/ui/components/StorageBar.qml:85
 #: src/ui/StorageView.qml:36 src/ui/ResourceView.qml:34
 #: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
-#: src/ui/MainPage.qml:357 src/ui/NetworkDetail.qml:155
+#: src/ui/MainPage.qml:359 src/ui/NetworkDetail.qml:155
 #: src/ui/NetworkDetail.qml:161 src/ui/VolumeCard.qml:114
 #: src/ui/VolumeDetail.qml:156 src/ui/VolumeDetail.qml:163
 msgid "—"
 msgstr "—"
 
-#: src/ui/components/StorageBar.qml:46 src/ui/ImageDetail.qml:102
-#: src/ui/MainPage.qml:90
+#: src/ui/components/StorageBar.qml:46 src/ui/ImageDetail.qml:104
+#: src/ui/MainPage.qml:92
 msgid "Images"
 msgstr "镜像"
 
-#: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:359
-#: src/ui/ContainerDetail.qml:257 src/ui/MainPage.qml:66
-#: src/ui/MainPage.qml:778 src/ui/MainPage.qml:881
+#: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:367
+#: src/ui/ContainerDetail.qml:259 src/ui/MainPage.qml:68
+#: src/ui/MainPage.qml:789 src/ui/MainPage.qml:892
 msgid "Containers"
 msgstr "容器"
 
@@ -600,7 +602,8 @@ msgid "Continue"
 msgstr "继续"
 
 #: src/ui/components/ConfirmDialog.qml:69
-#: src/ui/components/PullProgressList.qml:123 src/ui/ContainerDetail.qml:588
+#: src/ui/components/PullProgressList.qml:123 src/ui/ContainerDetail.qml:590
+#: src/ui/CreateContainer.qml:895
 msgid "Cancel"
 msgstr "取消"
 
@@ -612,7 +615,7 @@ msgstr "刷新"
 msgid "Dismiss"
 msgstr "关闭提示"
 
-#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:572
+#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:583
 msgid "Pull image"
 msgstr "拉取镜像"
 
@@ -700,7 +703,7 @@ msgstr "未指定标签，将拉取 “latest”：%1"
 msgid "This image is already being pulled."
 msgstr "该镜像正在拉取中。"
 
-#: src/ui/components/ImageRefInput.qml:118
+#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:202
 msgid "Image reference"
 msgstr "镜像引用"
 
@@ -891,7 +894,7 @@ msgstr "创建网络"
 msgid "Enter a name for the network."
 msgstr "请填写网络名称。"
 
-#: src/ui/components/CreateNetworkDialog.qml:44
+#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:71
 msgid ""
 "Use letters, digits, underscore, dot or dash, and do not start with a "
 "separator."
@@ -949,7 +952,8 @@ msgstr "内部网络（无外部访问）"
 msgid "Allow containers to be attached at runtime"
 msgstr "允许容器在运行时加入"
 
-#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:940
+#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:951
+#: src/ui/CreateContainer.qml:883
 msgid "Create"
 msgstr "创建"
 
@@ -981,12 +985,12 @@ msgctxt "@info additional image tags"
 msgid "Tags: %1"
 msgstr "标签：%1"
 
-#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:114
-#: src/ui/ImageDetail.qml:190
+#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:116
+#: src/ui/ImageDetail.qml:198
 msgid "image reference"
 msgstr "镜像引用"
 
-#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:197
+#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:205
 msgid "image ID"
 msgstr "镜像 ID"
 
@@ -998,8 +1002,8 @@ msgstr "存储"
 msgid "Unable to read Docker disk usage: %1"
 msgstr "无法读取 Docker 磁盘占用：%1"
 
-#: src/ui/StorageView.qml:64 src/ui/ImageDetail.qml:146
-#: src/ui/ContainerDetail.qml:299 src/ui/MainPage.qml:294
+#: src/ui/StorageView.qml:64 src/ui/ImageDetail.qml:154
+#: src/ui/ContainerDetail.qml:301 src/ui/MainPage.qml:296
 msgid "Retry"
 msgstr "重试"
 
@@ -1007,154 +1011,159 @@ msgstr "重试"
 msgid "Total"
 msgstr "合计"
 
-#: src/ui/ImageDetail.qml:129
+#: src/ui/ImageDetail.qml:131
 msgid "Loading image details…"
 msgstr "正在加载镜像详情…"
 
-#: src/ui/ImageDetail.qml:138
+#: src/ui/ImageDetail.qml:140
 msgid "Unable to retrieve image details."
 msgstr "无法获取镜像详情。"
 
-#: src/ui/ImageDetail.qml:141 src/ui/MainPage.qml:560
+#: src/ui/ImageDetail.qml:143 src/ui/MainPage.qml:562
+msgid "Create container…"
+msgstr "创建容器…"
+
+#: src/ui/ImageDetail.qml:149 src/ui/MainPage.qml:571
 msgid "Registry logins…"
 msgstr "仓库登录…"
 
-#: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:304 src/ui/main.qml:37
+#: src/ui/ImageDetail.qml:159 src/ui/ContainerDetail.qml:306 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
+#: src/ui/CreateContainer.qml:865
 msgid "Back"
 msgstr "返回"
 
-#: src/ui/ImageDetail.qml:173
+#: src/ui/ImageDetail.qml:181
 msgid "Repository:"
 msgstr "仓库："
 
-#: src/ui/ImageDetail.qml:175
+#: src/ui/ImageDetail.qml:183
 msgid "<none> (dangling)"
 msgstr "<none>（悬空）"
 
-#: src/ui/ImageDetail.qml:176
+#: src/ui/ImageDetail.qml:184
 msgid "repository"
 msgstr "仓库"
 
-#: src/ui/ImageDetail.qml:180
+#: src/ui/ImageDetail.qml:188
 msgid "Tag:"
 msgstr "标签："
 
-#: src/ui/ImageDetail.qml:182 src/ui/ImageDetail.qml:189
+#: src/ui/ImageDetail.qml:190 src/ui/ImageDetail.qml:197
 msgid "<none>"
 msgstr "<none>"
 
-#: src/ui/ImageDetail.qml:183
+#: src/ui/ImageDetail.qml:191
 msgid "tag"
 msgstr "标签"
 
-#: src/ui/ImageDetail.qml:187
+#: src/ui/ImageDetail.qml:195
 msgid "Full reference:"
 msgstr "完整引用："
 
-#: src/ui/ImageDetail.qml:194
+#: src/ui/ImageDetail.qml:202
 msgid "Image ID:"
 msgstr "镜像 ID："
 
-#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:419
+#: src/ui/ImageDetail.qml:209 src/ui/ContainerDetail.qml:421
 #: src/ui/NetworkDetail.qml:166 src/ui/VolumeDetail.qml:167
 msgid "Created:"
 msgstr "创建时间："
 
-#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:427
+#: src/ui/ImageDetail.qml:211 src/ui/ContainerDetail.qml:429
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr "%1（%2前）"
 
-#: src/ui/ImageDetail.qml:206 src/ui/VolumeDetail.qml:155
+#: src/ui/ImageDetail.qml:214 src/ui/VolumeDetail.qml:155
 msgid "Size:"
 msgstr "大小："
 
-#: src/ui/ImageDetail.qml:210
+#: src/ui/ImageDetail.qml:218
 msgid "Architecture:"
 msgstr "架构："
 
-#: src/ui/ImageDetail.qml:215
+#: src/ui/ImageDetail.qml:223
 msgid "OS:"
 msgstr "操作系统："
 
-#: src/ui/ImageDetail.qml:220
+#: src/ui/ImageDetail.qml:228
 msgid "Author:"
 msgstr "作者："
 
-#: src/ui/ImageDetail.qml:230
+#: src/ui/ImageDetail.qml:238
 msgid "Tags"
 msgstr "标签"
 
-#: src/ui/ImageDetail.qml:260
+#: src/ui/ImageDetail.qml:268
 msgid "Digests"
 msgstr "摘要"
 
-#: src/ui/ImageDetail.qml:304
+#: src/ui/ImageDetail.qml:312
 msgctxt "@info image layer count"
 msgid "Layers (%1)"
 msgid_plural "Layers (%1)"
 msgstr[0] "层（%1）"
 
-#: src/ui/ImageDetail.qml:312
+#: src/ui/ImageDetail.qml:320
 msgid "The Docker API reports layer digests, not per-layer sizes."
 msgstr "Docker API 只提供层摘要，不提供单层大小。"
 
-#: src/ui/ImageDetail.qml:351
+#: src/ui/ImageDetail.qml:359
 msgid "Show fewer layers"
 msgstr "收起层列表"
 
-#: src/ui/ImageDetail.qml:351
+#: src/ui/ImageDetail.qml:359
 msgctxt "@info show all image layers"
 msgid "Show all %1 layers"
 msgid_plural "Show all %1 layers"
 msgstr[0] "显示全部 %1 层"
 
-#: src/ui/ImageDetail.qml:367
+#: src/ui/ImageDetail.qml:375
 msgid "No containers use this image."
 msgstr "没有容器使用该镜像。"
 
-#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:530
+#: src/ui/ImageDetail.qml:419 src/ui/ContainerDetail.qml:532
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
 msgstr[0] "环境变量（%1 个）"
 
-#: src/ui/ImageDetail.qml:466
+#: src/ui/ImageDetail.qml:474
 msgid "Delete all tags…"
 msgstr "删除全部标签…"
 
-#: src/ui/ImageDetail.qml:474 src/ui/ImageDetail.qml:491
-#: src/ui/ContainerDetail.qml:231 src/ui/ContainerDetail.qml:1009
+#: src/ui/ImageDetail.qml:482 src/ui/ImageDetail.qml:499
+#: src/ui/ContainerDetail.qml:233 src/ui/ContainerDetail.qml:1011
 msgid "Delete"
 msgstr "删除"
 
-#: src/ui/ImageDetail.qml:486
+#: src/ui/ImageDetail.qml:494
 msgid "Delete image tag"
 msgstr "删除镜像标签"
 
-#: src/ui/ImageDetail.qml:488
+#: src/ui/ImageDetail.qml:496
 msgid "Delete the tag “%1”?"
 msgstr "确定要删除标签“%1”吗？"
 
-#: src/ui/ImageDetail.qml:489
+#: src/ui/ImageDetail.qml:497
 msgid "Delete the image “%1”?"
 msgstr "确定要删除镜像“%1”吗？"
 
-#: src/ui/ImageDetail.qml:490
+#: src/ui/ImageDetail.qml:498
 msgid "Only this tag is removed. Layers shared with other images are kept."
 msgstr "只会移除该标签；与其他镜像共享的层会保留。"
 
-#: src/ui/ImageDetail.qml:507 src/ui/ImageDetail.qml:510
+#: src/ui/ImageDetail.qml:515 src/ui/ImageDetail.qml:518
 msgid "Delete all tags"
 msgstr "删除全部标签"
 
-#: src/ui/ImageDetail.qml:508
+#: src/ui/ImageDetail.qml:516
 msgid "Delete every tag of this image (%1 tags)?"
 msgstr "确定要删除该镜像的全部标签（共 %1 个）吗？"
 
-#: src/ui/ImageDetail.qml:509
+#: src/ui/ImageDetail.qml:517
 msgid ""
 "All tags of this image are removed. Containers that reference it can no "
 "longer be started."
@@ -1176,273 +1185,273 @@ msgstr "网关："
 msgid "IPv4:"
 msgstr "IPv4："
 
-#: src/ui/ContainerDetail.qml:150
+#: src/ui/ContainerDetail.qml:152
 msgid "Disconnect from network"
 msgstr "从网络断开"
 
-#: src/ui/ContainerDetail.qml:151
+#: src/ui/ContainerDetail.qml:153
 msgid "Disconnect this container from “%1”?"
 msgstr "把这个容器从“%1”断开吗？"
 
-#: src/ui/ContainerDetail.qml:153
+#: src/ui/ContainerDetail.qml:155
 msgid ""
 "The container loses this network's addresses and aliases; connections "
 "through it may be interrupted."
 msgstr "容器会失去这个网络上的地址与别名，经由该网络的连接可能中断。"
 
-#: src/ui/ContainerDetail.qml:154 src/ui/ContainerDetail.qml:725
+#: src/ui/ContainerDetail.qml:156 src/ui/ContainerDetail.qml:727
 msgid "Disconnect"
 msgstr "断开"
 
-#: src/ui/ContainerDetail.qml:185 src/ui/ContainerCard.qml:161
+#: src/ui/ContainerDetail.qml:187 src/ui/ContainerCard.qml:161
 #: src/ui/ContainerCard.qml:165
 msgid "Start"
 msgstr "启动"
 
-#: src/ui/ContainerDetail.qml:193 src/ui/ContainerCard.qml:174
+#: src/ui/ContainerDetail.qml:195 src/ui/ContainerCard.qml:174
 #: src/ui/ContainerCard.qml:178
 msgid "Stop"
 msgstr "停止"
 
-#: src/ui/ContainerDetail.qml:201 src/ui/DaemonConfigPage.qml:578
+#: src/ui/ContainerDetail.qml:203 src/ui/DaemonConfigPage.qml:578
 msgid "Restart"
 msgstr "重启"
 
-#: src/ui/ContainerDetail.qml:219
+#: src/ui/ContainerDetail.qml:221
 msgid "Stop the container to delete it."
 msgstr "需要先停止容器才能删除。"
 
-#: src/ui/ContainerDetail.qml:265 src/ui/ContainerDetail.qml:791
+#: src/ui/ContainerDetail.qml:267 src/ui/ContainerDetail.qml:793
 msgid "Container"
 msgstr "容器"
 
-#: src/ui/ContainerDetail.qml:269
+#: src/ui/ContainerDetail.qml:271
 msgid "container name"
 msgstr "容器名称"
 
-#: src/ui/ContainerDetail.qml:287
+#: src/ui/ContainerDetail.qml:289
 msgid "Loading container details…"
 msgstr "正在加载容器详情…"
 
-#: src/ui/ContainerDetail.qml:296
+#: src/ui/ContainerDetail.qml:298
 msgid "Unable to retrieve container details."
 msgstr "无法获取容器详情。"
 
-#: src/ui/ContainerDetail.qml:336
+#: src/ui/ContainerDetail.qml:338
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr "概览"
 
-#: src/ui/ContainerDetail.qml:339
+#: src/ui/ContainerDetail.qml:341
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr "资源"
 
-#: src/ui/ContainerDetail.qml:342
+#: src/ui/ContainerDetail.qml:344
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr "网络"
 
-#: src/ui/ContainerDetail.qml:345
+#: src/ui/ContainerDetail.qml:347
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:348
+#: src/ui/ContainerDetail.qml:350
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr "日志"
 
-#: src/ui/ContainerDetail.qml:384
+#: src/ui/ContainerDetail.qml:386
 msgid "State:"
 msgstr "状态："
 
-#: src/ui/ContainerDetail.qml:400 src/ui/VolumeDetail.qml:173
+#: src/ui/ContainerDetail.qml:402 src/ui/VolumeDetail.qml:173
 msgid "Status:"
 msgstr "状态描述："
 
-#: src/ui/ContainerDetail.qml:405
+#: src/ui/ContainerDetail.qml:407
 msgid "Image:"
 msgstr "镜像："
 
-#: src/ui/ContainerDetail.qml:412
+#: src/ui/ContainerDetail.qml:414
 msgid "Container ID:"
 msgstr "容器 ID："
 
-#: src/ui/ContainerDetail.qml:415 src/ui/ContainerCard.qml:187
+#: src/ui/ContainerDetail.qml:417 src/ui/ContainerCard.qml:187
 msgid "container ID"
 msgstr "容器 ID"
 
-#: src/ui/ContainerDetail.qml:425
+#: src/ui/ContainerDetail.qml:427
 msgid "Started:"
 msgstr "启动时间："
 
-#: src/ui/ContainerDetail.qml:431
+#: src/ui/ContainerDetail.qml:433
 msgid "Finished:"
 msgstr "结束时间："
 
-#: src/ui/ContainerDetail.qml:440
+#: src/ui/ContainerDetail.qml:442
 msgid "Runtime"
 msgstr "运行时"
 
-#: src/ui/ContainerDetail.qml:450
+#: src/ui/ContainerDetail.qml:452
 msgid "Restart count:"
 msgstr "重启次数："
 
-#: src/ui/ContainerDetail.qml:454
+#: src/ui/ContainerDetail.qml:456
 msgid "Exit code:"
 msgstr "退出码："
 
-#: src/ui/ContainerDetail.qml:458
+#: src/ui/ContainerDetail.qml:460
 msgid "OOM killed:"
 msgstr "因 OOM 被杀："
 
-#: src/ui/ContainerDetail.qml:460 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:462 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:172
 msgid "Yes"
 msgstr "是"
 
-#: src/ui/ContainerDetail.qml:464
+#: src/ui/ContainerDetail.qml:466
 msgid "Process ID:"
 msgstr "进程 ID："
 
-#: src/ui/ContainerDetail.qml:469
+#: src/ui/ContainerDetail.qml:471
 msgid "Restart policy:"
 msgstr "重启策略："
 
-#: src/ui/ContainerDetail.qml:474
+#: src/ui/ContainerDetail.qml:476
 msgid "Platform:"
 msgstr "平台："
 
-#: src/ui/ContainerDetail.qml:483
+#: src/ui/ContainerDetail.qml:485
 msgid "Configuration"
 msgstr "配置"
 
-#: src/ui/ContainerDetail.qml:493
+#: src/ui/ContainerDetail.qml:495
 msgid "Entrypoint:"
 msgstr "入口点："
 
-#: src/ui/ContainerDetail.qml:501
+#: src/ui/ContainerDetail.qml:503
 msgid "Command:"
 msgstr "命令："
 
-#: src/ui/ContainerDetail.qml:509
+#: src/ui/ContainerDetail.qml:511
 msgid "Working directory:"
 msgstr "工作目录："
 
-#: src/ui/ContainerDetail.qml:515
+#: src/ui/ContainerDetail.qml:517
 msgid "User:"
 msgstr "用户："
 
-#: src/ui/ContainerDetail.qml:520
+#: src/ui/ContainerDetail.qml:522
 msgid "Hostname:"
 msgstr "主机名："
 
-#: src/ui/ContainerDetail.qml:540
+#: src/ui/ContainerDetail.qml:542
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] "标签（%1）"
 
-#: src/ui/ContainerDetail.qml:577
+#: src/ui/ContainerDetail.qml:579
 msgid "No network information."
 msgstr "没有网络信息。"
 
-#: src/ui/ContainerDetail.qml:588
+#: src/ui/ContainerDetail.qml:590
 msgid "Connect to a network…"
 msgstr "连接到网络…"
 
-#: src/ui/ContainerDetail.qml:625
+#: src/ui/ContainerDetail.qml:627
 msgid ""
 "This container is already connected to every network. Create another network "
 "first."
 msgstr "这个容器已经连接了所有网络。请先创建新的网络。"
 
-#: src/ui/ContainerDetail.qml:631
+#: src/ui/ContainerDetail.qml:633
 msgid "Choose a network:"
 msgstr "选择网络："
 
-#: src/ui/ContainerDetail.qml:648
+#: src/ui/ContainerDetail.qml:650
 msgid "already connected"
 msgstr "已连接"
 
-#: src/ui/ContainerDetail.qml:657
+#: src/ui/ContainerDetail.qml:659
 msgid "Aliases (optional, comma separated)"
 msgstr "别名（可选，用逗号分隔）"
 
-#: src/ui/ContainerDetail.qml:658
+#: src/ui/ContainerDetail.qml:660
 msgid "Aliases"
 msgstr "别名"
 
-#: src/ui/ContainerDetail.qml:668
+#: src/ui/ContainerDetail.qml:670
 msgid "Connect"
 msgstr "连接"
 
-#: src/ui/ContainerDetail.qml:676
+#: src/ui/ContainerDetail.qml:678
 msgid "Other containers on the same network can reach this one by its aliases."
 msgstr "同一网络里的其它容器可以用这些别名访问它。"
 
-#: src/ui/ContainerDetail.qml:709 src/ui/ResourceView.qml:128
+#: src/ui/ContainerDetail.qml:711 src/ui/ResourceView.qml:128
 msgid "Network:"
 msgstr "网络："
 
-#: src/ui/ContainerDetail.qml:757
+#: src/ui/ContainerDetail.qml:759
 msgid "MAC:"
 msgstr "MAC："
 
-#: src/ui/ContainerDetail.qml:773
+#: src/ui/ContainerDetail.qml:775
 msgid "Port mapping"
 msgstr "端口映射"
 
-#: src/ui/ContainerDetail.qml:782
+#: src/ui/ContainerDetail.qml:784
 msgid "No published ports."
 msgstr "没有已发布的端口。"
 
-#: src/ui/ContainerDetail.qml:802
+#: src/ui/ContainerDetail.qml:804
 msgid "Exposed but not published"
 msgstr "已暴露但未发布"
 
-#: src/ui/ContainerDetail.qml:821
+#: src/ui/ContainerDetail.qml:823
 msgid "%1, exposed but not published to the host"
 msgstr "%1，已暴露但未发布到宿主机"
 
-#: src/ui/ContainerDetail.qml:843
+#: src/ui/ContainerDetail.qml:845
 msgid "No mounts."
 msgstr "没有挂载。"
 
-#: src/ui/ContainerDetail.qml:887
+#: src/ui/ContainerDetail.qml:889
 msgid "mount"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:912
+#: src/ui/ContainerDetail.qml:914
 msgid "Not a directory"
 msgstr "不是目录"
 
-#: src/ui/ContainerDetail.qml:912
+#: src/ui/ContainerDetail.qml:914
 msgid "Host path missing"
 msgstr "宿主路径不存在"
 
-#: src/ui/ContainerDetail.qml:967 src/ui/VolumeDetail.qml:131
+#: src/ui/ContainerDetail.qml:969 src/ui/VolumeDetail.qml:131
 msgid "Open host folder"
 msgstr "打开宿主目录"
 
-#: src/ui/ContainerDetail.qml:975
+#: src/ui/ContainerDetail.qml:977
 msgid "host path"
 msgstr "宿主路径"
 
-#: src/ui/ContainerDetail.qml:980
+#: src/ui/ContainerDetail.qml:982
 msgid "container path"
 msgstr "容器路径"
 
-#: src/ui/ContainerDetail.qml:1006
+#: src/ui/ContainerDetail.qml:1008
 msgid "Delete container"
 msgstr "删除容器"
 
-#: src/ui/ContainerDetail.qml:1007
+#: src/ui/ContainerDetail.qml:1009
 msgid "Delete the container “%1”?"
 msgstr "确定要删除容器“%1”吗？"
 
-#: src/ui/ContainerDetail.qml:1008
+#: src/ui/ContainerDetail.qml:1010
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr "容器会被删除；它的匿名卷与命名卷都会保留。"
 
@@ -1504,7 +1513,7 @@ msgctxt "@info data rate per second"
 msgid "%1/s"
 msgstr "%1/秒"
 
-#: src/ui/ResourceView.qml:48
+#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:55
 msgid "Resources"
 msgstr "资源"
 
@@ -1581,310 +1590,311 @@ msgstr "启动容器 %1"
 msgid "Stop container %1"
 msgstr "停止容器 %1"
 
-#: src/ui/MainPage.qml:56
+#: src/ui/MainPage.qml:58
 msgctxt "@info volumes with unknown size"
 msgid "one volume of unknown size"
 msgid_plural "%1 volumes of unknown size"
 msgstr[0] "1 个大小未知的卷"
 
-#: src/ui/MainPage.qml:84 src/ui/MainPage.qml:470
+#: src/ui/MainPage.qml:86 src/ui/MainPage.qml:472
 msgid "Stopped"
 msgstr "已停止"
 
-#: src/ui/MainPage.qml:105
+#: src/ui/MainPage.qml:107
 msgid "Loading Docker status…"
 msgstr "正在加载 Docker 状态…"
 
-#: src/ui/MainPage.qml:109
+#: src/ui/MainPage.qml:111
 msgid "Connected"
 msgstr "已连接"
 
-#: src/ui/MainPage.qml:111
+#: src/ui/MainPage.qml:113
 msgid "Not connected"
 msgstr "未连接"
 
-#: src/ui/MainPage.qml:128
+#: src/ui/MainPage.qml:130
 msgid "No containers found."
 msgstr "没有容器。"
 
-#: src/ui/MainPage.qml:134
+#: src/ui/MainPage.qml:136
 msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr "没有匹配“%1”的容器。"
 
-#: src/ui/MainPage.qml:135 src/ui/MainPage.qml:161
+#: src/ui/MainPage.qml:137 src/ui/MainPage.qml:163
 msgid "Clear search"
 msgstr "清除搜索"
 
-#: src/ui/MainPage.qml:139
+#: src/ui/MainPage.qml:141
 msgid "No containers match the current filter."
 msgstr "没有符合当前过滤条件的容器。"
 
-#: src/ui/MainPage.qml:140
+#: src/ui/MainPage.qml:142
 msgid "Show all containers"
 msgstr "显示全部容器"
 
-#: src/ui/MainPage.qml:153
+#: src/ui/MainPage.qml:155
 msgid "No images found."
 msgstr "没有镜像。"
 
-#: src/ui/MainPage.qml:155
+#: src/ui/MainPage.qml:157
 msgid "Pull an image"
 msgstr "拉取一个镜像"
 
-#: src/ui/MainPage.qml:160
+#: src/ui/MainPage.qml:162
 msgctxt "@info no image matches the search"
 msgid "No images match “%1”."
 msgstr "没有匹配“%1”的镜像。"
 
-#: src/ui/MainPage.qml:165
+#: src/ui/MainPage.qml:167
 msgid "No images match the current filter."
 msgstr "没有符合当前过滤条件的镜像。"
 
-#: src/ui/MainPage.qml:166
+#: src/ui/MainPage.qml:168
 msgid "Show all images"
 msgstr "显示全部镜像"
 
-#: src/ui/MainPage.qml:222
+#: src/ui/MainPage.qml:224
 msgctxt "@info last successful update"
 msgid "Updated %1 ago"
 msgstr "更新于 %1前"
 
-#: src/ui/MainPage.qml:223
+#: src/ui/MainPage.qml:225
 msgid "Not updated yet"
 msgstr "尚未更新"
 
-#: src/ui/MainPage.qml:229
+#: src/ui/MainPage.qml:231
 msgid "Update failed"
 msgstr "更新失败"
 
-#: src/ui/MainPage.qml:235
+#: src/ui/MainPage.qml:237
 msgid "Data is stale"
 msgstr "数据已过期"
 
-#: src/ui/MainPage.qml:242
+#: src/ui/MainPage.qml:244
 msgid "Auto-refresh is off"
 msgstr "自动刷新已关闭"
 
-#: src/ui/MainPage.qml:291
+#: src/ui/MainPage.qml:293
 msgid "Unable to connect to Docker Engine."
 msgstr "无法连接到 Docker 引擎。"
 
-#: src/ui/MainPage.qml:361
+#: src/ui/MainPage.qml:363
 msgid "Engine summary is unavailable"
 msgstr "引擎概要不可用"
 
-#: src/ui/MainPage.qml:369
+#: src/ui/MainPage.qml:371
 msgid ""
 "Container and image counts are unavailable because the engine summary could "
 "not be read."
 msgstr "无法读取引擎概要，容器与镜像数量暂不可用。"
 
-#: src/ui/MainPage.qml:407
+#: src/ui/MainPage.qml:409
 msgctxt "@title:tab container list"
 msgid "Containers (%1)"
 msgid_plural "Containers (%1)"
 msgstr[0] "容器（%1）"
 
-#: src/ui/MainPage.qml:410
+#: src/ui/MainPage.qml:412
 msgctxt "@title:tab image list"
 msgid "Images (%1)"
 msgid_plural "Images (%1)"
 msgstr[0] "镜像（%1）"
 
-#: src/ui/MainPage.qml:413
+#: src/ui/MainPage.qml:415
 msgctxt "@title:tab network list"
 msgid "Networks (%1)"
 msgid_plural "Networks (%1)"
 msgstr[0] "网络 (%1)"
 
-#: src/ui/MainPage.qml:416
+#: src/ui/MainPage.qml:418
 msgctxt "@title:tab volume list"
 msgid "Volumes (%1)"
 msgid_plural "Volumes (%1)"
 msgstr[0] "数据卷 (%1)"
 
-#: src/ui/MainPage.qml:419
+#: src/ui/MainPage.qml:421
 msgctxt "@title:tab engine information"
 msgid "Engine"
 msgstr "引擎"
 
-#: src/ui/MainPage.qml:440
+#: src/ui/MainPage.qml:442
 msgid "Search containers (name, image, ID)…"
 msgstr "搜索容器（名称、镜像、ID）…"
 
-#: src/ui/MainPage.qml:440
+#: src/ui/MainPage.qml:442
 msgid "Search images (repository, tag, ID)…"
 msgstr "搜索镜像（仓库、标签、ID）…"
 
-#: src/ui/MainPage.qml:458
+#: src/ui/MainPage.qml:460
 msgid "All states"
 msgstr "所有状态"
 
-#: src/ui/MainPage.qml:484
+#: src/ui/MainPage.qml:486
 msgid "All images"
 msgstr "所有镜像"
 
-#: src/ui/MainPage.qml:488 src/ui/MainPage.qml:865
+#: src/ui/MainPage.qml:490 src/ui/MainPage.qml:876
 msgid "In use"
 msgstr "使用中"
 
-#: src/ui/MainPage.qml:492
+#: src/ui/MainPage.qml:494
 msgid "Dangling"
 msgstr "悬空"
 
-#: src/ui/MainPage.qml:516
+#: src/ui/MainPage.qml:518
 msgid "Sort: Name"
 msgstr "排序：名称"
 
-#: src/ui/MainPage.qml:520
+#: src/ui/MainPage.qml:522
 msgid "Sort: State"
 msgstr "排序：状态"
 
-#: src/ui/MainPage.qml:524 src/ui/MainPage.qml:534
+#: src/ui/MainPage.qml:526 src/ui/MainPage.qml:536
 msgid "Sort: Created"
 msgstr "排序：创建时间"
 
-#: src/ui/MainPage.qml:530
+#: src/ui/MainPage.qml:532
 msgid "Sort: Repository"
 msgstr "排序：仓库"
 
-#: src/ui/MainPage.qml:538
+#: src/ui/MainPage.qml:540
 msgid "Sort: Size"
 msgstr "排序：大小"
 
-#: src/ui/MainPage.qml:571
+#: src/ui/MainPage.qml:582
 msgid "Pull image (%1 running)"
 msgstr "拉取镜像（%1 个进行中）"
 
-#: src/ui/MainPage.qml:598
+#: src/ui/MainPage.qml:609
 msgid "Unable to retrieve the container list: %1"
 msgstr "无法获取容器列表：%1"
 
-#: src/ui/MainPage.qml:656
+#: src/ui/MainPage.qml:667
 msgid "Unable to retrieve the image list: %1"
 msgstr "无法获取镜像列表：%1"
 
-#: src/ui/MainPage.qml:725
+#: src/ui/MainPage.qml:736
 msgid "Unable to retrieve the network list: %1"
 msgstr "无法读取网络列表：%1"
 
-#: src/ui/MainPage.qml:736
+#: src/ui/MainPage.qml:747
 msgid "Search by name, ID, driver or subnet…"
 msgstr "按名称、ID、驱动或子网搜索…"
 
-#: src/ui/MainPage.qml:745
+#: src/ui/MainPage.qml:756
 msgid "Create network…"
 msgstr "创建网络…"
 
-#: src/ui/MainPage.qml:760
+#: src/ui/MainPage.qml:771
 msgid "All networks"
 msgstr "所有网络"
 
-#: src/ui/MainPage.qml:761
+#: src/ui/MainPage.qml:772
 msgid "Built-in"
 msgstr "内置"
 
-#: src/ui/MainPage.qml:762
+#: src/ui/MainPage.qml:773
 msgid "User-defined"
 msgstr "自建"
 
-#: src/ui/MainPage.qml:776 src/ui/MainPage.qml:879
+#: src/ui/MainPage.qml:787 src/ui/MainPage.qml:890
 msgid "Driver"
 msgstr "驱动"
 
-#: src/ui/MainPage.qml:777
+#: src/ui/MainPage.qml:788
 msgid "Scope"
 msgstr "范围"
 
-#: src/ui/MainPage.qml:790
+#: src/ui/MainPage.qml:801
 msgid "No network matches the current search or filter."
 msgstr "没有网络符合当前的搜索或过滤条件。"
 
-#: src/ui/MainPage.qml:791
+#: src/ui/MainPage.qml:802
 msgid "No networks found."
 msgstr "没有找到网络。"
 
-#: src/ui/MainPage.qml:793
+#: src/ui/MainPage.qml:804
 msgid "Clear the search field or switch the filter back to “All networks”."
 msgstr "清空搜索框，或把过滤条件切回“所有网络”。"
 
-#: src/ui/MainPage.qml:795
+#: src/ui/MainPage.qml:806
 msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr "Docker 至少会提供内置的 bridge、host 与 none 三个网络。"
 
-#: src/ui/MainPage.qml:797 src/ui/MainPage.qml:1033
+#: src/ui/MainPage.qml:808 src/ui/MainPage.qml:1044
 msgid "Clear filters"
 msgstr "清除过滤条件"
 
-#: src/ui/MainPage.qml:841
+#: src/ui/MainPage.qml:852
 msgid "Unable to retrieve the volume list: %1"
 msgstr "无法读取数据卷列表：%1"
 
-#: src/ui/MainPage.qml:851
+#: src/ui/MainPage.qml:862
 msgid "Search by name, driver or mount point…"
 msgstr "按名称、驱动或挂载点搜索…"
 
-#: src/ui/MainPage.qml:863
+#: src/ui/MainPage.qml:874
 msgid "All volumes"
 msgstr "所有数据卷"
 
-#: src/ui/MainPage.qml:864
+#: src/ui/MainPage.qml:875
 msgid "Unused"
 msgstr "未使用"
 
-#: src/ui/MainPage.qml:880
+#: src/ui/MainPage.qml:891
 msgid "Size"
 msgstr "大小"
 
-#: src/ui/MainPage.qml:891
+#: src/ui/MainPage.qml:902
 msgid "Create volume…"
 msgstr "创建数据卷…"
 
-#: src/ui/MainPage.qml:900
+#: src/ui/MainPage.qml:911
 msgid "Clean up unused…"
 msgstr "清理未使用…"
 
-#: src/ui/MainPage.qml:934 src/ui/MainPage.qml:935
+#: src/ui/MainPage.qml:945 src/ui/MainPage.qml:946
+#: src/ui/CreateContainer.qml:565
 msgid "Volume name"
 msgstr "数据卷名称"
 
-#: src/ui/MainPage.qml:953
+#: src/ui/MainPage.qml:964
 msgid "The volume is created with the local driver."
 msgstr "数据卷使用 local 驱动创建。"
 
-#: src/ui/MainPage.qml:974
+#: src/ui/MainPage.qml:985
 msgctxt "@info volumes about to be removed"
 msgid "One unused volume will be removed:"
 msgid_plural "%1 unused volumes will be removed:"
 msgstr[0] "将删除 1 个未使用的数据卷："
 
-#: src/ui/MainPage.qml:993
+#: src/ui/MainPage.qml:1004
 msgid "Reclaimable space: %1"
 msgstr "可回收空间：%1"
 
-#: src/ui/MainPage.qml:1003
+#: src/ui/MainPage.qml:1014
 msgid "Clean up"
 msgstr "清理"
 
-#: src/ui/MainPage.qml:1013
+#: src/ui/MainPage.qml:1024
 msgid "Only volumes that no container uses are removed."
 msgstr "只会删除没有任何容器使用的数据卷。"
 
-#: src/ui/MainPage.qml:1026
+#: src/ui/MainPage.qml:1037
 msgid "No volume matches the current search or filter."
 msgstr "没有数据卷符合当前的搜索或过滤条件。"
 
-#: src/ui/MainPage.qml:1027
+#: src/ui/MainPage.qml:1038
 msgid "No volumes found."
 msgstr "没有找到数据卷。"
 
-#: src/ui/MainPage.qml:1029
+#: src/ui/MainPage.qml:1040
 msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr "清空搜索框，或把过滤条件切回“所有数据卷”。"
 
-#: src/ui/MainPage.qml:1031
+#: src/ui/MainPage.qml:1042
 msgid ""
 "Volumes keep data across container restarts. Create one here or let Docker "
 "create it when a container declares it."
@@ -1892,15 +1902,15 @@ msgstr ""
 "数据卷用于在容器重启之间保留数据。可以在这里创建，也可以在容器声明时由 "
 "Docker 自动创建。"
 
-#: src/ui/MainPage.qml:1076
+#: src/ui/MainPage.qml:1087
 msgid "User configuration…"
 msgstr "用户级配置…"
 
-#: src/ui/MainPage.qml:1083
+#: src/ui/MainPage.qml:1094
 msgid "System configuration…"
 msgstr "系统级配置…"
 
-#: src/ui/MainPage.qml:1090
+#: src/ui/MainPage.qml:1101
 msgid ""
 "Registry mirrors and other daemon settings. The system configuration needs "
 "administrator rights."
@@ -2563,6 +2573,284 @@ msgstr "数据卷及其中的数据都会被删除。正在使用它的容器需
 #: src/ui/VolumeDetail.qml:218
 msgid "The volume and the data inside it are deleted. This cannot be undone."
 msgstr "数据卷及其中的数据都会被删除，且无法撤销。"
+
+#: src/ui/CreateContainer.qml:47
+msgid "Basics"
+msgstr "基础"
+
+#: src/ui/CreateContainer.qml:51
+msgid "Environment & labels"
+msgstr "环境变量与标签"
+
+#: src/ui/CreateContainer.qml:57
+msgid "Review"
+msgstr "总览"
+
+#: src/ui/CreateContainer.qml:65
+msgid "Choose an image."
+msgstr "请选择一个镜像。"
+
+#: src/ui/CreateContainer.qml:67
+msgid ""
+"This image is not available locally. Pull it first, or tick “Pull it first”."
+msgstr "本地没有这个镜像。请先拉取，或勾选“本地没有时先拉取”。"
+
+#: src/ui/CreateContainer.qml:69
+msgid "Enter a name for the container."
+msgstr "请填写容器名称。"
+
+#: src/ui/CreateContainer.qml:73
+msgid "A container with this name already exists."
+msgstr "已经有同名的容器了。"
+
+#: src/ui/CreateContainer.qml:75
+msgid "Every port row needs a container port."
+msgstr "每一行端口都要填容器端口。"
+
+#: src/ui/CreateContainer.qml:77
+msgid "Host ports must be between 1 and 65535 (leave empty for a random port)."
+msgstr "宿主端口必须在 1–65535 之间（留空表示随机分配）。"
+
+#: src/ui/CreateContainer.qml:79
+msgid "This host port is already published by another container."
+msgstr "这个宿主端口已经被其它容器占用了。"
+
+#: src/ui/CreateContainer.qml:81
+msgid "Every environment or label row needs a key."
+msgstr "每一行环境变量或标签都要填键名。"
+
+#: src/ui/CreateContainer.qml:83
+msgid ""
+"Keys may contain letters, digits and underscore, and must not start with a "
+"digit."
+msgstr "键名只能包含字母、数字与下划线，且不能以数字开头。"
+
+#: src/ui/CreateContainer.qml:85
+msgid "Every mount needs a container path."
+msgstr "每个挂载都要填容器路径。"
+
+#: src/ui/CreateContainer.qml:87
+msgid "The container path must be absolute."
+msgstr "容器路径必须是绝对路径。"
+
+#: src/ui/CreateContainer.qml:89
+msgid "The same container path is used twice."
+msgstr "同一个容器路径被用了两次。"
+
+#: src/ui/CreateContainer.qml:91
+msgid "Every mount needs a source (host path or volume name)."
+msgstr "每个挂载都要填来源（宿主路径或卷名）。"
+
+#: src/ui/CreateContainer.qml:93
+msgid "Bind mounts need an absolute host path."
+msgstr "bind 挂载需要绝对宿主路径。"
+
+#: src/ui/CreateContainer.qml:95
+msgid "Volume names may contain letters, digits, underscore, dot or dash."
+msgstr "卷名只能包含字母、数字、下划线、点或短横线。"
+
+#: src/ui/CreateContainer.qml:97
+msgid "The memory limit must be at least 6 MiB (or empty for no limit)."
+msgstr "内存上限至少 6 MiB（留空表示不限制）。"
+
+#: src/ui/CreateContainer.qml:99
+msgid "The memory limit cannot be negative."
+msgstr "内存上限不能是负数。"
+
+#: src/ui/CreateContainer.qml:101
+msgid "The CPU limit cannot be negative."
+msgstr "CPU 上限不能是负数。"
+
+#: src/ui/CreateContainer.qml:193
+msgid "Which image should the container use?"
+msgstr "容器用哪个镜像？"
+
+#: src/ui/CreateContainer.qml:201
+msgid "Image reference, for example alpine:3.19"
+msgstr "镜像引用，例如 alpine:3.19"
+
+#: src/ui/CreateContainer.qml:210
+msgid "Pull it first if it is missing locally"
+msgstr "本地没有时先拉取"
+
+#: src/ui/CreateContainer.qml:216
+msgid "Local images:"
+msgstr "本地镜像："
+
+#: src/ui/CreateContainer.qml:242
+msgid "No local images. Pull one from the Images tab first."
+msgstr "本地没有镜像。请先在“镜像”页拉取一个。"
+
+#: src/ui/CreateContainer.qml:255
+msgid "Name, network and restart policy"
+msgstr "名称、网络与重启策略"
+
+#: src/ui/CreateContainer.qml:267 src/ui/CreateContainer.qml:268
+msgid "Container name"
+msgstr "容器名称"
+
+#: src/ui/CreateContainer.qml:275
+msgid "Suggest"
+msgstr "用建议名称"
+
+#: src/ui/CreateContainer.qml:313
+msgid "Network aliases (optional, comma separated)"
+msgstr "网络别名（可选，用逗号分隔）"
+
+#: src/ui/CreateContainer.qml:314
+msgid "Network aliases"
+msgstr "网络别名"
+
+#: src/ui/CreateContainer.qml:327
+msgid "Do not restart automatically"
+msgstr "不自动重启"
+
+#: src/ui/CreateContainer.qml:328
+msgid "Always"
+msgstr "总是"
+
+#: src/ui/CreateContainer.qml:329
+msgid "Unless stopped"
+msgstr "除非手动停止"
+
+#: src/ui/CreateContainer.qml:330
+msgid "On failure"
+msgstr "失败时"
+
+#: src/ui/CreateContainer.qml:339
+msgid "Start the container after creating it"
+msgstr "创建后启动容器"
+
+#: src/ui/CreateContainer.qml:353
+msgid "Published ports"
+msgstr "端口映射"
+
+#: src/ui/CreateContainer.qml:358
+msgid "Leave the host port empty to let Docker pick a free one."
+msgstr "宿主端口留空则由 Docker 挑一个空闲端口。"
+
+#: src/ui/CreateContainer.qml:409
+msgid "TCP"
+msgstr "TCP"
+
+#: src/ui/CreateContainer.qml:410
+msgid "UDP"
+msgstr "UDP"
+
+#: src/ui/CreateContainer.qml:422
+msgid "Remove this port"
+msgstr "移除这一行端口"
+
+#: src/ui/CreateContainer.qml:433
+msgid "Add port"
+msgstr "添加端口"
+
+#: src/ui/CreateContainer.qml:445
+msgid ""
+"No published ports. The container will only be reachable on its networks."
+msgstr "没有发布端口。容器只能通过它所在的网络访问。"
+
+#: src/ui/CreateContainer.qml:502
+msgid "Quick add from your presets:"
+msgstr "从预设快速添加："
+
+#: src/ui/CreateContainer.qml:551 src/ui/CreateContainer.qml:565
+msgid "Host path"
+msgstr "宿主路径"
+
+#: src/ui/CreateContainer.qml:552
+msgid "Named volume"
+msgstr "命名卷"
+
+#: src/ui/CreateContainer.qml:553
+msgid "tmpfs"
+msgstr "tmpfs"
+
+#: src/ui/CreateContainer.qml:566
+msgid "Mount source"
+msgstr "挂载来源"
+
+#: src/ui/CreateContainer.qml:576 src/ui/CreateContainer.qml:577
+msgid "Container path"
+msgstr "容器路径"
+
+#: src/ui/CreateContainer.qml:586
+msgid "Read-only"
+msgstr "只读"
+
+#: src/ui/CreateContainer.qml:597
+msgid "Remove this mount"
+msgstr "移除这个挂载"
+
+#: src/ui/CreateContainer.qml:605
+msgid "Add mount"
+msgstr "添加挂载"
+
+#: src/ui/CreateContainer.qml:612
+msgid ""
+"A host path that does not exist yet is fine: Docker creates the directory."
+msgstr "宿主路径还不存在也没关系：Docker 会创建目录。"
+
+#: src/ui/CreateContainer.qml:627
+msgid "Resources and privileges"
+msgstr "资源与特权"
+
+#: src/ui/CreateContainer.qml:635
+msgid "Memory limit (MiB):"
+msgstr "内存上限（MiB）："
+
+#: src/ui/CreateContainer.qml:646 src/ui/CreateContainer.qml:670
+msgid "No limit"
+msgstr "不限制"
+
+#: src/ui/CreateContainer.qml:657
+msgid "CPU limit (cores):"
+msgstr "CPU 上限（核）："
+
+#: src/ui/CreateContainer.qml:681
+msgid "Run with extended privileges (--privileged)"
+msgstr "以扩展特权运行（--privileged）"
+
+#: src/ui/CreateContainer.qml:698
+msgid ""
+"This container runs with the same access as root on the host. Only use it "
+"when you know why."
+msgstr "这个容器拥有与宿主 root 相同的访问权限。请只在明确知道原因时使用。"
+
+#: src/ui/CreateContainer.qml:711
+msgid "Review and create"
+msgstr "确认并创建"
+
+#: src/ui/CreateContainer.qml:744
+msgid ""
+"Environment variable values are not shown here on purpose; only their names."
+msgstr "这里有意不显示环境变量的值，只列键名。"
+
+#: src/ui/CreateContainer.qml:851
+msgid "Run with extended privileges"
+msgstr "以扩展特权运行"
+
+#: src/ui/CreateContainer.qml:852
+msgid "Give this container the same access as root on the host?"
+msgstr "要让这个容器拥有与宿主 root 相同的访问权限吗？"
+
+#: src/ui/CreateContainer.qml:853
+msgid ""
+"The container can access all devices and host files. Only continue if you "
+"trust the image."
+msgstr "容器可以访问所有设备与宿主文件。只有在信任该镜像时才继续。"
+
+#: src/ui/CreateContainer.qml:854
+msgid "Yes, run privileged"
+msgstr "是，以特权运行"
+
+#: src/ui/CreateContainer.qml:874
+msgid "Next"
+msgstr "下一步"
+
+#: src/ui/CreateContainer.qml:883
+msgid "Create and start"
+msgstr "创建并启动"
 
 #~ msgid "Connect to a network"
 #~ msgstr "连接到网络"

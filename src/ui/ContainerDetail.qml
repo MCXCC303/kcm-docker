@@ -82,6 +82,8 @@ KCM.AbstractKCM {
     /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
     signal closeRequested
+    /*! 克隆这个容器的配置（七期 §4.5）：只复制配置，不复制运行时状态。 */
+    signal cloneRequested(string containerId)
 
     /*! 正在等待"断开"确认的网络名（确认对话框要用）。 */
     property string pendingNetworkName: ""

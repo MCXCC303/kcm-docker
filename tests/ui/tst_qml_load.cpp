@@ -137,6 +137,7 @@ private Q_SLOTS:
     void networkRemovalIsHiddenForBuiltInNetworks();
     void containerNetworkSectionConnectsAndDisconnects();
     void volumesTabListsCreatesAndPreviewsCleanup();
+    void createContainerWizardGatesStepsAndHidesSecrets();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -1165,6 +1166,147 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
     QVERIFY2(!page->property("volumeCreatePanelOpen").toBool(), "the panel closes once the request is sent");
 }
 
+/*!
+ * 创建容器向导（ARCH_V5_V8 §4.4）：分步校验、特权的二次确认、总览不泄露环境变量值。
+ */
+void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
+{
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:3.19")};
+    m_backend->setImages({image});
+    QList<Network> networks;
+    Network app;
+    app.id = QString(64, QLatin1Char('a'));
+    app.name = QStringLiteral("app_default");
+    app.driver = QStringLiteral("bridge");
+    networks.append(app);
+    m_backend->setNetworks(networks);
+    m_stubKcm->controller()->refreshNetworks();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    // 必须放进窗口：ScrollView 里的内容与 Repeater 的条目在无窗口时不会真正建立
+    // （六期的网络页用例也踩过同一个坑）
+    QQuickWindow window;
+    window.resize(1100, 800);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1100);
+    page->setHeight(800);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    m_backend->completeRefresh();
+    QTest::qWait(20);
+
+
+    auto *wizard = m_stubKcm->controller()->createContainer();
+    QCOMPARE(wizard->stepKey(), QStringLiteral("image"));
+
+    // 第一步：没选镜像不能继续（"下一步"按钮也是禁用的，两条路径都要成立）
+    QQuickItem *nextButton = childByObjectName(page, QStringLiteral("wizardNextButton"));
+    QVERIFY(nextButton);
+    QVERIFY2(!nextButton->property("enabled").toBool(), "an empty image must not allow continuing");
+    QQuickItem *stepError = childByObjectName(page, QStringLiteral("wizardStepError"));
+    QVERIFY(stepError);
+    QTRY_VERIFY(stepError->property("visible").toBool());
+    QVERIFY2(!stepError->property("text").toString().isEmpty(), "the reason must be translated");
+
+    // 填镜像后可以继续；镜像不在本地时要给"先拉取"的提示
+    QQuickItem *imageField = childByObjectName(page, QStringLiteral("wizardImageField"));
+    QVERIFY(imageField);
+    imageField->setProperty("text", QStringLiteral("busybox:latest"));
+    QTRY_VERIFY(stepError->property("visible").toBool());
+    QCOMPARE(stepError->property("text").toString().contains(QStringLiteral("Pull")), true);
+    imageField->setProperty("text", QStringLiteral("alpine:3.19"));
+    QTRY_VERIFY(nextButton->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked"));
+    QCOMPARE(wizard->stepKey(), QStringLiteral("basics"));
+
+    // 名称：非法 → 阻断；合法 → 继续
+    QQuickItem *nameField = childByObjectName(page, QStringLiteral("wizardNameField"));
+    QVERIFY(nameField);
+    nameField->setProperty("text", QStringLiteral("bad name"));
+    QTRY_VERIFY(!nextButton->property("enabled").toBool());
+    nameField->setProperty("text", QStringLiteral("worker"));
+    QTRY_VERIFY(nextButton->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // ports
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // environment
+    QCOMPARE(wizard->stepKey(), QStringLiteral("environment"));
+
+    // 环境变量与标签：值默认按密码显示，改动会回写控制器
+    auto *environmentEditor = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardEnvironmentEditor")));
+    QVERIFY(environmentEditor);
+    QVERIFY2(environmentEditor->property("secretValues").toBool(), "environment values are masked by default");
+    // 用编辑器自己的 API 加一行（它与页面的回写路径才是被测对象）
+    QVariantList entries;
+    entries.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("API_TOKEN")},
+                                {QStringLiteral("value"), QStringLiteral("s3cret-value")}});
+    const QVariant entriesArg = entries;
+    QVERIFY(QMetaObject::invokeMethod(environmentEditor, "setEntries", Q_ARG(QVariant, entriesArg)));
+    QTRY_COMPARE(m_stubKcm->controller()->createContainer()->environmentRows().size(), 1);
+
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // mounts
+    QCOMPARE(wizard->stepKey(), QStringLiteral("mounts"));
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // resources
+    QCOMPARE(wizard->stepKey(), QStringLiteral("resources"));
+
+    // 特权：勾选必须先二次确认，确认前不生效
+    QQuickItem *privilegedCheck = childByObjectName(page, QStringLiteral("wizardPrivilegedCheck"));
+    QVERIFY(privilegedCheck);
+    // 模拟用户真的勾上：设 checked 会触发 toggled 处理器（直接 invoke 信号不会翻转状态）
+    privilegedCheck->setProperty("checked", true);
+    QTest::qWait(20);
+    QVERIFY2(!wizard->privileged(), "privileged must not be enabled without confirmation");
+    // 勾选状态本身不在这里断言（Qt 的 CheckBox 会在处理器里自行翻转），
+    // 要紧的是"没有确认就绝不生效"，这条由上一行守着
+    QQuickItem *privilegedNotice = childByObjectName(page, QStringLiteral("wizardPrivilegedNotice"));
+    QVERIFY(privilegedNotice);
+    QVERIFY2(!privilegedNotice->property("visible").toBool(), "the warning only shows once it is enabled");
+    // Kirigami.PromptDialog 不是 QQuickItem：按对象名在对象树里找
+    QObject *privilegedDialog = page->findChild<QObject *>(QStringLiteral("wizardPrivilegedDialog"));
+    QVERIFY2(privilegedDialog, "the privileged confirmation must exist");
+    QVERIFY2(!privilegedDialog->property("consequenceText").toString().isEmpty(),
+             "the privileged confirmation must explain the consequence");
+
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // summary
+    QCOMPARE(wizard->stepKey(), QStringLiteral("summary"));
+
+    // 总览：环境变量只列键名，值绝不出现
+    // 总览：环境变量只列键名，值绝不出现。
+    // 断言在**控制器**这一层：summary 是它的属性，密码不进总览这条规则就实现在那里；
+    // 界面把它画出来由上文的渲染截图复核（离屏用例里 Repeater 条目的父链不可靠）。
+    QString summaryText;
+    const QVariantList summaryRows = wizard->summary();
+    QVERIFY2(!summaryRows.isEmpty(), "the review step must have something to show");
+    for (const QVariant &entry : summaryRows) {
+        summaryText += entry.toMap().value(QStringLiteral("label")).toString() + QLatin1Char('=');
+        summaryText += entry.toMap().value(QStringLiteral("value")).toString() + QLatin1Char('\n');
+    }
+    QVERIFY2(summaryText.contains(QStringLiteral("alpine:3.19")), qPrintable(summaryText));
+    QVERIFY2(!summaryText.contains(QStringLiteral("s3cret-value")), qPrintable(summaryText));
+    QVERIFY2(summaryText.contains(QStringLiteral("API_TOKEN")), qPrintable(summaryText));
+
+    // 提交：请求真的发给后端，并带上表单里的字段
+    QQuickItem *createButton = childByObjectName(page, QStringLiteral("wizardCreateButton"));
+    QVERIFY(createButton);
+    QVERIFY(QMetaObject::invokeMethod(createButton, "clicked"));
+    QTRY_COMPARE(m_backend->lastContainerCreate().name, QStringLiteral("worker"));
+    QCOMPARE(m_backend->lastContainerCreate().image, QStringLiteral("alpine:3.19"));
+    QCOMPARE(m_backend->lastContainerCreate().network, QStringLiteral("app_default"));
+    QCOMPARE(m_backend->lastContainerCreate().environment, QStringList {QStringLiteral("API_TOKEN=s3cret-value")});
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -1184,6 +1326,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("NetworkDetail.qml"),
         QStringLiteral("VolumeCard.qml"),
         QStringLiteral("VolumeDetail.qml"),
+        QStringLiteral("CreateContainer.qml"),
         QStringLiteral("StorageView.qml"),
         QStringLiteral("ResourceView.qml"),
         QStringLiteral("components/StatTile.qml"),

@@ -44,6 +44,8 @@ KCM.SimpleKCM {
     signal closeRequested
     /*! 打开仓库认证页并把该镜像的仓库预填进登录框（ARCH_V5_V8 §2.7）。 */
     signal registryAuthRequested(string serverAddress)
+    /*! 基于这个镜像创建容器（七期 §4.5）。 */
+    signal createContainerRequested(string imageReference)
 
     /*!
         删除语义（ARCH_V4 §2.4）：
@@ -137,6 +139,12 @@ KCM.SimpleKCM {
             type: Kirigami.MessageType.Error
             text: controller.errorText.length > 0 ? controller.errorText : i18n("Unable to retrieve image details.")
             actions: [
+                Kirigami.Action {
+                    text: i18n("Create container…")
+                    icon.name: "list-add"
+                    enabled: page.operations.writeAllowed
+                    onTriggered: page.createContainerRequested(page.controller.primaryTag)
+                },
                 Kirigami.Action {
                     text: i18n("Registry logins…")
                     icon.name: "dialog-password"

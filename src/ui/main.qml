@@ -88,6 +88,11 @@ KCM.AbstractKCM {
                         "scope": scope
                     });
                 }
+                onCreateContainerRequested: function (presetImage) {
+                    stack.push(createContainerComponent, {
+                        "presetImage": presetImage
+                    });
+                }
                 onVolumeActivated: function (volumeName) {
                     stack.push(volumeDetailComponent, {
                         "volumeName": volumeName
@@ -111,6 +116,26 @@ KCM.AbstractKCM {
 
             ContainerDetail {
                 onCloseRequested: stack.pop()
+                onCloneRequested: function (containerId) {
+                    stack.push(createContainerComponent, {
+                        "cloneFromContainerId": containerId
+                    });
+                }
+            }
+        }
+
+        Component {
+            id: createContainerComponent
+
+            CreateContainer {
+                onCloseRequested: stack.pop()
+                // 创建成功：直接进新容器的详情（§4.6）
+                onContainerCreated: function (containerId) {
+                    stack.pop();
+                    stack.push(containerDetailComponent, {
+                        "containerId": containerId
+                    });
+                }
             }
         }
 
@@ -157,6 +182,11 @@ KCM.AbstractKCM {
 
             ImageDetail {
                 onCloseRequested: stack.pop()
+                onCreateContainerRequested: function (imageReference) {
+                    stack.push(createContainerComponent, {
+                        "presetImage": imageReference
+                    });
+                }
                 onRegistryAuthRequested: function (serverAddress) {
                     stack.push(registryAuthComponent, {
                         "presetServerAddress": serverAddress

@@ -71,6 +71,14 @@ class CreateContainerController : public QObject
 
     /*! 挂载预设（摘要形式，界面据此铺"快速添加"列表）。 */
     Q_PROPERTY(QVariantList presets READ presets NOTIFY presetsChanged)
+    /*!
+     * 选择列表：本地镜像与可用网络。
+     *
+     * 做成**属性**而不是 Q_INVOKABLE：函数调用既不会建立依赖，又会随着每次表单改动
+     * 让 Repeater 重建全部条目（实测会崩）。它们只在后端数据变化时才通知。
+     */
+    Q_PROPERTY(QVariantList availableImages READ availableImages NOTIFY choiceListsChanged)
+    Q_PROPERTY(QVariantList availableNetworks READ availableNetworks NOTIFY choiceListsChanged)
 
     /*! 确认总览：`[{label, value}]`，最后一步只读展示。 */
     Q_PROPERTY(QVariantList summary READ summary NOTIFY changed)
@@ -83,6 +91,8 @@ public:
 
     /*! 步骤 key 顺序（界面与测试共用；不要在 QML 里另抄一份）。 */
     static QStringList stepKeys();
+    /*! 同上，但以属性形式暴露给 QML（静态方法在 QML 里拿不到）。 */
+    Q_PROPERTY(QStringList stepKeys READ stepKeys CONSTANT)
 
     QString stepKey() const;
     int stepIndex() const;
@@ -143,11 +153,17 @@ public:
     /*! 名称冲突时给一个可用的候选名（`web` → `web-copy`）。 */
     Q_INVOKABLE QString suggestedName() const;
 
+    /*! 指定步骤的校验结果（诊断与测试用；不影响当前步骤）。 */
+    Q_INVOKABLE QString stepErrorKeyForStep(const QString &key) const;
+
     /*! 上一步 / 下一步（下一步会先校验当前步骤）。 */
     Q_INVOKABLE bool nextStep();
     Q_INVOKABLE void previousStep();
     /*! 跳到某一步（步骤按钮用；只允许跳到已通过校验的那一步或它之前）。 */
     Q_INVOKABLE bool goToStep(const QString &key);
+
+    QVariantList availableImages() const;
+    QVariantList availableNetworks() const;
 
     /*! 从预设添加一条挂载（已存在则忽略）。 */
     Q_INVOKABLE bool addMountFromPreset(const QString &presetId);
@@ -162,6 +178,8 @@ Q_SIGNALS:
     void changed();
     void stepChanged();
     void presetsChanged();
+    /*! 镜像或网络列表变了（选择列表要重铺）。 */
+    void choiceListsChanged();
     /*! 提交成功（界面据此跳到新容器详情页）。 */
     void submitted(const QString &containerId);
 
@@ -172,6 +190,8 @@ private:
     QString validatePorts() const;
     QString validateMounts() const;
     QVariantMap requestMap() const;
+    /*! 默认网络：列表里的第一个（列表是异步到的，因此这里每次现算）。 */
+    QString defaultNetwork() const;
     QStringList splitLines(const QString &text) const;
     void touch();
 

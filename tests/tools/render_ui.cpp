@@ -605,6 +605,8 @@ int main(int argc, char **argv)
     } else if (page == QLatin1String("image-detail")) {
         qmlFile = QStringLiteral("ImageDetail.qml");
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    } else if (page == QLatin1String("create-container")) {
+        qmlFile = QStringLiteral("CreateContainer.qml");
     } else if (page == QLatin1String("network-detail")) {
         qmlFile = QStringLiteral("NetworkDetail.qml");
         // fixture 里 app_default 的 id 是 64 个 'a'
@@ -696,7 +698,34 @@ int main(int argc, char **argv)
     // 对话框（弹层）**必须在窗口就绪之后**才打开：它的内容在打开时创建，
     // 若此时还没有窗口，内容永远不会被布局，截图上就是一片空白（实测踩过）
     QTimer::singleShot(600, &app, [&]() {
-        // KONTAINER_RENDER_CONNECT_NETWORK=1：展开"连接到网络"内联面板
+        // KONTAINER_RENDER_WIZARD_STEP=<step key>：把创建向导直接推进到某一步（复核表单排版）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_WIZARD_STEP")) {
+        auto *controller = stub->controller()->createContainer();
+        const QString step = qEnvironmentVariable("KONTAINER_RENDER_WIZARD_STEP");
+        controller->setImage(QStringLiteral("postgres:17-alpine"));
+        controller->setName(QStringLiteral("demo-container"));
+        controller->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 5432},
+                                              {QStringLiteral("hostPort"), 15432},
+                                              {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")},
+                                              {QStringLiteral("protocol"), QStringLiteral("tcp")}}});
+        controller->setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("POSTGRES_PASSWORD")},
+                                                     {QStringLiteral("value"), QStringLiteral("not-a-real-secret")}}});
+        controller->setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("volume")},
+                                               {QStringLiteral("source"), QStringLiteral("pgdata")},
+                                               {QStringLiteral("destination"), QStringLiteral("/var/lib/postgresql/data")},
+                                               {QStringLiteral("readOnly"), false}}});
+        controller->setNetwork(QStringLiteral("app_default"));
+        const QString target = (step == QLatin1String("summary") || step == QLatin1String("all")) ? QStringLiteral("summary") : step;
+        const bool moved = controller->goToStep(target);
+        std::fprintf(stderr, "DBG wizard target=%s moved=%d now=%s error=%s\n", qPrintable(target), int(moved),
+                     qPrintable(controller->stepKey()), qPrintable(controller->stepErrorKey()));
+        // 逐步前进，找出卡在哪一步
+        for (const QString &key : Kontainer::CreateContainerController::stepKeys()) {
+            std::fprintf(stderr, "DBG   step %s error=%s\n", qPrintable(key), qPrintable(controller->stepErrorKeyForStep(key)));
+        }
+    }
+
+    // KONTAINER_RENDER_CONNECT_NETWORK=1：展开"连接到网络"内联面板
         if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CONNECT_NETWORK")) {
             QQuickItem *connectEntry = nullptr;
             std::function<void(QQuickItem *)> walkConnect = [&](QQuickItem *node) {

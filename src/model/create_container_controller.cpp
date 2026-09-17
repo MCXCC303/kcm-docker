@@ -53,9 +53,24 @@ CreateContainerController::CreateContainerController(OperationController *operat
         Q_EMIT presetsChanged();
         Q_EMIT changed();
     });
-    // 后端数据变了（容器/镜像列表刷新）会影响重名与端口冲突的判断，因此也要重算
+    // 后端数据变了会影响重名与端口冲突的判断；镜像/网络列表还要重铺选择列表
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &CreateContainerController::changed);
-    connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &CreateContainerController::changed);
+    connect(m_backend, &DockerBackendInterface::imagesUpdated, this, [this] {
+        Q_EMIT choiceListsChanged();
+        Q_EMIT changed();
+    });
+    connect(m_backend, &DockerBackendInterface::networksUpdated, this, [this] {
+        // 网络列表是异步到的：如果用户还没选网络，就采用第一个（界面上那个下拉显示的就是它，
+        // 不能出现"看着选了、实际提交空"）
+        if (m_network.isEmpty()) {
+            const QVariantList choices = availableNetworks();
+            if (!choices.isEmpty()) {
+                m_network = choices.first().toMap().value(QStringLiteral("name")).toString();
+            }
+        }
+        Q_EMIT choiceListsChanged();
+        Q_EMIT changed();
+    });
     // 创建成功：把 id 交给界面跳转
     connect(m_backend, &DockerBackendInterface::containerCreated, this, [this](const QString &id, const QString &) {
         m_createdContainerId = id;
@@ -126,6 +141,12 @@ QString CreateContainerController::user() const
 QString CreateContainerController::hostname() const
 {
     return m_hostname;
+}
+
+QString CreateContainerController::defaultNetwork() const
+{
+    const QVariantList choices = availableNetworks();
+    return choices.isEmpty() ? QString() : choices.first().toMap().value(QStringLiteral("name")).toString();
 }
 
 QString CreateContainerController::network() const
@@ -367,7 +388,7 @@ void CreateContainerController::reset(const QString &presetImage)
     m_workingDirectory.clear();
     m_user.clear();
     m_hostname.clear();
-    m_network.clear();
+    m_network = defaultNetwork();
     m_networkAliasesText.clear();
     m_restartPolicy = QStringLiteral("no");
     m_restartMaxRetries = 0;
@@ -383,6 +404,42 @@ void CreateContainerController::reset(const QString &presetImage)
     m_createdContainerId.clear();
     Q_EMIT stepChanged();
     Q_EMIT changed();
+}
+
+QVariantList CreateContainerController::availableImages() const
+{
+    QVariantList result;
+    const QList<Image> images = m_backend->images();
+    for (const Image &image : images) {
+        for (const QString &tag : image.repoTags) {
+            // 悬空镜像（<none>:<none>）不进选择列表：没法用引用去创建容器
+            if (tag.isEmpty() || tag.startsWith(QLatin1String("<none>"))) {
+                continue;
+            }
+            result.append(QVariantMap {
+                {QStringLiteral("reference"), tag},
+                {QStringLiteral("shortId"), image.shortId()},
+            });
+        }
+    }
+    std::sort(result.begin(), result.end(), [](const QVariant &lhs, const QVariant &rhs) {
+        return lhs.toMap().value(QStringLiteral("reference")).toString()
+            < rhs.toMap().value(QStringLiteral("reference")).toString();
+    });
+    return result;
+}
+
+QVariantList CreateContainerController::availableNetworks() const
+{
+    QVariantList result;
+    const QList<Network> networks = m_backend->networks();
+    for (const Network &network : networks) {
+        result.append(QVariantMap {
+            {QStringLiteral("name"), network.name},
+            {QStringLiteral("driver"), network.driver},
+        });
+    }
+    return result;
 }
 
 QString CreateContainerController::suggestedName() const
@@ -587,6 +644,20 @@ QString CreateContainerController::validateMounts() const
         }
     }
     return {};
+}
+
+QString CreateContainerController::stepErrorKeyForStep(const QString &key) const
+{
+    // 临时切到该步骤求值：校验逻辑只写一份，避免"界面校验"与"诊断校验"分叉
+    auto *self = const_cast<CreateContainerController *>(this);
+    const int saved = m_stepIndex;
+    const int target = int(stepKeyList().indexOf(key));
+    if (target >= 0) {
+        self->m_stepIndex = target;
+    }
+    const QString error = validateCurrentStep();
+    self->m_stepIndex = saved;
+    return error;
 }
 
 QString CreateContainerController::validateCurrentStep() const
