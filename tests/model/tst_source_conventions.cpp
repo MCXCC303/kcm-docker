@@ -231,25 +231,50 @@ void SourceConventionsTest::kioStaysInHostPathService()
 }
 
 /*!
- * 外部进程与提权继续全面禁止（ARCH_V3 §1.3 / ARCH_V4 §1.4）：
- * 不调用 docker CLI，不引入 KAuth，权限模型是「按 socket 实际权限工作」。
+ * 外部进程与提权的边界（ARCH_V3 §1.3 → **ARCH_V5_V8 §1.5.1 有条件放宽**）。
+ *
+ * 五期引入了第一个受限提权组件（用户已批准，理由见 ARCH_V5_V8 §1.5.1：
+ * 系统级部署下 `/etc/docker/daemon.json` 用户不可写，配置镜像源没有不提权的实现方式）。
+ * 因此这条断言从"KAuth 全面禁止"改成**白名单**：
+ *
+ *  - `QProcess` 仍然全面禁止（我们从不 shell out；重启走 systemd D-Bus）
+ *  - `KAuth` 只允许出现在被审阅过的提权文件里：客户端与 helper
+ *  - 其他任何文件引入 KAuth / 提权机制 → 直接失败
  */
 void SourceConventionsTest::externalProcessesStayForbidden()
 {
     const QMap<QString, QString> sources = collectFiles(sourceDir() + QStringLiteral("/src"), {QStringLiteral("*.cpp"), QStringLiteral("*.h"), QStringLiteral("*.qml")});
     QVERIFY2(!sources.isEmpty(), "no production sources found");
 
-    // 外部进程 / 提权
-    const QRegularExpression forbidden(QStringLiteral("(QProcess|KAuth|KAuth\\b|kauth)"));
+    // 允许出现 KAuth 的文件（提权边界：改动这里必须是一次显式、被审阅的设计变更）
+    const QStringList privilegedFiles = {
+        QStringLiteral("backend/privileged_config_client.cpp"),
+        QStringLiteral("backend/privileged_config_client.h"),
+        QStringLiteral("kauth/kontainer_helper.cpp"),
+        QStringLiteral("kauth/privileged_config_request.cpp"),
+        QStringLiteral("kauth/privileged_config_request.h"),
+    };
+
+    // 只拦"真的会执行外部程序"的写法：`systemctl` 这类词会出现在给用户复制的命令文本里，
+    // 那不是我们在执行（重启走 systemd D-Bus），因此不按关键词拦。
+    const QRegularExpression externalProcess(QStringLiteral("(QProcess|popen\\(|execv|/bin/sh)"));
+    const QRegularExpression privilegeEscalation(QStringLiteral("(KAuth|polkit)"));
 
     QStringList offenders;
     for (auto it = sources.constBegin(); it != sources.constEnd(); ++it) {
-        for (const QString &hit : linesMatching(it.value(), forbidden)) {
+        for (const QString &hit : linesMatching(it.value(), externalProcess)) {
+            offenders.append(QStringLiteral("%1 → %2").arg(it.key(), hit));
+        }
+        if (privilegedFiles.contains(it.key())) {
+            continue;
+        }
+        for (const QString &hit : linesMatching(it.value(), privilegeEscalation)) {
             offenders.append(QStringLiteral("%1 → %2").arg(it.key(), hit));
         }
     }
     QVERIFY2(offenders.isEmpty(),
-             qPrintable(QStringLiteral("Kontainer never shells out and never escalates privileges:\n%1").arg(offenders.join(QLatin1Char('\n')))));
+             qPrintable(QStringLiteral("Kontainer never shells out; privilege escalation is limited to the reviewed helper files:\n%1")
+                            .arg(offenders.join(QLatin1Char('\n')))));
 }
 
 QTEST_GUILESS_MAIN(SourceConventionsTest)

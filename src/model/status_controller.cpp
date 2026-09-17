@@ -282,6 +282,7 @@ void StatusController::onEngineUpdated()
 
 void StatusController::onContainersUpdated()
 {
+    m_daemonConfig->setRunningContainerCount(runningContainerCount());
     m_containerModel->setContainers(m_backend->containers());
     m_containersOk = true;
     m_containersFailed = false;
@@ -500,6 +501,20 @@ bool StatusController::openHostPath(const QString &path)
     setHostPathError(QString());
     // 路径本身不进日志（ARCH_V2 §40）；结果经 openFinished 回来
     return m_hostPaths->openDirectory(path);
+}
+
+int StatusController::runningContainerCount() const
+{
+    int running = 0;
+    if (!m_backend) {
+        return running;
+    }
+    for (const Container &container : m_backend->containers()) {
+        if (container.stateKey() == QLatin1String("running")) {
+            ++running;
+        }
+    }
+    return running;
 }
 
 QStringList StatusController::portBindingsInUse() const

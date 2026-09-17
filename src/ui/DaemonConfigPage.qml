@@ -234,6 +234,18 @@ KCM.AbstractKCM {
                             return i18n("That backup cannot be used (it is unreadable or not valid JSON).");
                         case "writeFailed":
                             return i18n("Writing the configuration file failed. The previous file was left unchanged.");
+                        case "helperUnavailable":
+                            return i18n("Administrator access is not available (the helper or its policy is not installed). Use the command below instead.");
+                        case "cancelled":
+                            return i18n("Authorization was cancelled; nothing was changed.");
+                        case "authorizationDenied":
+                            return i18n("Authorization was denied; nothing was changed.");
+                        case "invalidRequest":
+                            return i18n("The helper rejected the request; nothing was changed.");
+                        case "systemdUnavailable":
+                            return i18n("Could not reach systemd to restart the Docker service.");
+                        case "restartFailed":
+                            return i18n("Restarting the Docker service failed.");
                         default:
                             return "";
                         }
@@ -316,6 +328,14 @@ KCM.AbstractKCM {
 
                 /* ---------------- 写不进去时的出路 ---------------- */
                 Kirigami.InlineMessage {
+                    objectName: "helperUnavailableMessage"
+                    Layout.fillWidth: true
+                    visible: page.controller.lastError === "helperUnavailable"
+                    type: Kirigami.MessageType.Warning
+                    text: i18n("This build has no administrator helper installed, so the change must be applied manually.")
+                }
+
+                Kirigami.InlineMessage {
                     Layout.fillWidth: true
                     visible: page.controller.requiresPrivilege
                     type: Kirigami.MessageType.Information
@@ -333,7 +353,7 @@ KCM.AbstractKCM {
                     objectName: "manualCommandArea"
 
                     Layout.fillWidth: true
-                    visible: page.showManualCommands
+                    visible: page.showManualCommands || page.controller.lastError === "helperUnavailable"
                     readOnly: true
                     text: page.controller.privilegedCommand()
                     font.family: "monospace"
@@ -362,6 +382,13 @@ KCM.AbstractKCM {
             }
 
             QQC2.Button {
+                objectName: "restartDockerButton"
+                text: i18n("Restart Docker…")
+                icon.name: "system-reboot"
+                onClicked: restartDialog.open()
+            }
+
+            QQC2.Button {
                 objectName: "restoreBackupButton"
                 text: i18n("Restore previous version")
                 icon.name: "document-revert"
@@ -379,6 +406,33 @@ KCM.AbstractKCM {
                 font: Kirigami.Theme.smallFont
                 opacity: 0.7
             }
+        }
+    }
+
+    Components.ConfirmDialog {
+        id: restartDialog
+
+        objectName: "restartDockerDialog"
+        headingText: i18n("Restart Docker")
+        questionText: i18n("Restart the Docker service now?")
+        consequenceText: page.controller.liveRestoreEnabled
+            ? i18n("Running containers are kept because live-restore is enabled.")
+            : i18np("One running container will be stopped; it comes back automatically if its restart policy says so.",
+                    "%1 running containers will be stopped; they come back automatically if their restart policy says so.",
+                    page.controller.runningContainers)
+        acceptText: i18n("Restart")
+        destructive: true
+        onConfirmed: page.controller.restartDocker()
+    }
+
+    Connections {
+        target: page.controller
+        function onRestarted(success, errorKey) {
+            saveMessage.visible = true;
+            saveMessage.type = success ? Kirigami.MessageType.Positive : Kirigami.MessageType.Error;
+            saveMessage.text = success
+                ? i18n("Docker restarted. The page refreshes once the engine is reachable again.")
+                : i18n("Restarting Docker failed (%1).", errorKey);
         }
     }
 

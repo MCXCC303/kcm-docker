@@ -15,6 +15,8 @@
 namespace Kontainer
 {
 
+class PrivilegedConfigClient;
+
 /*!
  * 运行时配置页的控制器（ARCH_V5_V8 §2.2/§2.3/§2.4）。
  *
@@ -73,6 +75,14 @@ public:
     /*! 引擎信息变化（`/info` 回来）时更新"生效状态"的对照基准。 */
     void setEngineInfo(const EngineInfo &info);
 
+    /*!
+     * 注入提权客户端（组合根负责；为空表示当前环境没有提权通路）。
+     * 为空时需要提权的保存会直接给出降级命令，而不是静默失败。
+     */
+    void setPrivilegedClient(PrivilegedConfigClient *client);
+    /*! 运行中的容器数（重启影响提示用）。由 StatusController 提供。 */
+    void setRunningContainerCount(int count);
+
     QString formKey() const;
     QString configPath() const;
     bool configExists() const;
@@ -97,6 +107,8 @@ public:
     QString lastError() const;
     QString lastBackupPath() const;
     bool dirty() const;
+    /*! 运行中的容器数（重启确认文案用）。 */
+    int runningContainers() const;
 
     /*! 重新探测 + 重新读文件（页面进入、保存/重启之后调用）。 */
     Q_INVOKABLE void reload();
@@ -124,12 +136,19 @@ public:
     /*! helper 不可用时的"自己动手"命令（可直接复制到终端执行）。 */
     Q_INVOKABLE QString privilegedCommand() const;
 
+    /*! 重启 Docker（系统级走 helper，rootless 走会话 systemd）。 */
+    Q_INVOKABLE void restartDocker();
+    /*! 运行中的容器数：重启确认文案要用它（"将停止 N 个运行中的容器"）。 */
+    Q_PROPERTY(int runningContainers READ runningContainers NOTIFY changed)
+
 Q_SIGNALS:
     void changed();
     void resultChanged();
     void dirtyChanged();
     /*! 保存成功（页面据此提示"待重启生效"或"已写入"）。 */
     void saved();
+    /*! 重启结果（页面据此提示；成功时 daemon 会短暂不可用）。 */
+    void restarted(bool success, const QString &errorKey);
 
 private:
     void refreshFromDisk();
@@ -149,6 +168,8 @@ private:
     QString m_lastError;
     QString m_lastBackupPath;
     bool m_dirty = false;
+    PrivilegedConfigClient *m_privilegedClient = nullptr;
+    int m_runningContainers = 0;
 };
 
 } // namespace Kontainer

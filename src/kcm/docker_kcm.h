@@ -14,6 +14,7 @@ namespace Kontainer
 
 class DockerBackend;
 class KioHostPathService;
+class PrivilegedConfigClient;
 
 /*!
  * KCM Layer（ARCH_V1 §6.1）。
@@ -42,6 +43,8 @@ private:
     DockerBackend *m_backend = nullptr;
     /*! 挂载分区「打开宿主目录」的生产实现（ARCH_V4 §2.1.1）。 */
     KioHostPathService *m_hostPaths = nullptr;
+    /*! 受限提权客户端（唯一以 root 运行的是 helper，不是本进程）。 */
+    PrivilegedConfigClient *m_privilegedClient = nullptr;
     StatusController *m_controller = nullptr;
 };
 

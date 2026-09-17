@@ -5,6 +5,7 @@
 
 #include "model/daemon_config_controller.h"
 
+#include "backend/privileged_config_client.h"
 #include "logging.h"
 
 namespace Kontainer
@@ -14,12 +15,58 @@ namespace
 {
 /*! `lastError` 里既可能是技术原因，也可能是这个 key（界面据此走降级路径）。 */
 constexpr auto kPrivilegeRequired = "privilegeRequired";
+/*! 没有提权通路（helper / policy 未安装）：界面据此直接给出可复制的命令。 */
+constexpr auto kHelperUnavailable = "helperUnavailable";
 } // namespace
 
 DaemonConfigController::DaemonConfigController(QObject *parent)
     : QObject(parent)
 {
     refreshFromDisk();
+}
+
+void DaemonConfigController::setPrivilegedClient(PrivilegedConfigClient *client)
+{
+    m_privilegedClient = client;
+    if (!client) {
+        return;
+    }
+    connect(client, &PrivilegedConfigClient::finished, this, [this](PrivilegedConfigClient::Operation operation, bool success, const QString &errorKey) {
+        if (operation == PrivilegedConfigClient::Operation::WriteConfig) {
+            if (!success) {
+                setLastError(errorKey);
+                return;
+            }
+            refreshFromDisk();
+            Q_EMIT resultChanged();
+            Q_EMIT saved();
+            return;
+        }
+        Q_EMIT restarted(success, errorKey);
+    });
+}
+
+void DaemonConfigController::setRunningContainerCount(int count)
+{
+    if (m_runningContainers == count) {
+        return;
+    }
+    m_runningContainers = count;
+    Q_EMIT changed();
+}
+
+int DaemonConfigController::runningContainers() const
+{
+    return m_runningContainers;
+}
+
+void DaemonConfigController::restartDocker()
+{
+    if (!m_privilegedClient) {
+        Q_EMIT restarted(false, QStringLiteral("helperUnavailable"));
+        return;
+    }
+    m_privilegedClient->restartDocker(m_deployment.form != DaemonForm::Rootless);
 }
 
 void DaemonConfigController::setEngineInfo(const EngineInfo &info)
@@ -217,10 +264,14 @@ bool DaemonConfigController::save()
     }
 
     if (m_deployment.requiresPrivilege()) {
-        // 系统级且不可写：交给 5C 的提权 helper；这里先把"需要提权"这一事实告诉界面，
-        // 界面据此走授权流程或降级到"自己动手"命令
-        setLastError(QString::fromLatin1(kPrivilegeRequired));
-        return false;
+        // 系统级且不可写：交给受限 helper。没有提权通路时明确告知（界面走降级命令），
+        // 绝不让用户以为"点了保存就是保存了"
+        if (!m_privilegedClient) {
+            setLastError(QString::fromLatin1(kHelperUnavailable));
+            return false;
+        }
+        m_privilegedClient->writeConfig(buildEdits());
+        return false; // 结果经 finished() 异步回来（成功后发 saved()）
     }
 
     QString backupPath;
@@ -258,7 +309,8 @@ bool DaemonConfigController::restoreBackup(const QString &backupPath)
         return false;
     }
     if (m_deployment.requiresPrivilege()) {
-        setLastError(QString::fromLatin1(kPrivilegeRequired));
+        // 恢复也属于写系统文件：同样只能走 helper（这里不提供"绕过"的路径）
+        setLastError(m_privilegedClient ? QString::fromLatin1(kPrivilegeRequired) : QString::fromLatin1(kHelperUnavailable));
         return false;
     }
 

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+                              "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+    Kontainer 的受限提权动作（ARCH_V5_V8 §2.4）。
+
+    只有两个动作，且动作语义被 helper 严格限制：
+      - write_daemon_config：把白名单键的编辑合并进 /etc/docker/daemon.json（路径固定）
+      - restart_docker：通过 systemd D-Bus 重启 docker.service（单元名固定）
+
+    auth_admin_keep：一次授权在短时间内可以覆盖"保存 + 重启"两步操作，
+    避免用户连续被问两次密码。
+-->
+<policyconfig>
+  <vendor>Kontainer</vendor>
+  <vendor_url>https://invent.kde.org/</vendor_url>
+
+  <action id="org.kde.kontainer.write_daemon_config">
+    <description>Write the Docker daemon configuration</description>
+    <description xml:lang="zh_CN">写入 Docker 守护进程配置</description>
+    <message>Kontainer wants to change the Docker daemon configuration (/etc/docker/daemon.json)</message>
+    <message xml:lang="zh_CN">Kontainer 需要修改 Docker 守护进程配置（/etc/docker/daemon.json）</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+
+  <action id="org.kde.kontainer.restart_docker">
+    <description>Restart the Docker daemon</description>
+    <description xml:lang="zh_CN">重启 Docker 守护进程</description>
+    <message>Kontainer wants to restart the Docker service. Running containers will be stopped.</message>
+    <message xml:lang="zh_CN">Kontainer 需要重启 Docker 服务；正在运行的容器会被停止。</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

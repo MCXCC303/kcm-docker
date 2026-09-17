@@ -62,11 +62,23 @@ DaemonConfigDocument DaemonConfigDocument::fromFile(const QString &path)
         return document;
     }
     document.m_exists = true;
-    document.m_rawContent = file.readAll();
+    const QByteArray content = file.readAll();
     file.close();
 
+    DaemonConfigDocument parsed = fromContent(content, path);
+    parsed.m_exists = true;
+    return parsed;
+}
+
+DaemonConfigDocument DaemonConfigDocument::fromContent(const QByteArray &content, const QString &path)
+{
+    DaemonConfigDocument document;
+    document.m_path = path;
+    document.m_rawContent = content;
+    document.m_exists = !content.trimmed().isEmpty();
+
     QJsonParseError parseError;
-    const QJsonDocument parsed = QJsonDocument::fromJson(document.m_rawContent, &parseError);
+    const QJsonDocument parsed = QJsonDocument::fromJson(content, &parseError);
     if (parseError.error != QJsonParseError::NoError || !parsed.isObject()) {
         document.m_valid = false;
         document.m_errorText = parseError.errorString();

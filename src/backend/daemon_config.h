@@ -51,6 +51,9 @@ public:
     /*! 从文件读取；文件不存在时返回空文档（`exists=false`）。 */
     static DaemonConfigDocument fromFile(const QString &path);
 
+    /*! 从内存内容构造（提权 helper 与合并逻辑复用同一套解析/合并语义）。 */
+    static DaemonConfigDocument fromContent(const QByteArray &content, const QString &path = QString());
+
     bool exists() const
     {
         return m_exists;

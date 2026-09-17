@@ -275,6 +275,8 @@ public:
      * 创建表单用它做端口冲突的前置检测（判定逻辑在 Presentation.hostPortConflicts）。
      */
     Q_INVOKABLE QStringList portBindingsInUse() const;
+    /*! 运行中的容器数（重启 daemon 的影响提示）。 */
+    Q_INVOKABLE int runningContainerCount() const;
 
 public Q_SLOTS:
     /*! 手动刷新（§16 必须项）；请求去重由 backend 负责（§29）。 */

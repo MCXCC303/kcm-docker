@@ -29,6 +29,8 @@ add_library(kontainer_core STATIC
     backend/host_path_service.h
     backend/http/json_line_reader.cpp
     backend/http/json_line_reader.h
+    backend/privileged_config_client.cpp
+    backend/privileged_config_client.h
 
     dto/container_dto.cpp
     dto/container_dto.h
@@ -110,6 +112,9 @@ add_library(kontainer_core STATIC
     model/storage_status.cpp
     model/storage_status.h
 
+    kauth/privileged_config_request.cpp
+    kauth/privileged_config_request.h
+
     refresh_policy.h
 )
 
@@ -123,6 +128,9 @@ target_link_libraries(kontainer_core
         Qt6::Gui
         Qt6::Network
         Qt6::Qml
+        # 受限提权客户端：只有 KAuth/DBus 的**客户端** API，执行时才会发起授权
+        Qt6::DBus
+        KF6::AuthCore
         KF6::CoreAddons
         KF6::I18n
 )
@@ -177,3 +185,22 @@ qt_add_resources(kcm_docker "kcm_docker_qml"
     FILES
         ${KONTAINER_QML_FILES}
 )
+
+# --- 受限提权 helper（ARCH_V5_V8 §2.4） ----------------------------------------
+# 只有这一个可执行文件以 root 运行；它的能力被 PrivilegedConfigRequest 限制在
+# 白名单键 + 固定路径 + 固定单元。校验逻辑与 core 共用，因此可以在无 root 的
+# 单元测试里验证"越权请求会被拒绝"。
+find_package(KF6 6.5 REQUIRED COMPONENTS Auth)
+
+add_executable(kontainer_helper kauth/kontainer_helper.cpp)
+target_link_libraries(kontainer_helper PRIVATE
+    kontainer_core
+    Qt6::Core
+    Qt6::DBus
+    KF6::AuthCore
+)
+install(TARGETS kontainer_helper ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+
+# helper 的 D-Bus 服务文件与 polkit policy：两者都必须安装，缺一个授权就会失败
+kauth_install_helper_files(kontainer_helper org.kde.kontainer root)
+kauth_install_actions(org.kde.kontainer "${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.policy")
