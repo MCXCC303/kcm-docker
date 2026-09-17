@@ -395,6 +395,7 @@ KCM.AbstractKCM {
                             required property string detail
                             required property string entryKey
 
+                            objectName: "networkEntry"
                             Layout.fillWidth: true
 
                             QQC2.Label {
@@ -436,6 +437,7 @@ KCM.AbstractKCM {
                             required property string label
                             required property string value
 
+                            objectName: "portEntry"
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing
 
@@ -482,6 +484,7 @@ KCM.AbstractKCM {
                             required property string value
                             required property string detail
 
+                            objectName: "mountEntry"
                             Layout.fillWidth: true
                             spacing: 0
 

@@ -295,6 +295,7 @@ KCM.SimpleKCM {
                         required property string label
                         required property string value
 
+                        objectName: "layerEntry"
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
@@ -348,6 +349,7 @@ KCM.SimpleKCM {
                         required property string value
                         required property string entryKey
 
+                        objectName: "usedByEntry"
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 

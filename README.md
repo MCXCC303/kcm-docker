@@ -295,6 +295,7 @@ po/                         翻译（zh_CN 已完整）
 | 容器排序 | §10 提到 Updated / Started | 只提供 Name / State / Created | 列表 API（`/containers/json`）不返回 StartAt，无法在不额外 inspect 的前提下排序 |
 | 性能基准 | §36 列出 10/50/100 容器、500/1000 镜像 | 未建立基准 | 列表已用 `ListView` 虚拟化；基准测试待补（记录为技术债） |
 | 模型更新粒度 | §13/§32 未强制 | 数据未变时不发信号；变化时仍是 `modelReset` | 已避免“每 5 秒无意义重置”，并在重置时恢复滚动位置；完全增量 `dataChanged` 留待后续 |
+| 详情页列表刷新 | §13/§32 未强制 | 数据未变时**完全不动**模型（`DetailListModel::setEntries` 提前返回） | 原先详情页的端口/网络/挂载/关联容器等列表在每次 inspect 复核（30s）与容器列表刷新（5s）时都无条件 `modelReset`，QML 的 Repeater 因此周期性销毁重建 delegate；已由 `tst_detail_controllers` 与 `tst_kcm_widget_churn` 双向锁住 |
 
 ---
 

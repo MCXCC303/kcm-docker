@@ -5,9 +5,11 @@
 
 #include "i18n.h"
 #include "model/container_detail_controller.h"
+#include "model/detail_list_model.h"
 #include "model/image_detail_controller.h"
 #include "support/mock_docker_backend.h"
 
+#include <QSignalSpy>
 #include <QtTest>
 
 using namespace Kontainer;
@@ -33,6 +35,7 @@ private Q_SLOTS:
     void containerDetailReportsErrorAndRetries();
     void imageDetailLoadsTagsLayersAndUsage();
     void imageDetailReportsError();
+    void unchangedDetailListsDoNotResetTheModel();
 };
 
 namespace
@@ -265,6 +268,59 @@ void DetailControllersTest::imageDetailReportsError()
 
     QCOMPARE(controller.loadStateKey(), QStringLiteral("error"));
     QVERIFY(!controller.errorText().isEmpty());
+}
+
+/*!
+ * ARCH_V2 §32/§34 + ARCH_V3 附录 A.1d：
+ * 静默刷新（数据没变）时详情列表**不得**重置模型。
+ *
+ * 详情页的列表会被反复重建：容器列表每 5 秒变化一次就会触发
+ * ImageDetailController::rebuildUsedBy()，inspect 复核每 30 秒触发
+ * ContainerDetailController::rebuildLists()。如果每次都发 modelReset，
+ * QML 里的 Repeater 就会反复销毁重建 delegate，而「布局正在算尺寸时条目被销毁」
+ * 正是真实会话里段错误（QGridLayoutEngine / polish）的触发条件。
+ */
+void DetailControllersTest::unchangedDetailListsDoNotResetTheModel()
+{
+    MockDockerBackend backend;
+
+    ContainerDetail detail = makeDetail(ContainerState::Running);
+    detail.networks = {{QStringLiteral("bridge"), QStringLiteral("id"), QStringLiteral("172.17.0.2"), {}, {}, QStringLiteral("172.17.0.1")}};
+    detail.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("rw"), false}};
+    backend.setContainerDetail(detail);
+
+    ContainerDetailController controller(&backend);
+    controller.setContainerId(QStringLiteral("cid-1"));
+    controller.start();
+    backend.completeRefresh();
+
+    // 一个 Docker 网络可能展开成多条展示条目（network / ipv6 / gateway），
+    // 因此这里只固定「初始条数」，不假设它与 Docker 侧条目数一一对应
+    const int initialNetworkCount = controller.networks()->count();
+    const int initialMountCount = controller.mounts()->count();
+    QVERIFY(initialNetworkCount > 0);
+    QVERIFY(initialMountCount > 0);
+
+    QSignalSpy networksReset(controller.networks(), &QAbstractItemModel::modelReset);
+    QSignalSpy mountsReset(controller.mounts(), &QAbstractItemModel::modelReset);
+    QSignalSpy countChanged(controller.networks(), &DetailListModel::countChanged);
+
+    // 连续三次「数据完全没变」的 inspect 复核
+    for (int round = 0; round < 3; ++round) {
+        controller.refresh();
+        backend.completeRefresh();
+    }
+    QCOMPARE(networksReset.count(), 0);
+    QCOMPARE(mountsReset.count(), 0);
+    QCOMPARE(countChanged.count(), 0);
+
+    // 数据真的变了就必须重置，否则界面会显示过期内容
+    detail.networks.append({QStringLiteral("host"), QStringLiteral("id2"), QStringLiteral("172.17.0.3"), {}, {}, QStringLiteral("172.17.0.1")});
+    backend.setContainerDetail(detail);
+    controller.refresh();
+    backend.completeRefresh();
+    QCOMPARE(networksReset.count(), 1);
+    QVERIFY(controller.networks()->count() > initialNetworkCount);
 }
 
 QTEST_GUILESS_MAIN(DetailControllersTest)

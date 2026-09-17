@@ -56,6 +56,8 @@ private Q_SLOTS:
     void widgetHostedKcmSurvivesNavigationChurn();
     void delegatesSurviveDataChanges_data();
     void delegatesSurviveDataChanges();
+    void silentRefreshesDoNotRecreateDetailEntries_data();
+    void silentRefreshesDoNotRecreateDetailEntries();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
@@ -154,6 +156,7 @@ void KcmWidgetChurnTest::fillData(int iteration)
         container.id = QStringLiteral("cid-%1").arg(i);
         container.name = QStringLiteral("container-%1").arg(i);
         container.image = QStringLiteral("alpine:latest");
+        container.imageId = QStringLiteral("sha256:aaaa");
         container.status = QStringLiteral("Up %1 minutes").arg(i);
         container.state = (i % 3 == 0) ? ContainerState::Running : ((i % 3 == 1) ? ContainerState::Paused : ContainerState::Exited);
         container.health = (i % 2 == 0) ? HealthState::Healthy : HealthState::Unhealthy;
@@ -175,6 +178,19 @@ void KcmWidgetChurnTest::fillData(int iteration)
     detail.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/%1").arg(iteration), QStringLiteral("/data"), QStringLiteral("rw"), false}};
     detail.networks = {{QStringLiteral("bridge"), QStringLiteral("id"), QStringLiteral("172.17.0.%1").arg(iteration % 250), {}, {}, QStringLiteral("172.17.0.1")}};
     m_backend->setContainerDetail(detail);
+
+    ImageDetail imageDetail;
+    imageDetail.id = QStringLiteral("sha256:aaaa");
+    imageDetail.repoTags = {QStringLiteral("alpine:latest"), QStringLiteral("alpine:3.21")};
+    imageDetail.sizeBytes = 8ll * 1024 * 1024;
+    imageDetail.created = now;
+    imageDetail.architecture = QStringLiteral("amd64");
+    imageDetail.os = QStringLiteral("linux");
+    for (int layer = 0; layer < 3; ++layer) {
+        imageDetail.layers.append(QStringLiteral("sha256:layer%1").arg(layer));
+    }
+    imageDetail.environment = {QStringLiteral("PATH=/usr/bin")};
+    m_backend->setImageDetail(imageDetail);
 
     StorageUsage storage;
     storage.valid = true;
@@ -248,23 +264,27 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
         // 进入容器详情：由 MainPage 发出导航信号（main.qml 里接到 StackView.push）
         QQuickItem *stack = childByObjectName(root, QStringLiteral("pageStack"));
         QVERIFY2(stack, "pageStack not found");
-        QQuickItem *mainPage = nullptr;
         // 同样必须走可视树：main.qml 的 MainPage 在 StackView 内部
-        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
-            if (!item || mainPage) {
-                return;
-            }
-            if (item->metaObject()->indexOfSignal("containerActivated(QString)") >= 0) {
-                mainPage = item;
-                return;
-            }
-            const QList<QQuickItem *> children = item->childItems();
-            for (QQuickItem *child : children) {
-                walk(child);
-            }
+        QQuickItem *mainPage = nullptr;
+        const auto findMainPage = [root]() -> QQuickItem * {
+            QQuickItem *found = nullptr;
+            std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+                if (!item || found) {
+                    return;
+                }
+                if (item->metaObject()->indexOfSignal("containerActivated(QString)") >= 0) {
+                    found = item;
+                    return;
+                }
+                const QList<QQuickItem *> children = item->childItems();
+                for (QQuickItem *child : children) {
+                    walk(child);
+                }
+            };
+            walk(root);
+            return found;
         };
-        walk(root);
-        QVERIFY2(mainPage, "MainPage not found");
+        QTRY_VERIFY_WITH_TIMEOUT((mainPage = findMainPage()) != nullptr, 5000);
         QVERIFY(QMetaObject::invokeMethod(mainPage, "containerActivated", Q_ARG(QString, QStringLiteral("cid-0"))));
         QCoreApplication::processEvents();
 
@@ -357,6 +377,115 @@ void KcmWidgetChurnTest::delegatesSurviveDataChanges()
                                        "(a JS array re-evaluates on every refresh and destroys its delegates "
                                        "during layout polish)")
                             .arg(objectName)));
+}
+
+/*!
+ * 崩溃路径的精确回归：**数据没变的刷新不得重建详情页里的条目**。
+ *
+ * 详情页的列表会被周期性重建：
+ *   - 容器列表每 5 秒刷新一次 → ImageDetailController::rebuildUsedBy()
+ *   - inspect 复核每 30 秒一次 → ContainerDetailController::rebuildLists()
+ * 修复前 DetailListModel::setEntries 无条件发 modelReset，QML 的 Repeater
+ * 因此反复销毁重建 delegate（网络条目还是一个 FormLayout），
+ * 而「布局正在算尺寸时条目被销毁」正是段错误的触发条件。
+ */
+void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries_data()
+{
+    QTest::addColumn<QString>("page");
+    QTest::addColumn<QString>("signalName");
+    QTest::addColumn<QString>("signalArgument");
+    QTest::addColumn<QString>("objectName");
+
+    QTest::newRow("container networks") << QStringLiteral("container") << QStringLiteral("containerActivated") << QStringLiteral("cid-0")
+                                        << QStringLiteral("networkEntry");
+    QTest::newRow("container mounts") << QStringLiteral("container") << QStringLiteral("containerActivated") << QStringLiteral("cid-0")
+                                      << QStringLiteral("mountEntry");
+    QTest::newRow("image used-by containers") << QStringLiteral("image") << QStringLiteral("imageActivated")
+                                             << QStringLiteral("sha256:aaaa") << QStringLiteral("usedByEntry");
+    QTest::newRow("image layers") << QStringLiteral("image") << QStringLiteral("imageActivated") << QStringLiteral("sha256:aaaa")
+                                  << QStringLiteral("layerEntry");
+}
+
+void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
+{
+    QFETCH(QString, page);
+    QFETCH(QString, signalName);
+    QFETCH(QString, signalArgument);
+    QFETCH(QString, objectName);
+
+    // 固定一份数据：下面的刷新都是「数据没变」的静默刷新
+    fillData(0);
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    QQuickWidget widget;
+    widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
+    widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
+                                            "function i18nc(context, text) { return text; }\n"
+                                            "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
+                                            "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
+    widget.resize(900, 700);
+    widget.show();
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    QTest::qWait(80);
+
+    QQuickItem *root = widget.rootObject();
+    QVERIFY(root);
+    QTRY_VERIFY_WITH_TIMEOUT(root->width() > 0, 5000);
+
+    // StackView 的 initialItem 需要一次布局之后才建立，因此这里轮询等待
+    const QByteArray signalSignature = (signalName + QStringLiteral("(QString)")).toUtf8();
+    const auto findMainPage = [root, &signalSignature]() -> QQuickItem * {
+        QQuickItem *found = nullptr;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            if (!item || found) {
+                return;
+            }
+            if (item->metaObject()->indexOfSignal(signalSignature.constData()) >= 0) {
+                found = item;
+                return;
+            }
+            const QList<QQuickItem *> children = item->childItems();
+            for (QQuickItem *child : children) {
+                walk(child);
+            }
+        };
+        walk(root);
+        return found;
+    };
+
+    QQuickItem *mainPage = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((mainPage = findMainPage()) != nullptr, 5000);
+    QVERIFY(QMetaObject::invokeMethod(mainPage, signalName.toUtf8().constData(), Q_ARG(QString, signalArgument)));
+    // 详情页进入后会发起 inspect，必须交付这一轮结果，页面才有真正的数据
+    m_backend->completeRefresh();
+
+    QQuickItem *before = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((before = TestSupport::findItemByObjectName(root, objectName)) != nullptr, 5000);
+    Q_UNUSED(page);
+
+    // 静默刷新若干轮：数据完全没变，但两条重建路径都要走到
+    //   - 容器列表刷新 → ImageDetailController::rebuildUsedBy()
+    //   - inspect 复核   → ContainerDetailController::rebuildLists()
+    for (int round = 0; round < 5; ++round) {
+        controller->refresh();
+        controller->containerDetail()->refresh();
+        controller->imageDetail()->refresh();
+        m_backend->completeRefresh();
+        QTest::qWait(30);
+    }
+
+    QQuickItem *after = TestSupport::findItemByObjectName(root, objectName);
+    QVERIFY2(after, qPrintable(objectName + QStringLiteral(" disappeared")));
+    QVERIFY2(after == before,
+             qPrintable(QStringLiteral("%1 was recreated by a silent refresh: the detail lists must not reset "
+                                       "the model when the data is unchanged (ARCH_V2 §32/§34)")
+                            .arg(objectName)));
+
+    const QStringList errors = takeQmlErrors();
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char('\n'))));
 }
 
 QTEST_MAIN(KcmWidgetChurnTest)

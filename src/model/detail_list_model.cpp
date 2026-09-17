@@ -86,6 +86,14 @@ QHash<int, QByteArray> DetailListModel::roleNames() const
 
 void DetailListModel::setEntries(const QList<DetailEntry> &entries)
 {
+    // 数据没变就什么都不做：不发 modelReset、不发 countChanged。
+    // 详情页的列表由 5 秒（容器列表变化 → 关联容器）与 30 秒（inspect 复核）周期重建，
+    // 无条件重置会让 Repeater 每次都销毁重建 delegate——「布局正在算尺寸时条目被销毁」
+    // 正是真实会话里段错误的触发条件（ARCH_V3 附录 A.1d）。
+    if (m_entries == entries) {
+        return;
+    }
+
     beginResetModel();
     m_entries = entries;
     endResetModel();
