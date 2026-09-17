@@ -35,6 +35,7 @@ private Q_SLOTS:
     void parsesStepLinesAndFailures();
     void packsContextAndBuildsThroughTheController();
     void buildListKeepsFailuresAndStepText();
+    void prunesTheBuildCacheAndReportsReclaimedSpace();
 
 private:
     /*! 一个"看起来可写"的 socket：写权限门靠它放行（与操作控制器用例同一手法）。 */
@@ -197,6 +198,36 @@ void ImageBuildTest::buildListKeepsFailuresAndStepText()
     QCOMPARE(operations.builds()->entries().at(row).imageId, QStringLiteral("sha256:deadbeef"));
     operations.clearFinishedBuilds();
     QCOMPARE(operations.builds()->count(), 0);
+}
+
+/*!
+ * 清理构建缓存（§5.5）：请求发出去、回收字节数如实说出来（0 也要说清楚）。
+ */
+void ImageBuildTest::prunesTheBuildCacheAndReportsReclaimedSpace()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MockDockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(writableSocketPath(dir.path())));
+    OperationController operations(&backend);
+    operations.refreshWriteAccess();
+    QVERIFY(operations.writeAllowed());
+
+    operations.pruneBuildCache();
+    QCOMPARE(backend.mutationCalls().size(), 1);
+    QCOMPARE(backend.mutationCalls().first().mutation, DockerBackendInterface::Mutation::PruneBuildCache);
+
+    backend.completeBuildCachePrune(3LL * 1024 * 1024);
+    backend.completeMutation(QStringLiteral("buildCache:"), DockerBackendInterface::MutationOutcome::Succeeded);
+    QVERIFY2(operations.resultText().contains(QStringLiteral("3")), qPrintable(operations.resultText()));
+    QVERIFY2(operations.resultText().contains(QStringLiteral("MiB")), qPrintable(operations.resultText()));
+
+    // 没有可回收的：也要明确说"没有"，而不是显示"已回收 0"
+    operations.pruneBuildCache();
+    backend.completeBuildCachePrune(0);
+    backend.completeMutation(QStringLiteral("buildCache:"), DockerBackendInterface::MutationOutcome::Succeeded);
+    QVERIFY2(!operations.resultText().contains(QStringLiteral("0 ")), qPrintable(operations.resultText()));
+    QVERIFY2(operations.resultText().contains(QStringLiteral("cache")), qPrintable(operations.resultText()));
 }
 
 QTEST_MAIN(ImageBuildTest)

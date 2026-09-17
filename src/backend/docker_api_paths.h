@@ -104,6 +104,14 @@ inline QString buildImage()
 }
 
 /*!
+ * 清理构建缓存（`POST /build/prune`，ARCH_V5_V8 §5.5）。
+ */
+inline QString buildPrune()
+{
+    return QStringLiteral("/build/prune");
+}
+
+/*!
  * 创建容器（`POST /containers/create`，ARCH_V5_V8 §4.6）。
  *
  * 注意：容器名是 **query 参数**（`?name=`），不在请求体里。

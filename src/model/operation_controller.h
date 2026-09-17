@@ -142,6 +142,12 @@ public:
                                 bool noCache = false,
                                 bool pull = false,
                                 const QString &inlineDockerfile = {});
+    /*!
+     * 清理构建缓存（八期 §5.5）：与清理数据卷一样，先由界面显示**可回收空间**再确认，
+     * 这里只负责发起与把回收结果说清楚。
+     */
+    Q_INVOKABLE void pruneBuildCache();
+
     /*! 取消一路构建（临时上下文由后端在结束时删除）。 */
     Q_INVOKABLE void cancelBuild(const QString &buildId);
     /*! 清掉已结束的构建记录（进行中的不动）。 */
@@ -303,6 +309,9 @@ private:
     bool m_pendingStartAfterCreate = false;
     bool m_startAfterCreateInFlight = false;
     QString m_createdContainerId;
+
+    /*! 最近一次构建缓存清理回收的字节数（`buildCachePruned` 记下，成功路径用它当结果）。 */
+    qint64 m_reclaimedBuildCacheBytes = -1;
 
     /*! 最近一次数据卷清理的明细文案（`volumesPruned` 记下，成功路径用它当结果）。 */
     QString m_pruneDetailText;

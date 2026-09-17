@@ -27,6 +27,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
+import org.kde.kontainer as Kontainer
 
 import "." as Local
 
@@ -34,6 +35,8 @@ ColumnLayout {
     id: root
 
     required property var operations
+    /*! 构建缓存当前占用的字节数（0 = 没有可回收的；由使用方从存储用量传入）。 */
+    property real buildCacheBytes: 0
 
     /*! 构建成功后点「查看镜像详情」。 */
     signal imageRequested(string imageId)
@@ -310,6 +313,44 @@ ColumnLayout {
             }
         }
         return result;
+    }
+
+    /* --------------------- 构建缓存清理（§5.5） --------------------- */
+    RowLayout {
+        objectName: "buildPruneRow"
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+
+        QQC2.Label {
+            Layout.fillWidth: true
+            // 可回收空间取自 /system/df 的构建缓存段：**先看清楚再删**
+            text: root.buildCacheBytes > 0
+                ? i18n("Build cache: %1 can be reclaimed. Untagged intermediate images are removed.", Kontainer.Format.byteSize(root.buildCacheBytes))
+                : i18n("Build cache: nothing to reclaim right now.")
+            font: Kirigami.Theme.smallFont
+            opacity: 0.75
+            wrapMode: Text.WordWrap
+        }
+
+        QQC2.Button {
+            objectName: "pruneBuildCacheButton"
+            text: i18n("Clean up build cache…")
+            icon.name: "edit-clear-history"
+            enabled: root.operations.writeAllowed && root.buildCacheBytes > 0
+            onClicked: pruneBuildCacheDialog.open()
+        }
+    }
+
+    Local.ConfirmDialog {
+        id: pruneBuildCacheDialog
+
+        objectName: "pruneBuildCacheDialog"
+        headingText: i18n("Clean up the build cache")
+        questionText: i18n("Remove cached build layers?")
+        consequenceText: i18n("The next build has to redo the work that was cached. Images are not affected; only intermediate layers and cache records are removed.")
+        acceptText: i18n("Clean up")
+        destructive: true
+        onConfirmed: root.operations.pruneBuildCache()
     }
 
     /* ---------------------------- 列表 ---------------------------- */

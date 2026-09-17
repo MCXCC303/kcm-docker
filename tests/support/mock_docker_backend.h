@@ -107,6 +107,8 @@ public:
     void refreshNetworks() override;
     void refreshVolumes(bool includeUsage = true) override;
     void buildImage(const Kontainer::ImageBuildRequest &request) override;
+    void pruneBuildCache() override;
+    void completeBuildCachePrune(qint64 reclaimedBytes);
     void cancelImageBuild(const QString &buildId) override;
     void createContainer(const Kontainer::ContainerCreateRequest &request) override;
 

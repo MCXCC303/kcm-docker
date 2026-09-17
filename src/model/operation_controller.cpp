@@ -17,6 +17,7 @@
 #include "logging.h"
 #include "model/docker_error_text.h"
 
+#include <KFormat>
 #include <KLocalizedString>
 
 namespace Kontainer
@@ -123,6 +124,10 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
         if (!warning.isEmpty()) {
             qCWarning(kontainerModel) << "container create warning:" << warning;
         }
+    });
+
+    connect(m_backend, &DockerBackendInterface::buildCachePruned, this, [this](qint64 reclaimedBytes) {
+        m_reclaimedBuildCacheBytes = reclaimedBytes;
     });
 
     connect(m_backend, &DockerBackendInterface::volumesPruned, this, [this](const QStringList &names, qint64 reclaimedBytes) {
@@ -1014,6 +1019,20 @@ bool OperationController::buildImage(const QString &contextDirectory,
     return true;
 }
 
+void OperationController::pruneBuildCache()
+{
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("cleaning the build cache")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return;
+    }
+    m_reclaimedBuildCacheBytes = -1;
+    beginOperation(Mutation::PruneBuildCache, QStringLiteral("buildCache:"));
+    m_backend->pruneBuildCache();
+}
+
 void OperationController::cancelBuild(const QString &buildId)
 {
     m_backend->cancelImageBuild(buildId);
@@ -1289,6 +1308,10 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         m_backend->refreshImages();
         m_backend->refreshStorageUsage();
         break;
+    case Mutation::PruneBuildCache:
+        // 清理后存储占用变了（构建缓存那一段）
+        m_backend->refreshStorageUsage();
+        break;
     case Mutation::CreateVolume:
     case Mutation::RemoveVolume:
     case Mutation::PruneVolumes:
@@ -1345,6 +1368,11 @@ QString OperationController::successText(Mutation mutation, const QString &targe
         // 构建的进度与结果主要在构建列表里；这里只给一句总的结果
         return i18n("Image built.");
     }
+    case Mutation::PruneBuildCache:
+        if (m_reclaimedBuildCacheBytes == 0) {
+            return i18n("No build cache to clean up.");
+        }
+        return i18n("Build cache cleaned up, %1 reclaimed.", KFormat().formatByteSize(double(m_reclaimedBuildCacheBytes)));
     case Mutation::CreateVolume: {
         const QString name = targetKey.section(QLatin1Char(':'), 1);
         return i18n("Volume created: %1", name);

@@ -806,6 +806,8 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "create-container";
     case DockerBackendInterface::Mutation::BuildImage:
         return "build-image";
+    case DockerBackendInterface::Mutation::PruneBuildCache:
+        return "prune-build-cache";
     case DockerBackendInterface::Mutation::CreateVolume:
         return "create-volume";
     case DockerBackendInterface::Mutation::RemoveVolume:
@@ -1304,6 +1306,34 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
                 return;
             }
             finishBuild(id, MutationOutcome::Succeeded, DockerError());
+        });
+    });
+}
+
+void DockerBackend::pruneBuildCache()
+{
+    // 构建缓存是全局的：目标键用 `buildCache:` 前缀，避免与某个构建的取消混淆
+    runMutation(Mutation::PruneBuildCache, QStringLiteral("buildCache:"), [this] {
+        DockerReply *reply = m_client.post(ApiPaths::buildPrune(), QUrlQuery(), mutationTimeoutMs());
+        connect(reply, &DockerReply::finished, this, [this, reply] {
+            const DockerReply::State state = reply->state();
+            const DockerError error = reply->error();
+            const QByteArray body = reply->body();
+            reply->deleteLater();
+
+            if (state != DockerReply::State::Succeeded) {
+                emitMutationFinished(Mutation::PruneBuildCache,
+                                     QStringLiteral("buildCache:"),
+                                     outcomeFor(reply),
+                                     error);
+                return;
+            }
+
+            const QJsonObject object = QJsonDocument::fromJson(body).object();
+            // 引擎回的是 {"CachesDeleted":[…],"SpaceReclaimed":123}
+            const qint64 reclaimed = qint64(object.value(QStringLiteral("SpaceReclaimed")).toDouble());
+            Q_EMIT buildCachePruned(reclaimed);
+            emitMutationFinished(Mutation::PruneBuildCache, QStringLiteral("buildCache:"), MutationOutcome::Succeeded, DockerError());
         });
     });
 }

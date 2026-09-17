@@ -686,6 +686,7 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     operations: root.operations
                     formOpen: root.buildPanelOpen
+                    buildCacheBytes: root.controller.storage.buildCacheBytes > 0 ? root.controller.storage.buildCacheBytes : 0
                     visible: root.buildPanelOpen || root.operations.builds.count > 0
                     onImageRequested: function (imageId) {
                         root.imageActivated(imageId);

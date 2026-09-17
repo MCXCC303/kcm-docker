@@ -109,6 +109,8 @@ public:
         CreateContainer,
         /*! 八期：从 Dockerfile 构建镜像（§5.3）。 */
         BuildImage,
+        /*! 八期：清理构建缓存（§5.5）。 */
+        PruneBuildCache,
         /*! 六期：数据卷的创建 / 删除 / 清理（§3.5）。 */
         CreateVolume,
         RemoveVolume,
@@ -217,6 +219,14 @@ public:
      * 其它驱动"只识别不创建"（有意偏离，见 §3.3）。
      */
     virtual void createNetwork(const Kontainer::NetworkCreateRequest &request) = 0;
+    /*!
+     * 清理构建缓存（`POST /build/prune`，§5.5）。
+     *
+     * 可回收空间由界面用 `GET /system/df` 里的 BuildCache 预估（见 `StorageUsage`），
+     * 真正的回收字节数在 `buildCachePruned()` 里回来。
+     */
+    virtual void pruneBuildCache() = 0;
+
     /*!
      * 构建镜像（`POST /build`，§5.3）。
      *
@@ -340,6 +350,8 @@ Q_SIGNALS:
     void imagesUpdated();
     void networksUpdated();
     void volumesUpdated();
+    /*! 构建缓存清理完成：回收的字节数。 */
+    void buildCachePruned(qint64 reclaimedBytes);
     /*! 构建进度：`update` 是这一行的增量（step、状态原文、进度）。 */
     void imageBuildProgress(const QString &buildId, const Kontainer::ImageBuildUpdate &update);
     /*! 构建结束：成功时带镜像 id，失败时 `error` 里是**含失败步骤**的原因。 */

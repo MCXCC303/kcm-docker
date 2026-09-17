@@ -121,6 +121,16 @@ void MockDockerBackend::buildImage(const ImageBuildRequest &request)
     m_mutationCalls.append({Mutation::BuildImage, QStringLiteral("build:") + request.id, false});
 }
 
+void MockDockerBackend::pruneBuildCache()
+{
+    m_mutationCalls.append({Mutation::PruneBuildCache, QStringLiteral("buildCache:"), false});
+}
+
+void MockDockerBackend::completeBuildCachePrune(qint64 reclaimedBytes)
+{
+    Q_EMIT buildCachePruned(reclaimedBytes);
+}
+
 void MockDockerBackend::cancelImageBuild(const QString &buildId)
 {
     m_cancelledBuilds.append(buildId);
