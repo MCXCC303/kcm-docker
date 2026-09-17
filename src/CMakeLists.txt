@@ -1,3 +1,6 @@
+# 提权与凭据：core 直接用到 KAuth 客户端 API 与 KWallet（helper 只在授权后以 root 执行）
+find_package(KF6 6.5 REQUIRED COMPONENTS Auth Wallet)
+
 # --- 核心库 -------------------------------------------------------------------
 # backend + model：与 KCM 插件、单元测试共同链接，保证分层可测试（ARCH_V1 §28/§30/§35）
 add_library(kontainer_core STATIC
@@ -30,6 +33,10 @@ add_library(kontainer_core STATIC
     backend/http/json_line_reader.cpp
     backend/http/json_line_reader.h
     backend/privileged_client.h
+    backend/credential_store.cpp
+    backend/credential_store.h
+    backend/kwallet_credential_store.cpp
+    backend/kwallet_credential_store.h
     backend/registry_auth.cpp
     backend/registry_auth.h
     backend/privileged_config_client.cpp
@@ -134,6 +141,8 @@ target_link_libraries(kontainer_core
         # 受限提权客户端：只有 KAuth/DBus 的**客户端** API，执行时才会发起授权
         Qt6::DBus
         KF6::AuthCore
+        # 凭据存储：KWallet 是唯一持久化位置（ARCH_V5_V8 §2.6）
+        KF6::Wallet
         KF6::CoreAddons
         KF6::I18n
 )
@@ -193,8 +202,6 @@ qt_add_resources(kcm_docker "kcm_docker_qml"
 # 只有这一个可执行文件以 root 运行；它的能力被 PrivilegedConfigRequest 限制在
 # 白名单键 + 固定路径 + 固定单元。校验逻辑与 core 共用，因此可以在无 root 的
 # 单元测试里验证"越权请求会被拒绝"。
-find_package(KF6 6.5 REQUIRED COMPONENTS Auth)
-
 add_executable(kontainer_helper kauth/kontainer_helper.cpp)
 target_link_libraries(kontainer_helper PRIVATE
     kontainer_core

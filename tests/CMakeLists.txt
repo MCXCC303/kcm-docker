@@ -6,6 +6,7 @@ add_library(kontainer_test_support STATIC
     support/fake_host_path_service.cpp
     support/fake_host_path_service.h
     support/fake_privileged_client.h
+    support/fake_credential_backend.h
     support/mock_docker_backend.cpp
     support/mock_docker_backend.h
     support/qml_stub_kcm.cpp
@@ -40,6 +41,7 @@ endif()
 kontainer_add_test(tst_docker_capabilities backend/tst_docker_capabilities.cpp)
 kontainer_add_test(tst_image_reference backend/tst_image_reference.cpp)
 kontainer_add_test(tst_registry_auth backend/tst_registry_auth.cpp)
+kontainer_add_test(tst_credential_store backend/tst_credential_store.cpp)
 kontainer_add_test(tst_dto_parsers backend/tst_dto_parsers.cpp)
 kontainer_add_test(tst_error_mapping backend/tst_error_mapping.cpp)
 kontainer_add_test(tst_api_version backend/tst_api_version.cpp)
