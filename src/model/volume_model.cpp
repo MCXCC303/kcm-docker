@@ -150,6 +150,28 @@ QStringList VolumeModel::unusedNames() const
     return result;
 }
 
+qint64 VolumeModel::knownUnusedSize() const
+{
+    qint64 total = 0;
+    for (const Volume &volume : m_volumes) {
+        if (volume.usageKnown() && !volume.isInUse() && volume.sizeKnown()) {
+            total += volume.sizeBytes;
+        }
+    }
+    return total;
+}
+
+int VolumeModel::unknownUnusedSizeCount() const
+{
+    int count = 0;
+    for (const Volume &volume : m_volumes) {
+        if (volume.usageKnown() && !volume.isInUse() && !volume.sizeKnown()) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 QVariantList VolumeModel::summaries() const
 {
     QVariantList result;

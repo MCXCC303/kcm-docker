@@ -27,6 +27,7 @@ Kirigami.Page {
     readonly property var containerList: controller.containerList
     readonly property var imageList: controller.imageList
     readonly property var networkList: controller.networkList
+    readonly property var volumeList: controller.volumeList
 
     /*! 卡片被激活：由 main.qml 接到导航上（ARCH_V2 §43：导航属于 KCM 层） */
     signal containerActivated(string containerId)
@@ -37,6 +38,27 @@ Kirigami.Page {
     signal imageActivated(string imageId)
     /*! 打开网络详情（六期 §3.2）；由 main.qml 负责导航。 */
     signal networkActivated(string networkId)
+    /*! 打开数据卷详情（六期 §3.5）。 */
+    signal volumeActivated(string volumeName)
+
+    /*! 数据卷页的内联面板（创建 / 清理）。 */
+    property bool volumeCreatePanelOpen: false
+    property bool volumePrunePanelOpen: false
+
+    /*! 可回收空间文案：只统计**已知**大小，并且明说还有几个卷的大小未知。 */
+    function pruneReclaimableText(): string {
+        const model = root.controller.volumeModel;
+        const known = model.knownUnusedSize();
+        const unknown = model.unknownUnusedSizeCount();
+        let text = Kontainer.Format.byteSize(known);
+        if (unknown > 0) {
+            text += " + " + i18ncp("@info volumes with unknown size",
+                                   "one volume of unknown size",
+                                   "%1 volumes of unknown size",
+                                   unknown);
+        }
+        return text;
+    }
 
     /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
     readonly property var tiles: [
@@ -353,6 +375,12 @@ Kirigami.Page {
                 StorageView {
                     Layout.fillWidth: true
                     controller: root.controller
+                    // 看到「数据卷」占用后想看看是哪些：跳到数据卷页（索引 3）
+                    onSegmentActivated: function (entryKey) {
+                        if (entryKey === "volumes") {
+                            tabBar.currentIndex = 3;
+                        }
+                    }
                 }
             }
         }
@@ -365,11 +393,13 @@ Kirigami.Page {
             objectName: "tabBar"
             Layout.fillWidth: true
 
-            // 网络是低频数据：只在切到网络页时刷新（§3.2），不加入 5 秒轮询。
-            // 索引 2 = 网络页（0 容器 / 1 镜像 / 2 网络 / 3 引擎）
+            // 网络与数据卷都是低频数据：只在切到对应页面时刷新，不加入 5 秒轮询。
+            // 索引：0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 引擎
             onCurrentIndexChanged: {
                 if (tabBar.currentIndex === 2) {
                     root.controller.refreshNetworks();
+                } else if (tabBar.currentIndex === 3) {
+                    root.controller.refreshVolumes();
                 }
             }
 
@@ -381,6 +411,9 @@ Kirigami.Page {
             }
             QQC2.TabButton {
                 text: i18ncp("@title:tab network list", "Networks (%1)", "Networks (%1)", root.controller.networkModel.count)
+            }
+            QQC2.TabButton {
+                text: i18ncp("@title:tab volume list", "Volumes (%1)", "Volumes (%1)", root.controller.volumeModel.count)
             }
             QQC2.TabButton {
                 text: i18nc("@title:tab engine information", "Engine")
@@ -788,6 +821,242 @@ Kirigami.Page {
 
                     delegate: NetworkCard {
                         onActivated: root.networkActivated(id)
+                    }
+                }
+            }
+
+            /* ---------------------------- 数据卷 --------------------------- */
+            ColumnLayout {
+                id: volumesTab
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.InlineMessage {
+                    objectName: "volumesErrorMessage"
+                    Layout.fillWidth: true
+                    visible: root.controller.volumesStateKey === "error"
+                    type: Kirigami.MessageType.Error
+                    text: i18n("Unable to retrieve the volume list: %1", root.controller.volumesError)
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.TextField {
+                        objectName: "volumeSearchField"
+                        Layout.fillWidth: true
+                        placeholderText: i18n("Search by name, driver or mount point…")
+                        text: root.volumeList.searchText
+                        onTextChanged: root.volumeList.searchText = text
+                    }
+
+                    QQC2.ComboBox {
+                        id: volumeUsageCombo
+
+                        objectName: "volumeUsageCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("All volumes"), value: "all"},
+                            {text: i18n("Unused"), value: "unused"},
+                            {text: i18n("In use"), value: "inUse"}
+                        ]
+                        onActivated: root.volumeList.usageFilter = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.volumeList.usageFilter)
+                    }
+
+                    QQC2.ComboBox {
+                        id: volumeSortCombo
+
+                        objectName: "volumeSortCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("Name"), value: "name"},
+                            {text: i18n("Driver"), value: "driver"},
+                            {text: i18n("Size"), value: "size"},
+                            {text: i18n("Containers"), value: "refs"}
+                        ]
+                        onActivated: root.volumeList.sortKey = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.volumeList.sortKey)
+                    }
+
+                    // 创建卷（只读模式不出现）
+                    QQC2.Button {
+                        objectName: "createVolumeEntryButton"
+                        visible: root.operations.writeAllowed
+                        text: i18n("Create volume…")
+                        icon.name: "list-add"
+                        onClicked: root.volumeCreatePanelOpen = !root.volumeCreatePanelOpen
+                    }
+
+                    // 清理未使用（先列出将被删除的卷，再确认）
+                    QQC2.Button {
+                        objectName: "pruneVolumesEntryButton"
+                        visible: root.operations.writeAllowed
+                        text: i18n("Clean up unused…")
+                        icon.name: "edit-clear"
+                        // 先读一次 count 建立依赖：QML 不追踪函数调用，否则模型填充后
+                        // 这个 enabled 会停留在初始值（按钮一直是灰的）
+                        enabled: root.controller.volumeModel.count >= 0
+                            && root.controller.volumeModel.unusedNames().length > 0
+                        onClicked: root.volumePrunePanelOpen = !root.volumePrunePanelOpen
+                    }
+                }
+
+                /* 创建卷：内联面板（理由同"连接网络"：弹层内容在离屏时序下不可靠） */
+                ColumnLayout {
+                    objectName: "volumeCreatePanel"
+                    Layout.fillWidth: true
+                    visible: root.volumeCreatePanelOpen && root.operations.writeAllowed
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Kirigami.InlineMessage {
+                        objectName: "volumeCreateError"
+                        Layout.fillWidth: true
+                        visible: root.operations.resultKey === "error" && root.operations.resultText.length > 0
+                        type: Kirigami.MessageType.Error
+                        text: root.operations.resultText
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.TextField {
+                            id: volumeNameField
+
+                            objectName: "volumeNameField"
+                            Layout.fillWidth: true
+                            placeholderText: i18n("Volume name")
+                            Accessible.name: i18n("Volume name")
+                        }
+
+                        QQC2.Button {
+                            objectName: "createVolumeButton"
+                            text: i18n("Create")
+                            icon.name: "list-add"
+                            enabled: volumeNameField.text.trim().length > 0
+                            onClicked: {
+                                if (root.operations.createVolume(volumeNameField.text, "local", [])) {
+                                    root.volumeCreatePanelOpen = false;
+                                    volumeNameField.text = "";
+                                }
+                            }
+                        }
+
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            text: i18n("The volume is created with the local driver.")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.75
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                /* 清理未使用：**先列出将被删除的卷**与可回收空间，再让用户确认 */
+                ColumnLayout {
+                    objectName: "volumePrunePanel"
+                    Layout.fillWidth: true
+                    visible: root.volumePrunePanelOpen && root.operations.writeAllowed
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Kirigami.Separator {
+                        Layout.fillWidth: true
+                    }
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: i18ncp("@info volumes about to be removed", "One unused volume will be removed:", "%1 unused volumes will be removed:", root.controller.volumeModel.unusedNames().length)
+                        font.bold: true
+                    }
+
+                    Repeater {
+                        model: root.controller.volumeModel.unusedNames()
+
+                        delegate: QQC2.Label {
+                            required property string modelData
+                            Layout.fillWidth: true
+                            text: "• " + modelData
+                            font.family: "monospace"
+                            elide: Text.ElideMiddle
+                        }
+                    }
+
+                    QQC2.Label {
+                        objectName: "volumePruneSpaceLabel"
+                        Layout.fillWidth: true
+                        text: i18n("Reclaimable space: %1", root.pruneReclaimableText())
+                        opacity: 0.8
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.Button {
+                            objectName: "pruneVolumesConfirmButton"
+                            text: i18n("Clean up")
+                            icon.name: "edit-clear"
+                            onClicked: {
+                                root.operations.pruneVolumes();
+                                root.volumePrunePanelOpen = false;
+                            }
+                        }
+
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Only volumes that no container uses are removed.")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.75
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                Components.EmptyPlaceholder {
+                    objectName: "volumesEmptyPlaceholder"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    message: root.volumeList.count === 0 && root.controller.volumeModel.count > 0
+                        ? i18n("No volume matches the current search or filter.")
+                        : root.controller.volumeModel.count === 0 ? i18n("No volumes found.") : ""
+                    explanationText: root.volumeList.count === 0 && root.controller.volumeModel.count > 0
+                        ? i18n("Clear the search field or switch the filter back to “All volumes”.")
+                        : root.controller.volumeModel.count === 0
+                            ? i18n("Volumes keep data across container restarts. Create one here or let Docker create it when a container declares it.")
+                            : ""
+                    actionText: root.volumeList.count === 0 && root.controller.volumeModel.count > 0 ? i18n("Clear filters") : ""
+                    actionIconName: "edit-clear"
+                    onActionTriggered: {
+                        root.volumeList.searchText = "";
+                        root.volumeList.usageFilter = "all";
+                        volumeUsageCombo.currentIndex = volumeUsageCombo.indexOfValue("all");
+                        volumeSearchField.text = "";
+                    }
+                }
+
+                ListView {
+                    id: volumeView
+
+                    objectName: "volumeView"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: root.volumeList.count > 0
+                    clip: true
+                    model: root.volumeList
+                    spacing: Kirigami.Units.smallSpacing / 2
+                    keyNavigationEnabled: true
+                    activeFocusOnTab: true
+
+                    QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
+
+                    delegate: VolumeCard {
+                        onActivated: root.volumeActivated(name)
                     }
                 }
             }

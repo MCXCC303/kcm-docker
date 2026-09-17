@@ -88,6 +88,11 @@ KCM.AbstractKCM {
                         "scope": scope
                     });
                 }
+                onVolumeActivated: function (volumeName) {
+                    stack.push(volumeDetailComponent, {
+                        "volumeName": volumeName
+                    });
+                }
                 onNetworkActivated: function (networkId) {
                     stack.push(networkDetailComponent, {
                         "networkId": networkId
@@ -105,6 +110,14 @@ KCM.AbstractKCM {
             id: containerDetailComponent
 
             ContainerDetail {
+                onCloseRequested: stack.pop()
+            }
+        }
+
+        Component {
+            id: volumeDetailComponent
+
+            VolumeDetail {
                 onCloseRequested: stack.pop()
             }
         }

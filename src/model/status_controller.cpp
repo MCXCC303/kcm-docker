@@ -40,6 +40,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_imageModel(new ImageModel(this))
     , m_volumeModel(new VolumeModel(this))
     , m_volumeFilter(new VolumeFilterModel(this))
+    , m_volumeDetail(new VolumeDetailController(backend, this))
     , m_networkModel(new NetworkModel(this))
     , m_networkFilter(new NetworkFilterModel(this))
     , m_networkDetail(new NetworkDetailController(backend, this))

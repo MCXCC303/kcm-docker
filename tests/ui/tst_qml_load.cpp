@@ -136,6 +136,7 @@ private Q_SLOTS:
     void createNetworkDialogValidatesBeforeSubmitting();
     void networkRemovalIsHiddenForBuiltInNetworks();
     void containerNetworkSectionConnectsAndDisconnects();
+    void volumesTabListsCreatesAndPreviewsCleanup();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -732,7 +733,8 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
     QVERIFY(tabBar);
-    QCOMPARE(tabBar->property("count").toInt(), 4);
+    // 0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 引擎
+    QCOMPARE(tabBar->property("count").toInt(), 5);
 
     // 没进网络页就不该去读网络列表（低频数据，按需刷新）
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Networks), 0);
@@ -1070,6 +1072,99 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QVERIFY2(!page->property("connectPanelOpen").toBool(), "the panel closes after a successful connect");
 }
 
+/*!
+ * 数据卷页（ARCH_V5_V8 §3.5）：列表、未使用过滤、创建面板与清理预览。
+ */
+void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
+{
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    QList<Volume> volumes;
+    Volume used;
+    used.name = QStringLiteral("app_data");
+    used.driver = QStringLiteral("local");
+    used.mountpoint = QStringLiteral("/var/lib/docker/volumes/app_data/_data");
+    used.sizeBytes = 4096;
+    used.refCount = 1;
+    used.labels.append({QStringLiteral("com.example.owner"), QStringLiteral("team-a")});
+    volumes.append(used);
+    Volume unused;
+    unused.name = QStringLiteral("cache");
+    unused.driver = QStringLiteral("local");
+    unused.mountpoint = QStringLiteral("/var/lib/docker/volumes/cache/_data");
+    unused.sizeBytes = 2048;
+    unused.refCount = 0;
+    volumes.append(unused);
+    // 使用情况未知、但**大小已知**：这样"可回收空间"就能区分两种实现
+    // （把未知当成未使用会把 512 字节也算进去 → 2.5 KiB 而不是 2.0 KiB）
+    Volume unknown;
+    unknown.name = QStringLiteral("legacy");
+    unknown.driver = QStringLiteral("local");
+    unknown.mountpoint = QStringLiteral("/var/lib/docker/volumes/legacy/_data");
+    unknown.sizeBytes = 512;
+    unknown.refCount = -1;
+    volumes.append(unknown);
+    m_backend->setVolumes(volumes);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QCOMPARE(tabBar->property("count").toInt(), 5);
+    // 没进数据卷页就不去读列表
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Volumes), 0);
+    QVERIFY(tabBar->setProperty("currentIndex", 3));
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Volumes), 1);
+    m_backend->completeRefresh();
+
+    QQuickItem *volumeView = childByObjectName(page, QStringLiteral("volumeView"));
+    QVERIFY2(volumeView, "the volumes tab must have its own list");
+    QTRY_COMPARE(volumeView->property("count").toInt(), 3);
+
+    // 未使用过滤：只有 cache（legacy 的使用情况未知，不能算进"可清理"）
+    auto *filter = m_stubKcm->controller()->volumeList();
+    filter->setUsageFilter(QStringLiteral("unused"));
+    QTRY_COMPARE(volumeView->property("count").toInt(), 1);
+    filter->setUsageFilter(QStringLiteral("all"));
+    QTRY_COMPARE(volumeView->property("count").toInt(), 3);
+
+    // 清理预览：列出将被删除的卷与可回收空间（未知大小要如实说明）
+    QQuickItem *pruneEntry = findItemByName(page, QStringLiteral("pruneVolumesEntryButton"));
+    QVERIFY(pruneEntry);
+    QVERIFY(QMetaObject::invokeMethod(pruneEntry, "clicked"));
+    QVERIFY(page->property("volumePrunePanelOpen").toBool());
+    QString reclaimable;
+    QVERIFY(QMetaObject::invokeMethod(page, "pruneReclaimableText", Q_RETURN_ARG(QString, reclaimable)));
+    // 只有 cache（2048 字节 = 2.0 KiB）算可回收：未知使用情况的 legacy（512 字节）不算
+    QVERIFY2(reclaimable.contains(QStringLiteral("2.0 KiB")), qPrintable(reclaimable));
+    QVERIFY2(!reclaimable.contains(QStringLiteral("2.5 KiB")), qPrintable(reclaimable));
+
+    // 创建面板：名称校验（空名不可提交），合法名会真的发出请求
+    QQuickItem *createEntry = findItemByName(page, QStringLiteral("createVolumeEntryButton"));
+    QVERIFY(createEntry);
+    QVERIFY(QMetaObject::invokeMethod(createEntry, "clicked"));
+    QVERIFY(page->property("volumeCreatePanelOpen").toBool());
+    QQuickItem *nameField = findItemByName(page, QStringLiteral("volumeNameField"));
+    QQuickItem *createButton = findItemByName(page, QStringLiteral("createVolumeButton"));
+    QVERIFY(nameField && createButton);
+    QVERIFY2(!createButton->property("enabled").toBool(), "an empty name must not be submittable");
+    nameField->setProperty("text", QStringLiteral("new_volume"));
+    QTRY_VERIFY(createButton->property("enabled").toBool());
+    QVERIFY(QMetaObject::invokeMethod(createButton, "clicked"));
+    QCOMPARE(m_backend->lastCreatedVolumeName(), QStringLiteral("new_volume"));
+    QCOMPARE(m_backend->lastCreatedVolumeDriver(), QStringLiteral("local"));
+    QVERIFY2(!page->property("volumeCreatePanelOpen").toBool(), "the panel closes once the request is sent");
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -1087,6 +1182,8 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("RegistryAuthPage.qml"),
         QStringLiteral("NetworkCard.qml"),
         QStringLiteral("NetworkDetail.qml"),
+        QStringLiteral("VolumeCard.qml"),
+        QStringLiteral("VolumeDetail.qml"),
         QStringLiteral("StorageView.qml"),
         QStringLiteral("ResourceView.qml"),
         QStringLiteral("components/StatTile.qml"),

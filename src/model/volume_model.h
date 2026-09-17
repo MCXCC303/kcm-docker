@@ -69,6 +69,10 @@ public:
     Q_INVOKABLE QStringList unusedNames() const;
     /*! 纯数据摘要 `[{name, driver, mountpoint, inUse}]`（面板/对话框用）。 */
     Q_INVOKABLE QVariantList summaries() const;
+    /*! 未使用卷里**已知**大小之和（清理预览用；未知的不计入）。 */
+    Q_INVOKABLE qint64 knownUnusedSize() const;
+    /*! 未使用卷里大小未知的个数（预览要如实说明"还有 N 个大小未知"）。 */
+    Q_INVOKABLE int unknownUnusedSizeCount() const;
 
 Q_SIGNALS:
     void countChanged();

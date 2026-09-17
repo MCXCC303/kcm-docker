@@ -26,6 +26,9 @@ ColumnLayout {
 
     readonly property var storage: controller.storage
 
+    /*! 某一段被点击（转发给页面：数据卷那段可以跳转到卷列表）。 */
+    signal segmentActivated(string entryKey)
+
     spacing: Kirigami.Units.smallSpacing
 
     function sizeText(bytes) {

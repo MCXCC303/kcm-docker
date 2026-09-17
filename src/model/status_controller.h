@@ -21,6 +21,7 @@
 #include "model/network_filter_model.h"
 #include "model/network_detail_controller.h"
 #include "model/network_model.h"
+#include "model/volume_detail_controller.h"
 #include "model/volume_filter_model.h"
 #include "model/volume_model.h"
 #include "model/refresh_scheduler.h"
@@ -99,6 +100,8 @@ class StatusController : public QObject
     /*! 数据卷列表与过滤代理。 */
     Q_PROPERTY(Kontainer::VolumeModel *volumeModel READ volumeModel CONSTANT)
     Q_PROPERTY(Kontainer::VolumeFilterModel *volumeList READ volumeList CONSTANT)
+    /*! 数据卷详情（选中一个卷后读它的标签与驱动选项）。 */
+    Q_PROPERTY(Kontainer::VolumeDetailController *volumeDetail READ volumeDetail CONSTANT)
     /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
     Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
@@ -306,6 +309,10 @@ public:
     {
         return m_volumeFilter;
     }
+    VolumeDetailController *volumeDetail() const
+    {
+        return m_volumeDetail;
+    }
     ContainerDetailController *containerDetail() const
     {
         return m_containerDetail;
@@ -420,6 +427,7 @@ private:
     ImageModel *m_imageModel = nullptr;
     VolumeModel *m_volumeModel = nullptr;
     VolumeFilterModel *m_volumeFilter = nullptr;
+    VolumeDetailController *m_volumeDetail = nullptr;
     ListState m_volumesState = ListState::Idle;
     QString m_volumesError;
     bool m_volumesOk = false;

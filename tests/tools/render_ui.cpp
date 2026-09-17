@@ -539,6 +539,29 @@ int main(int argc, char **argv)
                                   DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
     }
 
+    // 数据卷列表（六期 §3.5）：使用中 / 未使用 / 使用情况未知三种形态
+    {
+        QList<Kontainer::Volume> volumes;
+        auto makeVolume = [](const QString &name, const QString &driver, qint64 size, int refs, bool usageKnown) {
+            Kontainer::Volume volume;
+            volume.name = name;
+            volume.driver = driver;
+            volume.mountpoint = QStringLiteral("/var/lib/docker/volumes/%1/_data").arg(name);
+            volume.createdAt = QDateTime::currentDateTimeUtc().addSecs(-3600 * 12);
+            volume.scope = QStringLiteral("local");
+            volume.sizeBytes = usageKnown ? size : -1;
+            volume.refCount = usageKnown ? refs : -1;
+            if (name == QStringLiteral("app_data")) {
+                volume.labels.append({QStringLiteral("com.docker.compose.project"), QStringLiteral("app")});
+            }
+            return volume;
+        };
+        volumes.append(makeVolume(QStringLiteral("app_data"), QStringLiteral("local"), 220200960, 2, true));
+        volumes.append(makeVolume(QStringLiteral("app_cache"), QStringLiteral("local"), 52428800, 0, true));
+        volumes.append(makeVolume(QStringLiteral("backup_2026"), QStringLiteral("local"), 0, 0, false));
+        backend->setVolumes(volumes);
+    }
+
     // 网络列表（六期 §3.2）：内置三个 + 一个 compose 建的网络（带成员）
     {
         QList<Kontainer::Network> networks;
