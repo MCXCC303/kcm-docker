@@ -10,6 +10,7 @@
 #include "backend/docker_error.h"
 #include "refresh_policy.h"
 
+#include <QMap>
 #include <QObject>
 #include <QUrlQuery>
 
@@ -34,6 +35,14 @@ class DockerReply : public QObject
     Q_OBJECT
 
 public:
+    /*!
+     * 请求头是否安全（名字与值都不得含 CR/LF，值里也不能有裸控制字符）。
+     *
+     * `X-Registry-Auth` 的值由 `RegistryAuth::encode()` 生成、可控，但凭据最终
+     * 来自用户输入或钱包，因此在真正写进 socket 之前必须再挡一次。
+     */
+    static bool isHeaderSafe(const QByteArray &name, const QByteArray &value);
+
     /*! 四期只用到这三个方法（ARCH_V4 §2.2.1）。 */
     enum class Method {
         Get,
@@ -68,6 +77,14 @@ public:
         int headersTimeoutMs = 0;
         /*! 流式响应：超时按「多久没有新数据」计算，而不是整个请求的总时长。 */
         bool streaming = false;
+        /*!
+         * 额外请求头（例如 `X-Registry-Auth`）。
+         *
+         * 值是 base64url，本来就不会含 CR/LF；但这里仍然在发送前做一次校验
+         * （见 `isHeaderSafe()`）——手写 HTTP 请求不能让任何来源拼出换行，
+         * 否则就是请求头注入。
+         */
+        QMap<QByteArray, QByteArray> headers;
     };
 
     ~DockerReply() override;
@@ -224,15 +241,15 @@ public:
      * 写请求（无请求体，带 Content-Length: 0）。
      * `timeoutMs <= 0` 时使用客户端默认超时。
      */
-    DockerReply *post(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0);
+    DockerReply *post(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
     DockerReply *del(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0);
     /*!
      * 流式写请求：超时按「多久没有新数据」计算（镜像拉取可以合法地跑很久）。
      */
-    DockerReply *postStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0);
+    DockerReply *postStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
 
     /*! 通用入口：路径拼接（版本前缀）、超时与流式标记都在这里统一处理。 */
-    DockerReply *request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming);
+    DockerReply *request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming, const QMap<QByteArray, QByteArray> &headers = {});
 
 private:
     DockerEndpoint m_endpoint = DockerEndpoint::fromEnvironment();

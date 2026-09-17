@@ -59,6 +59,30 @@ DockerReply::DockerReply(DockerEndpoint endpoint, Request request, QObject *pare
     connect(m_timer, &QTimer::timeout, this, &DockerReply::onTimeout);
 }
 
+bool DockerReply::isHeaderSafe(const QByteArray &name, const QByteArray &value)
+{
+    if (name.isEmpty()) {
+        return false;
+    }
+    const auto isTokenChar = [](char ch) {
+        // RFC 7230 的 token 字符集：字母数字与 !#$%&'*+-.^_`|~
+        return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+            || QByteArray("!#$%&'*+-.^_`|~").contains(ch);
+    };
+    for (const char ch : name) {
+        if (!isTokenChar(ch)) {
+            return false;
+        }
+    }
+    for (const char ch : value) {
+        // 禁止 CR/LF（请求头注入）与其余控制字符
+        if (ch == '\r' || ch == '\n' || (static_cast<unsigned char>(ch) < 0x20 && ch != '\t')) {
+            return false;
+        }
+    }
+    return true;
+}
+
 DockerReply::~DockerReply() = default;
 
 void DockerReply::start()
@@ -98,6 +122,13 @@ void DockerReply::onConnected()
         request += "?" + m_request.query.toString(QUrl::FullyEncoded).toUtf8();
     }
     request += " HTTP/1.1\r\n";
+    for (auto it = m_request.headers.constBegin(); it != m_request.headers.constEnd(); ++it) {
+        if (!isHeaderSafe(it.key(), it.value())) {
+            fail(DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("unsafe request header")));
+            return;
+        }
+        request += it.key() + ": " + it.value() + "\r\n";
+    }
     request += "Host: docker\r\n";
     request += "Accept: application/json\r\n";
     request += "User-Agent: kontainer/" KONTAINER_VERSION "\r\n";
@@ -298,9 +329,9 @@ DockerReply *DockerClient::get(const QString &apiPath, const QUrlQuery &query)
     return request(DockerReply::Method::Get, apiPath, query, m_timeoutMs, false);
 }
 
-DockerReply *DockerClient::post(const QString &apiPath, const QUrlQuery &query, int timeoutMs)
+DockerReply *DockerClient::post(const QString &apiPath, const QUrlQuery &query, int timeoutMs, const QMap<QByteArray, QByteArray> &headers)
 {
-    return request(DockerReply::Method::Post, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false);
+    return request(DockerReply::Method::Post, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false, headers);
 }
 
 DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, int timeoutMs)
@@ -308,15 +339,15 @@ DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, i
     return request(DockerReply::Method::Delete, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false);
 }
 
-DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs)
+DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs, const QMap<QByteArray, QByteArray> &headers)
 {
-    DockerReply *reply = request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true);
+    DockerReply *reply = request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true, headers);
     // 首个响应用普通请求超时：仓库不可达时快速失败，而不是干等一分钟
     reply->setHeadersTimeoutMs(m_timeoutMs);
     return reply;
 }
 
-DockerReply *DockerClient::request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming)
+DockerReply *DockerClient::request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming, const QMap<QByteArray, QByteArray> &headers)
 {
     QString path = apiPath;
     if (m_apiVersion.isValid()) {
@@ -333,6 +364,7 @@ DockerReply *DockerClient::request(DockerReply::Method method, const QString &ap
     request.query = query;
     request.timeoutMs = std::max(minimumTimeoutMs, timeoutMs);
     request.streaming = streaming;
+    request.headers = headers;
 
     auto *reply = new DockerReply(m_endpoint, request, this);
     reply->start();
