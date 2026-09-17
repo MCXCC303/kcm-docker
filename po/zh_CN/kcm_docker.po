@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.4.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-17 18:18+0800\n"
+"POT-Creation-Date: 2026-09-17 18:46+0800\n"
 "PO-Revision-Date: 2026-09-17 04:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -87,8 +87,7 @@ msgstr "该镜像正被容器使用，无法删除。"
 #: src/model/docker_error_text.cpp:35
 msgid ""
 "The image has more than one tag. Force deletion removes all of its tags."
-msgstr ""
-"该镜像有多个标签；强制删除会移除它的全部标签。"
+msgstr "该镜像有多个标签；强制删除会移除它的全部标签。"
 
 #: src/model/docker_error_text.cpp:39
 msgid "The name is already in use."
@@ -121,8 +120,7 @@ msgstr "Kontainer 不支持该 Docker 引擎版本。"
 #: src/model/docker_error_text.cpp:62
 msgid ""
 "The object no longer exists. It may have been removed outside Kontainer."
-msgstr ""
-"该对象已不存在，可能是被 Kontainer 之外的工具删除了。"
+msgstr "该对象已不存在，可能是被 Kontainer 之外的工具删除了。"
 
 #: src/model/docker_error_text.cpp:66
 msgid "The action was not started because a precondition was not met."
@@ -148,119 +146,127 @@ msgstr "Docker 守护进程返回了意外数据。"
 msgid "Unknown Docker error."
 msgstr "未知的 Docker 错误。"
 
-#: src/model/operation_controller.cpp:143
+#: src/model/operation_controller.cpp:119
 msgid ""
 "The Docker daemon refused the last write operation because of missing "
 "permissions. Kontainer switched to read-only for this session."
 msgstr ""
-"由于权限不足，Docker 守护进程拒绝了下一次写操作。Kontainer 已在本次会话中切换为只读。"
+"由于权限不足，Docker 守护进程拒绝了下一次写操作。Kontainer 已在本次会话中切换"
+"为只读。"
 
-#: src/model/operation_controller.cpp:145
+#: src/model/operation_controller.cpp:121
 msgid ""
 "Kontainer can only read from this Docker socket: the current user is not "
 "allowed to write it. Add the user to the group that owns the socket, or use "
 "a rootless Docker setup."
 msgstr ""
-"Kontainer 只能读取该 Docker socket：当前用户没有写权限。"
-"请把该用户加入 socket 所属的组，或改用 rootless Docker 部署。"
+"Kontainer 只能读取该 Docker socket：当前用户没有写权限。请把该用户加入 "
+"socket 所属的组，或改用 rootless Docker 部署。"
 
-#: src/model/operation_controller.cpp:148
+#: src/model/operation_controller.cpp:124
 msgid ""
 "The Docker socket does not exist, so containers and images cannot be managed."
-msgstr ""
-"Docker socket 不存在，因此无法管理容器与镜像。"
+msgstr "Docker socket 不存在，因此无法管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:150
+#: src/model/operation_controller.cpp:126
 msgid ""
 "Managing containers and images is only available for the local Docker socket."
-msgstr ""
-"仅本机 Docker socket 支持管理容器与镜像。"
+msgstr "仅本机 Docker socket 支持管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:208
+#: src/model/operation_controller.cpp:184
+#: src/model/operation_controller.cpp:287
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr "Kontainer 处于只读模式，因此未执行%1。"
 
-#: src/model/operation_controller.cpp:213
+#: src/model/operation_controller.cpp:189
 msgid "Another operation on this object is still running."
 msgstr "该对象上仍有操作在进行中。"
 
-#: src/model/operation_controller.cpp:262
+#: src/model/operation_controller.cpp:238
 msgid "starting the container"
 msgstr "启动容器"
 
-#: src/model/operation_controller.cpp:272
+#: src/model/operation_controller.cpp:248
 msgid "stopping the container"
 msgstr "停止容器"
 
-#: src/model/operation_controller.cpp:282
+#: src/model/operation_controller.cpp:258
 msgid "restarting the container"
 msgstr "重启容器"
 
-#: src/model/operation_controller.cpp:292
+#: src/model/operation_controller.cpp:268
 msgid "removing the container"
 msgstr "删除容器"
 
-#: src/model/operation_controller.cpp:303
+#: src/model/operation_controller.cpp:279
 msgid "“%1” is not a valid image reference."
 msgstr "“%1”不是合法的镜像引用。"
 
-#: src/model/operation_controller.cpp:310
+#: src/model/operation_controller.cpp:287
 msgid "pulling the image"
 msgstr "拉取镜像"
 
-#: src/model/operation_controller.cpp:315
-msgid "An image pull is already running."
-msgstr "已有镜像正在拉取。"
+#: src/model/operation_controller.cpp:294
+msgid "This image is already being pulled: %1"
+msgstr "该镜像已经在拉取中：%1"
 
-#: src/model/operation_controller.cpp:340
+#: src/model/operation_controller.cpp:388
 msgid "removing the image"
 msgstr "删除镜像"
 
-#: src/model/operation_controller.cpp:393
+#: src/model/operation_controller.cpp:468
+#: src/ui/components/PullProgressList.qml:161
 msgid "Image pull cancelled."
 msgstr "已取消镜像拉取。"
 
-#: src/model/operation_controller.cpp:393
+#: src/model/operation_controller.cpp:468
 msgid "Operation cancelled."
 msgstr "已取消操作。"
 
-#: src/model/operation_controller.cpp:444
+#: src/model/operation_controller.cpp:519
 msgid "Container started."
 msgstr "容器已启动。"
 
-#: src/model/operation_controller.cpp:446
+#: src/model/operation_controller.cpp:521
 msgid "Container stopped."
 msgstr "容器已停止。"
 
-#: src/model/operation_controller.cpp:448
+#: src/model/operation_controller.cpp:523
 msgid "Container restarted."
 msgstr "容器已重启。"
 
-#: src/model/operation_controller.cpp:450
+#: src/model/operation_controller.cpp:525
 msgid "Container removed."
 msgstr "容器已删除。"
 
-#: src/model/operation_controller.cpp:453
+#: src/model/operation_controller.cpp:528
 msgid "Image pulled: %1"
 msgstr "已拉取镜像：%1"
 
-#: src/model/operation_controller.cpp:456
+#: src/model/operation_controller.cpp:531
 msgid "Image removed."
 msgstr "镜像已删除。"
 
-#: src/model/operation_controller.cpp:458
+#: src/model/operation_controller.cpp:533
 msgid "Done."
 msgstr "完成。"
 
-#: src/model/operation_controller.cpp:465
+#: src/model/operation_controller.cpp:541
+msgid ""
+"%1 The registry may be unreachable from the Docker daemon (network, proxy, "
+"or IPv6 routing)."
+msgstr ""
+"%1 Docker 守护进程可能无法访问镜像仓库（网络、代理或 IPv6 路由问题）。"
+
+#: src/model/operation_controller.cpp:551
 msgid "The container is already running."
 msgstr "容器已经在运行。"
 
-#: src/model/operation_controller.cpp:467
+#: src/model/operation_controller.cpp:553
 msgid "The container is already stopped."
 msgstr "容器已经停止。"
 
-#: src/model/operation_controller.cpp:469
+#: src/model/operation_controller.cpp:555
 msgid "Nothing to do: the object is already in the requested state."
 msgstr "无需操作：对象已处于目标状态。"
 
@@ -349,10 +355,11 @@ msgid "Continue"
 msgstr "继续"
 
 #: src/ui/components/ConfirmDialog.qml:69
+#: src/ui/components/PullProgressList.qml:118
 msgid "Cancel"
 msgstr "取消"
 
-#: src/ui/components/OperationMessage.qml:55 src/ui/main.qml:24
+#: src/ui/components/OperationMessage.qml:55 src/ui/main.qml:31
 msgid "Refresh"
 msgstr "刷新"
 
@@ -360,44 +367,82 @@ msgstr "刷新"
 msgid "Dismiss"
 msgstr "关闭提示"
 
-#: src/ui/components/PullImageDialog.qml:46 src/ui/MainPage.qml:509
+#: src/ui/components/PullImageDialog.qml:47 src/ui/MainPage.qml:511
 msgid "Pull image"
 msgstr "拉取镜像"
 
-#: src/ui/components/PullImageDialog.qml:66
+#: src/ui/components/PullImageDialog.qml:71
 msgid ""
 "Image reference (for example “alpine:3.19” or “registry.example.com/team/"
 "app”)."
-msgstr ""
-"镜像引用（例如 “alpine:3.19” 或 “registry.example.com/team/app”）。"
+msgstr "镜像引用（例如 “alpine:3.19” 或 “registry.example.com/team/app”）。"
 
-#: src/ui/components/PullImageDialog.qml:77
+#: src/ui/components/PullImageDialog.qml:82
 msgid "alpine:3.19"
 msgstr "alpine:3.19"
 
-#: src/ui/components/PullImageDialog.qml:86
+#: src/ui/components/PullImageDialog.qml:89
 msgid "This is not a valid image reference."
 msgstr "这不是合法的镜像引用。"
 
-#: src/ui/components/PullImageDialog.qml:96
+#: src/ui/components/PullImageDialog.qml:99
 msgid "No tag given, “latest” will be pulled: %1"
 msgstr "未指定标签，将拉取 “latest”：%1"
 
-#: src/ui/components/PullImageDialog.qml:137
-msgid "%1 of %2 layers"
-msgstr "第 %1 / %2 层"
+#: src/ui/components/PullImageDialog.qml:109
+msgid "This image is already being pulled."
+msgstr "该镜像正在拉取中。"
 
-#: src/ui/components/PullImageDialog.qml:152
+#: src/ui/components/PullImageDialog.qml:117
+msgid ""
+"Pulling continues in the background; progress is shown in the image list."
+msgstr ""
+"拉取会在后台继续；进度显示在镜像列表中。"
+
+#: src/ui/components/PullImageDialog.qml:129
 msgid "Pull"
 msgstr "拉取"
 
-#: src/ui/components/PullImageDialog.qml:161
-msgid "Cancel pull"
-msgstr "取消拉取"
-
-#: src/ui/components/PullImageDialog.qml:161
+#: src/ui/components/PullImageDialog.qml:138
 msgid "Close"
 msgstr "关闭"
+
+#: src/ui/components/PullProgressList.qml:44
+msgid "Pulling images (%1)"
+msgstr "正在拉取镜像（%1）"
+
+#: src/ui/components/PullProgressList.qml:45
+msgid "Recent pulls"
+msgstr "最近的拉取"
+
+#: src/ui/components/PullProgressList.qml:53
+msgid "Clear finished"
+msgstr "清空已结束"
+
+#: src/ui/components/PullProgressList.qml:130
+msgid "Remove this entry from the list"
+msgstr "从列表中移除这条记录"
+
+#: src/ui/components/PullProgressList.qml:131
+msgid "Remove this entry"
+msgstr "移除这条记录"
+
+#: src/ui/components/PullProgressList.qml:154
+#: src/ui/components/PullProgressList.qml:180
+msgid "Pull failed: %1"
+msgstr "拉取失败：%1"
+
+#: src/ui/components/PullProgressList.qml:155
+msgid "Pull failed."
+msgstr "拉取失败。"
+
+#: src/ui/components/PullProgressList.qml:158
+msgid "Image pulled."
+msgstr "镜像已拉取。"
+
+#: src/ui/components/PullProgressList.qml:168
+msgid "%1 of %2 layers"
+msgstr "第 %1 / %2 层"
 
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
@@ -465,7 +510,7 @@ msgstr "正在加载镜像详情…"
 msgid "Unable to retrieve image details."
 msgstr "无法获取镜像详情。"
 
-#: src/ui/ImageDetail.qml:144 src/ui/ContainerDetail.qml:236 src/ui/main.qml:31
+#: src/ui/ImageDetail.qml:144 src/ui/ContainerDetail.qml:236 src/ui/main.qml:37
 msgid "Back"
 msgstr "返回"
 
@@ -601,8 +646,7 @@ msgstr "确定要删除该镜像的全部标签（共 %1 个）吗？"
 msgid ""
 "All tags of this image are removed. Containers that reference it can no "
 "longer be started."
-msgstr ""
-"该镜像的全部标签都会被移除；引用它的容器将无法再启动。"
+msgstr "该镜像的全部标签都会被移除；引用它的容器将无法再启动。"
 
 #: src/ui/ContainerDetail.qml:55
 msgid "Host"
@@ -1046,15 +1090,19 @@ msgstr "排序：仓库"
 msgid "Sort: Size"
 msgstr "排序：大小"
 
-#: src/ui/MainPage.qml:535
+#: src/ui/MainPage.qml:510
+msgid "Pull image (%1 running)"
+msgstr "拉取镜像（%1 个进行中）"
+
+#: src/ui/MainPage.qml:537
 msgid "Unable to retrieve the container list: %1"
 msgstr "无法获取容器列表：%1"
 
-#: src/ui/MainPage.qml:593
+#: src/ui/MainPage.qml:595
 msgid "Unable to retrieve the image list: %1"
 msgstr "无法获取镜像列表：%1"
 
-#: src/ui/main.qml:44
+#: src/ui/main.qml:50
 msgid "Auto-refresh"
 msgstr "自动刷新"
 
@@ -1144,6 +1192,12 @@ msgstr "启动容器 %1"
 #: src/ui/ContainerCard.qml:177
 msgid "Stop container %1"
 msgstr "停止容器 %1"
+
+#~ msgid "An image pull is already running."
+#~ msgstr "已有镜像正在拉取。"
+
+#~ msgid "Cancel pull"
+#~ msgstr "取消拉取"
 
 #~ msgid "Ports"
 #~ msgstr "端口"

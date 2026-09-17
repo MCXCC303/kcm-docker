@@ -20,11 +20,17 @@ KCM.AbstractKCM {
     readonly property var controller: kcm.controller
 
     actions: [
+        /*!
+            手动刷新。
+
+            注意：这里**不**绑定 `enabled: !controller.busy`。自动刷新每 5 秒会让
+            busy 抖动一次，按钮跟着在「可点 / 不可点」之间切换，看起来就是在闪；
+            而重复触发刷新本身是无害的——backend 会把在途的同类请求合并（ARCH_V2 §29）。
+        */
         Kirigami.Action {
             text: i18n("Refresh")
             icon.name: "view-refresh"
             visible: stack.depth === 1
-            enabled: !root.controller.busy
             onTriggered: root.controller.refresh()
         },
         Kirigami.Action {

@@ -168,6 +168,17 @@ void MockDockerBackend::completeMutations(MutationOutcome outcome, const DockerE
     }
 }
 
+void MockDockerBackend::completeMutation(const QString &targetKey, MutationOutcome outcome, const DockerError &error)
+{
+    for (int i = 0; i < m_mutationCalls.size(); ++i) {
+        if (m_mutationCalls.at(i).targetKey == targetKey) {
+            const MutationCall call = m_mutationCalls.takeAt(i);
+            Q_EMIT mutationFinished(call.mutation, call.targetKey, outcome, error);
+            return;
+        }
+    }
+}
+
 void MockDockerBackend::emitPullProgress(const ImagePullProgress &progress)
 {
     Q_EMIT imagePullProgress(progress);
@@ -198,9 +209,14 @@ void MockDockerBackend::pullImage(const QString &reference)
     m_mutationCalls.append({Mutation::PullImage, QStringLiteral("image:") + reference, false});
 }
 
-void MockDockerBackend::cancelImagePull()
+void MockDockerBackend::cancelImagePull(const QString &reference)
 {
-    m_pullCancelled = true;
+    m_cancelledPulls.append(reference);
+}
+
+void MockDockerBackend::cancelAllImagePulls()
+{
+    ++m_cancelAllCount;
 }
 
 void MockDockerBackend::removeImage(const QString &id, bool force)

@@ -684,11 +684,18 @@ DockerEndpoint DockerBackend::endpoint() const
 void DockerBackend::emitMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error)
 {
     // 只记录操作、目标 key 与结果：不记录请求体、响应体或挂载路径（ARCH_V1 §27 / ARCH_V2 §40）
-    qCDebug(kontainerBackend) << "mutation" << mutationName(mutation) << targetKey
-                              << (outcome == MutationOutcome::Succeeded     ? "succeeded"
-                                      : outcome == MutationOutcome::Unchanged ? "unchanged"
-                                      : outcome == MutationOutcome::Cancelled ? "cancelled"
-                                                                              : "failed");
+    const char *result = outcome == MutationOutcome::Succeeded     ? "succeeded"
+        : outcome == MutationOutcome::Unchanged                    ? "unchanged"
+        : outcome == MutationOutcome::Cancelled                    ? "cancelled"
+                                                                   : "failed";
+    if (outcome == MutationOutcome::Failed) {
+        // 失败必须可诊断：分类 + 引擎原文（HTTP 状态码也在里面）。
+        // 这里出现的是镜像引用 / 容器 ID / 引擎消息，不含凭据与挂载路径。
+        qCWarning(kontainerBackend) << "mutation" << mutationName(mutation) << targetKey << result
+                                    << "kind" << int(error.kind()) << "http" << error.httpStatus() << "detail" << error.detail();
+    } else {
+        qCDebug(kontainerBackend) << "mutation" << mutationName(mutation) << targetKey << result;
+    }
     Q_EMIT mutationFinished(mutation, targetKey, outcome, error);
 }
 
@@ -766,24 +773,16 @@ void DockerBackend::removeImage(const QString &id, bool force)
     });
 }
 
-void DockerBackend::clearPullState()
-{
-    m_pullReader.reset();
-    m_pullLayers.clear();
-    m_pullProgress = ImagePullProgress();
-    m_pullFailed = false;
-}
-
 void DockerBackend::pullImage(const QString &reference)
 {
-    const QString targetKey = OperationTarget::image(reference);
+    const QString targetKey = OperationTarget::image(ImageReference::normalized(reference));
 
-    // 同一时刻只允许一个拉取：第二个请求直接以失败结束，由上层给出文案
-    if (m_pullReply) {
+    // 同一个引用重复拉取：拒绝并给出明确文案（不同引用可以并发）
+    if (m_pulls.contains(targetKey)) {
         emitMutationFinished(Mutation::PullImage,
                              targetKey,
                              MutationOutcome::Failed,
-                             DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("an image pull is already running")));
+                             DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("this image is already being pulled")));
         return;
     }
 
@@ -811,126 +810,160 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
         return;
     }
 
-    clearPullState();
-    m_pullProgress.reference = ImageReference::normalized(reference);
-
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("fromImage"), parts->fromImage());
     if (!parts->tag.isEmpty()) {
         query.addQueryItem(QStringLiteral("tag"), parts->tag);
     }
 
-    m_pullReply = m_client.postStream(ApiPaths::imageCreate(), query, pullIdleTimeoutMs());
-    DockerReply *reply = m_pullReply;
+    // 注意：QHash 的引用在插入时可能失效，因此这里先插入、再用迭代器访问，
+    // 并且后续所有回调都通过 targetKey 重新查找状态，不保存引用。
+    ImagePullState state;
+    state.reference = ImageReference::normalized(reference);
+    state.targetKey = targetKey;
+    state.progress.reference = state.reference;
+    const auto inserted = m_pulls.insert(targetKey, state);
+    inserted->reply = m_client.postStream(ApiPaths::imageCreate(), query, pullIdleTimeoutMs());
+    DockerReply *reply = inserted->reply;
 
-    connect(reply, &DockerReply::streamStarted, this, [this, reply] {
-        // 4xx/5xx 由 finished 统一处理；这里只让 UI 立刻知道「开始了」
+    connect(reply, &DockerReply::streamStarted, this, [this, reply, targetKey] {
         if (reply->httpStatus() >= 400) {
-            return;
+            return; // 4xx/5xx 交给 finished 统一处理
         }
-        Q_EMIT imagePullProgress(m_pullProgress);
+        if (const auto it = m_pulls.constFind(targetKey); it != m_pulls.constEnd()) {
+            emitPullProgress(*it);
+        }
     });
 
-    connect(reply, &DockerReply::bodyChunk, this, [this, reply] {
+    connect(reply, &DockerReply::bodyChunk, this, [this, reply, targetKey] {
         if (reply->httpStatus() >= 400) {
             return;
         }
-        const QList<QJsonObject> lines = m_pullReader.feed(reply->takeBody());
+        const auto it = m_pulls.find(targetKey);
+        if (it == m_pulls.end()) {
+            return;
+        }
+        const QList<QJsonObject> lines = it->reader.feed(reply->takeBody());
         for (const QJsonObject &line : lines) {
-            // 订阅者可能在 imagePullProgress 里同步取消（用户点了取消）：
-            // 取消后不要再继续喂进度，否则会往已经被清空的状态里写数据
-            if (reply->isFinished()) {
+            // 订阅者可能在 imagePullProgress 里同步取消：取消后不要再写进度
+            if (reply->isFinished() || !m_pulls.contains(targetKey)) {
                 return;
             }
-            handlePullLine(line);
+            handlePullLine(*it, line);
         }
     });
 
     connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
         const DockerReply::State state = reply->state();
         const DockerError error = reply->error();
+        reply->deleteLater();
 
-        // 收尾：最后一行可能没有换行符
+        auto it = m_pulls.find(targetKey);
+        if (it == m_pulls.end()) {
+            return; // 已经被取消并清算过
+        }
+        it->reply = nullptr;
+
         if (state != DockerReply::State::Cancelled) {
-            const QList<QJsonObject> tail = m_pullReader.finish();
+            // 收尾：最后一行可能没有换行符
+            const QList<QJsonObject> tail = it->reader.finish();
             for (const QJsonObject &line : tail) {
-                handlePullLine(line);
+                handlePullLine(*it, line);
             }
         }
 
-        if (m_pullReader.malformedLines() > 0 || m_pullReader.droppedLines() > 0) {
-            qCWarning(kontainerBackend) << "image pull stream had" << m_pullReader.malformedLines() << "malformed and"
-                                        << m_pullReader.droppedLines() << "dropped lines";
+        if (it->reader.malformedLines() > 0 || it->reader.droppedLines() > 0) {
+            qCWarning(kontainerBackend) << "image pull stream had" << it->reader.malformedLines() << "malformed and"
+                                        << it->reader.droppedLines() << "dropped lines";
         }
 
-        m_pullReply = nullptr;
-        reply->deleteLater();
-
         if (state == DockerReply::State::Cancelled) {
-            clearPullState();
-            emitMutationFinished(Mutation::PullImage, targetKey, MutationOutcome::Cancelled, DockerError());
+            finishPull(targetKey, MutationOutcome::Cancelled, DockerError());
             return;
         }
         if (state != DockerReply::State::Succeeded) {
-            clearPullState();
-            emitMutationFinished(Mutation::PullImage, targetKey, MutationOutcome::Failed, error);
+            finishPull(targetKey, MutationOutcome::Failed, error);
             return;
         }
-        if (m_pullFailed) {
+        if (it->failed) {
             // 流内的 error 行才是真正的失败原因（此时 HTTP 状态是 200）
-            const QString message = m_pullProgress.errorText;
-            clearPullState();
-            emitMutationFinished(Mutation::PullImage,
-                                 targetKey,
-                                 MutationOutcome::Failed,
-                                 DockerError(DockerError::Kind::EngineError, message));
+            const QString message = it->progress.errorText;
+            finishPull(targetKey, MutationOutcome::Failed, DockerError(DockerError::Kind::EngineError, message));
             return;
         }
 
-        m_pullProgress.phase = ImagePullProgress::Phase::Complete;
-        if (m_pullProgress.totalBytes > 0) {
-            m_pullProgress.currentBytes = m_pullProgress.totalBytes;
+        it->progress.phase = ImagePullProgress::Phase::Complete;
+        if (it->progress.totalBytes > 0) {
+            it->progress.currentBytes = it->progress.totalBytes;
         }
-        Q_EMIT imagePullProgress(m_pullProgress);
-
-        clearPullState();
-        emitMutationFinished(Mutation::PullImage, targetKey, MutationOutcome::Succeeded, DockerError());
+        emitPullProgress(*it);
+        finishPull(targetKey, MutationOutcome::Succeeded, DockerError());
     });
 }
 
-void DockerBackend::cancelImagePull()
+void DockerBackend::finishPull(const QString &targetKey, MutationOutcome outcome, const DockerError &error)
 {
-    if (m_pullReply) {
-        qCDebug(kontainerBackend) << "cancelling image pull";
-        m_pullReply->cancel();
+    m_pulls.remove(targetKey);
+    emitMutationFinished(Mutation::PullImage, targetKey, outcome, error);
+}
+
+void DockerBackend::cancelImagePull(const QString &reference)
+{
+    const QString targetKey = OperationTarget::image(ImageReference::normalized(reference));
+    const auto it = m_pulls.find(targetKey);
+    if (it == m_pulls.end()) {
+        return;
+    }
+    qCDebug(kontainerBackend) << "cancelling image pull" << targetKey;
+    // 取消后紧接着会收到 finished（state = Cancelled），由那里统一清算
+    if (it->reply) {
+        it->reply->cancel();
+    } else {
+        finishPull(targetKey, MutationOutcome::Cancelled, DockerError());
     }
 }
 
-void DockerBackend::handlePullLine(const QJsonObject &object)
+void DockerBackend::cancelAllImagePulls()
+{
+    const QList<QString> keys = m_pulls.keys();
+    for (const QString &targetKey : keys) {
+        const auto it = m_pulls.find(targetKey);
+        if (it != m_pulls.end() && it->reply) {
+            it->reply->cancel();
+        }
+    }
+}
+
+void DockerBackend::emitPullProgress(const ImagePullState &state)
+{
+    Q_EMIT imagePullProgress(state.progress);
+}
+
+void DockerBackend::handlePullLine(ImagePullState &state, const QJsonObject &object)
 {
     const DockerImagePullLineDTO line = DockerImagePullLineDTO::fromJson(object);
 
     if (!line.error.isEmpty()) {
-        m_pullFailed = true;
-        m_pullProgress.phase = ImagePullProgress::Phase::Failed;
-        m_pullProgress.errorText = line.error;
-        Q_EMIT imagePullProgress(m_pullProgress);
+        state.failed = true;
+        state.progress.phase = ImagePullProgress::Phase::Failed;
+        state.progress.errorText = line.error;
+        emitPullProgress(state);
         return;
     }
 
     if (!line.status.isEmpty()) {
         // status 是引擎原文（"Downloading"、"Pull complete"…），按数据显示，不翻译
-        m_pullProgress.statusText = line.status;
+        state.progress.statusText = line.status;
         const ImagePullProgress::Phase phase = DockerImagePullLineDTO::phaseForStatus(line.status);
         if (phase != ImagePullProgress::Phase::Waiting) {
-            m_pullProgress.phase = phase;
+            state.progress.phase = phase;
         }
     }
     if (!line.id.isEmpty()) {
-        m_pullProgress.layerId = line.id;
+        state.progress.layerId = line.id;
         // "Pulling from <repo>" 这类行也带 id（那是 tag，不是层），不能算进层数
         if (line.isLayerStatus()) {
-            PullLayerState &layer = m_pullLayers[line.id];
+            PullLayerState &layer = state.layers[line.id];
             if (line.hasProgress) {
                 layer.current = line.current;
                 layer.total = line.total;
@@ -944,26 +977,26 @@ void DockerBackend::handlePullLine(const QJsonObject &object)
         }
     }
 
-    updatePullTotals();
-    Q_EMIT imagePullProgress(m_pullProgress);
+    updatePullTotals(state);
+    emitPullProgress(state);
 }
 
-void DockerBackend::updatePullTotals()
+void DockerBackend::updatePullTotals(ImagePullState &state)
 {
     qint64 current = 0;
     qint64 total = 0;
     int completed = 0;
-    for (auto it = m_pullLayers.constBegin(); it != m_pullLayers.constEnd(); ++it) {
+    for (auto it = state.layers.constBegin(); it != state.layers.constEnd(); ++it) {
         current += it->current;
         total += it->total;
         if (it->complete) {
             ++completed;
         }
     }
-    m_pullProgress.currentBytes = current;
-    m_pullProgress.totalBytes = total;
-    m_pullProgress.completedLayers = completed;
-    m_pullProgress.totalLayers = m_pullLayers.size();
+    state.progress.currentBytes = current;
+    state.progress.totalBytes = total;
+    state.progress.completedLayers = completed;
+    state.progress.totalLayers = state.layers.size();
 }
 
 } // namespace Kontainer

@@ -125,9 +125,17 @@ public:
     virtual void restartContainer(const QString &id) = 0;
     /*! 删除容器；不带 `v`（不删卷）、不带 `force`（运行中必须由引擎拒绝）。 */
     virtual void removeContainer(const QString &id) = 0;
+    /*!
+     * 拉取镜像（ARCH_V4 §2.4）。
+     *
+     * 支持**并发**：不同引用可以同时在途，互不影响；同一个引用重复拉取会被拒绝
+     * （引擎自己也会去重，但在我们这一侧拒绝能给出更清楚的文案）。
+     */
     virtual void pullImage(const QString &reference) = 0;
-    /*! 取消在途拉取；没有在途拉取时是空操作。 */
-    virtual void cancelImagePull() = 0;
+    /*! 取消某个在途拉取；没有该拉取时是空操作。 */
+    virtual void cancelImagePull(const QString &reference) = 0;
+    /*! 取消全部在途拉取（关闭 KCM / 退出时的兜底）。 */
+    virtual void cancelAllImagePulls() = 0;
     /*! `force=true` 用于多标签镜像的强制删除（引擎在 409 时要求）。 */
     virtual void removeImage(const QString &id, bool force) = 0;
 

@@ -72,7 +72,8 @@ void DockerReply::start()
                               QStringLiteral("socket %1 does not exist").arg(m_endpoint.socketPath())));
         return;
     }
-    m_timer->start(m_request.timeoutMs);
+    // 两段超时：先等「首个响应」，收到响应头之后才按流式静默超时算
+    m_timer->start(m_request.headersTimeoutMs > 0 ? m_request.headersTimeoutMs : m_request.timeoutMs);
     m_socket->connectToServer(m_endpoint.socketPath());
 }
 
@@ -156,6 +157,10 @@ void DockerReply::notifyStreamStarted()
         return;
     }
     m_streamStarted = true;
+    // 响应头到了：切换到流式静默超时（拉取可以合法地跑很久）
+    if (m_request.streaming) {
+        m_timer->start(m_request.timeoutMs);
+    }
     Q_EMIT streamStarted();
 }
 
@@ -220,6 +225,12 @@ void DockerReply::onTimeout()
         return;
     }
     if (m_request.streaming) {
+        // 还没收到响应头 → 请求根本没开始（例如引擎联系不上镜像仓库）
+        if (!m_streamStarted) {
+            fail(DockerError(DockerError::Kind::Timeout,
+                             QStringLiteral("no response headers within %1 ms").arg(m_request.headersTimeoutMs)));
+            return;
+        }
         fail(DockerError(DockerError::Kind::Timeout,
                          QStringLiteral("no data within %1 ms").arg(m_request.timeoutMs)));
         return;
@@ -299,7 +310,10 @@ DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, i
 
 DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs)
 {
-    return request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true);
+    DockerReply *reply = request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true);
+    // 首个响应用普通请求超时：仓库不可达时快速失败，而不是干等一分钟
+    reply->setHeadersTimeoutMs(m_timeoutMs);
+    return reply;
 }
 
 DockerReply *DockerClient::request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming)

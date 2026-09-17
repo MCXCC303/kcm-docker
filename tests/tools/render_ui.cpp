@@ -23,6 +23,7 @@
 
 #include "i18n.h"
 #include "model/qml_registration.h"
+#include "model/operation_controller.h"
 #include "support/mock_docker_backend.h"
 #include "support/qml_stub_kcm.h"
 
@@ -365,6 +366,29 @@ int main(int argc, char **argv)
 
     // 先让 controller 完成一轮刷新，页面才有数据可渲染
     stub->controller()->refresh();
+    // KONTAINER_RENDER_PULLS=1：造出「一路进行中 + 一路失败」的拉取列表，
+    // 用于截图复核进度条、取消按钮与失败原因是否可见（ARCH_V4 §2.4）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_PULLS")) {
+        auto *operations = stub->controller()->operations();
+        operations->pullImage(QStringLiteral("quay.io/libpod/alpine:latest"));
+        operations->pullImage(QStringLiteral("registry.example.com/team/app:2.4.1"));
+
+        ImagePullProgress progress;
+        progress.reference = QStringLiteral("quay.io/libpod/alpine:latest");
+        progress.phase = ImagePullProgress::Phase::Downloading;
+        progress.statusText = QStringLiteral("Downloading");
+        progress.currentBytes = 41;
+        progress.totalBytes = 100;
+        progress.completedLayers = 1;
+        progress.totalLayers = 3;
+        backend->emitPullProgress(progress);
+
+        // 只让后面那一路失败：前一路保持「进行中」，这样截图里三种状态都能看到
+        backend->completeMutation(QStringLiteral("image:registry.example.com/team/app:2.4.1"),
+                                  DockerBackendInterface::MutationOutcome::Failed,
+                                  DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
+    }
+
     backend->completeRefresh();
 
     const QString sourceDir = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/");

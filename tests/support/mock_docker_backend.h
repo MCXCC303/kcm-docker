@@ -57,12 +57,19 @@ public:
     }
     int mutationCount(Mutation mutation) const;
     QString lastMutationTarget(Mutation mutation) const;
-    bool pullCancelled() const
+    /*! 被请求取消的引用（按引用取消，ARCH_V4 §2.4）。 */
+    QStringList cancelledPulls() const
     {
-        return m_pullCancelled;
+        return m_cancelledPulls;
+    }
+    int cancelAllCount() const
+    {
+        return m_cancelAllCount;
     }
     /*! 结束全部在途写操作（默认成功）；可指定结果与错误。 */
     void completeMutations(MutationOutcome outcome = MutationOutcome::Succeeded, const DockerError &error = DockerError());
+    /*! 只结束某一个目标的操作（用于「一路拉取结束、另一路继续」这类场景）。 */
+    void completeMutation(const QString &targetKey, MutationOutcome outcome, const DockerError &error = DockerError());
     /*! 模拟引擎推送一条拉取进度。 */
     void emitPullProgress(const ImagePullProgress &progress);
 
@@ -92,7 +99,8 @@ public:
     void restartContainer(const QString &id) override;
     void removeContainer(const QString &id) override;
     void pullImage(const QString &reference) override;
-    void cancelImagePull() override;
+    void cancelImagePull(const QString &reference) override;
+    void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
     bool isLoading() const override;
     bool isRefreshingFastData() const override;
@@ -126,7 +134,8 @@ private:
 
     DockerEndpoint m_endpoint;
     QList<MutationCall> m_mutationCalls;
-    bool m_pullCancelled = false;
+    QStringList m_cancelledPulls;
+    int m_cancelAllCount = 0;
 };
 
 } // namespace Kontainer

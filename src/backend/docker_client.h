@@ -57,6 +57,15 @@ public:
         QString path;
         QUrlQuery query;
         int timeoutMs = 0;
+        /*!
+         * 流式请求的「首个响应」超时：在收到响应头之前用这个值。
+         *
+         * 为什么需要两段超时：拉取镜像时引擎要先联系镜像仓库，如果仓库不可达
+         * （网络 / 代理 / IPv6 没有出口），引擎会**一个字节都不回**。
+         * 这时用 60 秒的静默超时太久了——用户看到的只是「点了没反应」；
+         * 10 秒内没有响应头就判定「拉取没能开始」，给出可操作的提示（ARCH_V4 §2.2.1）。
+         */
+        int headersTimeoutMs = 0;
         /*! 流式响应：超时按「多久没有新数据」计算，而不是整个请求的总时长。 */
         bool streaming = false;
     };
@@ -101,6 +110,12 @@ public:
      * 取消后调用的 takeBody()/body() 仍能看到已收到的部分数据。
      */
     void cancel();
+
+    /*! 流式请求：收到响应头之前使用的超时（由 DockerClient 设置）。 */
+    void setHeadersTimeoutMs(int timeoutMs)
+    {
+        m_request.headersTimeoutMs = timeoutMs;
+    }
 
 Q_SIGNALS:
     /*! 响应头已解析：httpStatus() 可用，流式请求据此先判断 2xx / 非 2xx。 */

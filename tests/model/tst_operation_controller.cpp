@@ -5,6 +5,7 @@
 
 #include "backend/docker_endpoint.h"
 #include "i18n.h"
+#include "model/image_pull_model.h"
 #include "model/operation_controller.h"
 #include "support/mock_docker_backend.h"
 
@@ -39,7 +40,6 @@ private Q_SLOTS:
     /* 串行与忙碌态 */
     void sameTargetIsSerialised();
     void differentTargetsRunInParallel();
-    void secondPullIsRefusedWhilePulling();
 
     /* 结果通道 */
     void successRefreshesAffectedDataSets();
@@ -49,8 +49,12 @@ private Q_SLOTS:
     void dismissClearsResult();
 
     /* 拉取 */
-    void pullReportsProgressAndClearsOnFinish();
-    void cancelDelegatesToBackend();
+    void pullAppearsInTheListWithProgress();
+    void differentImagesPullConcurrently();
+    void pullDoesNotBlockOtherOperations();
+    void cancelTargetsOnePull();
+    void failedPullKeepsTheReason();
+    void clearFinishedPullsKeepsActiveOnes();
     void invalidReferenceIsRejectedBeforeBackend();
 
 private:
@@ -173,20 +177,6 @@ void OperationControllerTest::differentTargetsRunInParallel()
     QVERIFY(!m_operations->busy());
 }
 
-void OperationControllerTest::secondPullIsRefusedWhilePulling()
-{
-    m_operations->pullImage(QStringLiteral("alpine:3.19"));
-    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 1);
-    QVERIFY(m_operations->pulling());
-
-    m_operations->pullImage(QStringLiteral("busybox:latest"));
-    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 1);
-    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
-
-    m_backend->completeMutations();
-    QVERIFY(!m_operations->pulling());
-}
-
 void OperationControllerTest::successRefreshesAffectedDataSets()
 {
     const int containersBefore = m_backend->refreshCount(DockerBackendInterface::Section::Containers);
@@ -258,14 +248,23 @@ void OperationControllerTest::dismissClearsResult()
     QVERIFY(m_operations->resultText().isEmpty());
 }
 
-void OperationControllerTest::pullReportsProgressAndClearsOnFinish()
+/*!
+ * 拉取列表（ARCH_V4 §2.4 的落地）：拉取是长任务，必须能在后台继续、
+ * 可以同时拉多个不同镜像、失败原因留在列表里而不是被静默丢掉。
+ */
+void OperationControllerTest::pullAppearsInTheListWithProgress()
 {
-    QSignalSpy pullSpy(m_operations, &OperationController::pullChanged);
+    QSignalSpy listSpy(m_operations, &OperationController::pullListChanged);
     m_operations->pullImage(QStringLiteral("alpine"));
+
+    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 1);
+    QCOMPARE(m_backend->lastMutationTarget(Mutation::PullImage), QStringLiteral("image:alpine:latest"));
+    QCOMPARE(m_operations->pulls()->count(), 1);
+    QCOMPARE(m_operations->activePullCount(), 1);
     QVERIFY(m_operations->pulling());
     // 归一化后的引用（缺 tag → latest）才是用户看到的目标
-    QCOMPARE(m_operations->pullReference(), QStringLiteral("alpine:latest"));
-    QVERIFY(!m_operations->pullProgressKnown());
+    QCOMPARE(m_operations->pulls()->index(0, 0).data(ImagePullModel::ReferenceRole).toString(), QStringLiteral("alpine:latest"));
+    QVERIFY(!m_operations->pulls()->index(0, 0).data(ImagePullModel::ProgressKnownRole).toBool());
 
     ImagePullProgress progress;
     progress.reference = QStringLiteral("alpine:latest");
@@ -277,31 +276,109 @@ void OperationControllerTest::pullReportsProgressAndClearsOnFinish()
     progress.completedLayers = 1;
     m_backend->emitPullProgress(progress);
 
-    QVERIFY(m_operations->pullProgressKnown());
-    QCOMPARE(m_operations->pullProgress(), 0.3);
-    QCOMPARE(m_operations->pullStatusText(), QStringLiteral("Downloading"));
-    QCOMPARE(m_operations->pullTotalLayers(), 2);
-    QVERIFY(pullSpy.count() >= 2);
+    const QModelIndex index = m_operations->pulls()->index(0, 0);
+    QVERIFY(index.data(ImagePullModel::ProgressKnownRole).toBool());
+    QCOMPARE(index.data(ImagePullModel::ProgressRole).toDouble(), 0.3);
+    QCOMPARE(index.data(ImagePullModel::StatusTextRole).toString(), QStringLiteral("Downloading"));
+    QCOMPARE(index.data(ImagePullModel::TotalLayersRole).toInt(), 2);
 
     m_backend->completeMutations();
     QVERIFY(!m_operations->pulling());
+    QCOMPARE(m_operations->activePullCount(), 0);
+    // 成功后记录留在列表里（带「已完成」状态），而不是凭空消失
+    QCOMPARE(m_operations->pulls()->count(), 1);
+    QCOMPARE(m_operations->pulls()->index(0, 0).data(ImagePullModel::StatusKeyRole).toString(), QStringLiteral("succeeded"));
     QCOMPARE(m_operations->resultKey(), QStringLiteral("success"));
-    QVERIFY(m_operations->resultText().contains(QStringLiteral("alpine:latest")));
+    QVERIFY(!listSpy.isEmpty());
 }
 
-void OperationControllerTest::cancelDelegatesToBackend()
+void OperationControllerTest::differentImagesPullConcurrently()
 {
     m_operations->pullImage(QStringLiteral("alpine"));
-    m_operations->cancelPull();
-    QVERIFY(m_backend->pullCancelled());
+    m_operations->pullImage(QStringLiteral("busybox:latest"));
+
+    // 两路并发：互不影响（这是这次改动的核心诉求）
+    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 2);
+    QCOMPARE(m_operations->activePullCount(), 2);
+    QCOMPARE(m_operations->pulls()->count(), 2);
+
+    // 同一个引用重复拉取：拒绝，并且不产生第二个请求
+    m_operations->pullImage(QStringLiteral("alpine"));
+    QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 2);
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+
+    m_backend->completeMutations();
+    QCOMPARE(m_operations->activePullCount(), 0);
+}
+
+void OperationControllerTest::pullDoesNotBlockOtherOperations()
+{
+    m_operations->pullImage(QStringLiteral("alpine"));
+    QVERIFY(m_operations->pulling());
+    // 拉取可能跑很久，不该让整页进入「忙」状态（否则刷新按钮会一直闪）
+    QVERIFY(!m_operations->busy());
+
+    m_operations->startContainer(QStringLiteral("cid-1"));
+    QCOMPARE(m_backend->mutationCount(Mutation::StartContainer), 1);
+}
+
+void OperationControllerTest::cancelTargetsOnePull()
+{
+    m_operations->pullImage(QStringLiteral("alpine"));
+    m_operations->pullImage(QStringLiteral("busybox"));
+    m_operations->cancelPull(QStringLiteral("busybox:latest"));
+
+    // 只取消点中的那一路
+    QCOMPARE(m_backend->cancelledPulls(), QStringList {QStringLiteral("busybox:latest")});
 
     m_backend->completeMutations(MutationOutcome::Cancelled);
-    QVERIFY(!m_operations->pulling());
+    QCOMPARE(m_operations->activePullCount(), 0);
     QCOMPARE(m_operations->resultKey(), QStringLiteral("cancelled"));
-    QVERIFY(!m_operations->resultText().isEmpty());
     // 取消不是错误：不产生错误样式，也不影响写权限
     QCOMPARE(m_operations->resultCategoryKey(), QStringLiteral("none"));
     QVERIFY(m_operations->writeAllowed());
+
+    m_operations->cancelAllPulls();
+    QCOMPARE(m_backend->cancelAllCount(), 1);
+}
+
+void OperationControllerTest::failedPullKeepsTheReason()
+{
+    m_operations->pullImage(QStringLiteral("nope/nope:none"));
+
+    ImagePullProgress failed;
+    failed.reference = QStringLiteral("nope/nope:none");
+    failed.phase = ImagePullProgress::Phase::Failed;
+    failed.errorText = QStringLiteral("manifest unknown");
+    m_backend->emitPullProgress(failed);
+
+    m_backend->completeMutations(MutationOutcome::Failed, DockerError(DockerError::Kind::EngineError, QStringLiteral("manifest unknown")));
+
+    // 失败必须**留在列表里**并带原因：点开拉取窗口再关掉不会把失败吞掉
+    QCOMPARE(m_operations->pulls()->count(), 1);
+    const QModelIndex index = m_operations->pulls()->index(0, 0);
+    QCOMPARE(index.data(ImagePullModel::StatusKeyRole).toString(), QStringLiteral("failed"));
+    QCOMPARE(index.data(ImagePullModel::DetailTextRole).toString(), QStringLiteral("manifest unknown"));
+    QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
+
+    // 用户处理完可以移除；移除后列表为空
+    m_operations->dismissPull(QStringLiteral("nope/nope:none"));
+    QCOMPARE(m_operations->pulls()->count(), 0);
+    QCOMPARE(m_operations->activePullCount(), 0);
+}
+
+void OperationControllerTest::clearFinishedPullsKeepsActiveOnes()
+{
+    m_operations->pullImage(QStringLiteral("alpine"));
+    m_operations->pullImage(QStringLiteral("busybox"));
+    // 第一路结束，第二路继续
+    m_backend->completeMutations(MutationOutcome::Succeeded);
+
+    QCOMPARE(m_operations->pulls()->count(), 2);
+    QCOMPARE(m_operations->activePullCount(), 0);
+
+    m_operations->clearFinishedPulls();
+    QCOMPARE(m_operations->pulls()->count(), 0);
 }
 
 void OperationControllerTest::invalidReferenceIsRejectedBeforeBackend()
@@ -310,6 +387,7 @@ void OperationControllerTest::invalidReferenceIsRejectedBeforeBackend()
     QCOMPARE(m_backend->mutationCount(Mutation::PullImage), 0);
     QCOMPARE(m_operations->resultKey(), QStringLiteral("error"));
     QVERIFY(!m_operations->pulling());
+    QCOMPARE(m_operations->pulls()->count(), 0);
 
     QVERIFY(m_operations->isValidImageReference(QStringLiteral("alpine")));
     QVERIFY(!m_operations->isValidImageReference(QString()));

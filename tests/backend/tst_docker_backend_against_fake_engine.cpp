@@ -417,6 +417,7 @@ private Q_SLOTS:
     void pullImageCanBeCancelled();
     void removeImageSendsForceFlag();
     void mutationWaitsForApiVersionHandshake();
+    void concurrentPullsAreIndependent();
 
 private:
     FakeEngine *m_engine = nullptr;
@@ -903,7 +904,7 @@ void DockerBackendFakeEngineTest::pullImageCanBeCancelled()
     connect(&backend, &DockerBackend::imagePullProgress, this, [&backend, &requestedCancel] {
         if (!requestedCancel) {
             requestedCancel = true;
-            backend.cancelImagePull();
+            backend.cancelImagePull(QStringLiteral("alpine:3.19"));
         }
     });
 
@@ -958,6 +959,49 @@ void DockerBackendFakeEngineTest::mutationWaitsForApiVersionHandshake()
     QCOMPARE(request.method, QStringLiteral("POST"));
     QVERIFY2(request.path.startsWith(QStringLiteral("/v1.56/")), qPrintable(request.path));
     QCOMPARE(finishedSpy.at(0).at(2).value<Outcome>(), Outcome::Succeeded);
+}
+
+
+/*!
+ * 并发拉取（ARCH_V4 §2.4）：不同引用同时在途，互不干扰——
+ * 取消其中一路不能影响另一路的状态与结果。
+ */
+void DockerBackendFakeEngineTest::concurrentPullsAreIndependent()
+{
+    m_engine->setPullChunkDelayMs(25);
+
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+
+    QSet<QString> progressing;
+    bool cancelledFirst = false;
+    connect(&backend, &DockerBackend::imagePullProgress, this, [&](const ImagePullProgress &progress) {
+        progressing.insert(progress.reference);
+        if (progress.reference == QLatin1String("alpine:3.19") && !cancelledFirst) {
+            cancelledFirst = true;
+            backend.cancelImagePull(QStringLiteral("alpine:3.19"));
+        }
+    });
+
+    QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
+    backend.pullImage(QStringLiteral("alpine:3.19"));
+    backend.pullImage(QStringLiteral("busybox:latest"));
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 20000);
+
+    QHash<QString, int> outcomeByTarget;
+    for (const QList<QVariant> &call : finishedSpy) {
+        outcomeByTarget.insert(call.at(1).toString(), int(call.at(2).value<Outcome>()));
+    }
+    QCOMPARE(outcomeByTarget.value(QStringLiteral("image:alpine:3.19")), int(Outcome::Cancelled));
+    QCOMPARE(outcomeByTarget.value(QStringLiteral("image:busybox:latest")), int(Outcome::Succeeded));
+    // 两路都真的推进过（不是一路跑完另一路才开始）
+    QVERIFY(progressing.contains(QStringLiteral("alpine:3.19")));
+    QVERIFY(progressing.contains(QStringLiteral("busybox:latest")));
+
+    // 取消过的引用可以重新拉取（状态没有残留）
+    backend.pullImage(QStringLiteral("alpine:3.19"));
+    QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() == 3, 20000);
+    QCOMPARE(finishedSpy.at(2).at(2).value<Outcome>(), Outcome::Succeeded);
 }
 
 QTEST_GUILESS_MAIN(DockerBackendFakeEngineTest)

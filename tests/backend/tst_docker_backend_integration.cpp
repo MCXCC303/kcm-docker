@@ -4,6 +4,7 @@
 */
 
 #include "backend/docker_backend.h"
+#include "domain/image_pull_progress.h"
 #include "i18n.h"
 #include "model/docker_error_text.h"
 
@@ -13,10 +14,16 @@
 using namespace Kontainer;
 
 /*!
- * 针对真实 Docker Engine 的只读集成测试（ARCH_V1 §29）。
+ * 针对真实 Docker Engine 的集成测试（ARCH_V1 §29 / ARCH_V4 §5.3）。
  *
- * 只做 GET；如果本机没有可用的 Docker socket，则整体跳过（CI 不应依赖开发者的
- * Docker 数据目录）。测试不修改任何 Docker 状态。
+ * 默认**只做 GET**；如果本机没有可用的 Docker socket，则整体跳过
+ * （CI 不应依赖开发者的 Docker 数据目录）。
+ *
+ * 唯一的例外是显式 opt-in 的拉取测试（`pullsAnImageWhenExplicitlyRequested`）：
+ * 自动化测试绝不擅自修改用户的 Docker 资源，因此它需要
+ * `KONTAINER_PULL_TEST=1`，并且默认拉取一个**已经存在**的小镜像
+ * （重复拉取对镜像库是无副作用的），引用可以用
+ * `KONTAINER_PULL_REFERENCE` 覆盖。
  */
 class DockerBackendIntegrationTest : public QObject
 {
@@ -29,6 +36,7 @@ private Q_SLOTS:
     void readsContainerList();
     void readsImageList();
     void missingSocketProducesClearError();
+    void pullsAnImageWhenExplicitlyRequested();
 };
 
 void DockerBackendIntegrationTest::initTestCase()
@@ -127,6 +135,65 @@ void DockerBackendIntegrationTest::missingSocketProducesClearError()
     QCOMPARE(int(error.kind()), int(DockerError::Kind::DockerUnavailable));
     QVERIFY(!dockerErrorText(error).isEmpty());
     QVERIFY(!backend.engineInfo().available);
+}
+
+
+/*!
+ * 真实 daemon 上的拉取（ARCH_V4 §2.4 / §5.3，opt-in）。
+ *
+ * 覆盖自动化测试里最难伪造的两件事：真实引擎的 chunked 进度流长什么样，
+ * 以及「流内 error 行 / 正常结束」在真实实现下如何被判定。
+ *
+ * 默认拉取 `quay.io/libpod/alpine:latest`（podman 常用的公共小镜像）：
+ * 如果本地已经有它，重复拉取只会返回「已是最新」，不会向镜像库新增任何东西。
+ * 想换镜像请设置 `KONTAINER_PULL_REFERENCE`。
+ *
+ * 运行方式：
+ *     KONTAINER_PULL_TEST=1 ./bin/tst_docker_backend_integration pullsAnImageWhenExplicitlyRequested
+ */
+void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
+{
+    if (!qEnvironmentVariableIsSet("KONTAINER_PULL_TEST")) {
+        QSKIP("opt-in: set KONTAINER_PULL_TEST=1 to allow a real image pull");
+    }
+
+    const DockerEndpoint endpoint = DockerEndpoint::fromEnvironment();
+    if (!endpoint.isValid() || !QFileInfo::exists(endpoint.socketPath())) {
+        QSKIP("no Docker socket available on this machine");
+    }
+
+    const QString reference = qEnvironmentVariable("KONTAINER_PULL_REFERENCE", QStringLiteral("quay.io/libpod/alpine:latest"));
+
+    DockerBackend backend;
+    backend.setEndpoint(endpoint);
+
+    QList<ImagePullProgress> progress;
+    connect(&backend, &DockerBackend::imagePullProgress, this, [&progress](const ImagePullProgress &update) {
+        progress.append(update);
+    });
+    QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
+
+    backend.pullImage(reference);
+    // 首次拉取可能要下载若干 MB；给足时间，但仍然有上限
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 180000);
+
+    const auto outcome = finishedSpy.at(0).at(2).value<DockerBackendInterface::MutationOutcome>();
+    const DockerError error = finishedSpy.at(0).at(3).value<DockerError>();
+    QVERIFY2(outcome == DockerBackendInterface::MutationOutcome::Succeeded,
+             qPrintable(QStringLiteral("pull failed: kind=%1 http=%2 detail=%3")
+                            .arg(int(error.kind()))
+                            .arg(error.httpStatus())
+                            .arg(error.detail())));
+
+    QVERIFY2(!progress.isEmpty(), "a real pull must report at least one progress line");
+    QVERIFY(!progress.last().reference.isEmpty());
+    bool sawComplete = false;
+    for (const ImagePullProgress &update : progress) {
+        if (update.phase == ImagePullProgress::Phase::Complete) {
+            sawComplete = true;
+        }
+    }
+    QVERIFY2(sawComplete, "the pull stream must end with a completed state");
 }
 
 QTEST_GUILESS_MAIN(DockerBackendIntegrationTest)

@@ -8,6 +8,7 @@
 #include "backend/docker_backend_interface.h"
 #include "backend/docker_capabilities.h"
 #include "domain/image_pull_progress.h"
+#include "model/image_pull_model.h"
 
 #include <QObject>
 #include <QSet>
@@ -54,15 +55,10 @@ class OperationController : public QObject
     /*! 可选引导动作：空 / refresh。 */
     Q_PROPERTY(QString resultActionKey READ resultActionKey NOTIFY resultChanged)
 
-    /* --- 拉取进度 --- */
-    Q_PROPERTY(bool pulling READ pulling NOTIFY pullChanged)
-    Q_PROPERTY(QString pullReference READ pullReference NOTIFY pullChanged)
-    Q_PROPERTY(QString pullStatusText READ pullStatusText NOTIFY pullChanged)
-    /*! 0.0~1.0；未知时为 -1（进度条走不确定态）。 */
-    Q_PROPERTY(double pullProgress READ pullProgress NOTIFY pullChanged)
-    Q_PROPERTY(bool pullProgressKnown READ pullProgressKnown NOTIFY pullChanged)
-    Q_PROPERTY(int pullCompletedLayers READ pullCompletedLayers NOTIFY pullChanged)
-    Q_PROPERTY(int pullTotalLayers READ pullTotalLayers NOTIFY pullChanged)
+    /* --- 拉取列表（可并发、可在后台继续，ARCH_V4 §2.4） --- */
+    Q_PROPERTY(Kontainer::ImagePullModel *pulls READ pulls CONSTANT)
+    Q_PROPERTY(bool pulling READ pulling NOTIFY pullListChanged)
+    Q_PROPERTY(int activePullCount READ activePullCount NOTIFY pullListChanged)
 
     /* --- 权限门 --- */
     Q_PROPERTY(bool writeAllowed READ writeAllowed NOTIFY writeAccessChanged)
@@ -82,13 +78,13 @@ public:
     QString resultCategoryKey() const;
     QString resultActionKey() const;
 
+    ImagePullModel *pulls() const
+    {
+        return m_pulls;
+    }
+    /*! 是否至少有一路拉取在进行中（用于工具栏指示与对话框文案）。 */
     bool pulling() const;
-    QString pullReference() const;
-    QString pullStatusText() const;
-    double pullProgress() const;
-    bool pullProgressKnown() const;
-    int pullCompletedLayers() const;
-    int pullTotalLayers() const;
+    int activePullCount() const;
 
     bool writeAllowed() const;
     QString writeAccessKey() const;
@@ -110,7 +106,14 @@ public:
     Q_INVOKABLE void restartContainer(const QString &id);
     Q_INVOKABLE void removeContainer(const QString &id);
     Q_INVOKABLE void pullImage(const QString &reference);
-    Q_INVOKABLE void cancelPull();
+    /*! 取消某一项拉取（列表里的「取消」按钮）。 */
+    Q_INVOKABLE void cancelPull(const QString &reference);
+    /*! 取消全部在途拉取。 */
+    Q_INVOKABLE void cancelAllPulls();
+    /*! 从列表里移除一条已结束的记录（失败的记录会一直留着，直到用户处理）。 */
+    Q_INVOKABLE void dismissPull(const QString &reference);
+    /*! 清空所有已结束的记录。 */
+    Q_INVOKABLE void clearFinishedPulls();
     Q_INVOKABLE void removeImage(const QString &id, bool force);
 
     /*! 关掉结果提示（用户已读）。 */
@@ -126,7 +129,7 @@ public:
 Q_SIGNALS:
     void stateChanged();
     void resultChanged();
-    void pullChanged();
+    void pullListChanged();
     void writeAccessChanged();
     /*! 容器已删除：详情页据此返回列表。 */
     void containerRemoved(const QString &id);
@@ -155,6 +158,10 @@ private:
     void beginOperation(Mutation mutation, const QString &targetKey);
     void onMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error);
     void onPullProgress(const ImagePullProgress &progress);
+    /*! 按引用找到拉取记录；不存在返回 nullptr。 */
+    ImagePullEntry *findPull(const QString &reference);
+    /*! 重排并写入模型：进行中的在前，已结束的按结束顺序倒序（最近的在最上面）。 */
+    void publishPulls();
     void onBackendMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error);
 
     void setResult(Result result, const QString &text, const QString &detail = QString(), const DockerError &error = DockerError());
@@ -165,6 +172,8 @@ private:
     void refreshAfter(Mutation mutation, const QString &targetKey);
     static QString successText(Mutation mutation, const QString &targetKey);
     static QString unchangedText(Mutation mutation);
+    /*! 失败文案：通用分类文案 + 与操作相关的可操作提示。 */
+    static QString failureText(Mutation mutation, const DockerError &error);
 
     DockerBackendInterface *m_backend = nullptr;
 
@@ -176,8 +185,9 @@ private:
     QString m_resultCategoryKey = QStringLiteral("none");
     QString m_resultActionKey;
 
-    ImagePullProgress m_pullProgress;
-    bool m_pulling = false;
+    ImagePullModel *m_pulls = nullptr;
+    /*! 界面顺序（进行中 + 已结束），模型每次按它重建。 */
+    QList<ImagePullEntry> m_pullEntries;
 
     WriteAccess m_writeAccess = WriteAccess::Allowed;
     bool m_writeDegraded = false;

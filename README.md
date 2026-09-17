@@ -39,7 +39,7 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 | 数据可视化配色 | 趋势线与存储条使用 `ChartPalette` 的专用取色（亮/暗各一套，均通过 WCAG AA 4.5:1 校验），不再借用状态语义色 |
 | 排版与响应 | 详情页正文限宽 42 gridUnit 居中；资源数值右对齐；统计卡按窗口宽度 5/3/2 列重排；数值字号走 `Kirigami.Heading` |
 | **容器操作** | 启动 / 停止 / 重启（可逆，列表行内与详情页 footer 都可触发）、删除（仅详情页，运行中不给按钮并说明原因）。同目标串行，操作在途时按钮禁用并显示忙碌指示 |
-| **镜像操作** | 拉取（对话框内校验引用、缺 tag 时显式提示会补 `latest`、分层进度、可取消）、删除（单标签只删该标签；多标签另给「删除全部标签」入口，走 `force`） |
+| **镜像操作** | 拉取：**拉取列表**（可同时拉取多个不同镜像、关掉对话框不中断、每路单独取消、进度与状态常驻镜像标签页）、对话框内校验引用并在缺 tag 时显式提示会补 `latest`、**失败记录带引擎原文保留**直到用户处理；删除：单标签只删该标签，多标签另给「删除全部标签」入口（走 `force`） |
 | **操作反馈** | 所有操作结果走唯一的 `OperationMessage`：成功 / 已处于目标状态 / 已取消 / 失败，失败文案按「用户可自行解决 / 环境问题 / 意外」分级呈现，并附引擎原文 |
 | **挂载分区** | 类型（bind / volume / tmpfs）、`rw`/`ro`、命名卷名、宿主路径 → 容器路径；宿主路径不存在时给出警告且不提供打开动作；**可在系统文件管理器中打开宿主目录**（tmpfs 与匿名卷没有宿主目录） |
 | **端口映射** | 芯片 + 连线拓扑：左列容器端口、右列宿主绑定，一个容器端口对应多个宿主地址时画多条线；只 `EXPOSE` 未映射的端口单独成组、不画线；连线为纯装饰（`Accessible.ignored`），信息全部由文字承载 |
@@ -74,6 +74,22 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 
 破坏性操作统一走 `ConfirmDialog`：固定句式「确定要 &lt;动作&gt; &lt;目标&gt;「&lt;名称&gt;」吗？」+
 **必填**的后果说明；确认按钮写动作名（「删除」），不写「确定」。
+
+### 拉取失败怎么排查
+
+拉取是唯一需要 Docker daemon **主动访问外部网络**的操作。失败时先看这两点：
+
+1. **daemon 能不能访问镜像仓库**：`curl -m 10 https://registry-1.docker.io/v2/` 应当返回 `401`
+   （401 = 通了，只是需要认证）。若超时，多半是 DNS/路由问题——例如
+   `registry-1.docker.io` 只解析到 IPv6 而本机没有 IPv6 出口时，daemon 会**一个字节都不回**。
+   此时任何 Docker Hub 镜像都拉不动，但 `ghcr.io` / `quay.io` 等 IPv4 可达的仓库正常。
+   解决办法在 daemon 侧：配置可达的 `registry-mirrors`、修好 IPv6 路由，或改用其他仓库。
+2. **界面上的反馈**：拉取列表里的那一条会显示引擎原文（例如
+   `no response headers within 10000 ms`）。这条记录不会消失，直到你手动移除；
+   同时顶部会给出「仓库可能不可达」的提示。
+
+Kontainer 侧的行为约定：收到响应头之前用 10 秒超时（快速失败、不干等），
+收到响应头之后按「60 秒没有新数据」判定卡死；取消只影响对应那一路。
 
 ### 一直成立的数据安全约定
 
@@ -242,14 +258,14 @@ ctest --test-dir build --output-on-failure
 | `tst_json_line_reader` | 拉取流的行解析：一行跨多个 chunk、一个 chunk 多行、半行缓存、畸形行不中断流、超长行防御 |
 | `tst_image_reference` | 镜像引用解析与校验：裸名补 `latest`、`registry:port/repo:tag`、digest 形式、仓库名必须小写、非法输入拒绝 |
 | `tst_docker_capabilities` | 写权限门：可写 / 只读 / socket 缺失 / 非 unix endpoint 一律不可写 |
-| `tst_operation_controller` | 写操作编排：同目标串行、不同目标并行、拉取全局串行、写后即读、结果通道、403 → 会话降级为只读且不可逆 |
+| `tst_operation_controller` | 写操作编排：同目标串行、不同目标并行、**多路拉取并发**、重复引用拒绝、每路独立取消、失败记录保留原因、清空已结束、写后即读、结果通道、403 → 会话降级为只读且不可逆 |
 | `tst_mount_list_model` | 挂载行字段映射、宿主路径探测（存在 / 缺失 / 不是目录 / 不适用）、命名卷、打开动作与失败提示、内容未变不重置模型 |
 | `tst_port_mapping_model` | 已发布 / 未发布分组、一对多映射、排序稳定、芯片文本、内容未变不重置模型 |
 | `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
 | `tst_refresh_churn` / `tst_kcm_widget_churn` | 刷新抖动压力测试：数据、窗口尺寸、分区、页面进出反复变化；后者用 **QQuickWidget**（与 kcmshell6 相同的宿主形态）承载 `main.qml`，并断言「同一结构下的数值刷新不得重建统计块与存储图例的条目」——针对真实会话里出现过的布局 polish 段错误 |
 | `tst_qml_resource` | **从 qrc 加载界面**（与插件运行时完全一致的路径）：`main.qml` 能加载、源码目录里每个界面文件都在资源里且内容一致（期望值由扫描源码树得出，不维护第二份清单）、单例能从 qrc 解析。资源清单漏项这类问题不会被源码目录测试发现，只会让安装后的 KCM 打不开 |
 | `tst_docker_backend_against_fake_engine` | 进程内假 Engine：协商、chunked、去重、inspect/stats/df 解析、`/info` 失败后计数作废、版本不匹配、stats 生命周期；**写操作契约**（动词与 query、`stop` 带 `t=`、删除容器不带 `v`、304 → 「已处于目标状态」、409 保留引擎原文、拉取进度聚合、流内 error 判失败、取消恰好上报一次、写操作等待版本握手） |
-| `tst_docker_backend_integration` | 真实 Docker 只读端到端（无 socket 时自动跳过） |
+| `tst_docker_backend_integration` | 真实 Docker 只读端到端（无 socket 时自动跳过）；另有 **opt-in 的真实拉取**用例（`KONTAINER_PULL_TEST=1`，默认拉取一个已存在的小镜像，不向镜像库新增内容） |
 
 > 注意：这台机器上的 Qt 6.11 只执行「无参测试函数 + `QFETCH`」形式的数据驱动用例，
 > 带参数的测试函数会被**静默跳过**，因此所有数据驱动测试都使用 `QFETCH` 写法。

@@ -20,6 +20,7 @@ using MutationOutcome = DockerBackendInterface::MutationOutcome;
 OperationController::OperationController(DockerBackendInterface *backend, QObject *parent)
     : QObject(parent)
     , m_backend(backend)
+    , m_pulls(new ImagePullModel(this))
 {
     Q_ASSERT(m_backend);
 
@@ -83,37 +84,12 @@ QString OperationController::resultActionKey() const
 
 bool OperationController::pulling() const
 {
-    return m_pulling;
+    return m_pulls->activeCount() > 0;
 }
 
-QString OperationController::pullReference() const
+int OperationController::activePullCount() const
 {
-    return m_pullProgress.reference;
-}
-
-QString OperationController::pullStatusText() const
-{
-    return m_pullProgress.statusText;
-}
-
-double OperationController::pullProgress() const
-{
-    return m_pulling ? m_pullProgress.fraction() : -1.0;
-}
-
-bool OperationController::pullProgressKnown() const
-{
-    return m_pulling && !m_pullProgress.isIndeterminate();
-}
-
-int OperationController::pullCompletedLayers() const
-{
-    return m_pullProgress.completedLayers;
-}
-
-int OperationController::pullTotalLayers() const
-{
-    return m_pullProgress.totalLayers;
+    return m_pulls->activeCount();
 }
 
 WriteAccess OperationController::effectiveWriteAccess() const
@@ -306,32 +282,104 @@ void OperationController::pullImage(const QString &reference)
         return;
     }
     const QString normalized = ImageReference::normalized(reference);
-    const QString targetKey = OperationTarget::image(normalized);
-    if (!admit(targetKey, i18n("pulling the image"))) {
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("pulling the image")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
         return;
     }
-    if (m_pulling) {
+    if (m_pulls->rowForReference(normalized) >= 0) {
         setResult(Result::Error,
-                  i18n("An image pull is already running."),
+                  i18n("This image is already being pulled: %1", normalized),
                   QString(),
                   DockerError(DockerError::Kind::PreconditionFailed));
         return;
     }
 
-    beginOperation(Mutation::PullImage, targetKey);
-    m_pulling = true;
-    m_pullProgress = ImagePullProgress();
-    m_pullProgress.reference = normalized;
-    Q_EMIT pullChanged();
+    // 新拉取放到列表最前面，并立刻进入「进行中」状态：进度条先显示为不确定态，
+    // 不阻塞界面，也不影响别的镜像拉取
+    ImagePullEntry entry;
+    entry.reference = normalized;
+    entry.statusKey = QStringLiteral("pulling");
+    entry.active = true;
+    m_pullEntries.prepend(entry);
+    publishPulls();
+
+    // 拉取不再占用「操作忙碌」集合：它可能跑很久，不该让整页看起来在忙
     m_backend->pullImage(normalized);
 }
 
-void OperationController::cancelPull()
+void OperationController::cancelPull(const QString &reference)
 {
-    if (!m_pulling) {
+    const QString normalized = ImageReference::normalized(reference);
+    if (m_pulls->rowForReference(normalized) < 0) {
         return;
     }
-    m_backend->cancelImagePull();
+    m_backend->cancelImagePull(normalized);
+}
+
+void OperationController::cancelAllPulls()
+{
+    m_backend->cancelAllImagePulls();
+}
+
+void OperationController::dismissPull(const QString &reference)
+{
+    const QString normalized = ImageReference::normalized(reference);
+    for (int i = 0; i < m_pullEntries.size(); ++i) {
+        const ImagePullEntry &entry = m_pullEntries.at(i);
+        if (entry.reference == normalized && entry.isFinished()) {
+            m_pullEntries.removeAt(i);
+            publishPulls();
+            return;
+        }
+    }
+}
+
+void OperationController::clearFinishedPulls()
+{
+    QList<ImagePullEntry> kept;
+    for (const ImagePullEntry &entry : std::as_const(m_pullEntries)) {
+        if (entry.active) {
+            kept.append(entry);
+        }
+    }
+    if (kept.size() == m_pullEntries.size()) {
+        return;
+    }
+    m_pullEntries = kept;
+    publishPulls();
+}
+
+ImagePullEntry *OperationController::findPull(const QString &reference)
+{
+    const QString normalized = ImageReference::normalized(reference);
+    for (ImagePullEntry &entry : m_pullEntries) {
+        if (entry.reference == normalized) {
+            return &entry;
+        }
+    }
+    return nullptr;
+}
+
+void OperationController::publishPulls()
+{
+    // 进行中的在前，已结束的保持「最近结束的在前」
+    QList<ImagePullEntry> ordered;
+    ordered.reserve(m_pullEntries.size());
+    for (const ImagePullEntry &entry : std::as_const(m_pullEntries)) {
+        if (entry.active) {
+            ordered.append(entry);
+        }
+    }
+    for (const ImagePullEntry &entry : std::as_const(m_pullEntries)) {
+        if (!entry.active) {
+            ordered.append(entry);
+        }
+    }
+    m_pulls->setEntries(ordered);
+    Q_EMIT pullListChanged();
 }
 
 void OperationController::removeImage(const QString &id, bool force)
@@ -349,9 +397,16 @@ void OperationController::onPullProgress(const ImagePullProgress &progress)
     if (progress.reference.isEmpty()) {
         return;
     }
-    m_pullProgress = progress;
-    m_pulling = progress.phase != ImagePullProgress::Phase::Complete && progress.phase != ImagePullProgress::Phase::Failed;
-    Q_EMIT pullChanged();
+    ImagePullEntry *entry = findPull(progress.reference);
+    if (!entry) {
+        return;
+    }
+    entry->statusText = progress.statusText;
+    entry->progressKnown = !progress.isIndeterminate();
+    entry->progress = entry->progressKnown ? progress.fraction() : -1.0;
+    entry->completedLayers = progress.completedLayers;
+    entry->totalLayers = progress.totalLayers;
+    publishPulls();
 }
 
 void OperationController::onBackendMutationFinished(Mutation mutation,
@@ -374,9 +429,29 @@ void OperationController::onMutationFinished(Mutation mutation,
     }
 
     if (mutation == Mutation::PullImage) {
-        // 拉取结束后无论结果如何都要收起进度条（失败 / 取消的结果由 resultText 呈现）
-        m_pulling = false;
-        Q_EMIT pullChanged();
+        // 拉取结束：更新列表里的那一条（成功 / 失败 / 取消都保留在列表里，
+        // 失败原因因此不会被静默丢掉，用户处理完再手动移除）
+        const QString reference = targetKey.section(QLatin1Char(':'), 1);
+        ImagePullEntry *entry = findPull(reference);
+        if (entry) {
+            entry->active = false;
+            switch (outcome) {
+            case MutationOutcome::Succeeded:
+            case MutationOutcome::Unchanged:
+                entry->statusKey = QStringLiteral("succeeded");
+                entry->progressKnown = true;
+                entry->progress = 1.0;
+                break;
+            case MutationOutcome::Cancelled:
+                entry->statusKey = QStringLiteral("cancelled");
+                break;
+            case MutationOutcome::Failed:
+                entry->statusKey = QStringLiteral("failed");
+                entry->detailText = error.detail();
+                break;
+            }
+        }
+        publishPulls();
     }
 
     switch (outcome) {
@@ -397,7 +472,7 @@ void OperationController::onMutationFinished(Mutation mutation,
         if (error.kind() == DockerError::Kind::PermissionDenied) {
             degradeToReadOnly(error);
         }
-        setResult(Result::Error, dockerErrorText(error), error.detail(), error);
+        setResult(Result::Error, failureText(mutation, error), error.detail(), error);
         break;
     }
     }
@@ -456,6 +531,17 @@ QString OperationController::successText(Mutation mutation, const QString &targe
         return i18n("Image removed.");
     }
     return i18n("Done.");
+}
+
+QString OperationController::failureText(Mutation mutation, const DockerError &error)
+{
+    const QString base = dockerErrorText(error);
+    // 拉取卡住（引擎联系不上镜像仓库）时，光说「超时」用户不知道能做什么
+    if (mutation == Mutation::PullImage && error.kind() == DockerError::Kind::Timeout) {
+        return i18n("%1 The registry may be unreachable from the Docker daemon (network, proxy, or IPv6 routing).",
+                    base);
+    }
+    return base;
 }
 
 QString OperationController::unchangedText(Mutation mutation)

@@ -69,7 +69,8 @@ public:
     void restartContainer(const QString &id) override;
     void removeContainer(const QString &id) override;
     void pullImage(const QString &reference) override;
-    void cancelImagePull() override;
+    void cancelImagePull(const QString &reference) override;
+    void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
 
     bool isLoading() const override;
@@ -109,6 +110,25 @@ public:
 private:
     using ReadyCallback = std::function<void()>;
 
+    /* --- 镜像拉取（流式，可并发，ARCH_V4 §2.4） --- */
+
+    struct PullLayerState {
+        qint64 current = 0;
+        qint64 total = 0;
+        bool complete = false;
+    };
+
+    /*! 一路拉取的全部状态：每路都有自己的流解析器与进度聚合。 */
+    struct ImagePullState {
+        QString reference;
+        QString targetKey;
+        DockerReply *reply = nullptr;
+        JsonLineReader reader;
+        ImagePullProgress progress;
+        QHash<QString, PullLayerState> layers;
+        bool failed = false;
+    };
+
     /*! 需要 API 版本前缀的请求：若尚未协商，则先完成握手再执行。 */
     void withApiVersion(Section section, ReadyCallback callback);
 
@@ -120,9 +140,10 @@ private:
     /*! start / stop / restart / remove 共用的实现。 */
     void runContainerMutation(Mutation mutation, const QString &id, const QString &apiPath, const QUrlQuery &query);
     void startPullRequest(const QString &reference, const QString &targetKey);
-    void handlePullLine(const QJsonObject &object);
-    void updatePullTotals();
-    void clearPullState();
+    void handlePullLine(ImagePullState &state, const QJsonObject &object);
+    void updatePullTotals(ImagePullState &state);
+    void finishPull(const QString &targetKey, MutationOutcome outcome, const DockerError &error);
+    void emitPullProgress(const ImagePullState &state);
     void emitMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error);
 
     void startPing();
@@ -172,6 +193,9 @@ private:
 
     QList<QPair<Section, ReadyCallback>> m_readyCallbacks;
 
+    /*! 在途拉取，key = targetKey（`image:<归一化引用>`）。 */
+    QHash<QString, ImagePullState> m_pulls;
+
     /*! 等待版本握手的写操作（握手完成或失败后统一清算）。 */
     struct PendingMutation {
         Mutation mutation;
@@ -180,17 +204,6 @@ private:
     };
     QList<PendingMutation> m_pendingMutations;
 
-    /* --- 镜像拉取（流式） --- */
-    struct PullLayerState {
-        qint64 current = 0;
-        qint64 total = 0;
-        bool complete = false;
-    };
-    DockerReply *m_pullReply = nullptr;
-    JsonLineReader m_pullReader;
-    ImagePullProgress m_pullProgress;
-    QHash<QString, PullLayerState> m_pullLayers;
-    bool m_pullFailed = false;
 };
 
 } // namespace Kontainer

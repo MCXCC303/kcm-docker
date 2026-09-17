@@ -81,6 +81,8 @@ add_library(kontainer_core STATIC
     model/image_filter_model.h
     model/image_model.cpp
     model/image_model.h
+    model/image_pull_model.cpp
+    model/image_pull_model.h
     model/metrics_model.cpp
     model/metrics_model.h
     model/mount_list_model.cpp

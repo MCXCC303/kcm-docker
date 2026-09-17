@@ -506,7 +506,9 @@ Kirigami.Page {
             QQC2.Button {
                 objectName: "pullImageEntryButton"
                 visible: tabBar.currentIndex === 1 && root.operations.writeAllowed
-                text: i18n("Pull image")
+                text: root.operations.activePullCount > 0
+                    ? i18n("Pull image (%1 running)", root.operations.activePullCount)
+                    : i18n("Pull image")
                 icon.name: "download"
                 onClicked: {
                     pullDialog.reset();
@@ -591,6 +593,12 @@ Kirigami.Page {
                     visible: root.controller.imagesStateKey === "error"
                     type: Kirigami.MessageType.Error
                     text: i18n("Unable to retrieve the image list: %1", root.controller.imagesError)
+                }
+
+                /* 拉取进度（可并发、后台继续、失败保留原因，ARCH_V4 §2.4） */
+                Components.PullProgressList {
+                    Layout.fillWidth: true
+                    operations: root.operations
                 }
 
                 Components.EmptyPlaceholder {
