@@ -423,6 +423,7 @@ private Q_SLOTS:
     void concurrentPullsAreIndependent();
     void authCheckSendsCredentialsOnlyInTheHeader();
     void authCheckClassifiesFailures();
+    void pullSendsCredentialsOnlyWhenPresent();
 
 private:
     FakeEngine *m_engine = nullptr;
@@ -450,6 +451,42 @@ RegistryCredential sampleCredential()
  * 凭据**只能**出现在 `X-Registry-Auth` 头里：不进 URL（query 里没有）、不进请求体。
  * 同时头本身必须是 Docker 认的 base64url(JSON)——假引擎把头原样记下来供断言。
  */
+/*!
+ * 私有仓库拉取：凭据只走 `X-Registry-Auth` 头，且 `serveraddress` 必须是**镜像所在仓库**
+ * （调用方给的凭据结构里可能写着别的地址）。
+ */
+void DockerBackendFakeEngineTest::pullSendsCredentialsOnlyWhenPresent()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    m_engine->setPullLines({QByteArrayLiteral("{\"status\":\"Pull complete\"}\n")});
+
+    // 匿名拉取：一个头都不加
+    QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
+    backend.pullImage(QStringLiteral("alpine:3.19"));
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+    QVERIFY2(!m_engine->lastRequest().headers.contains("X-Registry-Auth"),
+             "anonymous pulls must not send an auth header");
+
+    // 带凭据：头里能解回同一条凭据，且 serveraddress 被改写成镜像所在仓库
+    RegistryCredential credential;
+    credential.serverAddress = QStringLiteral("index.docker.io"); // 故意写成别的仓库
+    credential.username = QStringLiteral("alice");
+    credential.password = QStringLiteral("s3cret");
+    backend.pullImage(QStringLiteral("registry.example.com:5000/team/app:1.0"), credential);
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);
+
+    const FakeEngine::RequestRecord request = m_engine->lastRequest();
+    QVERIFY2(!request.headers.contains("s3cret"), "the raw password must never be sent in a header");
+    const int headerStart = request.headers.indexOf("X-Registry-Auth: ") + int(qstrlen("X-Registry-Auth: "));
+    QVERIFY2(headerStart > int(qstrlen("X-Registry-Auth: ")) - 1, "the pull must carry the auth header");
+    QString errorKey;
+    const RegistryCredential decoded = RegistryAuth::decode(request.headers.mid(headerStart).split('\r').value(0), &errorKey);
+    QVERIFY2(errorKey.isEmpty(), qPrintable(errorKey));
+    QCOMPARE(decoded.username, QStringLiteral("alice"));
+    QCOMPARE(decoded.serverAddress, QStringLiteral("registry.example.com:5000"));
+}
+
 void DockerBackendFakeEngineTest::authCheckSendsCredentialsOnlyInTheHeader()
 {
     DockerBackend backend;

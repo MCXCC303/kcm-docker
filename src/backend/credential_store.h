@@ -99,6 +99,13 @@ public:
     bool hasCredential(const QString &serverAddress) const;
     /*! 读取；没有该仓库或内容损坏时返回空凭据（不会把半条凭据交给调用方）。 */
     RegistryCredential credential(const QString &serverAddress) const;
+    /*!
+     * 按镜像引用取凭据（`ghcr.io/team/app:1` → `ghcr.io`）。
+     *
+     * 拉取/构建只需要这一句：仓库地址的解析规则只有 `RegistryAuth` 一处实现，
+     * 调用方不该自己拆引用。
+     */
+    RegistryCredential credentialForImage(const QString &imageReference) const;
 
     /*!
      * 保存（覆盖同名条目）。

@@ -7,6 +7,8 @@
 #include "i18n.h"
 #include "model/image_pull_model.h"
 #include "model/operation_controller.h"
+#include "backend/credential_store.h"
+#include "support/fake_credential_backend.h"
 #include "support/mock_docker_backend.h"
 
 #include <QFile>
@@ -55,6 +57,7 @@ private Q_SLOTS:
     void cancelTargetsOnePull();
     void failedPullKeepsTheReason();
     void clearFinishedPullsKeepsActiveOnes();
+    void pullImageUsesTheStoredCredential();
     void invalidReferenceIsRejectedBeforeBackend();
 
 private:
@@ -320,6 +323,42 @@ void OperationControllerTest::pullDoesNotBlockOtherOperations()
 
     m_operations->startContainer(QStringLiteral("cid-1"));
     QCOMPARE(m_backend->mutationCount(Mutation::StartContainer), 1);
+}
+
+/*!
+ * 私有仓库：拉取时把钱包里对应仓库的凭据交给后端（ARCH_V5_V8 §2.6）。
+ *
+ * 这里断言的是"凭据真的到了拉取路径"，且没有凭据时保持匿名——
+ * 拉取失败（401）由引擎给出，界面照旧显示原因，不会因为钱包不可用而整条路断掉。
+ */
+void OperationControllerTest::pullImageUsesTheStoredCredential()
+{
+    FakeCredentialBackend wallet;
+    CredentialStore store(&wallet);
+    store.open();
+    m_operations->setCredentialStore(&store);
+
+    RegistryCredential ghcr;
+    ghcr.serverAddress = QStringLiteral("ghcr.io");
+    ghcr.username = QStringLiteral("alice");
+    ghcr.password = QStringLiteral("s3cret");
+    QVERIFY(store.store(ghcr));
+
+    m_operations->pullImage(QStringLiteral("ghcr.io/team/app:1.0"));
+    QCOMPARE(m_backend->lastPullCredential().username, QStringLiteral("alice"));
+    QCOMPARE(m_backend->lastPullCredential().password, QStringLiteral("s3cret"));
+    QCOMPARE(m_backend->lastPullCredential().serverAddress, QStringLiteral("ghcr.io"));
+
+    // 没有凭据的仓库：匿名拉取（凭据为空，而不是上一条的残留）
+    m_operations->pullImage(QStringLiteral("alpine:3.19"));
+    QVERIFY2(m_backend->lastPullCredential().isEmpty(), "an unauthenticated registry must pull anonymously");
+
+    // 钱包不可用（未打开）：同样退化成匿名，而不是拒绝拉取
+    CredentialStore closedWallet(&wallet);
+    m_operations->setCredentialStore(&closedWallet);
+    m_operations->pullImage(QStringLiteral("ghcr.io/team/other:2.0"));
+    QVERIFY(m_backend->lastPullCredential().isEmpty());
+    QCOMPARE(m_backend->lastPullCredential().serverAddress, QString());
 }
 
 void OperationControllerTest::cancelTargetsOnePull()

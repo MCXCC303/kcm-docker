@@ -5,6 +5,8 @@
 
 #include "model/operation_controller.h"
 
+#include "backend/credential_store.h"
+
 #include "domain/image_reference.h"
 #include "logging.h"
 #include "model/docker_error_text.h"
@@ -306,8 +308,15 @@ void OperationController::pullImage(const QString &reference)
     m_pullEntries.prepend(entry);
     publishPulls();
 
-    // 拉取不再占用「操作忙碌」集合：它可能跑很久，不该让整页看起来在忙
-    m_backend->pullImage(normalized);
+    // 拉取不再占用「操作忙碌」集合：它可能跑很久，不该让整页看起来在忙。
+    // 私有仓库的凭据来自钱包（没有就是匿名拉取，引擎会回 401，用户看得见原因）
+    const RegistryCredential credential = m_credentialStore ? m_credentialStore->credentialForImage(normalized) : RegistryCredential();
+    m_backend->pullImage(normalized, credential);
+}
+
+void OperationController::setCredentialStore(CredentialStore *store)
+{
+    m_credentialStore = store;
 }
 
 void OperationController::cancelPull(const QString &reference)

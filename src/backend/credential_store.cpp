@@ -121,6 +121,15 @@ RegistryCredential CredentialStore::credential(const QString &serverAddress) con
     return decoded;
 }
 
+RegistryCredential CredentialStore::credentialForImage(const QString &imageReference) const
+{
+    const QString address = RegistryAuth::serverAddressForImage(imageReference);
+    if (address.isEmpty()) {
+        return {};
+    }
+    return credential(address);
+}
+
 bool CredentialStore::store(const RegistryCredential &credential, QString *errorKey)
 {
     auto fail = [errorKey](const char *key) {

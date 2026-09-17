@@ -204,8 +204,9 @@ void MockDockerBackend::removeContainer(const QString &id)
     m_mutationCalls.append({Mutation::RemoveContainer, QStringLiteral("container:") + id, false});
 }
 
-void MockDockerBackend::pullImage(const QString &reference)
+void MockDockerBackend::pullImage(const QString &reference, const RegistryCredential &credential)
 {
+    m_lastPullCredential = credential;
     m_mutationCalls.append({Mutation::PullImage, QStringLiteral("image:") + reference, false});
 }
 

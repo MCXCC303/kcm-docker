@@ -17,6 +17,8 @@
 namespace Kontainer
 {
 
+class CredentialStore;
+
 /*!
  * 写操作的编排与反馈（ARCH_V4 §2.2.4）。
  *
@@ -106,6 +108,14 @@ public:
     Q_INVOKABLE void restartContainer(const QString &id);
     Q_INVOKABLE void removeContainer(const QString &id);
     Q_INVOKABLE void pullImage(const QString &reference);
+
+    /*!
+     * 凭据来源（可为空 = 只做匿名拉取）。
+     *
+     * 控制器只依赖 `CredentialStore` 的读取接口：钱夹不可用时它返回空凭据，
+     * 拉取照旧按匿名进行（而不是失败）——私有仓库会得到引擎的 401，用户看得见原因。
+     */
+    void setCredentialStore(CredentialStore *store);
     /*! 取消某一项拉取（列表里的「取消」按钮）。 */
     Q_INVOKABLE void cancelPull(const QString &reference);
     /*! 取消全部在途拉取。 */
@@ -176,6 +186,7 @@ private:
     static QString failureText(Mutation mutation, const DockerError &error);
 
     DockerBackendInterface *m_backend = nullptr;
+    CredentialStore *m_credentialStore = nullptr;
 
     QSet<QString> m_busyTargets;
     int m_stateRevision = 0;

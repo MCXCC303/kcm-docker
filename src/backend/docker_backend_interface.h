@@ -149,7 +149,13 @@ public:
      * 支持**并发**：不同引用可以同时在途，互不影响；同一个引用重复拉取会被拒绝
      * （引擎自己也会去重，但在我们这一侧拒绝能给出更清楚的文案）。
      */
-    virtual void pullImage(const QString &reference) = 0;
+    /*!
+     * 拉取镜像。
+     *
+     * `credential` 是给**该镜像所在仓库**的凭据（可为空 = 匿名拉取）。
+     * 它只用于这一次请求的 `X-Registry-Auth` 头：不落盘、不进日志。
+     */
+    virtual void pullImage(const QString &reference, const Kontainer::RegistryCredential &credential = {}) = 0;
     /*! 取消某个在途拉取；没有该拉取时是空操作。 */
     virtual void cancelImagePull(const QString &reference) = 0;
     /*! 取消全部在途拉取（关闭 KCM / 退出时的兜底）。 */

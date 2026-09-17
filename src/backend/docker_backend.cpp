@@ -876,7 +876,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
     });
 }
 
-void DockerBackend::pullImage(const QString &reference)
+void DockerBackend::pullImage(const QString &reference, const RegistryCredential &credential)
 {
     const QString targetKey = OperationTarget::image(ImageReference::normalized(reference));
 
@@ -897,12 +897,12 @@ void DockerBackend::pullImage(const QString &reference)
         return;
     }
 
-    runMutation(Mutation::PullImage, targetKey, [this, reference, targetKey] {
-        startPullRequest(reference, targetKey);
+    runMutation(Mutation::PullImage, targetKey, [this, reference, targetKey, credential] {
+        startPullRequest(reference, targetKey, credential);
     });
 }
 
-void DockerBackend::startPullRequest(const QString &reference, const QString &targetKey)
+void DockerBackend::startPullRequest(const QString &reference, const QString &targetKey, const RegistryCredential &credential)
 {
     const auto parts = ImageReference::parse(reference);
     if (!parts) {
@@ -926,7 +926,21 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
     state.targetKey = targetKey;
     state.progress.reference = state.reference;
     const auto inserted = m_pulls.insert(targetKey, state);
-    inserted->reply = m_client.postStream(ApiPaths::imageCreate(), query, pullIdleTimeoutMs());
+    // 凭据只走请求头（空凭据不加头，保持匿名拉取的原样）；serveraddress 用镜像所在的仓库，
+    // 避免调用方给的凭据结构里写着别的仓库
+    QMap<QByteArray, QByteArray> headers;
+    if (!credential.isEmpty()) {
+        RegistryCredential outgoing = credential;
+        const QString registry = RegistryAuth::serverAddressForImage(reference);
+        if (!registry.isEmpty()) {
+            outgoing.serverAddress = registry;
+        }
+        const QByteArray encoded = RegistryAuth::encode(outgoing);
+        if (!encoded.isEmpty()) {
+            headers.insert(QByteArrayLiteral("X-Registry-Auth"), encoded);
+        }
+    }
+    inserted->reply = m_client.postStream(ApiPaths::imageCreate(), query, pullIdleTimeoutMs(), headers);
     DockerReply *reply = inserted->reply;
 
     connect(reply, &DockerReply::streamStarted, this, [this, reply, targetKey] {

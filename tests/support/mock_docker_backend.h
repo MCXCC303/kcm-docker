@@ -98,7 +98,7 @@ public:
     void stopContainer(const QString &id) override;
     void restartContainer(const QString &id) override;
     void removeContainer(const QString &id) override;
-    void pullImage(const QString &reference) override;
+    void pullImage(const QString &reference, const Kontainer::RegistryCredential &credential = {}) override;
     void cancelImagePull(const QString &reference) override;
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
@@ -121,6 +121,11 @@ public:
     int authCheckCount() const
     {
         return m_authCheckCount;
+    }
+    /*! 最近一次拉取带上的凭据（断言"钱包里的凭据真的传到了拉取路径"）。 */
+    RegistryCredential lastPullCredential() const
+    {
+        return m_lastPullCredential;
     }
     bool isLoading() const override;
     bool isRefreshingFastData() const override;
@@ -152,6 +157,7 @@ private:
     QString m_lastAuthServerAddress;
     RegistryCredential m_lastAuthCredential;
     int m_authCheckCount = 0;
+    RegistryCredential m_lastPullCredential;
 
     bool m_loading = false;
     QHash<int, bool> m_pending;

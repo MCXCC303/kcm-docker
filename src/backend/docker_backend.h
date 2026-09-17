@@ -68,7 +68,7 @@ public:
     void stopContainer(const QString &id) override;
     void restartContainer(const QString &id) override;
     void removeContainer(const QString &id) override;
-    void pullImage(const QString &reference) override;
+    void pullImage(const QString &reference, const Kontainer::RegistryCredential &credential = {}) override;
     void cancelImagePull(const QString &reference) override;
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
@@ -145,7 +145,7 @@ private:
     void runMutation(Mutation mutation, const QString &targetKey, ReadyCallback run);
     /*! start / stop / restart / remove 共用的实现。 */
     void runContainerMutation(Mutation mutation, const QString &id, const QString &apiPath, const QUrlQuery &query);
-    void startPullRequest(const QString &reference, const QString &targetKey);
+    void startPullRequest(const QString &reference, const QString &targetKey, const Kontainer::RegistryCredential &credential);
     void handlePullLine(ImagePullState &state, const QJsonObject &object);
     void updatePullTotals(ImagePullState &state);
     void finishPull(const QString &targetKey, MutationOutcome outcome, const DockerError &error);
