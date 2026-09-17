@@ -62,6 +62,8 @@ private Q_SLOTS:
     void createNetworkRefreshesAndReports();
     void removeNetworkIsGatedAndTracked();
     void connectAndDisconnectContainerToNetwork();
+    void createVolumeValidatesAndRefreshes();
+    void removeAndPruneVolumes();
     void invalidReferenceIsRejectedBeforeBackend();
 
 private:
@@ -506,6 +508,82 @@ void OperationControllerTest::connectAndDisconnectContainerToNetwork()
     QVERIFY(!m_operations->disconnectContainerFromNetwork(networkId, QString()));
     QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
     QCOMPARE(m_operations->resultDetailText(), QStringLiteral("missingTarget"));
+}
+
+/*!
+ * 创建数据卷（ARCH_V5_V8 §3.5）：校验在 C++ 侧，失败不发请求。
+ */
+void OperationControllerTest::createVolumeValidatesAndRefreshes()
+{
+    QList<Volume> existing;
+    Volume appData;
+    appData.name = QStringLiteral("app_data");
+    appData.driver = QStringLiteral("local");
+    existing.append(appData);
+    m_backend->setVolumes(existing);
+
+    QVERIFY(!m_operations->createVolume(QString()));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameRequired"));
+    QVERIFY(!m_operations->createVolume(QStringLiteral("has space")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameInvalid"));
+    QVERIFY(!m_operations->createVolume(QStringLiteral("app_data")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameInUse"));
+    QCOMPARE(m_backend->mutationCalls().size(), 0); // 校验失败一个请求都不发
+
+    QSignalSpy volumesSpy(m_operations, &OperationController::volumesChanged);
+    QVERIFY(m_operations->createVolume(QStringLiteral(" cache "), QStringLiteral("local"),
+                                       {QVariantMap {{QStringLiteral("key"), QStringLiteral("owner")},
+                                                     {QStringLiteral("value"), QStringLiteral("team-a")}}}));
+    QCOMPARE(m_backend->lastCreatedVolumeName(), QStringLiteral("cache")); // 已 trim
+    QCOMPARE(m_backend->lastCreatedVolumeDriver(), QStringLiteral("local"));
+
+    m_backend->completeMutations(DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(volumesSpy.count(), 1);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("cache")), qPrintable(m_operations->resultText()));
+    // 写后即读：列表与存储占用都要重读
+    QVERIFY(m_backend->refreshCount(DockerBackendInterface::Section::Volumes) >= 1);
+    QVERIFY(m_backend->refreshCount(DockerBackendInterface::Section::Storage) >= 1);
+}
+
+/*!
+ * 删除与清理（§3.5）：删除**不提供 force**；prune 的"成功明细"经信号补齐文案。
+ */
+void OperationControllerTest::removeAndPruneVolumes()
+{
+    const QString name = QStringLiteral("cache");
+    QSignalSpy volumesSpy(m_operations, &OperationController::volumesChanged);
+
+    QVERIFY(m_operations->removeVolume(name));
+    QCOMPARE(m_backend->lastRemovedVolume(), name);
+    m_backend->completeMutation(OperationTarget::volume(name), DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(volumesSpy.count(), 1);
+
+    // 被容器使用时引擎拒绝：结果里带上引擎原文（界面说明"先用容器断开"）
+    QVERIFY(m_operations->removeVolume(QStringLiteral("app_data")));
+    m_backend->completeMutation(OperationTarget::volume(QStringLiteral("app_data")),
+                                DockerBackendInterface::MutationOutcome::Failed,
+                                DockerError(DockerError::Kind::Conflict, QStringLiteral("volume is in use")));
+    QVERIFY2(m_operations->resultDetailText().contains(QStringLiteral("in use")),
+             qPrintable(m_operations->resultDetailText()));
+
+    // 清理：先发请求，成功后用信号里的明细补一句"回收了多少"
+    QVERIFY(m_operations->pruneVolumes());
+    QCOMPARE(m_backend->pruneCallCount(), 1);
+    m_backend->completePrune({QStringLiteral("cache"), QStringLiteral("legacy")}, 2048);
+    m_backend->completeMutation(OperationTarget::volumePrune(), DockerBackendInterface::MutationOutcome::Succeeded);
+    // 只有成功的删除与清理会触发重读（失败的那次不该重读）
+    QCOMPARE(volumesSpy.count(), 2);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("2")), qPrintable(m_operations->resultText()));
+    QVERIFY2(!m_operations->resultText().isEmpty(), qPrintable(m_operations->resultText()));
+    QVERIFY2(m_operations->resultDetailText().contains(QStringLiteral("cache")),
+             qPrintable(m_operations->resultDetailText())); // 明细里列出删掉的卷名
+
+    // 没有可清理的卷：给出"无需清理"而不是假装成功（真实顺序：明细信号先到，mutationFinished 后到）
+    QVERIFY(m_operations->pruneVolumes());
+    m_backend->completePrune({}, 0);
+    m_backend->completeMutation(OperationTarget::volumePrune(), DockerBackendInterface::MutationOutcome::Succeeded);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("Nothing")), qPrintable(m_operations->resultText()));
+    QVERIFY(m_operations->resultDetailText().isEmpty());
 }
 
 void OperationControllerTest::cancelTargetsOnePull()

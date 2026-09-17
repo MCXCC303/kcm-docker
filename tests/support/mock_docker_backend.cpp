@@ -115,6 +115,31 @@ void MockDockerBackend::refreshVolumes(bool includeUsage)
     beginRefresh(Section::Volumes);
 }
 
+void MockDockerBackend::createVolume(const QString &name, const QString &driver, const QList<QPair<QString, QString>> &labels)
+{
+    Q_UNUSED(labels);
+    m_lastCreatedVolume = {name, driver};
+    m_mutationCalls.append({Mutation::CreateVolume, OperationTarget::volume(name), false});
+}
+
+void MockDockerBackend::removeVolume(const QString &name)
+{
+    m_lastRemovedVolume = name;
+    m_mutationCalls.append({Mutation::RemoveVolume, OperationTarget::volume(name), false});
+}
+
+void MockDockerBackend::pruneVolumes()
+{
+    ++m_pruneCalls;
+    // 目标键与真实后端一致：prune 不是针对某个卷，用专门的键
+    m_mutationCalls.append({Mutation::PruneVolumes, OperationTarget::volumePrune(), false});
+}
+
+void MockDockerBackend::completePrune(const QStringList &names, qint64 reclaimedBytes)
+{
+    Q_EMIT volumesPruned(names, reclaimedBytes);
+}
+
 void MockDockerBackend::refreshStorageUsage()
 {
     beginRefresh(Section::Storage);

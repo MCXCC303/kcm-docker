@@ -151,6 +151,21 @@ public:
     /*! 把容器从网络断开（`force` 默认关闭：不强断正在使用的网络）。 */
     Q_INVOKABLE bool disconnectContainerFromNetwork(const QString &networkId, const QString &containerId);
 
+    /*!
+     * 创建数据卷（ARCH_V5_V8 §3.5）：名称规则与重名检查在这里做，失败给稳定 key。
+     */
+    Q_INVOKABLE bool createVolume(const QString &name,
+                                  const QString &driver = {},
+                                  const QVariantList &labels = {});
+    /*! 删除数据卷（不提供 force：被容器使用时让引擎拒绝并说明原因）。 */
+    Q_INVOKABLE bool removeVolume(const QString &name);
+    /*! 清理未使用的数据卷（`POST /volumes/prune`）：成功后的明细经 `volumesPruned` 回来。 */
+    Q_INVOKABLE bool pruneVolumes();
+    /*! 卷名校验（返回稳定 key，空 = 通过）。 */
+    Q_INVOKABLE QString volumeNameError(const QString &name) const;
+    /*! 卷名是否已存在。 */
+    Q_INVOKABLE bool volumeNameTaken(const QString &name) const;
+
     /*! 关掉结果提示（用户已读）。 */
     Q_INVOKABLE void dismissResult();
 
@@ -188,6 +203,8 @@ Q_SIGNALS:
     void imageRemoved(const QString &id);
     /*! 网络集合变化（创建 / 删除成功）：网络页与容器详情据此重读。 */
     void networksChanged();
+    /*! 数据卷集合或占用变化（创建 / 删除 / 清理成功）。 */
+    void volumesChanged();
 
 private:
     enum class Result {
@@ -221,7 +238,8 @@ private:
     void degradeToReadOnly(const DockerError &error);
 
     void refreshAfter(Mutation mutation, const QString &targetKey);
-    static QString successText(Mutation mutation, const QString &targetKey);
+    /*! 结果文案（非静态：数据卷清理的文案要读上一次的明细）。 */
+    QString successText(Mutation mutation, const QString &targetKey) const;
     static QString unchangedText(Mutation mutation);
     /*! 失败文案：通用分类文案 + 与操作相关的可操作提示。 */
     static QString failureText(Mutation mutation, const DockerError &error);
@@ -232,6 +250,10 @@ private:
     QSet<QString> m_busyTargets;
     int m_stateRevision = 0;
     Result m_result = Result::None;
+    /*! 最近一次数据卷清理的明细文案（`volumesPruned` 记下，成功路径用它当结果）。 */
+    QString m_pruneDetailText;
+    QString m_pruneDetailList;
+
     QString m_resultText;
     QString m_resultDetailText;
     QString m_resultCategoryKey = QStringLiteral("none");

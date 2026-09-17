@@ -785,6 +785,12 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "connect-network";
     case DockerBackendInterface::Mutation::DisconnectNetwork:
         return "disconnect-network";
+    case DockerBackendInterface::Mutation::CreateVolume:
+        return "create-volume";
+    case DockerBackendInterface::Mutation::RemoveVolume:
+        return "remove-volume";
+    case DockerBackendInterface::Mutation::PruneVolumes:
+        return "prune-volumes";
     }
     return "mutation";
 }
@@ -1140,6 +1146,87 @@ void DockerBackend::stopContainerLogs(const QString &id)
         // cancel() 之后 finished 仍会来一次，届时按 Cancelled 收尾
         it->reply->cancel();
     }
+}
+
+void DockerBackend::createVolume(const QString &name, const QString &driver, const QList<QPair<QString, QString>> &labels)
+{
+    const QString targetKey = OperationTarget::volume(name);
+
+    runMutation(Mutation::CreateVolume, targetKey, [this, name, driver, labels, targetKey] {
+        QJsonObject payload;
+        payload.insert(QStringLiteral("Name"), name);
+        if (!driver.isEmpty()) {
+            payload.insert(QStringLiteral("Driver"), driver);
+        }
+        if (!labels.isEmpty()) {
+            QJsonObject labelObject;
+            for (const auto &label : labels) {
+                if (!label.first.isEmpty()) {
+                    labelObject.insert(label.first, label.second);
+                }
+            }
+            payload.insert(QStringLiteral("Labels"), labelObject);
+        }
+
+        DockerReply *reply = m_client.post(ApiPaths::volumeCreate(),
+                                           QUrlQuery(),
+                                           mutationTimeoutMs(),
+                                           {},
+                                           QJsonDocument(payload).toJson(QJsonDocument::Compact));
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerError error = reply->error();
+            reply->deleteLater();
+            emitMutationFinished(Mutation::CreateVolume, targetKey, outcomeFor(reply), error);
+        });
+    });
+}
+
+void DockerBackend::removeVolume(const QString &name)
+{
+    const QString targetKey = OperationTarget::volume(name);
+
+    runMutation(Mutation::RemoveVolume, targetKey, [this, name, targetKey] {
+        // 不传 force：被容器使用时让引擎拒绝，界面把原因说清楚
+        DockerReply *reply = m_client.del(ApiPaths::volume(name), QUrlQuery(), mutationTimeoutMs());
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerError error = reply->error();
+            reply->deleteLater();
+            emitMutationFinished(Mutation::RemoveVolume, targetKey, outcomeFor(reply), error);
+        });
+    });
+}
+
+void DockerBackend::pruneVolumes()
+{
+    const QString targetKey = OperationTarget::volumePrune();
+
+    runMutation(Mutation::PruneVolumes, targetKey, [this, targetKey] {
+        DockerReply *reply = m_client.post(ApiPaths::volumesPrune(), QUrlQuery(), mutationTimeoutMs());
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerReply::State state = reply->state();
+            const DockerError error = reply->error();
+            const QByteArray body = reply->body();
+            reply->deleteLater();
+
+            if (state != DockerReply::State::Succeeded) {
+                emitMutationFinished(Mutation::PruneVolumes, targetKey, outcomeFor(reply), error);
+                return;
+            }
+
+            // 响应里带"删了哪些、回收了多少"：这份明细经 volumesPruned 交给界面
+            const QJsonObject object = QJsonDocument::fromJson(body).object();
+            QStringList names;
+            const QJsonArray deleted = object.value(QStringLiteral("VolumesDeleted")).toArray();
+            for (const QJsonValue &entry : deleted) {
+                if (entry.isString()) {
+                    names.append(entry.toString());
+                }
+            }
+            const qint64 reclaimed = qint64(object.value(QStringLiteral("SpaceReclaimed")).toDouble(0));
+            Q_EMIT volumesPruned(names, reclaimed);
+            emitMutationFinished(Mutation::PruneVolumes, targetKey, MutationOutcome::Succeeded, DockerError());
+        });
+    });
 }
 
 void DockerBackend::createNetwork(const NetworkCreateRequest &request)

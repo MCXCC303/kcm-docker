@@ -106,6 +106,29 @@ public:
     void refreshImages() override;
     void refreshNetworks() override;
     void refreshVolumes(bool includeUsage = true) override;
+    void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) override;
+    void removeVolume(const QString &name) override;
+    void pruneVolumes() override;
+
+    /*! 最近一次创建的卷参数与删除的卷名（断言参数传递与校验）。 */
+    QString lastCreatedVolumeName() const
+    {
+        return m_lastCreatedVolume.first;
+    }
+    QString lastCreatedVolumeDriver() const
+    {
+        return m_lastCreatedVolume.second;
+    }
+    QString lastRemovedVolume() const
+    {
+        return m_lastRemovedVolume;
+    }
+    int pruneCallCount() const
+    {
+        return m_pruneCalls;
+    }
+    /*! 让 prune 的"成功明细"回来（真实后端在响应里拿到删除列表与回收空间）。 */
+    void completePrune(const QStringList &names, qint64 reclaimedBytes);
     void refreshStorageUsage() override;
     void inspectContainer(const QString &id) override;
     void inspectImage(const QString &id) override;
@@ -233,6 +256,9 @@ private:
     QList<Network> m_networks;
     QList<Volume> m_volumes;
     bool m_lastVolumesIncludeUsage = true;
+    QPair<QString, QString> m_lastCreatedVolume; // name, driver
+    QString m_lastRemovedVolume;
+    int m_pruneCalls = 0;
     NetworkCreateRequest m_lastNetworkCreate;
     QString m_lastRemovedNetwork;
     QPair<QString, QString> m_lastNetworkConnect;

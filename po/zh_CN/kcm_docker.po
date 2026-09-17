@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.5.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 05:00+0800\n"
+"POT-Creation-Date: 2026-09-18 05:20+0800\n"
 "PO-Revision-Date: 2026-09-18 02:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -66,20 +66,20 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:93
+#: src/model/status_controller.cpp:97
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:96
+#: src/model/status_controller.cpp:100
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:99
+#: src/model/status_controller.cpp:103
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:566
+#: src/model/status_controller.cpp:612
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -153,7 +153,15 @@ msgstr "Docker 守护进程返回了意外数据。"
 msgid "Unknown Docker error."
 msgstr "未知的 Docker 错误。"
 
-#: src/model/operation_controller.cpp:122
+#: src/model/operation_controller.cpp:43
+msgid "Nothing to clean up: no unused volume was found."
+msgstr "没有可清理的内容：没有找到未使用的数据卷。"
+
+#: src/model/operation_controller.cpp:47
+msgid "Cleaned up %1 volume(s) and reclaimed %2."
+msgstr "已清理 %1 个数据卷，回收 %2。"
+
+#: src/model/operation_controller.cpp:140
 msgid ""
 "The Docker daemon refused the last write operation because of missing "
 "permissions. Kontainer switched to read-only for this session."
@@ -161,7 +169,7 @@ msgstr ""
 "由于权限不足，Docker 守护进程拒绝了下一次写操作。Kontainer 已在本次会话中切换"
 "为只读。"
 
-#: src/model/operation_controller.cpp:124
+#: src/model/operation_controller.cpp:142
 msgid ""
 "Kontainer can only read from this Docker socket: the current user is not "
 "allowed to write it. Add the user to the group that owns the socket, or use "
@@ -170,176 +178,214 @@ msgstr ""
 "Kontainer 只能读取该 Docker socket：当前用户没有写权限。请把该用户加入 "
 "socket 所属的组，或改用 rootless Docker 部署。"
 
-#: src/model/operation_controller.cpp:127
+#: src/model/operation_controller.cpp:145
 msgid ""
 "The Docker socket does not exist, so containers and images cannot be managed."
 msgstr "Docker socket 不存在，因此无法管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:129
+#: src/model/operation_controller.cpp:147
 msgid ""
 "Managing containers and images is only available for the local Docker socket."
 msgstr "仅本机 Docker socket 支持管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:187
-#: src/model/operation_controller.cpp:290
-#: src/model/operation_controller.cpp:394
-#: src/model/operation_controller.cpp:436
-#: src/model/operation_controller.cpp:464
-#: src/model/operation_controller.cpp:503
+#: src/model/operation_controller.cpp:205
+#: src/model/operation_controller.cpp:308
+#: src/model/operation_controller.cpp:412
+#: src/model/operation_controller.cpp:454
+#: src/model/operation_controller.cpp:517
+#: src/model/operation_controller.cpp:553
+#: src/model/operation_controller.cpp:575
+#: src/model/operation_controller.cpp:606
+#: src/model/operation_controller.cpp:645
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr "Kontainer 处于只读模式，因此未执行%1。"
 
-#: src/model/operation_controller.cpp:192
-#: src/model/operation_controller.cpp:418
-#: src/model/operation_controller.cpp:444
-#: src/model/operation_controller.cpp:482
-#: src/model/operation_controller.cpp:512
+#: src/model/operation_controller.cpp:210
+#: src/model/operation_controller.cpp:436
+#: src/model/operation_controller.cpp:462
+#: src/model/operation_controller.cpp:526
+#: src/model/operation_controller.cpp:561
+#: src/model/operation_controller.cpp:583
+#: src/model/operation_controller.cpp:624
+#: src/model/operation_controller.cpp:654
 msgid "Another operation on this object is still running."
 msgstr "该对象上仍有操作在进行中。"
 
-#: src/model/operation_controller.cpp:241
+#: src/model/operation_controller.cpp:259
 msgid "starting the container"
 msgstr "启动容器"
 
-#: src/model/operation_controller.cpp:251
+#: src/model/operation_controller.cpp:269
 msgid "stopping the container"
 msgstr "停止容器"
 
-#: src/model/operation_controller.cpp:261
+#: src/model/operation_controller.cpp:279
 msgid "restarting the container"
 msgstr "重启容器"
 
-#: src/model/operation_controller.cpp:271
+#: src/model/operation_controller.cpp:289
 msgid "removing the container"
 msgstr "删除容器"
 
-#: src/model/operation_controller.cpp:282
+#: src/model/operation_controller.cpp:300
 msgid "“%1” is not a valid image reference."
 msgstr "“%1”不是合法的镜像引用。"
 
-#: src/model/operation_controller.cpp:290
+#: src/model/operation_controller.cpp:308
 msgid "pulling the image"
 msgstr "拉取镜像"
 
-#: src/model/operation_controller.cpp:297
+#: src/model/operation_controller.cpp:315
 msgid "This image is already being pulled: %1"
 msgstr "该镜像已经在拉取中：%1"
 
-#: src/model/operation_controller.cpp:368
+#: src/model/operation_controller.cpp:386
 msgid "The network was not created because the name is not valid."
 msgstr "网络未创建：名称不合法。"
 
-#: src/model/operation_controller.cpp:373
+#: src/model/operation_controller.cpp:391
 msgid "The network was not created because the subnet is not valid."
 msgstr "网络未创建：子网格式不合法。"
 
-#: src/model/operation_controller.cpp:378
+#: src/model/operation_controller.cpp:396
 msgid "The network was not created because the gateway is not valid."
 msgstr "网络未创建：网关不合法（它必须属于所填子网）。"
 
-#: src/model/operation_controller.cpp:386
+#: src/model/operation_controller.cpp:404
 msgid "The network was not created because the name is already in use."
 msgstr "网络未创建：这个名称已经被占用。"
 
-#: src/model/operation_controller.cpp:394
+#: src/model/operation_controller.cpp:412
 msgid "creating the network"
 msgstr "创建网络"
 
-#: src/model/operation_controller.cpp:436
+#: src/model/operation_controller.cpp:454
 msgid "removing the network"
 msgstr "删除网络"
 
-#: src/model/operation_controller.cpp:458
+#: src/model/operation_controller.cpp:505
+msgid "The volume was not created because the name is not valid."
+msgstr "数据卷未创建：名称不合法。"
+
+#: src/model/operation_controller.cpp:511
+msgid "The volume was not created because the name is already in use."
+msgstr "数据卷未创建：这个名称已经被占用。"
+
+#: src/model/operation_controller.cpp:517
+msgid "creating the volume"
+msgstr "创建数据卷"
+
+#: src/model/operation_controller.cpp:553
+msgid "removing the volume"
+msgstr "删除数据卷"
+
+#: src/model/operation_controller.cpp:575
+msgid "cleaning up the volumes"
+msgstr "清理数据卷"
+
+#: src/model/operation_controller.cpp:600
 msgid ""
 "The container was not connected because a network or container was missing."
 msgstr "容器未连接：缺少网络或容器。"
 
-#: src/model/operation_controller.cpp:464
+#: src/model/operation_controller.cpp:606
 msgid "connecting the container to the network"
 msgstr "把容器连接到网络"
 
-#: src/model/operation_controller.cpp:497
+#: src/model/operation_controller.cpp:639
 msgid ""
 "The container was not disconnected because a network or container was "
 "missing."
 msgstr "容器未断开：缺少网络或容器。"
 
-#: src/model/operation_controller.cpp:503
+#: src/model/operation_controller.cpp:645
 msgid "disconnecting the container from the network"
 msgstr "把容器从网络断开"
 
-#: src/model/operation_controller.cpp:598
+#: src/model/operation_controller.cpp:740
 msgid "removing the image"
 msgstr "删除镜像"
 
-#: src/model/operation_controller.cpp:679
+#: src/model/operation_controller.cpp:826
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr "已取消镜像拉取。"
 
-#: src/model/operation_controller.cpp:679
+#: src/model/operation_controller.cpp:826
 msgid "Operation cancelled."
 msgstr "已取消操作。"
 
-#: src/model/operation_controller.cpp:750
+#: src/model/operation_controller.cpp:904
 msgid "Container started."
 msgstr "容器已启动。"
 
-#: src/model/operation_controller.cpp:752
+#: src/model/operation_controller.cpp:906
 msgid "Container stopped."
 msgstr "容器已停止。"
 
-#: src/model/operation_controller.cpp:754
+#: src/model/operation_controller.cpp:908
 msgid "Container restarted."
 msgstr "容器已重启。"
 
-#: src/model/operation_controller.cpp:756
+#: src/model/operation_controller.cpp:910
 msgid "Container removed."
 msgstr "容器已删除。"
 
-#: src/model/operation_controller.cpp:759
+#: src/model/operation_controller.cpp:913
 msgid "Image pulled: %1"
 msgstr "已拉取镜像：%1"
 
-#: src/model/operation_controller.cpp:762
+#: src/model/operation_controller.cpp:916
 msgid "Image removed."
 msgstr "镜像已删除。"
 
-#: src/model/operation_controller.cpp:765
+#: src/model/operation_controller.cpp:919
 msgid "Network created: %1"
 msgstr "网络已创建：%1"
 
-#: src/model/operation_controller.cpp:768
+#: src/model/operation_controller.cpp:922
 msgid "Network removed."
 msgstr "网络已删除。"
 
-#: src/model/operation_controller.cpp:770
+#: src/model/operation_controller.cpp:924
 msgid "Container connected to the network."
 msgstr "容器已连接到网络。"
 
-#: src/model/operation_controller.cpp:772
+#: src/model/operation_controller.cpp:926
 msgid "Container disconnected from the network."
 msgstr "容器已从网络断开。"
 
-#: src/model/operation_controller.cpp:774
+#: src/model/operation_controller.cpp:929
+msgid "Volume created: %1"
+msgstr "数据卷已创建：%1"
+
+#: src/model/operation_controller.cpp:932
+msgid "Volume removed."
+msgstr "数据卷已删除。"
+
+#: src/model/operation_controller.cpp:935
+msgid "Unused volumes cleaned up."
+msgstr "未使用的数据卷已清理。"
+
+#: src/model/operation_controller.cpp:937
 msgid "Done."
 msgstr "完成。"
 
-#: src/model/operation_controller.cpp:782
+#: src/model/operation_controller.cpp:945
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr "%1 Docker 守护进程可能无法访问镜像仓库（网络、代理或 IPv6 路由问题）。"
 
-#: src/model/operation_controller.cpp:792
+#: src/model/operation_controller.cpp:955
 msgid "The container is already running."
 msgstr "容器已经在运行。"
 
-#: src/model/operation_controller.cpp:794
+#: src/model/operation_controller.cpp:957
 msgid "The container is already stopped."
 msgstr "容器已经停止。"
 
-#: src/model/operation_controller.cpp:796
+#: src/model/operation_controller.cpp:959
 msgid "Nothing to do: the object is already in the requested state."
 msgstr "无需操作：对象已处于目标状态。"
 

@@ -5,6 +5,10 @@
 
 #include "model/operation_controller.h"
 
+#include "model/format.h"
+
+#include <QRegularExpression>
+
 #include "backend/credential_store.h"
 #include "backend/registry_auth.h"
 
@@ -29,6 +33,20 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
 
     connect(m_backend, &DockerBackendInterface::mutationFinished, this, &OperationController::onBackendMutationFinished);
     connect(m_backend, &DockerBackendInterface::imagePullProgress, this, &OperationController::onPullProgress);
+    // 清理数据卷的"成功明细"（删了哪些、回收多少）：mutationFinished 只带错误，放不下这份内容
+    connect(m_backend, &DockerBackendInterface::volumesPruned, this, [this](const QStringList &names, qint64 reclaimedBytes) {
+        // 只**记下**明细：紧接着 mutationFinished 会走统一的结果通道，
+        // 由 successText() 把这份内容当作这次清理的结果文案（直接 setResult 会被它覆盖）
+        m_pruneDetailText.clear();
+        m_pruneDetailList.clear();
+        if (names.isEmpty()) {
+            m_pruneDetailText = i18n("Nothing to clean up: no unused volume was found.");
+            return;
+        }
+        const Format format;
+        m_pruneDetailText = i18n("Cleaned up %1 volume(s) and reclaimed %2.", names.size(), format.byteSize(reclaimedBytes));
+        m_pruneDetailList = names.join(QStringLiteral(", "));
+    });
 
     refreshWriteAccess();
 }
@@ -451,6 +469,130 @@ void OperationController::removeNetwork(const QString &id, const QString &name)
     m_backend->removeNetwork(id);
 }
 
+QString OperationController::volumeNameError(const QString &name) const
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        return QStringLiteral("nameRequired");
+    }
+    // 与 Docker 一致：字母数字开头，其余允许 . _ -
+    static const QRegularExpression allowed(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]*$"));
+    if (!allowed.match(trimmed).hasMatch()) {
+        return QStringLiteral("nameInvalid");
+    }
+    return {};
+}
+
+bool OperationController::volumeNameTaken(const QString &name) const
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        return false;
+    }
+    const QList<Volume> volumes = m_backend->volumes();
+    for (const Volume &volume : volumes) {
+        if (volume.name == trimmed) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool OperationController::createVolume(const QString &name, const QString &driver, const QVariantList &labels)
+{
+    const QString nameError = volumeNameError(name);
+    if (!nameError.isEmpty()) {
+        setResult(Result::Error, i18n("The volume was not created because the name is not valid."), nameError);
+        return false;
+    }
+    const QString trimmed = name.trimmed();
+    if (volumeNameTaken(trimmed)) {
+        setResult(Result::Error,
+                  i18n("The volume was not created because the name is already in use."),
+                  QStringLiteral("nameInUse"));
+        return false;
+    }
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("creating the volume")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+
+    const QString targetKey = OperationTarget::volume(trimmed);
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+
+    QList<QPair<QString, QString>> labelPairs;
+    for (const QVariant &entry : labels) {
+        const QVariantMap map = entry.toMap();
+        const QString key = map.value(QStringLiteral("key")).toString().trimmed();
+        if (!key.isEmpty()) {
+            labelPairs.append({key, map.value(QStringLiteral("value")).toString()});
+        }
+    }
+
+    beginOperation(Mutation::CreateVolume, targetKey);
+    m_backend->createVolume(trimmed, driver, labelPairs);
+    return true;
+}
+
+bool OperationController::removeVolume(const QString &name)
+{
+    if (name.isEmpty()) {
+        return false;
+    }
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("removing the volume")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+    const QString targetKey = OperationTarget::volume(name);
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+    beginOperation(Mutation::RemoveVolume, targetKey);
+    m_backend->removeVolume(name);
+    return true;
+}
+
+bool OperationController::pruneVolumes()
+{
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("cleaning up the volumes")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+    const QString targetKey = OperationTarget::volumePrune();
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+    // 清掉上一次的明细：否则这次若没拿到明细，会显示上一次的"删了哪些"
+    m_pruneDetailText.clear();
+    m_pruneDetailList.clear();
+    beginOperation(Mutation::PruneVolumes, targetKey);
+    m_backend->pruneVolumes();
+    return true;
+}
+
 bool OperationController::connectContainerToNetwork(const QString &networkId, const QString &containerId, const QString &aliases)
 {
     if (networkId.isEmpty() || containerId.isEmpty()) {
@@ -667,7 +809,12 @@ void OperationController::onMutationFinished(Mutation mutation,
 
     switch (outcome) {
     case MutationOutcome::Succeeded:
-        setResult(Result::Success, successText(mutation, targetKey));
+        if (mutation == Mutation::PruneVolumes) {
+            // 清理的明细（卷名列表）放在"技术细节"行里，用户可以核对删了什么
+            setResult(Result::Success, successText(mutation, targetKey), m_pruneDetailList);
+        } else {
+            setResult(Result::Success, successText(mutation, targetKey));
+        }
         refreshAfter(mutation, targetKey);
         break;
     case MutationOutcome::Unchanged:
@@ -730,6 +877,13 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         m_backend->refreshContainers();
         Q_EMIT networksChanged();
         break;
+    case Mutation::CreateVolume:
+    case Mutation::RemoveVolume:
+    case Mutation::PruneVolumes:
+        m_backend->refreshVolumes(false); // 只要列表：占用由 storage 那次刷新负责
+        m_backend->refreshStorageUsage();
+        Q_EMIT volumesChanged();
+        break;
     case Mutation::ConnectNetwork:
     case Mutation::DisconnectNetwork: {
         // 网络成员列表与容器详情的网络分区都会变：两边都重读
@@ -743,7 +897,7 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
     }
 }
 
-QString OperationController::successText(Mutation mutation, const QString &targetKey)
+QString OperationController::successText(Mutation mutation, const QString &targetKey) const
 {
     switch (mutation) {
     case Mutation::StartContainer:
@@ -770,6 +924,15 @@ QString OperationController::successText(Mutation mutation, const QString &targe
         return i18n("Container connected to the network.");
     case Mutation::DisconnectNetwork:
         return i18n("Container disconnected from the network.");
+    case Mutation::CreateVolume: {
+        const QString name = targetKey.section(QLatin1Char(':'), 1);
+        return i18n("Volume created: %1", name);
+    }
+    case Mutation::RemoveVolume:
+        return i18n("Volume removed.");
+    case Mutation::PruneVolumes:
+        // 明细（删了哪些、回收多少）由 volumesPruned 先记下来，这里用它当结果文案
+        return m_pruneDetailText.isEmpty() ? i18n("Unused volumes cleaned up.") : m_pruneDetailText;
     }
     return i18n("Done.");
 }

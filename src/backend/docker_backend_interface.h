@@ -43,6 +43,16 @@ inline QString image(const QString &reference)
 {
     return QStringLiteral("image:") + reference;
 }
+/*! 数据卷：名字即标识（Docker 的卷没有独立 id）。 */
+inline QString volume(const QString &name)
+{
+    return QStringLiteral("volume:") + name;
+}
+/*! 数据卷清理（prune）不是针对某一个对象，但同样要走"目标忙碌"跟踪。 */
+inline QString volumePrune()
+{
+    return QStringLiteral("volume-prune");
+}
 /*! 网络：用**名字或 id** 都行（创建时只有名字，删除时用 id）。 */
 inline QString network(const QString &nameOrId)
 {
@@ -93,6 +103,10 @@ public:
         RemoveNetwork,
         ConnectNetwork,
         DisconnectNetwork,
+        /*! 六期：数据卷的创建 / 删除 / 清理（§3.5）。 */
+        CreateVolume,
+        RemoveVolume,
+        PruneVolumes,
     };
     Q_ENUM(Mutation)
 
@@ -195,6 +209,26 @@ public:
      * 其它驱动"只识别不创建"（有意偏离，见 §3.3）。
      */
     virtual void createNetwork(const Kontainer::NetworkCreateRequest &request) = 0;
+    /*!
+     * 创建数据卷（`POST /volumes/create`，§3.5）。
+     *
+     * 名称校验与重名检查在控制器侧做；这里只负责发请求（`Driver` 默认 local）。
+     */
+    virtual void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) = 0;
+    /*!
+     * 删除数据卷（`DELETE /volumes/{name}`）。
+     *
+     * **不传 force**：被容器使用时引擎会拒绝，界面把原因说清楚，而不是替用户强删。
+     */
+    virtual void removeVolume(const QString &name) = 0;
+    /*!
+     * 清理未使用的数据卷（`POST /volumes/prune`，§3.5）。
+     *
+     * 结果（删了哪些、回收了多少空间）经 `volumesPruned()` 回来——`mutationFinished`
+     * 只带错误，放不下这份"成功后的明细"。
+     */
+    virtual void pruneVolumes() = 0;
+
     /*! 删除网络（`DELETE /networks/{id}`）。内置网络由 daemon 拒绝（403）。 */
     virtual void removeNetwork(const QString &id) = 0;
 
@@ -282,6 +316,8 @@ Q_SIGNALS:
     void imagesUpdated();
     void networksUpdated();
     void volumesUpdated();
+    /*! 数据卷清理完成：删掉的卷名与回收的字节数（可能为空 = 没有可清理的）。 */
+    void volumesPruned(const QStringList &names, qint64 reclaimedBytes);
     void storageUpdated();
     void containerDetailUpdated();
     void imageDetailUpdated();
