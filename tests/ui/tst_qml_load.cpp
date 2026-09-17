@@ -12,6 +12,7 @@
 #include "support/qml_stub_kcm.h"
 
 #include <QJsonDocument>
+#include <cstdio>
 #include <QJsonObject>
 #include <QQmlComponent>
 #include <QQmlContext>
@@ -36,6 +37,24 @@ using MutationOutcome = DockerBackendInterface::MutationOutcome;
 namespace
 {
 /*! 在已经实例化的页面里按 objectName 找控件（页面没有窗口，直接遍历子对象即可）。 */
+/*! 列表编辑器当前的行数（读它内部 Repeater 的 count）。 */
+int repeaterCount(QQuickItem *editor)
+{
+    const QList<QObject *> objects = editor->findChildren<QObject *>();
+    for (QObject *object : objects) {
+        if (QString::fromLatin1(object->metaObject()->className()).contains(QLatin1String("Repeater"))) {
+            return object->property("count").toInt();
+        }
+    }
+    return -1;
+}
+
+/*! 待保存的配置内容里是否包含某段文本（用于断言"空草稿没有进配置"）。 */
+bool controller_pendingContains(Kontainer::DaemonConfigController *controller, const QString &needle)
+{
+    return controller->pendingContentPreview().contains(needle);
+}
+
 QQuickItem *findItemByName(QObject *root, const QString &objectName)
 {
     const QList<QQuickItem *> items = root->findChildren<QQuickItem *>();
@@ -418,23 +437,37 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
                  qPrintable(QStringLiteral("%1 must not appear on the user scope page").arg(QString::fromLatin1(name))));
     }
 
-    // 校验路径必须真的产出文案：用户点「添加加速器」会新增一个空行，
-    // 空行立刻走校验分支。这条路径里只能用 QML 的字符串字面量——写成 C++ 的
-    // QStringLiteral 会抛 ReferenceError，而且编译、页面加载、tst_qml_load 都看不出来
-    // （真实反馈：添加加速器时报 ReferenceError 且错误提示不出现）。
-    // 校验路径必须真的产出文案：用户点「添加加速器」后会新增一个空行，
-    // 空行立刻走校验分支（StringListEditor 的错误标签直接调用 validator("")）。
-    // 这条路径里只能用 QML 的字符串字面量——写成 C++ 的 QStringLiteral 会抛
-    // ReferenceError，而且编译、页面加载、控制台之外都看不出来
-    // （真实反馈：添加加速器时报 ReferenceError，且错误提示不出现）。
+    // 点「添加加速器」必须真的出现一个空行，并且它不会被"同步 initialEntries"清掉
+    // （真实反馈：点了添加只是变成未保存，条目没出现）。空行还会立刻走校验分支，
+    // 那条分支里只能用 QML 的字符串字面量——写成 C++ 的 QStringLiteral 会抛
+    // ReferenceError，而这条路径编译与页面加载都看不出来。
+    QQuickItem *mirrorsEditor = findItemByName(userPage.data(), QStringLiteral("mirrorsEditor"));
+    QVERIFY(mirrorsEditor);
+    QQuickItem *addButton = findItemByName(mirrorsEditor, QStringLiteral("stringListAddButton"));
+    QVERIFY(addButton);
+    QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
+
+    // 条目真的进了模型：Repeater 的 count 就是行数
+    // （无窗口的页面不会实例化 delegate，所以只能看模型，不能找 delegate 里的控件）
+    QCOMPARE(repeaterCount(mirrorsEditor), 1);
+    // 空行是待填写草稿，不是"外部变化"：再同步一次也不能把它清掉
+    // （真实反馈：点添加只是变成未保存、条目没出现——旧逻辑在这里把空行当外部变化清掉了）
+    QVERIFY(QMetaObject::invokeMethod(mirrorsEditor, "syncFromInitialEntries"));
+    QCOMPARE(repeaterCount(mirrorsEditor), 1);
+
+    // 校验分支必须真的产出文案（空行会立刻走这条分支）
     QQmlExpression emptyHostCall(qmlContext(userPage.data()), userPage.data(), QStringLiteral("mirrorError('')"));
-    const QString emptyHostMessage = emptyHostCall.evaluate().toString();
-    QVERIFY2(emptyHostMessage.contains(QStringLiteral("example")), qPrintable(emptyHostMessage));
+    QVERIFY2(emptyHostCall.evaluate().toString().contains(QStringLiteral("example")),
+             qPrintable(emptyHostCall.evaluate().toString()));
     QQmlExpression invalidCall(qmlContext(userPage.data()), userPage.data(), QStringLiteral("mirrorError('not a host')"));
     QVERIFY2(!invalidCall.evaluate().toString().isEmpty(), "the invalid-address branch must produce a message");
     for (const QString &captured : g_messages) {
         QVERIFY2(!captured.contains(QStringLiteral("ReferenceError")), qPrintable(captured));
     }
+
+    // 空行只是草稿：它不该进到待保存的内容里（写了地址才算一条）
+    QVERIFY2(!controller_pendingContains(user, QStringLiteral("mirror.example.com")),
+             "an empty draft row must not end up in the pending config");
 
     // 数据目录提示：用户级说的是"生效需要权限"
     QQuickItem *hint = findItemByName(userPage.data(), QStringLiteral("dataRootHint"));

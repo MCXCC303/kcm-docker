@@ -76,10 +76,15 @@ ColumnLayout {
         for (const value of root.initialEntries) {
             incoming.push(String(value));
         }
-        if (incoming.length === entries.count) {
+        // 与"当前条目的**有意义**内容"比较，而不是逐行比较原始值：
+        // 用户刚点「添加」得到的是一个空行（待填写的草稿），而 values() 会把空行丢掉，
+        // 于是控制器里的列表并不包含它。逐行比较会把这个空行当成"外部变化"清掉——
+        // 表现为"点了添加，只是变成未保存，条目没出现"（真实反馈）。
+        const current = root.values();
+        if (incoming.length === current.length) {
             let identical = true;
             for (let i = 0; i < incoming.length; ++i) {
-                if (entries.get(i).value !== incoming[i]) {
+                if (current[i] !== incoming[i].trim()) {
                     identical = false;
                     break;
                 }
