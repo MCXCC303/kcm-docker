@@ -32,6 +32,20 @@ KCM.AbstractKCM {
             icon.name: "go-previous"
             visible: stack.depth > 1
             onTriggered: stack.pop()
+        },
+        /*!
+            自动刷新开关（ARCH_V3 §2.7）。
+
+            关掉之后后台不再有任何定时刷新：界面只在用户按「刷新」时更新。
+            这既是给用户的选择（配置面板不需要一直跳动），
+            也是排查「定时刷新触发的界面重建」类问题的诊断开关。
+        */
+        Kirigami.Action {
+            text: i18n("Auto-refresh")
+            icon.name: "view-refresh"
+            checkable: true
+            checked: root.controller.autoRefreshEnabled
+            onTriggered: root.controller.autoRefreshEnabled = !root.controller.autoRefreshEnabled
         }
     ]
 

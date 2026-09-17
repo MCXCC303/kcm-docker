@@ -160,6 +160,11 @@ QString StatusController::listStateKeyFor(ListState state)
     return QStringLiteral("idle");
 }
 
+QString StatusController::buildStamp() const
+{
+    return QStringLiteral(KONTAINER_BUILD_STAMP);
+}
+
 QString StatusController::stateKey() const
 {
     return stateKeyFor(m_state);

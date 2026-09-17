@@ -89,6 +89,8 @@ add_library(kontainer_core STATIC
 
 target_include_directories(kontainer_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 
+target_compile_definitions(kontainer_core PUBLIC KONTAINER_BUILD_STAMP="${KONTAINER_BUILD_STAMP}")
+
 target_link_libraries(kontainer_core
     PUBLIC
         Qt6::Core

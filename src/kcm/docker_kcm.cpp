@@ -29,7 +29,7 @@ DockerKcm::DockerKcm(QObject *parent, const KPluginMetaData &metaData)
     // 暴露给 QML（org.kde.kontainer）。注册代码与 QML 加载测试共用。
     registerKontainerQmlTypes();
 
-    qCDebug(kontainerKcm) << "Kontainer KCM created; endpoint:" << m_backend->endpointDisplayName();
+    qCDebug(kontainerKcm) << "Kontainer KCM created; build:" << m_controller->buildStamp() << "endpoint:" << m_backend->endpointDisplayName();
 
     // 打开 KCM 立即刷新（ARCH_V1 §15）
     m_controller->refresh();

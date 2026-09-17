@@ -43,6 +43,17 @@ KCM.AbstractKCM {
     /*! 正文最大宽度：约 42 gridUnit，宽窗口下避免一行过长（§1.2）。 */
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
 
+    /*! 网络条目里地址行的字段名：IPv4 / IPv6 / 网关。 */
+    function networkValueLabel(entryKey: string): string {
+        if (entryKey === "network-ipv6") {
+            return i18n("IPv6:");
+        }
+        if (entryKey === "network-gateway") {
+            return i18n("Gateway:");
+        }
+        return i18n("IPv4:");
+    }
+
     /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
     signal closeRequested
@@ -386,10 +397,14 @@ KCM.AbstractKCM {
                         message: page.controller.networks.empty ? i18n("No network information.") : ""
                     }
 
+                    /*  网络条目**不用 FormLayout**：每个条目一个 GridLayout 落在
+                        Repeater 里，正是 core dump 中「外层布局 → 条目 box → 内层
+                        GridLayout sizeHint → 查 FormData 附加属性」的形状。
+                        改用与「挂载」一致的普通行布局，去掉这层嵌套。 */
                     Repeater {
                         model: page.controller.networks
 
-                        delegate: Kirigami.FormLayout {
+                        delegate: ColumnLayout {
                             required property string label
                             required property string value
                             required property string detail
@@ -397,22 +412,62 @@ KCM.AbstractKCM {
 
                             objectName: "networkEntry"
                             Layout.fillWidth: true
+                            spacing: 0
 
-                            QQC2.Label {
-                                Kirigami.FormData.label: entryKey === "network-ipv6" ? i18n("IPv6:") : (entryKey === "network-gateway" ? i18n("Gateway:") : i18n("Network:"))
-                                text: label
+                            /* 网络名只在主条目显示：IPv6 / 网关条目里 label 就是
+                               "IPv6"/"Gateway" 这类标题，重复展示会变成 "IPv6: IPv6" */
+                            RowLayout {
+                                Layout.fillWidth: true
+                                visible: entryKey === "network"
+                                spacing: Kirigami.Units.smallSpacing
+
+                                QQC2.Label {
+                                    text: i18n("Network:")
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                    opacity: 0.75
+                                    elide: Text.ElideRight
+                                }
+                                QQC2.Label {
+                                    text: label
+                                    font.family: "monospace"
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideMiddle
+                                }
                             }
-                            QQC2.Label {
-                                Kirigami.FormData.label: entryKey === "network" ? i18n("IPv4:") : i18n("Address:")
+                            RowLayout {
+                                Layout.fillWidth: true
                                 visible: value.length > 0
-                                text: value
-                                font.family: "monospace"
+                                spacing: Kirigami.Units.smallSpacing
+
+                                QQC2.Label {
+                                    text: page.networkValueLabel(entryKey)
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                    opacity: 0.75
+                                    elide: Text.ElideRight
+                                }
+                                QQC2.Label {
+                                    text: value
+                                    font.family: "monospace"
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideMiddle
+                                }
                             }
-                            QQC2.Label {
-                                Kirigami.FormData.label: i18n("MAC:")
+                            RowLayout {
+                                Layout.fillWidth: true
                                 visible: entryKey === "network" && detail.length > 0
-                                text: detail
-                                font.family: "monospace"
+                                spacing: Kirigami.Units.smallSpacing
+
+                                QQC2.Label {
+                                    text: i18n("MAC:")
+                                    Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                                    opacity: 0.75
+                                }
+                                QQC2.Label {
+                                    text: detail
+                                    font.family: "monospace"
+                                    Layout.fillWidth: true
+                                    elide: Text.ElideMiddle
+                                }
                             }
                         }
                     }

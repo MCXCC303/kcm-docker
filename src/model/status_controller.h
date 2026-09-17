@@ -65,6 +65,13 @@ class StatusController : public QObject
 
     /*! 一期 endpoint 不可在运行时改变（没有配置写入口），因此是 CONSTANT。 */
     Q_PROPERTY(QString endpoint READ endpoint CONSTANT)
+    /*!
+     * 构建标记（版本 + git 短哈希 + 构建时间）。
+     *
+     * 排查真实会话问题时，「用户装的到底是哪一次构建」必须能一眼确认——
+     * 曾经因为安装与重新链接只差 0.3 秒而无法判断崩溃对应哪份代码。
+     */
+    Q_PROPERTY(QString buildStamp READ buildStamp CONSTANT)
 
     Q_PROPERTY(bool autoRefreshEnabled READ autoRefreshEnabled WRITE setAutoRefreshEnabled NOTIFY autoRefreshEnabledChanged)
     Q_PROPERTY(int autoRefreshInterval READ autoRefreshInterval CONSTANT)
@@ -177,6 +184,8 @@ public:
         return m_storageError;
     }
     QString endpoint() const;
+    /*! 形如 "0.3.0+1e3b56e (2026-09-17 08:50 UTC)"。 */
+    QString buildStamp() const;
 
     bool autoRefreshEnabled() const;
     void setAutoRefreshEnabled(bool enabled);

@@ -16,6 +16,9 @@ ColumnLayout {
 
     required property var engine
 
+    /*! 构建标记，由 StatusController 提供。 */
+    required property string buildStamp
+
     spacing: Kirigami.Units.smallSpacing
 
     Kirigami.FormLayout {
@@ -75,5 +78,15 @@ ColumnLayout {
             visible: text.length > 0
             text: view.engine.storageDriver
         }
+    }
+
+    /* 构建标记：排查问题时用来确认运行的是哪一次构建（ARCH_V3 附录 A.1f）。 */
+    QQC2.Label {
+        Layout.fillWidth: true
+        Layout.topMargin: Kirigami.Units.smallSpacing
+        text: i18nc("@info build identification", "Build: %1", view.buildStamp)
+        font: Kirigami.Theme.smallFont
+        opacity: 0.6
+        wrapMode: Text.WordWrap
     }
 }

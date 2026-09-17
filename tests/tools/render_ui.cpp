@@ -41,6 +41,7 @@
 #include <QtGlobal>
 
 #include <cstdio>
+#include <functional>
 #include <memory>
 
 using namespace Kontainer;
@@ -294,6 +295,7 @@ int main(int argc, char **argv)
     const int height = QString::fromLocal8Bit(argv[3]).toInt();
     const QString theme = QString::fromLocal8Bit(argv[4]);
     const QString output = QString::fromLocal8Bit(argv[5]);
+    const int tabIndex = argc > 6 ? QString::fromLocal8Bit(argv[6]).toInt() : 0;
     const bool dark = theme == QLatin1String("dark");
 
     // 主题必须在引擎创建之前设好：Kirigami 从应用 QPalette 推导主题色
@@ -374,6 +376,28 @@ int main(int argc, char **argv)
     item->setWidth(width);
     item->setHeight(height);
     window.show();
+
+    // 可选：切到指定分区/标签页，便于逐页复核（例如容器详情的「网络」分区）
+    if (tabIndex > 0) {
+        QQuickItem *tabBar = nullptr;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node || tabBar) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("detailTabBar") || node->objectName() == QLatin1String("tabBar")) {
+                tabBar = node;
+                return;
+            }
+            const QList<QQuickItem *> children = node->childItems();
+            for (QQuickItem *child : children) {
+                walk(child);
+            }
+        };
+        walk(item);
+        if (tabBar) {
+            tabBar->setProperty("currentIndex", tabIndex);
+        }
+    }
 
     // 等布局与 delegate 完成（一次事件循环 + 一小段等待即可）
     QTimer::singleShot(900, &app, [&]() {

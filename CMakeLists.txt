@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(kontainer
-    VERSION 0.1.0
+    VERSION 0.3.0
     DESCRIPTION "Docker/容器的 KDE 系统设置模块 (KCM)"
     LANGUAGES CXX
 )
@@ -32,6 +32,23 @@ qt_standard_project_setup()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra)
 endif()
+
+# --- 构建标记 -----------------------------------------------------------------
+# 曾经出现「用户装的插件到底是哪一次构建」无法判断的情况：安装与重新链接只差
+# 0.3 秒，事后只能靠 md5 猜。因此把 git 短哈希与构建时间编进二进制并打印出来，
+# 之后任何一次崩溃都能立刻确定对应哪份代码。
+execute_process(
+    COMMAND git rev-parse --short HEAD
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    OUTPUT_VARIABLE KONTAINER_GIT_HASH
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+)
+if(NOT KONTAINER_GIT_HASH)
+    set(KONTAINER_GIT_HASH "unknown")
+endif()
+string(TIMESTAMP KONTAINER_BUILD_TIME "%Y-%m-%d %H:%M" UTC)
+set(KONTAINER_BUILD_STAMP "${PROJECT_VERSION}+${KONTAINER_GIT_HASH} (${KONTAINER_BUILD_TIME} UTC)")
 
 # 翻译：po/<lang>/<domain>.po 会被编译并安装到 ${KDE_INSTALL_LOCALEDIR}
 # （KLocalizedString 从 XDG_DATA_DIRS 下的 locale/ 目录读取，prefix.sh 已包含本前缀）

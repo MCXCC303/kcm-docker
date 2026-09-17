@@ -55,6 +55,7 @@ private Q_SLOTS:
     void containerDetailHasSections();
     void imageLayersCollapseByDefault();
     void keyboardNavigationAndAccessibilityAreWired();
+    void autoRefreshActionControlsTheScheduler();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
@@ -624,6 +625,45 @@ void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
     QAccessibleInterface *tileInterface = QAccessible::queryAccessibleInterface(tile);
     QVERIFY2(tileInterface, "stat tile has no accessible interface");
     QVERIFY2(!tileInterface->text(QAccessible::Name).isEmpty(), "stat tiles need an accessible name");
+}
+
+/*!
+ * ARCH_V3 §2.7：界面上的「自动刷新」开关必须真的控制刷新调度器。
+ *
+ * 它既是用户选项，也是排查「定时刷新触发的界面重建」类问题的诊断开关——
+ * 开关本身失效会让排查方向完全跑偏，所以这里做行为断言而不是只看它存在。
+ */
+void QmlLoadTest::autoRefreshActionControlsTheScheduler()
+{
+    StatusController *controller = m_stubKcm->controller();
+    QVERIFY(controller->autoRefreshEnabled());
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+
+    // 动作不是可视条目，因此从 QObject 子对象里找
+    QObject *autoRefresh = nullptr;
+    const QList<QObject *> children = object->findChildren<QObject *>();
+    for (QObject *child : children) {
+        if (child->property("checkable").toBool() && child->property("text").toString() == QLatin1String("Auto-refresh")) {
+            autoRefresh = child;
+            break;
+        }
+    }
+    QVERIFY2(autoRefresh, "auto-refresh action not found");
+
+    // 勾选状态跟随控制器（单一数据源）
+    QCOMPARE(autoRefresh->property("checked").toBool(), controller->autoRefreshEnabled());
+
+    QVERIFY(QMetaObject::invokeMethod(autoRefresh, "trigger"));
+    QVERIFY2(!controller->autoRefreshEnabled(), "triggering the action must turn auto-refresh off");
+    QCOMPARE(autoRefresh->property("checked").toBool(), controller->autoRefreshEnabled());
+
+    QVERIFY(QMetaObject::invokeMethod(autoRefresh, "trigger"));
+    QVERIFY2(controller->autoRefreshEnabled(), "triggering again must turn auto-refresh back on");
 }
 
 QTEST_MAIN(QmlLoadTest)

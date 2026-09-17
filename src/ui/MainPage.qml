@@ -191,6 +191,13 @@ Kirigami.Page {
                 color: Components.StatusPalette.color("neutral")
                 font: Kirigami.Theme.smallFont
             }
+            QQC2.Label {
+                // 关闭自动刷新后不给提示的话，用户会以为界面卡住了
+                visible: !root.controller.autoRefreshEnabled
+                text: i18n("Auto-refresh is off")
+                color: Components.StatusPalette.color("neutral")
+                font: Kirigami.Theme.smallFont
+            }
 
             Item {
                 Layout.fillWidth: true
@@ -590,6 +597,7 @@ Kirigami.Page {
                 EngineStatusView {
                     width: parent.width
                     engine: root.controller.engine
+                    buildStamp: root.controller.buildStamp
                 }
             }
         }
