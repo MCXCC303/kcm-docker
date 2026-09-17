@@ -75,6 +75,8 @@ struct DockerContainerInspectDTO {
     QString workingDirectory;
     QString user;
     QString hostname;
+    /*! `Config.Tty`：日志流按它分支（TTY = 原始字节，非 TTY = stdcopy 帧）。 */
+    bool tty = false;
     QString restartPolicy;
 
     QDateTime created;

@@ -97,7 +97,10 @@ void DockerReply::start()
         return;
     }
     // 两段超时：先等「首个响应」，收到响应头之后才按流式静默超时算
-    m_timer->start(m_request.headersTimeoutMs > 0 ? m_request.headersTimeoutMs : m_request.timeoutMs);
+    const int firstResponseTimeout = m_request.headersTimeoutMs > 0 ? m_request.headersTimeoutMs : m_request.timeoutMs;
+    if (firstResponseTimeout > 0) {
+        m_timer->start(firstResponseTimeout);
+    }
     m_socket->connectToServer(m_endpoint.socketPath());
 }
 
@@ -151,8 +154,9 @@ void DockerReply::onReadyRead()
 
     notifyStreamStarted();
 
-    // 流式响应：超时语义是「多久没有新数据」，每次收到数据就重新计时
-    if (m_request.streaming) {
+    // 流式响应：超时语义是「多久没有新数据」，每次收到数据就重新计时。
+    // timeoutMs == 0 表示不设静默超时（日志 follow 流可以合法地长时间静默）
+    if (m_request.streaming && m_request.timeoutMs > 0) {
         m_timer->start(m_request.timeoutMs);
     }
 
@@ -188,8 +192,8 @@ void DockerReply::notifyStreamStarted()
         return;
     }
     m_streamStarted = true;
-    // 响应头到了：切换到流式静默超时（拉取可以合法地跑很久）
-    if (m_request.streaming) {
+    // 响应头到了：切换到流式静默超时（拉取可以合法地跑很久；日志 follow 则不设超时）
+    if (m_request.streaming && m_request.timeoutMs > 0) {
         m_timer->start(m_request.timeoutMs);
     }
     Q_EMIT streamStarted();
@@ -339,6 +343,14 @@ DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, i
     return request(DockerReply::Method::Delete, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false);
 }
 
+DockerReply *DockerClient::getStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs)
+{
+    DockerReply *reply = request(DockerReply::Method::Get, apiPath, query, idleTimeoutMs, true);
+    // 首个响应仍用普通超时：连不上时快速失败，而不是干等
+    reply->setHeadersTimeoutMs(m_timeoutMs);
+    return reply;
+}
+
 DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs, const QMap<QByteArray, QByteArray> &headers)
 {
     DockerReply *reply = request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true, headers);
@@ -362,7 +374,8 @@ DockerReply *DockerClient::request(DockerReply::Method method, const QString &ap
     request.method = method;
     request.path = path;
     request.query = query;
-    request.timeoutMs = std::max(minimumTimeoutMs, timeoutMs);
+    // timeoutMs <= 0 = 不设静默超时（日志 follow 流）；其余取最小值保护
+    request.timeoutMs = timeoutMs <= 0 ? 0 : std::max(minimumTimeoutMs, timeoutMs);
     request.streaming = streaming;
     request.headers = headers;
 

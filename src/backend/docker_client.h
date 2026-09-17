@@ -244,6 +244,14 @@ public:
     DockerReply *post(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
     DockerReply *del(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0);
     /*!
+     * 流式读请求（日志跟随是 GET）。
+     *
+     * `idleTimeoutMs <= 0` 表示**不设静默超时**：`follow=1` 的日志流可以合法地
+     * 长时间没有数据（ARCH_V5_V8 §3.1.1），只能靠取消或页面生命周期结束。
+     */
+    DockerReply *getStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0);
+
+    /*!
      * 流式写请求：超时按「多久没有新数据」计算（镜像拉取可以合法地跑很久）。
      */
     DockerReply *postStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});

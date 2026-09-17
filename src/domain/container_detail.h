@@ -77,6 +77,13 @@ struct ContainerDetail {
     QString workingDirectory;
     QString user;
     QString hostname;
+    /*!
+     * 是否分配了 TTY（`Config.Tty`）。
+     *
+     * 日志流据此分形态：TTY 容器输出**原始字节**，非 TTY 是 8 字节帧的 stdcopy 流
+     * （ARCH_V5_V8 §3.1.1）。判错会让日志里混进帧头字节。
+     */
+    bool tty = false;
     QList<QPair<QString, QString>> labels;
     QString restartPolicy;
 

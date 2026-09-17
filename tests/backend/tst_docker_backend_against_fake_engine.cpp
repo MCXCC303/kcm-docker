@@ -289,7 +289,7 @@ private:
                                  "\"Health\":{\"Status\":\"healthy\"}},"
                                  "\"Config\":{\"Image\":\"alpine:latest\",\"Env\":[\"PATH=/usr/bin\",\"LANG=C\"],"
                                  "\"Cmd\":[\"sleep\",\"infinity\"],\"Entrypoint\":[\"/entry.sh\"],"
-                                 "\"WorkingDir\":\"/work\",\"Hostname\":\"fakehost\",\"User\":\"root\","
+                                 "\"WorkingDir\":\"/work\",\"Hostname\":\"fakehost\",\"User\":\"root\",\"Tty\":false,"
                                  "\"Labels\":{\"com.example.role\":\"test\"}},"
                                  "\"HostConfig\":{\"RestartPolicy\":{\"Name\":\"unless-stopped\",\"MaximumRetryCount\":0}},"
                                  "\"Mounts\":[{\"Type\":\"bind\",\"Source\":\"/host/data\",\"Destination\":\"/data\","
@@ -750,6 +750,8 @@ void DockerBackendFakeEngineTest::readsContainerDetail()
     QCOMPARE(detail.entrypoint, (QStringList {QStringLiteral("/entry.sh")}));
     QCOMPARE(detail.workingDirectory, QStringLiteral("/work"));
     QCOMPARE(detail.hostname, QStringLiteral("fakehost"));
+    // 日志流按 Config.Tty 分支：判错会把 8 字节帧头当成日志正文
+    QVERIFY2(!detail.tty, "the fixture is a non-TTY container");
     QCOMPARE(detail.user, QStringLiteral("root"));
     QCOMPARE(detail.labels.size(), 1);
     QCOMPARE(detail.labels.first().first, QStringLiteral("com.example.role"));

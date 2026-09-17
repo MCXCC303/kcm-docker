@@ -170,6 +170,7 @@ std::optional<DockerContainerInspectDTO> DockerContainerInspectDTO::fromJson(con
     dto.workingDirectory = stringValue(config, QStringLiteral("WorkingDir"));
     dto.user = stringValue(config, QStringLiteral("User"));
     dto.hostname = stringValue(config, QStringLiteral("Hostname"));
+    dto.tty = config.value(QStringLiteral("Tty")).toBool(false);
 
     dto.restartPolicy = restartPolicyText(object.value(QStringLiteral("HostConfig")).toObject());
     dto.ports = parsePorts(object.value(QStringLiteral("NetworkSettings")).toObject());
@@ -218,6 +219,7 @@ ContainerDetail containerDetailFromDto(const DockerContainerInspectDTO &dto)
     detail.workingDirectory = dto.workingDirectory;
     detail.user = dto.user;
     detail.hostname = dto.hostname;
+    detail.tty = dto.tty;
     detail.restartPolicy = dto.restartPolicy;
 
     detail.ports.reserve(dto.ports.size());
