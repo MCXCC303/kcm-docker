@@ -2,9 +2,10 @@
 
 KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM）。
 
-> **默认只读，写操作按 socket 权限工作**：读取永远是安全的；启动 / 停止 / 重启 / 删除容器、
-> 拉取 / 删除镜像只在 Docker socket 对当前用户**可写**时出现，且不引入任何提权机制。
-> 详见[写操作与权限](#写操作与权限)。
+> **读取永远安全；写操作按 Docker socket 的实际权限工作**：启动 / 停止 / 重启 / 删除容器、
+> 拉取 / 删除镜像只在 socket 对当前用户**可写**时出现。除此之外，五期引入了一个**能力被严格限制**
+> 的提权 helper（只做两件事：改 `/etc/docker/daemon.json`、重启 docker 服务），
+> 且仓库凭据只存 **KWallet**、绝不写明文。详见[写操作与权限](#写操作与权限)。
 
 - 一期（[ARCH_V1.md](ARCH_V1.md)）：只读状态面板 —— Engine 概要、容器列表、镜像列表
 - 二期（[ARCH_V2.md](ARCH_V2.md)）：可交互的只读 Dashboard —— 卡片导航、详情页、搜索/过滤/排序、
@@ -13,6 +14,8 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
   容器详情分区、镜像详情收敛、数据可视化色板、排版与响应
 - 四期（[ARCH_V4.md](ARCH_V4.md)）：首批写操作与信息架构 —— 容器与镜像操作、拉取进度与取消、
   挂载分区重构（可在文件管理器中打开宿主目录）、端口映射改为芯片 + 连线拓扑
+- 五期（[ARCH_V5_V8.md](ARCH_V5_V8.md)）：连接与信任 —— 系统运行时配置（首次引入**受限提权**）、
+  仓库认证与凭据管理（KWallet 唯一存储 + 一次性只读导入）、端口拓扑按容器取色、界面细节收口
 
 ---
 
@@ -142,11 +145,41 @@ sudo build/install-privileged-helper.sh uninstall
 > 前提：polkit 的认证代理（`polkit-kde-agent-1` 等）必须在当前会话里运行，
 > 否则授权请求会以 `NoResponder` 直接失败，而不是弹框。
 
+### 实机验证仓库认证
+
+自动化测试全部用内存凭据后端（绝不碰真实 KWallet），因此下面几项要在真实会话里过一遍：
+
+```bash
+# 1) 打开「镜像 → 仓库登录…」：钱包可用时不应出现"钱包不可用"横幅
+#    （系统设置里关掉 KWallet 再打开本页，应当出现横幅并说明"不会退回明文存储"）
+
+# 2) 登录：填一个**真实**的私有仓库与凭据 → 点「登录」
+#    期望：先出现"正在校验…"，成功后对话框关闭、列表出现该仓库（只有地址与用户名）
+#    故意填错密码：期望对话框内直接显示"仓库拒绝了这组凭据"，且列表**不**新增条目
+
+# 3) 令牌登录：勾选「使用访问令牌代替密码」，填令牌 → 列表里该行显示「令牌」
+
+# 4) 测试连接 / 移除：测试用已保存凭据再校验一次（不改动存储）；移除要二次确认
+
+# 5) 私有镜像拉取：登录成功后拉取该仓库的私有镜像应当成功；
+#    移除凭据后再拉取，失败行会出现「去登录…」，点它直接跳到对应仓库的登录框
+
+# 6) CLI 导入：页面底部列出 `~/.docker/config.json` 里钱包还没有的仓库，
+#    勾选后「导入所选」；再导入一次应当提示"没有可导入的内容"（幂等）
+
+# 7) 钱包落点：kcmshell6 里存的条目应出现在 KWallet 的 Kontainer 文件夹，
+#    而 `~/.docker/config.json` 内容不被修改（`git diff` 之外可用 md5sum 前后对比）
+```
+
 ### 权限模型
 
-**按 socket 实际权限工作，不引入提权**（决策记录见 [ARCH_V3.md](ARCH_V3.md) §1.3）：
+这里说的是 **Docker socket 的权限模型**（与上面那个受限 helper 是两件事：
+helper 只负责"改 `/etc/docker/daemon.json` 与重启 docker 服务"，从不影响 socket 权限，
+见 [ARCH_V5_V8.md](ARCH_V5_V8.md) §1.5.1 的决策修订）。
 
-- 没有 KAuth helper、没有 polkit policy、不修改 socket 权限、不调用 `docker` CLI
+**按 socket 实际权限工作**（决策记录见 [ARCH_V3.md](ARCH_V3.md) §1.3）：
+
+- 不修改 socket 权限、不调用 `docker` CLI
 - 启动时探测 socket 文件对当前进程是否可写（内核 `access(2)` 语义）；
   不可写时**写入口整体不出现**，并在页面顶部说明原因与解决方向
 - 运行中若引擎返回 403 / EACCES，**本次会话降级为只读**（不可逆，除非重开 KCM）
@@ -154,7 +187,8 @@ sudo build/install-privileged-helper.sh uninstall
 
 > ⚠️ **系统级（root daemon）Docker 下，把用户加入 docker 组等价于给予 root 权限。**
 > 本项目的目标部署形态是 rootless Docker（socket 由用户自己拥有），此时不涉及该权限放大。
-> 权限范围扩大属于次版本号变更：0.4.0 起包含写操作。
+> 权限范围扩大属于次版本号变更：**0.4.0** 起包含写操作（按 socket 权限）；
+> **0.5.0** 起包含受限提权组件（仅系统级 daemon 配置与重启）。
 
 ### 写操作清单
 
@@ -284,7 +318,7 @@ source build/prefix.sh
 kcmshell6 kcm_docker
 ```
 
-依赖：CMake ≥ 3.20、Qt 6.5+（Core/Gui/Qml/Quick/Network/Test）、KF6（CoreAddons、Config、I18n、KCMUtils）、ECM。
+依赖：CMake ≥ 3.20、Qt 6.5+（Core/Gui/Qml/Quick/Network/Test/DBus）、KF6（CoreAddons、Config、I18n、KCMUtils、KIO、Auth、Wallet）、ECM。
 
 - KCM 插件安装到 `${KDE_INSTALL_PLUGINDIR}/plasma/kcms/systemsettings/`
 - QML 打包进插件 qrc：`:/kcm/kcm_docker/main.qml` 等
@@ -357,6 +391,11 @@ ctest --test-dir build --output-on-failure
 | `tst_daemon_deployment` | 部署形态矩阵（系统级 / rootless / 未知）、配置路径选择、**形态未知时不猜系统路径**、可写性判定（已存在文件只看自身权限位；不存在则看最近的可创建父目录）、数据目录在家目录的提示 |
 | `tst_daemon_config` | `daemon.json` 读写：未知键原样保留、无法解析时只读且绝不覆盖、原子写 + 备份、空内容拒绝、**作用域与解锁状态机**（未解锁不得保存、授权超时自动上锁、换作用域即失效）、提权只取决于"这个文件能不能写"、降级命令按形态给出（rootless 用 `systemctl --user`） |
 | `tst_kontainer_helper` | 提权 helper 的安全边界：只接受白名单键、值校验在 helper 内再做一遍、超长内容拒绝、`dryRun` 不落盘、注入尝试（换行 / 任意路径 / 任意 systemd unit）一律拒绝 |
+| `tst_registry_auth` | 仓库认证头的编解码：base64url 字母表与 padding、令牌优先、Docker Hub 各种写法归一、`~/.docker/config.json` 的 `用户名:密码` 字段、畸形输入、以及"凭据里带 CRLF 也编不出不安全的头" |
+| `tst_credential_store` | 凭据存储：别名索引归一（`docker.io`/`index.docker.io`/带路径写法是同一个条目）、覆盖与删除、坏条目当作缺失、钱包禁用/拒绝解锁时明确失败、异步打开、条目里不放明文拼接 |
+| `tst_docker_cli_auth_importer` | 从 CLI 配置只读导入：归一化、令牌与密码两种条目、凭据助手指管条目如实报告、令牌缓存键（`…/access-token`）被忽略、缺失/损坏文件、导入不覆盖已有条目且可重复执行、`DOCKER_CONFIG` 生效 |
+| `tst_registry_auth_controller` | 认证管理规则：**先 `POST /auth` 校验成功才写钱包**、钱包不可用时不验证不保存、令牌登录、测试连接不改动存储、移除幂等、**模型里没有密码/令牌**、CLI 逐条导入与幂等、钱包异步打开的状态上报 |
+| `tst_presentation` | 展示助手：端口拓扑取色下标是纯函数（同种子同结果、200 个种子覆盖全部色位、空种子/非法色板长度不越界） |
 | `tst_kauth_wiring` | 提权链路的接线：helper id 单一来源（会话侧必须 `setHelperId`、helper 侧不许硬编码）、四个系统文件齐备、`.actions` 恰好是这两个动作且带中文对话框文案、helper 槽名与动作名对齐（KAuth 的"去前缀 + 点换下划线"规则）、**生成出来的策略不是空策略**且默认值是收紧的（`auth_admin_keep` + `allow_inactive=no`、不写 `allow_any`） |
 | `tst_i18n_consistency` | 翻译域一致性、译文完整性、**模板与源码同步**（现场跑一次 `xgettext` 比对 `po/kcm_docker.pot`，漏提取或多提取都失败）、**运行时真的加载 `.mo`** 并断言几条译文（域 / 语言 / 安装目录任一环错都会静默退回英文）、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
 | `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
@@ -486,8 +525,37 @@ po/                         翻译（zh_CN 已完整）
 | REST 路径位置 | ARCH_V3_pre §2.1 建议放进 `docker_endpoint.h` | 新建 `backend/docker_api_paths.h` | `docker_endpoint.h` 承载的是连接端点（`DOCKER_HOST` / socket）语义，混在一起会让两个概念纠缠；单独一个头文件反而能被断言「路径只出现在这里」 |
 | 端口拓扑的连线 | 用户要求「可以考虑节点图」 | 采纳芯片 + 连线；连线用 `Canvas` 而非 `Shape` | `Shape` 的子对象必须是 `ShapePath`，而 `Repeater` 是 Item；`Canvas` 是单 Item、零 delegate，离三期段错误的诱因最远（ARCH_V4 附录 A.1 有实测） |
 | 挂载跳转范围 | 用户原话「详情页面中点击挂载的文件夹」 | 只做容器详情；镜像详情不加「声明的卷 / 暴露端口」 | 镜像本身没有宿主目录，加了也只是摆设；实际挂载只有容器详情能看到 |
-| 私有仓库凭据 | ARCH_V3_pre §2.4 未涉及 | 明确不支持：不读 `~/.docker/config.json`、不执行 credential helper | 读取凭据文件涉及敏感数据；执行 helper 需要 `QProcess`（被 §1.4 禁止）。失败时引导用户用 CLI |
+| 私有仓库凭据 | ARCH_V3_pre §2.4 未涉及 | 四期不支持；**五期起**改为 KWallet 存储 + `~/.docker/config.json` 的一次性只读导入，仍不执行 credential helper | 四期不做是因为读取凭据属于敏感数据、且执行 helper 需要 `QProcess`（被 §1.4 禁止）；五期有明确的用户需求（私有仓库），因此把凭据收进 KWallet 而不是明文文件 |
 | 实施顺序 | ARCH_V4 初稿：4A → 4B → 4C → 4D | 实际：4B → 4C → 4D → 4A | 用户指示 4A 体量小，长任务应重点投入写操作；4A 与写操作无技术依赖（已回填进 ARCH_V4 §2.6 与偏离登记） |
+
+---
+
+## 五期完成定义（DoD）自查
+
+- 运行时配置：部署形态探测（系统级 / rootless / 未知，且**未知时不猜系统路径**）✅、
+  配置文件定位与可写性判定（缺失时看最近的可创建父目录）✅、未知键原样保留 ✅、
+  解析失败时只读且绝不覆写 ✅、原子写 + 每次保存前备份 ✅、恢复上一版本 ✅、
+  镜像加速器 / insecure-registries / 并发下载数 / 日志驱动四项可编辑（「默认」= 删除该键）✅、
+  写后即读与「重启 Docker（将停止 N 个容器）」的后果说明 ✅
+- 提权：动作名走官方命名（`org.kde.kontainer.daemon.save` / `.restart`）✅、
+  策略由 `.actions` 生成（不是手写 XML）✅、helper 白名单 + 值校验 + 固定路径 + 固定单元 ✅、
+  polkit 默认 `auth_admin_keep` 且界面显示解锁剩余时间 ✅、取消授权保持锁定且不报错 ✅、
+  helper 未安装时给出可复制的手动命令（功能不静默失败）✅、D-Bus 策略与服务文件齐备 ✅、
+  **四处标识符（helper id / setHelperId / .actions 前缀 / D-Bus allow own）由 `tst_kauth_wiring` 钉住** ✅
+- 仓库认证：凭据只存 KWallet（专用文件夹，未启用/被拒时明确失败且**不回退明文**）✅、
+  登录先 `POST /auth` 校验成功才写钱包 ✅、令牌登录 ✅、测试连接不改动存储 ✅、
+  移除二次确认 ✅、CLI 一次性只读导入且不覆盖已有条目 ✅、凭据只出现在
+  `X-Registry-Auth` 头（不进 URL/日志/模型）✅、401/403 与"该仓库还没登录"都有登录引导 ✅
+- 界面：用户级 / 系统级配置分入口，作用域与"哪个 daemon 读它"分开说明 ✅、
+  自动刷新不抹掉正在编辑的内容 ✅、未解锁时**所有**编辑控件禁用 ✅、
+  端口拓扑按容器确定性取色 ✅、挂载行容器路径靠右 + 宿主路径过长省略 ✅
+- 工程：`project VERSION` = 0.5.0 ✅、34 个测试目标全部通过 ✅、`-Wall -Wextra` 0 警告 ✅、
+  `po/zh_CN` 完整（414 条、0 fuzzy、0 未翻译）且模板与源码同步由测试强制 ✅、
+  新 QML 全部进 qrc 并被 `tst_qml_load` / `tst_qml_resource` 覆盖 ✅、
+  依赖新增 `KF6::Wallet` 已写进本文档 ✅
+- KDE：`kcmshell6 --smoke-test kcm_docker` 英文/中文退出码 0 ✅、亮/暗与中文离屏截图复核 ✅
+- ⏳ 仍需在真实桌面/真实凭据上验收：提权授权弹框与真实写入、真实仓库登录与私有镜像拉取、
+  KWallet 落点与 `~/.docker/config.json` 未被修改（步骤见上文两节「实机验证」）
 
 ---
 
@@ -567,7 +635,7 @@ po/                         翻译（zh_CN 已完整）
 
 | 期 | 主题 | 内容 |
 | --- | --- | --- |
-| 五期 | 连接与信任 | 共享组件抽取（`KeyValueListEditor` / `PortMappingEditor` / `HostPathPicker` / `ImageRefInput`）→ daemon 配置变更（镜像加速器等，**首次引入受限提权**）→ 仓库认证与凭据管理 |
+| 五期 ✅ | 连接与信任 | 共享组件抽取（`ImageRefInput` / `StringListEditor` / `KeyValueListEditor`）→ daemon 配置变更（镜像加速器等，**首次引入受限提权**）→ 仓库认证与凭据管理（KWallet）——**已交付 0.5.0**，见上方 DoD 自查 |
 | 六期 | 对象管理与容器日志 | 容器**日志流式显示**（跟随/暂停/清空/重连，只做显示）+ 网络管理（基础 bridge 创建、连接/断开、删除保护）+ 数据卷管理（含 prune） |
 | 七期 | 创建与部署 | 容器创建分步向导 + 从现有容器克隆 + 挂载预设（`~/.config/kontainerrc`） |
 | 八期 | 构建镜像 | Dockerfile 构建（上下文打包 + 请求体流式上传 + 构建进度列表 + 失败 step 定位） |

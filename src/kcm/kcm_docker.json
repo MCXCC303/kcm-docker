@@ -6,7 +6,7 @@
         "Description": "Docker Engine status panel with container and image management",
         "Description[zh_CN]": "Docker Engine 状态面板，可管理容器与镜像",
         "Icon": "folder-docker",
-        "Version": "0.4.0",
+        "Version": "0.5.0",
         "License": "GPL-2.0-or-later",
         "Authors": [
             {

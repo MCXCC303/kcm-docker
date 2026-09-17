@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QRegularExpression>
 #include <QtTest>
 
@@ -86,6 +88,7 @@ private Q_SLOTS:
     void kioStaysInHostPathService();
     void externalProcessesStayForbidden();
     void qmlUsesOnlyQmlIdentifiers();
+    void pluginMetadataVersionMatchesProject();
 };
 
 /*!
@@ -304,6 +307,22 @@ void SourceConventionsTest::qmlUsesOnlyQmlIdentifiers()
     }
     QVERIFY2(offenders.isEmpty(),
              qPrintable(QStringLiteral("C++ identifiers are not available in QML:\n%1").arg(offenders.join(QLatin1Char('\n')))));
+}
+
+/*!
+ * 插件元数据里的版本必须与 `project VERSION` 一致。
+ *
+ * 两处版本号一旦漂移，用户看到的"关于"版本与实际构建的版本就对不上，
+ * 而这类错误在发布流程里极难被发现（没人会去比对两个文件）。
+ */
+void SourceConventionsTest::pluginMetadataVersionMatchesProject()
+{
+    QFile file(sourceDir() + QStringLiteral("/src/kcm/kcm_docker.json"));
+    QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(file.fileName()));
+    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+    const QJsonObject plugin = root.value(QStringLiteral("KPlugin")).toObject();
+    QVERIFY2(!plugin.isEmpty(), "the metadata must have a KPlugin section");
+    QCOMPARE(plugin.value(QStringLiteral("Version")).toString(), QString::fromLatin1(KONTAINER_VERSION));
 }
 
 QTEST_GUILESS_MAIN(SourceConventionsTest)
