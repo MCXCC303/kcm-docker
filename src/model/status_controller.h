@@ -19,6 +19,7 @@
 #include "model/registry_auth_controller.h"
 #include "model/image_model.h"
 #include "model/network_filter_model.h"
+#include "model/network_detail_controller.h"
 #include "model/network_model.h"
 #include "model/refresh_scheduler.h"
 #include "model/storage_status.h"
@@ -89,6 +90,8 @@ class StatusController : public QObject
     /*! 网络列表与过滤代理（六期 §3.2）。 */
     Q_PROPERTY(Kontainer::NetworkModel *networkModel READ networkModel CONSTANT)
     Q_PROPERTY(Kontainer::NetworkFilterModel *networkList READ networkList CONSTANT)
+    /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
+    Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
     /* 刷新状态（§15/§16） */
     Q_PROPERTY(QDateTime lastUpdated READ lastUpdated NOTIFY refreshStateChanged)
@@ -273,6 +276,10 @@ public:
     {
         return m_networkFilter;
     }
+    NetworkDetailController *networkDetail() const
+    {
+        return m_networkDetail;
+    }
     ContainerDetailController *containerDetail() const
     {
         return m_containerDetail;
@@ -382,6 +389,7 @@ private:
     ImageModel *m_imageModel = nullptr;
     NetworkModel *m_networkModel = nullptr;
     NetworkFilterModel *m_networkFilter = nullptr;
+    NetworkDetailController *m_networkDetail = nullptr;
     ListState m_networksState = ListState::Idle;
     QString m_networksError;
     bool m_networksOk = false;

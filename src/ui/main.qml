@@ -88,6 +88,11 @@ KCM.AbstractKCM {
                         "scope": scope
                     });
                 }
+                onNetworkActivated: function (networkId) {
+                    stack.push(networkDetailComponent, {
+                        "networkId": networkId
+                    });
+                }
                 onRegistryAuthRequested: function (serverAddress) {
                     stack.push(registryAuthComponent, {
                         "presetServerAddress": serverAddress
@@ -118,6 +123,19 @@ KCM.AbstractKCM {
             DaemonConfigPage {
                 scope: "system"
                 onCloseRequested: stack.pop()
+            }
+        }
+
+        Component {
+            id: networkDetailComponent
+
+            NetworkDetail {
+                onCloseRequested: stack.pop()
+                onContainerRequested: function (containerId) {
+                    stack.push(containerDetailComponent, {
+                        "containerId": containerId
+                    });
+                }
             }
         }
 

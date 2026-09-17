@@ -16,6 +16,7 @@
 #include "model/image_filter_model.h"
 #include "model/image_model.h"
 #include "model/network_filter_model.h"
+#include "model/network_detail_controller.h"
 #include "model/network_model.h"
 #include "model/metrics_model.h"
 #include "model/operation_controller.h"
@@ -40,6 +41,7 @@ void registerKontainerQmlTypes()
     qmlRegisterUncreatableType<ImageFilterModel>("org.kde.kontainer", 1, 0, "ImageFilterModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<NetworkModel>("org.kde.kontainer", 1, 0, "NetworkModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<NetworkFilterModel>("org.kde.kontainer", 1, 0, "NetworkFilterModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<NetworkDetailController>("org.kde.kontainer", 1, 0, "NetworkDetailController", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<DetailListModel>("org.kde.kontainer", 1, 0, "DetailListModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<MetricsModel>("org.kde.kontainer", 1, 0, "MetricsModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<ContainerDetailController>("org.kde.kontainer", 1, 0, "ContainerDetailController", QStringLiteral("Provided by the KCM"));

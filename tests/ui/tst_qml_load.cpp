@@ -94,6 +94,8 @@ private Q_SLOTS:
     void configPageWordingAndLocksPerScope();
     void topologyConnectionColorsAreStablePerContainer();
     void registryAuthPageReflectsWalletAndStoredCredentials();
+    void networksTabListsAndOpensDetails();
+    void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
     void delegateActivationIsWired();
@@ -639,6 +641,155 @@ void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
     QVERIFY2(!hint->property("visible").toBool(), "the hint only appears once a valid reference is typed");
 }
 
+/*!
+ * 网络标签页（ARCH_V5_V8 §3.2）：列表、过滤、以及"切到该页才刷新"。
+ */
+void QmlLoadTest::networksTabListsAndOpensDetails()
+{
+    QList<Network> networks;
+    Network bridge;
+    bridge.id = QString(64, QLatin1Char('b'));
+    bridge.name = QStringLiteral("bridge");
+    bridge.driver = QStringLiteral("bridge");
+    bridge.scope = QStringLiteral("local");
+    bridge.ipamConfigs.append({QStringLiteral("172.17.0.0/16"), QStringLiteral("172.17.0.1")});
+    networks.append(bridge);
+
+    Network app;
+    app.id = QString(64, QLatin1Char('a'));
+    app.name = QStringLiteral("app_default");
+    app.driver = QStringLiteral("bridge");
+    app.scope = QStringLiteral("local");
+    app.ipamConfigs.append({QStringLiteral("172.18.0.0/16"), QStringLiteral("172.18.0.1")});
+    app.labels.append({QStringLiteral("com.docker.compose.project"), QStringLiteral("app")});
+    NetworkMember member;
+    member.containerId = QString(64, QLatin1Char('1'));
+    member.name = QStringLiteral("app");
+    member.ipv4Address = QStringLiteral("172.18.0.2");
+    member.macAddress = QStringLiteral("02:42:ac:12:00:02");
+    app.members.append(member);
+    networks.append(app);
+    m_backend->setNetworks(networks);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    // ListView 只为可见区域创建 delegate：需要真实窗口与布局
+    QQuickWindow window;
+    window.resize(1000, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1000);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QCOMPARE(tabBar->property("count").toInt(), 4);
+
+    // 没进网络页就不该去读网络列表（低频数据，按需刷新）
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Networks), 0);
+
+    QVERIFY(tabBar->setProperty("currentIndex", 2));
+    QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Networks), 1);
+    m_backend->completeRefresh();
+
+    QQuickItem *networkView = childByObjectName(page, QStringLiteral("networkView"));
+    QVERIFY2(networkView, "the networks tab must have its own list");
+    QTRY_COMPARE(networkView->property("count").toInt(), 2);
+    QTest::qWait(50); // 等 delegate 创建
+    QTRY_COMPARE(networkView->property("count").toInt(), 2);
+
+    int cards = 0;
+    int builtinChips = 0;
+    std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            if (child->objectName() == QLatin1String("networkCard")) {
+                ++cards;
+            } else if (child->objectName() == QLatin1String("networkPredefinedChip")) {
+                ++builtinChips;
+            }
+            walk(child);
+        }
+    };
+    walk(networkView);
+    QCOMPARE(cards, 2);
+    QCOMPARE(builtinChips, 2); // 两行都有这枚芯片，但只有内置网络那行可见
+
+    // 过滤：只看用户自建的网络
+    auto *filter = m_stubKcm->controller()->networkList();
+    filter->setOriginFilter(QStringLiteral("custom"));
+    QTRY_COMPARE(networkView->property("count").toInt(), 1);
+    filter->setOriginFilter(QStringLiteral("all"));
+    QTRY_COMPARE(networkView->property("count").toInt(), 2);
+
+    // 共享的容器/镜像搜索行不在这里出现（网络页有自己的工具栏）
+    QQuickItem *searchRow = childByObjectName(page, QStringLiteral("containerSearchField"));
+    if (searchRow) {
+        QVERIFY2(!searchRow->isVisible(), "the shared container/image toolbar must be hidden on the networks tab");
+    }
+}
+
+/*!
+ * 网络详情：成员容器列表 + 跳到容器详情的信号（导航由 main.qml 负责）。
+ */
+void QmlLoadTest::networkDetailShowsMembersAndJumpsToContainers()
+{
+    QList<Network> networks;
+    Network app;
+    app.id = QString(64, QLatin1Char('a'));
+    app.name = QStringLiteral("app_default");
+    app.driver = QStringLiteral("bridge");
+    app.scope = QStringLiteral("local");
+    app.created = QDateTime::currentDateTimeUtc().addSecs(-7200);
+    app.ipamConfigs.append({QStringLiteral("172.18.0.0/16"), QStringLiteral("172.18.0.1")});
+    app.labels.append({QStringLiteral("com.docker.compose.project"), QStringLiteral("app")});
+    app.options.append({QStringLiteral("com.docker.network.bridge.name"), QStringLiteral("br-app")});
+    NetworkMember member;
+    member.containerId = QString(64, QLatin1Char('1'));
+    member.name = QStringLiteral("app");
+    member.ipv4Address = QStringLiteral("172.18.0.2");
+    member.macAddress = QStringLiteral("02:42:ac:12:00:02");
+    app.members.append(member);
+    networks.append(app);
+    m_backend->setNetworks(networks);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/NetworkDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("networkId"), app.id);
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QCOMPARE(m_stubKcm->controller()->networkDetail()->name(), QStringLiteral("app_default"));
+    QQuickItem *goneMessage = childByObjectName(page, QStringLiteral("networkGoneMessage"));
+    QVERIFY(goneMessage);
+    QVERIFY2(!goneMessage->property("visible").toBool(), "the network exists, so no 'gone' notice");
+
+    QQuickItem *memberRow = childByObjectName(page, QStringLiteral("networkMemberRow"));
+    QVERIFY2(memberRow, "the member container must be listed");
+    QSignalSpy containerSpy(page, SIGNAL(containerRequested(QString)));
+    QVERIFY(QMetaObject::invokeMethod(memberRow, "clicked"));
+    QTRY_COMPARE(containerSpy.count(), 1);
+    QCOMPARE(containerSpy.at(0).at(0).toString(), member.containerId);
+
+    // 标签与选项折叠区存在（默认折叠，避免长列表淹没页面）
+    QQuickItem *labelsSection = childByObjectName(page, QStringLiteral("networkLabelsSection"));
+    QVERIFY(labelsSection);
+    QVERIFY2(!labelsSection->property("expanded").toBool(), "collapsible sections start collapsed");
+    QCOMPARE(m_stubKcm->controller()->networkDetail()->labels()->count(), 1);
+    QCOMPARE(m_stubKcm->controller()->networkDetail()->options()->count(), 1);
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -654,6 +805,8 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("EngineStatusView.qml"),
         QStringLiteral("DaemonConfigPage.qml"),
         QStringLiteral("RegistryAuthPage.qml"),
+        QStringLiteral("NetworkCard.qml"),
+        QStringLiteral("NetworkDetail.qml"),
         QStringLiteral("StorageView.qml"),
         QStringLiteral("ResourceView.qml"),
         QStringLiteral("components/StatTile.qml"),

@@ -539,6 +539,36 @@ int main(int argc, char **argv)
                                   DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
     }
 
+    // 网络列表（六期 §3.2）：内置三个 + 一个 compose 建的网络（带成员）
+    {
+        QList<Kontainer::Network> networks;
+        auto makeNetwork = [](const QString &name, const QString &driver, const QString &subnet, int members) {
+            Kontainer::Network network;
+            network.id = QString(64, name.at(0));
+            network.name = name;
+            network.driver = driver;
+            network.scope = QStringLiteral("local");
+            network.created = QDateTime::currentDateTimeUtc().addSecs(-3600 * 30);
+            if (!subnet.isEmpty()) {
+                network.ipamConfigs.append({subnet, QStringLiteral("172.18.0.1")});
+            }
+            for (int i = 0; i < members; ++i) {
+                Kontainer::NetworkMember member;
+                member.containerId = QString(64, QLatin1Char('1'));
+                member.name = i == 0 ? QStringLiteral("winboat") : QStringLiteral("app-%1").arg(i);
+                member.ipv4Address = QStringLiteral("172.18.0.%1").arg(i + 2);
+                member.macAddress = QStringLiteral("02:42:ac:12:00:0%1").arg(i + 2);
+                network.members.append(member);
+            }
+            return network;
+        };
+        networks.append(makeNetwork(QStringLiteral("bridge"), QStringLiteral("bridge"), QStringLiteral("172.17.0.0/16"), 0));
+        networks.append(makeNetwork(QStringLiteral("host"), QStringLiteral("host"), QString(), 0));
+        networks.append(makeNetwork(QStringLiteral("none"), QStringLiteral("null"), QString(), 0));
+        networks.append(makeNetwork(QStringLiteral("winboat_default"), QStringLiteral("bridge"), QStringLiteral("172.18.0.0/16"), 2));
+        backend->setNetworks(networks);
+    }
+
     backend->completeRefresh();
 
     const QString sourceDir = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/");
@@ -552,6 +582,10 @@ int main(int argc, char **argv)
     } else if (page == QLatin1String("image-detail")) {
         qmlFile = QStringLiteral("ImageDetail.qml");
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    } else if (page == QLatin1String("network-detail")) {
+        qmlFile = QStringLiteral("NetworkDetail.qml");
+        // fixture 里 winboat_default 的 id 是 64 个 'w'
+        initialProperties.insert(QStringLiteral("networkId"), QString(64, QLatin1Char('w')));
     } else if (page == QLatin1String("registry-auth")) {
         qmlFile = QStringLiteral("RegistryAuthPage.qml");
     } else if (page == QLatin1String("daemon-config-user")) {
@@ -617,6 +651,10 @@ int main(int argc, char **argv)
             tabBar->setProperty("currentIndex", tabIndex);
         }
     }
+
+    // 切到某个分区会触发按需刷新（例如网络页）：让假后端把这次刷新也完成掉，
+    // 否则截图上会停在"还没有数据"的中间态（真实环境里刷新是异步完成的）
+    backend->completeRefresh();
 
     // KONTAINER_RENDER_LOGS=1：往日志控制台灌一些输出（复核等宽控制台与状态条）
     if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LOGS")) {

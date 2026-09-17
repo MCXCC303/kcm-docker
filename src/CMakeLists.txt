@@ -105,6 +105,8 @@ add_library(kontainer_core STATIC
     model/image_detail_controller.h
     model/image_filter_model.cpp
     model/image_filter_model.h
+    model/network_detail_controller.cpp
+    model/network_detail_controller.h
     model/network_filter_model.cpp
     model/network_filter_model.h
     model/network_model.cpp

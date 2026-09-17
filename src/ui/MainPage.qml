@@ -26,6 +26,7 @@ Kirigami.Page {
     readonly property var controller: kcm.controller
     readonly property var containerList: controller.containerList
     readonly property var imageList: controller.imageList
+    readonly property var networkList: controller.networkList
 
     /*! 卡片被激活：由 main.qml 接到导航上（ARCH_V2 §43：导航属于 KCM 层） */
     signal containerActivated(string containerId)
@@ -34,6 +35,8 @@ Kirigami.Page {
     /*! 打开仓库认证页（ARCH_V5_V8 §2.7）：镜像标签页工具栏与失败引导都用它。 */
     signal registryAuthRequested(string serverAddress)
     signal imageActivated(string imageId)
+    /*! 打开网络详情（六期 §3.2）；由 main.qml 负责导航。 */
+    signal networkActivated(string networkId)
 
     /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
     readonly property var tiles: [
@@ -362,11 +365,22 @@ Kirigami.Page {
             objectName: "tabBar"
             Layout.fillWidth: true
 
+            // 网络是低频数据：只在切到网络页时刷新（§3.2），不加入 5 秒轮询。
+            // 索引 2 = 网络页（0 容器 / 1 镜像 / 2 网络 / 3 引擎）
+            onCurrentIndexChanged: {
+                if (tabBar.currentIndex === 2) {
+                    root.controller.refreshNetworks();
+                }
+            }
+
             QQC2.TabButton {
                 text: i18ncp("@title:tab container list", "Containers (%1)", "Containers (%1)", root.controller.containers.count)
             }
             QQC2.TabButton {
                 text: i18ncp("@title:tab image list", "Images (%1)", "Images (%1)", root.controller.images.count)
+            }
+            QQC2.TabButton {
+                text: i18ncp("@title:tab network list", "Networks (%1)", "Networks (%1)", root.controller.networkModel.count)
             }
             QQC2.TabButton {
                 text: i18nc("@title:tab engine information", "Engine")
@@ -382,7 +396,8 @@ Kirigami.Page {
         /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
-            visible: tabBar.currentIndex !== 2
+            // 容器/镜像共用的搜索过滤行：网络页与引擎页各有自己的工具栏（索引见 tabBar）
+            visible: tabBar.currentIndex === 0 || tabBar.currentIndex === 1
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.SearchField {
@@ -657,6 +672,110 @@ Kirigami.Page {
 
                     delegate: ImageCard {
                         onActivated: root.imageActivated(imageId)
+                    }
+                }
+            }
+
+            /* ---------------------------- 网络 ---------------------------- */
+            ColumnLayout {
+                id: networksTab
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.InlineMessage {
+                    objectName: "networksErrorMessage"
+                    Layout.fillWidth: true
+                    visible: root.controller.networksStateKey === "error"
+                    type: Kirigami.MessageType.Error
+                    text: i18n("Unable to retrieve the network list: %1", root.controller.networksError)
+                }
+
+                /* 搜索 / 过滤 / 排序：与容器、镜像列表同一套交互 */
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.TextField {
+                        objectName: "networkSearchField"
+                        Layout.fillWidth: true
+                        placeholderText: i18n("Search by name, ID, driver or subnet…")
+                        text: root.networkList.searchText
+                        onTextChanged: root.networkList.searchText = text
+                    }
+
+                    QQC2.ComboBox {
+                        id: networkOriginCombo
+
+                        objectName: "networkOriginCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("All networks"), value: "all"},
+                            {text: i18n("Built-in"), value: "predefined"},
+                            {text: i18n("User-defined"), value: "custom"}
+                        ]
+                        onActivated: root.networkList.originFilter = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.networkList.originFilter)
+                    }
+
+                    QQC2.ComboBox {
+                        id: networkSortCombo
+
+                        objectName: "networkSortCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("Name"), value: "name"},
+                            {text: i18n("Driver"), value: "driver"},
+                            {text: i18n("Scope"), value: "scope"},
+                            {text: i18n("Containers"), value: "members"}
+                        ]
+                        onActivated: root.networkList.sortKey = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.networkList.sortKey)
+                    }
+                }
+
+                Components.EmptyPlaceholder {
+                    objectName: "networksEmptyPlaceholder"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    message: root.networkList.count === 0 && root.controller.networkModel.count > 0
+                        ? i18n("No network matches the current search or filter.")
+                        : root.controller.networkModel.count === 0 ? i18n("No networks found.") : ""
+                    explanationText: root.networkList.count === 0 && root.controller.networkModel.count > 0
+                        ? i18n("Clear the search field or switch the filter back to “All networks”.")
+                        : root.controller.networkModel.count === 0
+                            ? i18n("Docker always provides at least the built-in bridge, host and none networks.")
+                            : ""
+                    actionText: root.networkList.count === 0 && root.controller.networkModel.count > 0 ? i18n("Clear filters") : ""
+                    actionIconName: "edit-clear"
+                    onActionTriggered: {
+                        root.networkList.searchText = "";
+                        root.networkList.originFilter = "all";
+                        networkOriginCombo.currentIndex = networkOriginCombo.indexOfValue("all");
+                        networkSearchField.text = "";
+                    }
+                }
+
+                ListView {
+                    id: networkView
+
+                    objectName: "networkView"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: root.networkList.count > 0
+                    clip: true
+                    model: root.networkList
+                    spacing: Kirigami.Units.smallSpacing / 2
+                    keyNavigationEnabled: true
+                    activeFocusOnTab: true
+
+                    QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
+
+                    delegate: NetworkCard {
+                        onActivated: root.networkActivated(id)
                     }
                 }
             }
