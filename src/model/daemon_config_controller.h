@@ -1,0 +1,154 @@
+/*
+    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#pragma once
+
+#include "backend/daemon_config.h"
+#include "backend/daemon_deployment.h"
+#include "domain/engine_info.h"
+
+#include <QObject>
+#include <QStringList>
+
+namespace Kontainer
+{
+
+/*!
+ * 运行时配置页的控制器（ARCH_V5_V8 §2.2/§2.3/§2.4）。
+ *
+ * 职责：
+ *  - 探测部署形态与配置文件状态（只读）
+ *  - 读取 `daemon.json`（允许未知键）并把白名单字段暴露给界面
+ *  - 与 `/info` 的实际值对照，标出「已生效 / 待重启」
+ *  - 保存（用户可写路径直接原子写入；系统级路径走 5C 的提权 helper）
+ *  - 生成"自己动手"的降级命令（helper 不可用时不让功能变成死胡同）
+ *
+ * 不负责：QML 文案（界面负责）、提权细节（helper 负责）。
+ */
+class DaemonConfigController : public QObject
+{
+    Q_OBJECT
+
+    /* --- 部署与文件状态 --- */
+    Q_PROPERTY(QString formKey READ formKey NOTIFY changed)
+    Q_PROPERTY(QString configPath READ configPath NOTIFY changed)
+    Q_PROPERTY(bool configExists READ configExists NOTIFY changed)
+    Q_PROPERTY(bool configWritable READ configWritable NOTIFY changed)
+    Q_PROPERTY(bool requiresPrivilege READ requiresPrivilege NOTIFY changed)
+    Q_PROPERTY(bool dataRootInHomeDir READ dataRootInHomeDir NOTIFY changed)
+    /*! 解析失败时的技术原因；为空表示文件可用（或不存在）。 */
+    Q_PROPERTY(QString parseError READ parseError NOTIFY changed)
+
+    /* --- 我们管理的设置 --- */
+    Q_PROPERTY(QStringList registryMirrors READ registryMirrors NOTIFY changed)
+    Q_PROPERTY(QStringList insecureRegistries READ insecureRegistries NOTIFY changed)
+    Q_PROPERTY(int maxConcurrentDownloads READ maxConcurrentDownloads NOTIFY changed)
+    Q_PROPERTY(QString logDriver READ logDriver NOTIFY changed)
+    /*! `data-root` / `storage-driver`（只读展示）。 */
+    Q_PROPERTY(QString dataRoot READ dataRoot NOTIFY changed)
+    Q_PROPERTY(QString configuredStorageDriver READ configuredStorageDriver NOTIFY changed)
+    /*! 我们不管的键（界面显示"其他键：N 个（只读）"）。 */
+    Q_PROPERTY(QStringList unmanagedKeys READ unmanagedKeys NOTIFY changed)
+
+    /* --- 生效状态 --- */
+    /*! `/info` 报告的镜像加速器（实际生效值）。 */
+    Q_PROPERTY(QStringList activeRegistryMirrors READ activeRegistryMirrors NOTIFY changed)
+    /*! 已保存但尚未生效（需要重启 daemon）。 */
+    Q_PROPERTY(bool restartPending READ restartPending NOTIFY changed)
+    /*! `LiveRestoreEnabled`：为假时重启会停掉运行中的容器。 */
+    Q_PROPERTY(bool liveRestoreEnabled READ liveRestoreEnabled NOTIFY changed)
+    /*! 当前配置文件的备份列表（新的在前）。 */
+    Q_PROPERTY(QStringList backups READ backups NOTIFY changed)
+
+    /* --- 保存结果 --- */
+    Q_PROPERTY(QString lastError READ lastError NOTIFY resultChanged)
+    Q_PROPERTY(QString lastBackupPath READ lastBackupPath NOTIFY resultChanged)
+    Q_PROPERTY(bool dirty READ dirty NOTIFY dirtyChanged)
+
+public:
+    explicit DaemonConfigController(QObject *parent = nullptr);
+
+    /*! 引擎信息变化（`/info` 回来）时更新"生效状态"的对照基准。 */
+    void setEngineInfo(const EngineInfo &info);
+
+    QString formKey() const;
+    QString configPath() const;
+    bool configExists() const;
+    bool configWritable() const;
+    bool requiresPrivilege() const;
+    bool dataRootInHomeDir() const;
+    QString parseError() const;
+
+    QStringList registryMirrors() const;
+    QStringList insecureRegistries() const;
+    int maxConcurrentDownloads() const;
+    QString logDriver() const;
+    QString dataRoot() const;
+    QString configuredStorageDriver() const;
+    QStringList unmanagedKeys() const;
+
+    QStringList activeRegistryMirrors() const;
+    bool restartPending() const;
+    bool liveRestoreEnabled() const;
+    QStringList backups() const;
+
+    QString lastError() const;
+    QString lastBackupPath() const;
+    bool dirty() const;
+
+    /*! 重新探测 + 重新读文件（页面进入、保存/重启之后调用）。 */
+    Q_INVOKABLE void reload();
+
+    /* --- 编辑（界面把当前值塞回来；未调用的字段表示不修改） --- */
+    Q_INVOKABLE void setRegistryMirrors(const QStringList &mirrors);
+    Q_INVOKABLE void setInsecureRegistries(const QStringList &registries);
+    Q_INVOKABLE void setMaxConcurrentDownloads(int value);
+    Q_INVOKABLE void setLogDriver(const QString &driver);
+
+    /*! 把当前编辑合并进原文档并返回预览（用于确认对话框里展示将写入的内容）。 */
+    Q_INVOKABLE QString pendingContentPreview() const;
+
+    /*!
+     * 保存。
+     *
+     * 用户可写路径 → 直接原子写入并返回 true；
+     * 需要提权 → 返回 false 并把 `lastError` 设为 `privilegeRequired`（5C 接上 helper 后由 helper 完成）。
+     */
+    Q_INVOKABLE bool save();
+
+    /*! 恢复某个备份（传入备份文件路径；空字符串表示最近一个）。 */
+    Q_INVOKABLE bool restoreBackup(const QString &backupPath = QString());
+
+    /*! helper 不可用时的"自己动手"命令（可直接复制到终端执行）。 */
+    Q_INVOKABLE QString privilegedCommand() const;
+
+Q_SIGNALS:
+    void changed();
+    void resultChanged();
+    void dirtyChanged();
+    /*! 保存成功（页面据此提示"待重启生效"或"已写入"）。 */
+    void saved();
+
+private:
+    void refreshFromDisk();
+    DaemonConfigEdits buildEdits() const;
+    void setLastError(const QString &error);
+    void setDirty(bool dirty);
+
+    EngineInfo m_engine;
+    DaemonDeployment m_deployment;
+    DaemonConfigDocument m_document;
+
+    /*! 编辑状态：只有被 set* 调用过的字段才会写回。 */
+    DaemonConfigEdits m_edits;
+
+    QStringList m_activeMirrors;
+    QStringList m_backups;
+    QString m_lastError;
+    QString m_lastBackupPath;
+    bool m_dirty = false;
+};
+
+} // namespace Kontainer

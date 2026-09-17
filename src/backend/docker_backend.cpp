@@ -223,6 +223,11 @@ void DockerBackend::startInfoRequest()
         m_engine.containersStopped = info->containersStopped;
         m_engine.imageCount = info->images;
         m_engine.memoryTotalBytes = info->memoryTotalBytes;
+        m_engine.securityOptions = info->securityOptions;
+        m_engine.dockerRootDir = info->dockerRootDir;
+        m_engine.loggingDriver = info->loggingDriver;
+        m_engine.registryMirrors = info->registryMirrors;
+        m_engine.liveRestoreEnabled = info->liveRestoreEnabled;
         // /info 的信息比 /version 更完整时优先采用
         if (!info->kernelVersion.isEmpty()) {
             m_engine.kernelVersion = info->kernelVersion;

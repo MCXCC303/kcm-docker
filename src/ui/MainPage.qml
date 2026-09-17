@@ -29,6 +29,8 @@ Kirigami.Page {
 
     /*! 卡片被激活：由 main.qml 接到导航上（ARCH_V2 §43：导航属于 KCM 层） */
     signal containerActivated(string containerId)
+    /*! 请求打开「运行时配置」页（daemon.json）。 */
+    signal configureRuntimeRequested()
     signal imageActivated(string imageId)
 
     /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
@@ -645,14 +647,40 @@ Kirigami.Page {
             }
 
             /* ---------------------------- Engine --------------------------- */
-            QQC2.ScrollView {
+            ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                spacing: Kirigami.Units.smallSpacing
 
-                EngineStatusView {
-                    width: parent.width
-                    engine: root.controller.engine
-                    buildStamp: root.controller.buildStamp
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Button {
+                        objectName: "openRuntimeConfigButton"
+                        text: i18n("Runtime configuration…")
+                        icon.name: "settings-configure"
+                        onClicked: root.configureRuntimeRequested()
+                    }
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Registry mirrors, insecure registries and other daemon settings.")
+                        font: Kirigami.Theme.smallFont
+                        opacity: 0.7
+                        elide: Text.ElideRight
+                    }
+                }
+
+                QQC2.ScrollView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+
+                    EngineStatusView {
+                        width: parent.width
+                        engine: root.controller.engine
+                        buildStamp: root.controller.buildStamp
+                    }
                 }
             }
         }

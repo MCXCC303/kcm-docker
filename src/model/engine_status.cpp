@@ -25,4 +25,15 @@ void EngineStatus::clear()
     Q_EMIT changed();
 }
 
+bool EngineStatus::rootless() const
+{
+    // Docker 以 `name=rootless` 标记 rootless 模式（SecurityOptions 里的字符串）
+    for (const QString &option : m_info.securityOptions) {
+        if (option.contains(QLatin1String("rootless"))) {
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace Kontainer

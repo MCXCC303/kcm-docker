@@ -110,6 +110,30 @@ std::optional<DockerInfoDTO> DockerInfoDTO::fromJson(const QJsonObject &object, 
     dto.cpus = intValue(object, QStringLiteral("NCPU"));
     dto.memoryTotalBytes = integerValue(object, QStringLiteral("MemTotal"));
 
+        const QJsonValue security = object.value(QStringLiteral("SecurityOptions"));
+        if (security.isArray()) {
+            for (const QJsonValue &entry : security.toArray()) {
+                if (entry.isString()) {
+                    dto.securityOptions.append(entry.toString());
+                }
+            }
+        }
+        dto.dockerRootDir = stringValue(object, QStringLiteral("DockerRootDir"));
+        dto.loggingDriver = stringValue(object, QStringLiteral("LoggingDriver"));
+        dto.liveRestoreEnabled = boolValue(object, QStringLiteral("LiveRestoreEnabled"));
+
+        const QJsonValue registryConfig = object.value(QStringLiteral("RegistryConfig"));
+        if (registryConfig.isObject()) {
+            const QJsonValue mirrors = registryConfig.toObject().value(QStringLiteral("Mirrors"));
+            if (mirrors.isArray()) {
+                for (const QJsonValue &entry : mirrors.toArray()) {
+                    if (entry.isString()) {
+                        dto.registryMirrors.append(entry.toString());
+                    }
+                }
+            }
+        }
+
     return dto;
 }
 

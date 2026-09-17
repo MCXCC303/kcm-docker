@@ -6,7 +6,14 @@
 #
 # 用法：
 #     tests/tools/render_ui.sh <page> <width> <height> <light|dark> <output.png>
-#     page = main | container-detail | image-detail | engine
+#     page = main | container-detail | image-detail | engine | daemon-config
+#
+# 另外两个可选环境变量（只影响截图内容，不影响产品行为）：
+#     KONTAINER_RENDER_PULLS=1       在镜像标签页造出「拉取中 + 拉取失败」两条记录
+#     KONTAINER_RENDER_MANY_PORTS=1  在容器详情造出 24 条端口映射
+#     KONTAINER_RENDER_ROOTLESS=1    让 fixture 报告 rootless 部署（配置页据此走用户配置路径）
+#     HOME=<临时目录>                让 daemon-config 页读到该目录下的 daemon.json
+#                                    （用于复核"用户可写"形态；默认读真实系统配置）
 #
 # 为什么需要包装脚本（而不是在 C++ 里 qputenv）：
 # KColorScheme / KConfig 在进程启动早期就确定了配置位置，实测在 main() 里

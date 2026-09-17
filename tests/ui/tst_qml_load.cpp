@@ -261,6 +261,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("ContainerCard.qml"),
         QStringLiteral("ImageCard.qml"),
         QStringLiteral("EngineStatusView.qml"),
+        QStringLiteral("DaemonConfigPage.qml"),
         QStringLiteral("StorageView.qml"),
         QStringLiteral("ResourceView.qml"),
         QStringLiteral("components/StatTile.qml"),

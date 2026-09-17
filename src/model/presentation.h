@@ -71,6 +71,19 @@ public:
 
     /*! 宿主 IP 是否是通配地址（`0.0.0.0` / `::` / 空字符串）。 */
     Q_INVOKABLE bool isWildcardHostIp(const QString &hostIp) const;
+
+    /* --- 运行时配置（daemon.json）字段校验（ARCH_V5_V8 §2.3） --- */
+
+    /*!
+     * 镜像加速器地址的校验结果 key。
+     *
+     * 返回 key 而不是文案：规则在 C++（可测、只有一份），文案在 QML（可翻译）。
+     * 空字符串 = 合法；`emptyHost` = 空输入；`invalid` = 形态不对。
+     */
+    Q_INVOKABLE QString registryMirrorErrorKey(const QString &value) const;
+
+    /*! insecure-registries 的校验结果 key（只接受 `host[:port]`，不接受 scheme 与路径）。 */
+    Q_INVOKABLE QString insecureRegistryErrorKey(const QString &value) const;
 };
 
 } // namespace Kontainer

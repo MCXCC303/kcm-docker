@@ -8,6 +8,7 @@
 #include "model/container_detail_controller.h"
 #include "model/container_filter_model.h"
 #include "model/container_model.h"
+#include "model/daemon_config_controller.h"
 #include "model/detail_list_model.h"
 #include "model/engine_status.h"
 #include "model/format.h"
@@ -38,6 +39,7 @@ void registerKontainerQmlTypes()
     qmlRegisterUncreatableType<DetailListModel>("org.kde.kontainer", 1, 0, "DetailListModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<MetricsModel>("org.kde.kontainer", 1, 0, "MetricsModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<ContainerDetailController>("org.kde.kontainer", 1, 0, "ContainerDetailController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<DaemonConfigController>("org.kde.kontainer", 1, 0, "DaemonConfigController", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<OperationController>("org.kde.kontainer", 1, 0, "OperationController", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<ImageDetailController>("org.kde.kontainer", 1, 0, "ImageDetailController", QStringLiteral("Provided by the KCM"));
 

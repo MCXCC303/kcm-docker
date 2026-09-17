@@ -38,6 +38,7 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
     , m_hostPaths(hostPaths)
+    , m_daemonConfig(new DaemonConfigController(this))
 {
     Q_ASSERT(m_backend);
     // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
@@ -47,6 +48,9 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     m_imageFilter->setSourceModel(m_imageModel);
 
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
+    // 配置页需要 /info 里的 SecurityOptions / RegistryConfig.Mirrors / LiveRestoreEnabled，
+    // 因此引擎信息一到就同步给配置控制器
+    m_daemonConfig->setEngineInfo(m_backend->engineInfo());
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &StatusController::onContainersUpdated);
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &StatusController::onImagesUpdated);
     connect(m_backend, &DockerBackendInterface::storageUpdated, this, &StatusController::onStorageUpdated);
@@ -260,6 +264,7 @@ QString StatusController::storageStateKey() const
 
 void StatusController::onEngineUpdated()
 {
+    m_daemonConfig->setEngineInfo(m_backend->engineInfo());
     const EngineInfo info = m_backend->engineInfo();
     if (info.available) {
         m_engine->setInfo(info);

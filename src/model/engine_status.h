@@ -30,6 +30,16 @@ class EngineStatus : public QObject
     Q_PROPERTY(QString architecture READ architecture NOTIFY changed)
     Q_PROPERTY(QString kernelVersion READ kernelVersion NOTIFY changed)
     Q_PROPERTY(QString engineName READ engineName NOTIFY changed)
+    /*! 是否 rootless 部署（`/info` 的 SecurityOptions 含 `name=rootless`）。 */
+    Q_PROPERTY(bool rootless READ rootless NOTIFY changed)
+    /*! `/info` 的 DockerRootDir。 */
+    Q_PROPERTY(QString dockerRootDir READ dockerRootDir NOTIFY changed)
+    /*! `/info` 的 LoggingDriver（六期日志功能据此判断能否读取）。 */
+    Q_PROPERTY(QString loggingDriver READ loggingDriver NOTIFY changed)
+    /*! `/info` 报告的镜像加速器（配置编辑的「已生效」对照）。 */
+    Q_PROPERTY(QStringList activeRegistryMirrors READ activeRegistryMirrors NOTIFY changed)
+    /*! LiveRestore 是否开启（决定重启 daemon 会不会停掉运行中的容器）。 */
+    Q_PROPERTY(bool liveRestoreEnabled READ liveRestoreEnabled NOTIFY changed)
     Q_PROPERTY(QString operatingSystem READ operatingSystem NOTIFY changed)
     Q_PROPERTY(QString cgroupVersion READ cgroupVersion NOTIFY changed)
     Q_PROPERTY(QString storageDriver READ storageDriver NOTIFY changed)
@@ -86,6 +96,23 @@ public:
     QString engineName() const
     {
         return m_info.engineName;
+    }
+    bool rootless() const;
+    QString dockerRootDir() const
+    {
+        return m_info.dockerRootDir;
+    }
+    QString loggingDriver() const
+    {
+        return m_info.loggingDriver;
+    }
+    QStringList activeRegistryMirrors() const
+    {
+        return m_info.registryMirrors;
+    }
+    bool liveRestoreEnabled() const
+    {
+        return m_info.liveRestoreEnabled;
     }
     QString operatingSystem() const
     {

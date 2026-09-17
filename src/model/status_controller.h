@@ -13,6 +13,7 @@
 #include "model/image_detail_controller.h"
 #include "model/image_filter_model.h"
 #include "backend/host_path_service.h"
+#include "model/daemon_config_controller.h"
 #include "model/operation_controller.h"
 #include "model/image_model.h"
 #include "model/refresh_scheduler.h"
@@ -95,6 +96,8 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::ImageDetailController *imageDetail READ imageDetail CONSTANT)
     /*! 写操作编排与结果通道（ARCH_V4 §2.2.4）。 */
     Q_PROPERTY(Kontainer::OperationController *operations READ operations CONSTANT)
+    /*! 运行时配置（daemon.json）页面（ARCH_V5_V8 §2.2/§2.3）。 */
+    Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfig READ daemonConfig CONSTANT)
     /*! 最近一次「打开宿主路径」的失败说明；为空表示没有失败。 */
     Q_PROPERTY(QString hostPathError READ hostPathError NOTIFY hostPathErrorChanged)
 
@@ -242,6 +245,10 @@ public:
     {
         return m_operations;
     }
+    DaemonConfigController *daemonConfig() const
+    {
+        return m_daemonConfig;
+    }
     QString hostPathError() const
     {
         return m_hostPathError;
@@ -324,6 +331,7 @@ private:
     ImageDetailController *m_imageDetail = nullptr;
     OperationController *m_operations = nullptr;
     HostPathService *m_hostPaths = nullptr;
+    DaemonConfigController *m_daemonConfig = nullptr;
     QString m_hostPathError;
 
     State m_state = State::Idle;

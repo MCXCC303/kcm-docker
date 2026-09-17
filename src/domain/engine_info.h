@@ -6,6 +6,7 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
 
 namespace Kontainer
 {
@@ -34,6 +35,16 @@ struct EngineInfo {
     int imageCount = 0;
     /*! 宿主内存总量（/info 的 MemTotal）：用于判断容器 memory limit 是否为“无限制”。 */
     qint64 memoryTotalBytes = 0;
+    /*! `/info` 的 SecurityOptions：含 `name=rootless` 即为 rootless 部署。 */
+    QStringList securityOptions;
+    /*! `/info` 的 DockerRootDir。 */
+    QString dockerRootDir;
+    /*! `/info` 的 LoggingDriver。 */
+    QString loggingDriver;
+    /*! `/info` 的 RegistryConfig.Mirrors：与配置文件对照可判断「已生效 / 待重启」。 */
+    QStringList registryMirrors;
+    /*! `/info` 的 LiveRestoreEnabled：为真时重启 daemon 不会停掉运行中的容器。 */
+    bool liveRestoreEnabled = false;
 };
 
 } // namespace Kontainer

@@ -192,7 +192,12 @@ void SourceConventionsTest::qmlNeverTalksHttp()
     const QMap<QString, QString> qmlFiles = collectFiles(sourceDir() + QStringLiteral("/src/ui"), {QStringLiteral("*.qml")});
     QVERIFY2(!qmlFiles.isEmpty(), "no QML sources found");
 
-    const QRegularExpression transport(QStringLiteral("(https?://|\"GET |\"POST|\"DELETE|unix://|/containers/|/images/)"));
+    // 只拦"真的在碰传输层"的写法：
+    //  - 请求 API（XMLHttpRequest / fetch）
+    //  - HTTP 方法字面量与 REST 路径片段、socket 地址
+    // 示例地址（例如镜像加速器占位符 `https://mirror.example.com`）是数据而不是请求，
+    // 因此不再把 `http(s)://` 一律当成违规——那会把"校验用户输入"也误判成越界。
+    const QRegularExpression transport(QStringLiteral("(XMLHttpRequest|fetch\\(|\"GET |\"POST|\"DELETE|unix://|/containers/|/images/)"));
     QStringList offenders;
     for (auto it = qmlFiles.constBegin(); it != qmlFiles.constEnd(); ++it) {
         for (const QString &hit : linesMatching(it.value(), transport)) {

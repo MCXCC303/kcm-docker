@@ -59,6 +59,16 @@ void fillFixture(MockDockerBackend &backend)
     engine.available = true;
     engine.countsAvailable = true;
     engine.serverVersion = QStringLiteral("29.8.0");
+    // 部署形态相关字段按本机真实情况填写（系统级 root daemon、无 rootless 标记、
+    // 数据目录在家目录、live-restore 关闭）：配置页与 Engine 页的截图才具备参考价值
+    engine.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
+    // KONTAINER_RENDER_ROOTLESS=1：模拟 rootless daemon（配合 HOME 覆盖可复核"用户可写"形态）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_ROOTLESS")) {
+        engine.securityOptions.append(QStringLiteral("name=rootless"));
+    }
+    engine.dockerRootDir = QStringLiteral("/home/thf/.local/share/docker/");
+    engine.loggingDriver = QStringLiteral("json-file");
+    engine.liveRestoreEnabled = false;
     engine.apiVersion = QStringLiteral("1.56");
     engine.minApiVersion = QStringLiteral("1.24");
     engine.osType = QStringLiteral("linux");
@@ -402,6 +412,10 @@ int main(int argc, char **argv)
     } else if (page == QLatin1String("image-detail")) {
         qmlFile = QStringLiteral("ImageDetail.qml");
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    } else if (page == QLatin1String("daemon-config")) {
+        // 运行时配置页（ARCH_V5_V8 §2.3）：内容来自真实文件系统，
+        // 用 HOME 指向临时目录即可构造"用户可写"的 rootless 形态（见 render_ui.sh 的说明）
+        qmlFile = QStringLiteral("DaemonConfigPage.qml");
     } else {
         std::fprintf(stderr, "unknown page: %s\n", qPrintable(page));
         return 2;

@@ -174,4 +174,32 @@ bool Presentation::hostPortConflicts(const QString &hostIp, int hostPort, const 
     return false;
 }
 
+QString Presentation::registryMirrorErrorKey(const QString &value) const
+{
+    const QString trimmed = value.trimmed();
+    if (trimmed.isEmpty()) {
+        return QStringLiteral("emptyHost");
+    }
+    // 镜像加速器是 daemon 主动去连的地址：必须是 http(s) URL，且带主机名、不带路径查询
+    static const QRegularExpression pattern(QStringLiteral("^https?://[A-Za-z0-9._\\-]+(:[0-9]{1,5})?/?$"));
+    if (!pattern.match(trimmed).hasMatch()) {
+        return QStringLiteral("invalid");
+    }
+    return {};
+}
+
+QString Presentation::insecureRegistryErrorKey(const QString &value) const
+{
+    const QString trimmed = value.trimmed();
+    if (trimmed.isEmpty()) {
+        return QStringLiteral("emptyHost");
+    }
+    // insecure-registries 是"仓库地址":只允许 host[:port]，写 scheme 或路径都不对
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9._\\-]+(:[0-9]{1,5})?$"));
+    if (!pattern.match(trimmed).hasMatch()) {
+        return QStringLiteral("invalid");
+    }
+    return {};
+}
+
 } // namespace Kontainer

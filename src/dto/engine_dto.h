@@ -7,6 +7,7 @@
 
 #include <QJsonObject>
 #include <QString>
+#include <QStringList>
 
 #include <optional>
 
@@ -49,6 +50,16 @@ struct DockerInfoDTO {
     int images = 0;
     int cpus = 0;
     qint64 memoryTotalBytes = 0;
+    /*! `/info` 的 SecurityOptions（判断是否 rootless：含 `name=rootless`）。 */
+    QStringList securityOptions;
+    /*! `/info` 的 DockerRootDir。 */
+    QString dockerRootDir;
+    /*! `/info` 的 LoggingDriver（六期日志功能据此判断能否读取）。 */
+    QString loggingDriver;
+    /*! `/info` 的 RegistryConfig.Mirrors（配置编辑的「已生效」对照）。 */
+    QStringList registryMirrors;
+    /*! `/info` 的 LiveRestoreEnabled（重启 daemon 是否影响运行中容器）。 */
+    bool liveRestoreEnabled = false;
 
     static std::optional<DockerInfoDTO> fromJson(const QJsonObject &object, QString *error = nullptr);
     static std::optional<DockerInfoDTO> fromPayload(const QByteArray &payload, QString *error = nullptr);

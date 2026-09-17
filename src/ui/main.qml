@@ -83,6 +83,7 @@ KCM.AbstractKCM {
                         "imageId": imageId
                     });
                 }
+                onConfigureRuntimeRequested: stack.push(daemonConfigComponent)
             }
         }
 
@@ -90,6 +91,14 @@ KCM.AbstractKCM {
             id: containerDetailComponent
 
             ContainerDetail {
+                onCloseRequested: stack.pop()
+            }
+        }
+
+        Component {
+            id: daemonConfigComponent
+
+            DaemonConfigPage {
                 onCloseRequested: stack.pop()
             }
         }

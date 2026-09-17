@@ -6,6 +6,10 @@ add_library(kontainer_core STATIC
 
     backend/docker_api_version.cpp
     backend/docker_api_version.h
+    backend/daemon_config.cpp
+    backend/daemon_config.h
+    backend/daemon_deployment.cpp
+    backend/daemon_deployment.h
     backend/docker_api_paths.h
     backend/docker_backend.cpp
     backend/docker_backend.h
@@ -67,6 +71,8 @@ add_library(kontainer_core STATIC
     model/container_model.cpp
     model/container_model.h
     model/detail_entry.h
+    model/daemon_config_controller.cpp
+    model/daemon_config_controller.h
     model/detail_list_model.cpp
     model/detail_list_model.h
     model/docker_error_text.cpp
