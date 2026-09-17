@@ -287,8 +287,8 @@ ColumnLayout {
                 id: envPasteField
 
                 objectName: "envPasteField"
-                // 示例文本是数据而不是界面文案：不进翻译（i18n-lint: allow 示例 .env 内容）
-                placeholderText: "TZ=Asia/Shanghai\n# comment\nAPI_KEY=\"secret\""
+                // 示例文本是数据而不是界面文案
+                placeholderText: "TZ=Asia/Shanghai\n# comment\nAPI_KEY=\"secret\"" // i18n-lint: allow 示例 .env 内容
                 font.family: "monospace"
                 wrapMode: TextEdit.NoWrap
             }

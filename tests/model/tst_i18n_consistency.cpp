@@ -190,10 +190,14 @@ void I18nConsistencyTest::noUnwrappedUiStrings()
         if (!file.open(QIODevice::ReadOnly)) {
             continue;
         }
-        const QStringList lines = stripComments(QString::fromUtf8(file.readAll())).split(QLatin1Char('\n'));
+        // 两份内容：raw 用于识别「豁免标记」（标记本身就在注释里，剥掉注释就看不见了），
+        // stripped 用于匹配真正的代码属性赋值（避免文档注释里的示例代码误报）
+        const QString rawContent = QString::fromUtf8(file.readAll());
+        const QStringList rawLines = rawContent.split(QLatin1Char('\n'));
+        const QStringList lines = stripComments(rawContent).split(QLatin1Char('\n'));
         for (int index = 0; index < lines.size(); ++index) {
             const QString &line = lines.at(index);
-            if (line.contains(QLatin1String("i18n-lint: allow"))) {
+            if (index < rawLines.size() && rawLines.at(index).contains(QLatin1String("i18n-lint: allow"))) {
                 continue;
             }
             const QRegularExpressionMatch match = textProperty.match(line);
