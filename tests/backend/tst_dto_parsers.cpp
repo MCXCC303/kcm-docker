@@ -7,6 +7,7 @@
 #include "dto/stats_dto.h"
 #include "dto/engine_dto.h"
 #include "dto/image_dto.h"
+#include "dto/network_dto.h"
 
 #include <QtTest>
 
@@ -24,6 +25,9 @@ private Q_SLOTS:
     // --- containers -----------------------------------------------------
     void parsesContainer();
     void containerWithoutOptionalFields();
+    void parsesNetworks();
+    void networkWithoutOptionalFields();
+    void networkListIsRobust();
     void containerWithUnknownFields();
     void containerWithWrongFieldTypes();
     void containerWithoutRequiredFieldsIsSkipped();
@@ -404,6 +408,127 @@ void DtoParsersTest::statsBlockIoToleratesSyncAsyncOnly()
     QVERIFY(dto.has_value());
     QCOMPARE(dto->blockReadBytes, quint64(150));
     QCOMPARE(dto->blockWriteBytes, quint64(0));
+}
+
+/*!
+ * 网络列表解析（ARCH_V5_V8 §3.2）。
+ *
+ * 样例取自本机真实 daemon 的 `GET /networks`（bridge / none / winboat_default / host），
+ * 字段缺失、类型不符、成员地址带子网前缀这些真实形态都要处理。
+ */
+void DtoParsersTest::parsesNetworks()
+{
+    const QByteArray payload = R"([
+        {
+            "Name": "bridge",
+            "Id": "5cd9ee041dffb38f712fa8b9284ef54c3fcaffd720958515aa3c155b82af90b9",
+            "Created": "2026-09-16T17:44:09.395242226+08:00",
+            "Scope": "local",
+            "Driver": "bridge",
+            "EnableIPv4": true,
+            "EnableIPv6": false,
+            "IPAM": {"Driver": "default", "Options": null,
+                     "Config": [{"Subnet": "172.17.0.0/16", "Gateway": "172.17.0.1"}]},
+            "Internal": false,
+            "Attachable": false,
+            "Ingress": false,
+            "Options": {"com.docker.network.bridge.name": "docker0",
+                        "com.docker.network.driver.mtu": "1500"},
+            "Labels": {},
+            "Containers": {}
+        },
+        {
+            "Name": "winboat_default",
+            "Id": "aaaaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff1234",
+            "Created": "2026-09-16T19:14:22.391557578+08:00",
+            "Scope": "local",
+            "Driver": "bridge",
+            "IPAM": {"Config": [{"Subnet": "172.18.0.0/16", "Gateway": "172.18.0.1"}]},
+            "Options": {},
+            "Labels": {"com.docker.compose.project": "winboat"},
+            "Containers": {
+                "1111111111111111111111111111111111111111111111111111111111111111": {
+                    "Name": "winboat", "EndpointID": "ep1",
+                    "MacAddress": "02:42:ac:12:00:02",
+                    "IPv4Address": "172.18.0.2/16", "IPv6Address": ""
+                }
+            }
+        }
+    ])";
+
+    QString error;
+    int skipped = 0;
+    const QList<DockerNetworkDTO> dtos = DockerNetworkDTO::listFromJson(payload, &error, &skipped);
+    QVERIFY2(error.isEmpty(), qPrintable(error));
+    QCOMPARE(skipped, 0);
+    QCOMPARE(dtos.size(), 2);
+
+    const QList<Network> networks = networksFromDto(dtos);
+    const Network &builtin = networks.at(0);
+    QCOMPARE(builtin.name, QStringLiteral("bridge"));
+    QCOMPARE(builtin.shortId(), QStringLiteral("5cd9ee041dff"));
+    QCOMPARE(builtin.driver, QStringLiteral("bridge"));
+    QCOMPARE(builtin.scope, QStringLiteral("local"));
+    QVERIFY(builtin.created.isValid());
+    QVERIFY2(builtin.isPredefined(), "bridge/host/none are the daemon's pre-defined networks");
+    QCOMPARE(builtin.subnetText(), QStringLiteral("172.17.0.0/16"));
+    QCOMPARE(builtin.primaryGateway(), QStringLiteral("172.17.0.1"));
+    QCOMPARE(builtin.memberCount(), 0);
+    // 选项按 key 排序：顺序稳定，界面不会每次刷新都换顺序
+    QCOMPARE(builtin.options.size(), 2);
+    QCOMPARE(builtin.options.first().first, QStringLiteral("com.docker.network.bridge.name"));
+
+    const Network &compose = networks.at(1);
+    QVERIFY2(!compose.isPredefined(), "a compose network must be deletable");
+    QCOMPARE(compose.labels.size(), 1);
+    QCOMPARE(compose.memberCount(), 1);
+    // 成员地址去掉子网前缀（daemon 给的是 172.18.0.2/16）
+    QCOMPARE(compose.members.first().name, QStringLiteral("winboat"));
+    QCOMPARE(compose.members.first().ipv4Address, QStringLiteral("172.18.0.2"));
+    QCOMPARE(compose.members.first().macAddress, QStringLiteral("02:42:ac:12:00:02"));
+}
+
+void DtoParsersTest::networkWithoutOptionalFields()
+{
+    // host / none 这类网络没有 IPAM、没有选项：不能因为缺字段就整条丢掉
+    const QByteArray payload = R"([
+        {"Name": "host", "Id": "2222222222222222222222222222222222222222222222222222222222222222", "Driver": "host"},
+        {"Name": "none", "Id": "3333333333333333333333333333333333333333333333333333333333333333", "Driver": "null",
+         "IPAM": {"Config": []}, "Options": null, "Labels": null}
+    ])";
+
+    int skipped = 0;
+    const QList<Network> networks = networksFromDto(DockerNetworkDTO::listFromJson(payload, nullptr, &skipped));
+    QCOMPARE(skipped, 0);
+    QCOMPARE(networks.size(), 2);
+    QCOMPARE(networks.at(0).driver, QStringLiteral("host"));
+    QVERIFY(networks.at(0).subnetText().isEmpty());
+    QVERIFY(networks.at(0).created.isNull());
+    QVERIFY(networks.at(0).isPredefined());
+    QVERIFY(networks.at(1).options.isEmpty());
+    QVERIFY(networks.at(1).isPredefined());
+}
+
+void DtoParsersTest::networkListIsRobust()
+{
+    // 坏条目跳过、好的保留；整体不是数组则报错且返回空
+    const QByteArray payload = R"([
+        {"Name": "good", "Id": "4444444444444444444444444444444444444444444444444444444444444444", "Driver": "bridge"},
+        {"Name": "no-id"},
+        "not-an-object"
+    ])";
+    QString error;
+    int skipped = 0;
+    const QList<Network> networks = networksFromDto(DockerNetworkDTO::listFromJson(payload, &error, &skipped));
+    QVERIFY(error.isEmpty());
+    QCOMPARE(skipped, 2);
+    QCOMPARE(networks.size(), 1);
+    QCOMPARE(networks.first().name, QStringLiteral("good"));
+
+    error.clear();
+    const QList<DockerNetworkDTO> broken = DockerNetworkDTO::listFromJson(QByteArrayLiteral("{\"not\":\"an array\"}"), &error, nullptr);
+    QVERIFY(broken.isEmpty());
+    QVERIFY(!error.isEmpty());
 }
 
 QTEST_GUILESS_MAIN(DtoParsersTest)
