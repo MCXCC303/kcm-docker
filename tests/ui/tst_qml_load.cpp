@@ -6,6 +6,7 @@
 #include "i18n.h"
 #include "model/image_pull_model.h"
 #include "model/mount_preset_store.h"
+#include "domain/image_build.h"
 #include "model/presentation.h"
 #include "model/qml_registration.h"
 #include "support/qml_item_utils.h"
@@ -140,6 +141,7 @@ private Q_SLOTS:
     void volumesTabListsCreatesAndPreviewsCleanup();
     void createContainerWizardGatesStepsAndHidesSecrets();
     void presetPanelManagesPresets();
+    void buildPanelSubmitsAndShowsFailureStep();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -1375,6 +1377,98 @@ void QmlLoadTest::presetPanelManagesPresets()
 }
 
 
+/*!
+ * 构建面板（ARCH_V5_V8 §5.4）：表单校验、提交的字段、以及列表里的**失败步骤**。
+ */
+void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
+{
+    QTemporaryDir contextDir;
+    QVERIFY(contextDir.isValid());
+    QFile dockerfile(QDir(contextDir.path()).filePath(QStringLiteral("Dockerfile")));
+    QVERIFY(dockerfile.open(QIODevice::WriteOnly));
+    dockerfile.write(QByteArrayLiteral("FROM alpine:3.19\nRUN exit 1\n"));
+    dockerfile.close();
+
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/BuildImagePanel.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    // required property 必须在创建时给：创建后再 setProperty 会先报"未初始化"
+    QVariantMap initialProperties;
+    initialProperties.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    initialProperties.insert(QStringLiteral("formOpen"), true);
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initialProperties, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *panel = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(panel);
+
+    QQuickWindow window;
+    window.resize(1000, 700);
+    panel->setParentItem(window.contentItem());
+    panel->setWidth(1000);
+    panel->setHeight(700);
+    window.show();
+    QTRY_VERIFY(panel->width() > 0);
+
+    auto *startButton = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildStartButton")));
+    auto *contextField = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildContextField")));
+    auto *tagsField = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildTagsField")));
+    auto *targetField = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildTargetField")));
+    auto *noCacheCheck = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildNoCacheCheck")));
+    QVERIFY(startButton && contextField && tagsField && targetField && noCacheCheck);
+
+    // 上下文与标签都没填：不能提交（按钮也是禁用的）
+    QVERIFY2(!startButton->property("enabled").toBool(), "an empty form must not be submittable");
+    auto *formError = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildFormError")));
+    QVERIFY(formError);
+    contextField->setProperty("text", QStringLiteral("relative/path"));
+    QTRY_VERIFY(formError->property("visible").toBool());
+    QVERIFY2(formError->property("text").toString().contains(QStringLiteral("absolute")),
+             "a relative context path must be rejected with a clear reason");
+
+    // 填好之后提交：字段如实传给控制器
+    contextField->setProperty("text", contextDir.path());
+    tagsField->setProperty("text", QStringLiteral("app:1.0\napp:latest"));
+    targetField->setProperty("text", QStringLiteral("runtime"));
+    // 用 click() 而不是直接写 checked：前者才是用户动作（可勾选按钮会自行翻转并发出 toggled）
+    QVERIFY(QMetaObject::invokeMethod(noCacheCheck, "click"));
+    QTRY_VERIFY(panel->property("noCache").toBool());
+    QVERIFY(QMetaObject::invokeMethod(startButton, "clicked"));
+
+    const ImageBuildRequest request = m_backend->lastBuildRequest();
+    QCOMPARE(request.tags, QStringList({QStringLiteral("app:1.0"), QStringLiteral("app:latest")}));
+    QCOMPARE(request.target, QStringLiteral("runtime"));
+    QVERIFY(request.noCache);
+    QVERIFY2(!request.contextArchive.isEmpty(), "the context must have been packed");
+    QCOMPARE(m_stubKcm->controller()->operations()->builds()->count(), 1);
+
+    // 列表：进行中显示步骤，失败后把失败步骤留在列表里
+    const QString buildId = m_stubKcm->controller()->operations()->builds()->entries().first().id;
+    ImageBuildUpdate update;
+    update.statusText = QStringLiteral("Step 2/3 : RUN exit 1");
+    update.stepIndex = 2;
+    update.totalSteps = 3;
+    update.stepCommand = QStringLiteral("RUN exit 1");
+    update.progress = 0.66;
+    update.progressKnown = true;
+    m_backend->emitBuildProgress(buildId, update);
+    update.errorText = QStringLiteral("Step 2/3 (RUN exit 1) failed: exit code 1");
+    m_backend->emitBuildProgress(buildId, update);
+
+    // 失败的步骤留在**数据**里（用例断言控制器；卡片把它画出来由渲染截图复核——
+    // 离屏用例里 Repeater 条目的父链不可靠，这条教训在七期已经踩过）
+    m_backend->emitBuildFinished(buildId,
+                                 DockerBackendInterface::MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::EngineError, QStringLiteral("exit code 1")));
+    const ImageBuildEntry entry = m_stubKcm->controller()->operations()->builds()->entries().first();
+    QVERIFY2(entry.detailText.contains(QStringLiteral("Step 2/3")), qPrintable(entry.detailText));
+    QVERIFY2(entry.detailText.contains(QStringLiteral("RUN exit 1")), qPrintable(entry.detailText));
+    QVERIFY2(!entry.active, "a failed build must not stay active");
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -1411,6 +1505,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/OperationMessage.qml"),
         QStringLiteral("components/PullImageDialog.qml"),
         QStringLiteral("components/PullProgressList.qml"),
+        QStringLiteral("components/BuildImagePanel.qml"),
         QStringLiteral("components/FieldChip.qml"),
         QStringLiteral("components/PortTopology.qml"),
         QStringLiteral("components/ImageRefInput.qml"),

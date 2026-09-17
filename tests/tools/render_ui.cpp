@@ -732,6 +732,65 @@ int main(int argc, char **argv)
         }
     }
 
+    // KONTAINER_RENDER_OPEN_BUILD=1：展开镜像页的构建表单，并造一条进行中与一条失败的构建
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_BUILD")) {
+        auto *controller = stub->controller();
+        QQuickItem *entry = nullptr;
+        std::function<void(QQuickItem *)> walkBuild = [&](QQuickItem *node) {
+            if (!node || entry) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("buildImageEntryButton")) {
+                entry = node;
+                return;
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walkBuild(child);
+            }
+        };
+        walkBuild(item);
+        if (entry) {
+            QMetaObject::invokeMethod(entry, "clicked");
+        }
+        // 造两条记录：一条进行中（第 3/7 步）、一条失败（带着失败步骤）
+        QTemporaryDir *contextDir = new QTemporaryDir(); // 进程退出时随渲染结束一起结束
+        QFile dockerfile(QDir(contextDir->path()).filePath(QStringLiteral("Dockerfile")));
+        if (dockerfile.open(QIODevice::WriteOnly)) {
+            dockerfile.write("FROM alpine:3.19\nRUN make\n");
+            dockerfile.close();
+        }
+        controller->operations()->buildImage(contextDir->path(), {QStringLiteral("demo-app:1.0")});
+        controller->operations()->buildImage(contextDir->path(),
+                                             {QStringLiteral("demo-app:2.0")},
+                                             QStringLiteral("Dockerfile"),
+                                             {},
+                                             {},
+                                             {},
+                                             true);
+        const QList<ImageBuildEntry> builds = controller->operations()->builds()->entries();
+        if (builds.size() >= 2) {
+            ImageBuildUpdate running;
+            running.statusText = QStringLiteral("Step 3/7 : RUN make");
+            running.stepIndex = 3;
+            running.totalSteps = 7;
+            running.stepCommand = QStringLiteral("RUN make");
+            running.progress = 3.0 / 7.0;
+            running.progressKnown = true;
+            backend->emitBuildProgress(builds.first().id, running);
+
+            ImageBuildUpdate failed;
+            failed.statusText = QStringLiteral("Step 2/4 : RUN npm run build");
+            failed.stepIndex = 2;
+            failed.totalSteps = 4;
+            failed.stepCommand = QStringLiteral("RUN npm run build");
+            failed.errorText = QStringLiteral("Step 2/4 (RUN npm run build) failed: The command '/bin/sh -c npm run build' returned a non-zero code: 1");
+            backend->emitBuildProgress(builds.last().id, failed);
+            backend->emitBuildFinished(builds.last().id,
+                                               DockerBackendInterface::MutationOutcome::Failed,
+                                               DockerError(DockerError::Kind::EngineError, QStringLiteral("exit code 1")));
+        }
+    }
+
     // KONTAINER_RENDER_OPEN_PRESETS=1：展开向导里的预设管理面板
     if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_PRESETS")) {
         QQuickItem *manage = nullptr;

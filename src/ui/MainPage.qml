@@ -38,6 +38,9 @@ Kirigami.Page {
     signal imageActivated(string imageId)
     /*! 打开网络详情（六期 §3.2）；由 main.qml 负责导航。 */
     signal networkActivated(string networkId)
+    /*! 构建镜像的内联表单是否展开（八期 §5.4）。 */
+    property bool buildPanelOpen: false
+
     /*! 打开数据卷详情（六期 §3.5）。 */
     signal volumeActivated(string volumeName)
     /*! 打开创建容器向导（七期 §4.4）；presetImage 为空表示从零开始。 */
@@ -555,6 +558,15 @@ Kirigami.Page {
                 onModelChanged: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
             }
 
+            // 构建镜像（八期 §5.4）：只读模式不出现入口
+            QQC2.Button {
+                objectName: "buildImageEntryButton"
+                visible: tabBar.currentIndex === 1 && root.operations.writeAllowed
+                text: i18n("Build image…")
+                icon.name: "run-build"
+                onClicked: root.buildPanelOpen = !root.buildPanelOpen
+            }
+
             // 创建容器（七期 §4.4）：只读模式不出现入口
             QQC2.Button {
                 objectName: "createContainerEntryButton"
@@ -668,6 +680,18 @@ Kirigami.Page {
                 }
 
                 /* 拉取进度（可并发、后台继续、失败保留原因，ARCH_V4 §2.4） */
+                Components.BuildImagePanel {
+                    id: buildPanel
+
+                    Layout.fillWidth: true
+                    operations: root.operations
+                    formOpen: root.buildPanelOpen
+                    visible: root.buildPanelOpen || root.operations.builds.count > 0
+                    onImageRequested: function (imageId) {
+                        root.imageActivated(imageId);
+                    }
+                }
+
                 Components.PullProgressList {
                     Layout.fillWidth: true
                     operations: root.operations
