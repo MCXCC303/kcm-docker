@@ -5,6 +5,8 @@
 
 #include "i18n.h"
 #include "model/container_detail_controller.h"
+#include "model/mount_list_model.h"
+#include "model/port_mapping_model.h"
 #include "model/detail_list_model.h"
 #include "model/image_detail_controller.h"
 #include "support/mock_docker_backend.h"
@@ -65,7 +67,7 @@ ContainerDetail makeDetail(ContainerState state)
                                             QString(),
                                             QStringLiteral("02:42:ac:11:00:05"),
                                             QStringLiteral("172.17.0.1")});
-    detail.mounts.append(ContainerMount {QStringLiteral("bind"), QStringLiteral("/host/data"), QStringLiteral("/data"), QStringLiteral("rw"), false});
+    detail.mounts.append(ContainerMount {QStringLiteral("bind"), QString(), QStringLiteral("/host/data"), QStringLiteral("/data"), QStringLiteral("rw"), false});
     detail.labels.append({QStringLiteral("com.example.role"), QStringLiteral("test")});
     return detail;
 }
@@ -107,13 +109,19 @@ void DetailControllersTest::containerDetailLoadsAndBuildsLists()
     QCOMPARE(controller.environmentCount(), 2);
 
     // 结构化子列表（不是把 JSON 丢给 QML）
-    QCOMPARE(controller.ports()->count(), 1);
-    QCOMPARE(controller.ports()->index(0, 0).data(DetailListModel::LabelRole).toString(), QStringLiteral("8080/tcp"));
-    QCOMPARE(controller.ports()->index(0, 0).data(DetailListModel::ValueRole).toString(), QStringLiteral("18080"));
+    // 端口现在是结构化模型（拓扑图要按字段画，而不是解析文本，ARCH_V4 §2.1.2）
+    QCOMPARE(controller.publishedPorts()->count(), 1);
+    QCOMPARE(controller.unpublishedPorts()->count(), 0);
+    QCOMPARE(controller.publishedPorts()->index(0, 0).data(PortMappingModel::ContainerChipTextRole).toString(), QStringLiteral("8080/tcp"));
+    QCOMPARE(controller.publishedPorts()->index(0, 0).data(PortMappingModel::HostChipTextRole).toString(), QStringLiteral("0.0.0.0:18080"));
     QCOMPARE(controller.networks()->index(0, 0).data(DetailListModel::LabelRole).toString(), QStringLiteral("bridge"));
     QCOMPARE(controller.networks()->index(0, 0).data(DetailListModel::ValueRole).toString(), QStringLiteral("172.17.0.5"));
-    QCOMPARE(controller.mounts()->index(0, 0).data(DetailListModel::LabelRole).toString(), QStringLiteral("/data"));
-    QCOMPARE(controller.mounts()->index(0, 0).data(DetailListModel::ValueRole).toString(), QStringLiteral("/host/data"));
+    QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::DestinationRole).toString(), QStringLiteral("/data"));
+    QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::SourceRole).toString(), QStringLiteral("/host/data"));
+    QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::ModeRole).toString(), QStringLiteral("rw"));
+    // 没有注入宿主路径服务时，不谎报路径存在，也不提供打开动作
+    QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("notApplicable"));
+    QVERIFY(!controller.mounts()->index(0, 0).data(MountListModel::OpenableRole).toBool());
     QCOMPARE(controller.labels()->count(), 1);
     QCOMPARE(controller.environmentVariables()->count(), 2);
     QCOMPARE(controller.environmentVariables()->index(0, 0).data(DetailListModel::LabelRole).toString(), QStringLiteral("PATH"));
@@ -286,7 +294,7 @@ void DetailControllersTest::unchangedDetailListsDoNotResetTheModel()
 
     ContainerDetail detail = makeDetail(ContainerState::Running);
     detail.networks = {{QStringLiteral("bridge"), QStringLiteral("id"), QStringLiteral("172.17.0.2"), {}, {}, QStringLiteral("172.17.0.1")}};
-    detail.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("rw"), false}};
+    detail.mounts = {{QStringLiteral("bind"), QString(), QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("rw"), false}};
     backend.setContainerDetail(detail);
 
     ContainerDetailController controller(&backend);

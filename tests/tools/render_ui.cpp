@@ -194,12 +194,14 @@ void fillFixture(MockDockerBackend &backend)
                         QStringLiteral("02:42:ac:11:00:04"),
                         QStringLiteral("172.17.0.1")}};
     detail.mounts = {{QStringLiteral("bind"),
+                      QString(),
                       QStringLiteral("/srv/frontend/config"),
                       QStringLiteral("/etc/frontend"),
                       QStringLiteral("ro"),
                       true},
                      {QStringLiteral("volume"),
                       QStringLiteral("frontend-cache"),
+                      QStringLiteral("/var/lib/docker/volumes/frontend-cache/_data"),
                       QStringLiteral("/var/cache/frontend"),
                       QStringLiteral("rw"),
                       false}};

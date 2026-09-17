@@ -22,6 +22,8 @@ include(KDECMakeSettings)
 # --- Qt6 / KF6 ---------------------------------------------------------------
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Qml Quick)
 find_package(KF6 6.5 REQUIRED COMPONENTS CoreAddons Config I18n KCMUtils)
+# KIO 只被 KCM 插件使用（容器详情「打开宿主目录」），core 与单元测试都不依赖它
+find_package(KF6 6.5 REQUIRED COMPONENTS KIO)
 
 qt_standard_project_setup()
 
@@ -85,6 +87,8 @@ set(KONTAINER_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/ConfirmDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/OperationMessage.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/PullImageDialog.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/FieldChip.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/PortTopology.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/StatusChip.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/CopyButton.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/CopyableText.qml"

@@ -178,7 +178,7 @@ void KcmWidgetChurnTest::fillData(int iteration)
     detail.started = now;
     detail.environment = {QStringLiteral("A=%1").arg(iteration), QStringLiteral("B=2"), QStringLiteral("C=3")};
     detail.labels = {{QStringLiteral("k%1").arg(iteration), QStringLiteral("v")}};
-    detail.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/%1").arg(iteration), QStringLiteral("/data"), QStringLiteral("rw"), false}};
+    detail.mounts = {{QStringLiteral("bind"), QString(), QStringLiteral("/srv/%1").arg(iteration), QStringLiteral("/data"), QStringLiteral("rw"), false}};
     detail.networks = {{QStringLiteral("bridge"), QStringLiteral("id"), QStringLiteral("172.17.0.%1").arg(iteration % 250), {}, {}, QStringLiteral("172.17.0.1")}};
     m_backend->setContainerDetail(detail);
 

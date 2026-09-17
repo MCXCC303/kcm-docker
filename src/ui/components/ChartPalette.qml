@@ -85,6 +85,19 @@ QtObject {
     readonly property color storageVolumes: darkScheme ? "#87beeb" : "#1a64a0"
     readonly property color storageBuildCache: darkScheme ? "#a9d0f1" : "#1d70b4"
 
+    /* ---------------- 端口映射拓扑（ARCH_V4 §2.1.2） ---------------- */
+
+    /*!
+        拓扑连线颜色。
+        这是**结构性图形**，不是数据序列也不是状态：因此既不用序列色也不用状态色，
+        而是单独取一组中性色，并对两种配色都保证与背景的对比度（§1.8 / AA）。
+    */
+    readonly property color topologyLink: darkScheme ? "#9aa4ad" : "#4a545e"
+
+    /*! 拓扑节点（容器 / 宿主）的背景与边框。 */
+    readonly property color topologyNodeBackground: darkScheme ? "#31363b" : "#e6e9ec"
+    readonly property color topologyNodeBorder: darkScheme ? "#4b5157" : "#c2c7cc"
+
     /*!
         段与段之间的分隔线颜色。
         存储色阶的相邻级差只有约 1.2:1，靠颜色本身不足以稳定区分，

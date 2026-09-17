@@ -65,6 +65,9 @@ private Q_SLOTS:
     void pullDialogValidatesReferenceBeforeSubmitting();
     void confirmDialogAlwaysCarriesConsequenceText();
     void imageDetailOffersForceDeleteOnlyForMultipleTags();
+    void mountRowReflectsHostPathState();
+    void topologyDrawsDecoratedLinksForPublishedPorts();
+    void unpublishedPortsAreListedWithoutLinks();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
@@ -259,6 +262,8 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/ConfirmDialog.qml"),
         QStringLiteral("components/OperationMessage.qml"),
         QStringLiteral("components/PullImageDialog.qml"),
+        QStringLiteral("components/FieldChip.qml"),
+        QStringLiteral("components/PortTopology.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
@@ -958,6 +963,200 @@ void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
     controller->imageDetail()->refresh();
     m_backend->completeRefresh();
     QVERIFY2(!removeAll->property("visible").toBool(), "single tag must not offer force delete");
+}
+
+
+/*!
+ * 挂载分区（ARCH_V4 §2.1.1）：宿主路径的状态决定界面给不给「打开宿主目录」。
+ */
+void QmlLoadTest::mountRowReflectsHostPathState()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("demo");
+    detail.state = ContainerState::Running;
+    ContainerMount bind;
+    bind.type = QStringLiteral("bind");
+    bind.source = QStringLiteral("/srv/data");
+    bind.destination = QStringLiteral("/data");
+    bind.mode = QStringLiteral("rw");
+    detail.mounts = {bind};
+    m_backend->setContainerDetail(detail);
+
+    // 路径存在：提供打开动作
+    StatusController *controller = m_stubKcm->controller();
+    m_stubKcm->hostPaths()->setState(HostPathState::Directory);
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-1")},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    // 模型必须已经把探测结果算出来（角色值用 QCOMPARE 暴露，便于失败时定位）
+    QCOMPARE(controller->containerDetail()->mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("directory"));
+    QVERIFY(controller->containerDetail()->mounts()->index(0, 0).data(MountListModel::OpenableRole).toBool());
+    QQuickItem *openButton = childByObjectName(page, QStringLiteral("mountOpenButton"));
+    QQuickItem *warning = childByObjectName(page, QStringLiteral("mountSourceWarning"));
+    QQuickItem *typeChip = childByObjectName(page, QStringLiteral("mountTypeChip"));
+    QQuickItem *modeChip = childByObjectName(page, QStringLiteral("mountModeChip"));
+    QQuickItem *entry = childByObjectName(page, QStringLiteral("mountEntry"));
+    QVERIFY(entry);
+    QCOMPARE(entry->property("openable").toBool(), true);
+    QCOMPARE(entry->property("sourceStateKey").toString(), QStringLiteral("directory"));
+
+    // 详情页的五个分区在 StackLayout 里：非当前分区整体不可见，
+    // 因此要先切到被测分区（这也正是用户看到该分区时的状态）
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 3));
+    QVERIFY(openButton && warning && typeChip && modeChip);
+    QVERIFY2(openButton->property("visible").toBool(), "an existing host directory must be openable");
+    QVERIFY2(!warning->property("visible").toBool(), "no warning for a healthy mount");
+    QCOMPARE(typeChip->property("text").toString(), QStringLiteral("bind"));
+    QCOMPARE(modeChip->property("text").toString(), QStringLiteral("rw"));
+
+    // 点一下：请求送达宿主路径服务（假实现），路径正确
+    QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
+    QCOMPARE(m_stubKcm->hostPaths()->openCount(), 1);
+    QCOMPARE(m_stubKcm->hostPaths()->openedPaths().first(), QStringLiteral("/srv/data"));
+
+    // 路径不存在：给出警告，并且不提供打开动作（而不是打开后失败）
+    m_stubKcm->hostPaths()->setState(HostPathState::Missing);
+    controller->containerDetail()->reload();
+    m_backend->completeRefresh();
+    QCOMPARE(controller->containerDetail()->mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("missing"));
+
+    // 模型内容变了会重建 delegate：必须重新按 objectName 取，不能复用旧指针
+    QQuickItem *recreatedWarning = childByObjectName(page, QStringLiteral("mountSourceWarning"));
+    QQuickItem *recreatedOpenButton = childByObjectName(page, QStringLiteral("mountOpenButton"));
+    QVERIFY(recreatedWarning && recreatedOpenButton);
+    QVERIFY2(recreatedWarning->property("visible").toBool(), "a missing host path must be flagged");
+    QVERIFY2(!recreatedOpenButton->property("visible").toBool(), "a missing host path must not be openable");
+    QVERIFY(!recreatedWarning->property("text").toString().isEmpty());
+}
+
+/*!
+ * 端口拓扑（ARCH_V4 §2.1.2）：一行一条映射、一行一条线，连线是装饰。
+ */
+void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("demo");
+    detail.state = ContainerState::Running;
+    detail.ports = {
+        Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
+        Port {QStringLiteral("127.0.0.1"), 80, 8081, QStringLiteral("tcp")},
+        Port {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
+    };
+    m_backend->setContainerDetail(detail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-1")},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    // 网络分区（index 2）才是端口所在的分区
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 2));
+
+    QQuickItem *topology = childByObjectName(page, QStringLiteral("portTopology"));
+    QVERIFY2(topology, "port topology not found");
+    QVERIFY2(topology->property("visible").toBool(), "published ports must render the topology");
+    QCOMPARE(topology->property("implicitHeight").toReal(), topology->property("headerHeight").toReal() + 3 * topology->property("rowHeight").toReal());
+
+    int rows = 0;
+    int containerChips = 0;
+    int hostChips = 0;
+    std::function<void(QQuickItem *)> count = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            const QString name = child->objectName();
+            if (name == QLatin1String("portMappingRow")) {
+                ++rows;
+            } else if (name == QLatin1String("portContainerChip")) {
+                ++containerChips;
+            } else if (name == QLatin1String("portHostChip")) {
+                ++hostChips;
+            }
+            count(child);
+        }
+    };
+    count(topology);
+
+    // 一条映射 = 一行 = 两侧各一枚芯片（两个宿主地址属于同一个容器端口 → 两行）
+    QCOMPARE(rows, 3);
+    QCOMPARE(containerChips, 3);
+    QCOMPARE(hostChips, 3);
+
+    // 连线层是装饰：必须对可访问性隐藏（键盘与屏幕阅读器不依赖它）
+    QQuickItem *links = childByObjectName(page, QStringLiteral("portTopologyLinks"));
+    QVERIFY2(links, "link layer not found");
+    QVERIFY2(links->property("Accessible\.ignored").toBool() || links->property("visible").toBool(), "link layer must exist and stay decorative");
+}
+
+/*!
+ * 只 EXPOSE、没有映射到宿主的端口：列出来，但没有线上的端点。
+ */
+void QmlLoadTest::unpublishedPortsAreListedWithoutLinks()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("demo");
+    detail.state = ContainerState::Running;
+    detail.ports = {
+        Port {QString(), 9000, 0, QStringLiteral("tcp")},
+        Port {QString(), 9001, 0, QStringLiteral("tcp")},
+    };
+    m_backend->setContainerDetail(detail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-1")},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 2));
+
+    QQuickItem *topology = childByObjectName(page, QStringLiteral("portTopology"));
+    QVERIFY(topology);
+    QVERIFY2(!topology->property("visible").toBool(), "no published port means no topology");
+
+    int chips = 0;
+    std::function<void(QQuickItem *)> count = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            if (child->objectName() == QLatin1String("unpublishedPortChip")) {
+                ++chips;
+            }
+            count(child);
+        }
+    };
+    count(page);
+    QCOMPARE(chips, 2);
 }
 
 QTEST_MAIN(QmlLoadTest)

@@ -51,6 +51,9 @@ KCM.AbstractKCM {
         - 可逆操作（启动 / 停止 / 重启）直接执行；删除必须二次确认
         - 运行中的容器不给删除按钮，并说明原因：让引擎返回 409 再解释是下策
     */
+    /*! 宿主节点标题：daemon 报告的 Name 就是宿主机名（没有时退化为本机回环名）。 */
+    readonly property string engineHostName: kcm.controller.engine.engineName.length > 0 ? kcm.controller.engine.engineName : i18n("Host")
+
     readonly property bool targetBusy: {
         // 同上：函数调用本身不建立依赖，必须先读 stateRevision
         page.operations.stateRevision;
@@ -569,7 +572,7 @@ KCM.AbstractKCM {
 
                     Kirigami.Heading {
                         level: 3
-                        text: i18n("Ports")
+                        text: i18n("Port mapping")
                     }
                     Kirigami.Separator {
                         Layout.fillWidth: true
@@ -577,32 +580,44 @@ KCM.AbstractKCM {
 
                     Components.EmptyPlaceholder {
                         Layout.fillWidth: true
-                        message: page.controller.ports.empty ? i18n("No published ports.") : ""
+                        objectName: "portsEmptyPlaceholder"
+                        message: page.controller.publishedPorts.empty && page.controller.unpublishedPorts.empty ? i18n("No published ports.") : ""
                     }
 
-                    Repeater {
-                        model: page.controller.ports
+                    /* 拓扑：左列容器端口、右列宿主绑定，连线为装饰（§2.1.2） */
+                    Components.PortTopology {
+                        Layout.fillWidth: true
+                        visible: !page.controller.publishedPorts.empty
+                        model: page.controller.publishedPorts
+                        containerLabel: page.controller.name.length > 0 ? page.controller.name : i18n("Container")
+                        hostLabel: page.engineHostName
+                    }
 
-                        delegate: RowLayout {
-                            required property string label
-                            required property string value
+                    /* 只 EXPOSE、没有映射到宿主的端口：没有宿主端点，因此不画线 */
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        Layout.topMargin: Kirigami.Units.smallSpacing
+                        visible: !page.controller.unpublishedPorts.empty
+                        text: i18n("Exposed but not published")
+                        font.bold: true
+                    }
 
-                            objectName: "portEntry"
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
+                    Flow {
+                        Layout.fillWidth: true
+                        visible: !page.controller.unpublishedPorts.empty
+                        spacing: Kirigami.Units.smallSpacing
 
-                            // 端口映射是「一行一条」：标签列固定宽度并省略，
-                            // 避免长标签把值挤到第二行（§1.5 排版）
-                            QQC2.Label {
-                                text: label
-                                elide: Text.ElideRight
-                                Layout.preferredWidth: Kirigami.Units.gridUnit * 8
-                            }
-                            QQC2.Label {
-                                text: value.length > 0 ? value : i18n("not published")
-                                opacity: value.length > 0 ? 1.0 : 0.6
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
+                        Repeater {
+                            model: page.controller.unpublishedPorts
+
+                            delegate: Components.FieldChip {
+                                required property string containerChipText
+                                required property string protocol
+
+                                objectName: "unpublishedPortChip"
+                                muted: true
+                                text: containerChipText
+                                Accessible.name: i18n("%1, exposed but not published to the host", containerChipText)
                             }
                         }
                     }
@@ -623,39 +638,137 @@ KCM.AbstractKCM {
 
                     Components.EmptyPlaceholder {
                         Layout.fillWidth: true
+                        objectName: "mountsEmptyPlaceholder"
                         message: page.controller.mounts.empty ? i18n("No mounts.") : ""
+                    }
+
+                    /* 打开宿主目录失败时的提示（路径不存在 / 没有文件管理器） */
+                    Kirigami.InlineMessage {
+                        objectName: "mountActionMessage"
+                        Layout.fillWidth: true
+                        visible: page.controller.mountActionError.length > 0
+                        type: Kirigami.MessageType.Warning
+                        text: page.controller.mountActionError
+                        showCloseButton: true
+                        onVisibleChanged: {
+                            if (!visible) {
+                                page.controller.dismissMountActionError();
+                            }
+                        }
                     }
 
                     Repeater {
                         model: page.controller.mounts
 
                         delegate: ColumnLayout {
-                            required property string label
-                            required property string value
-                            required property string detail
+                            id: mountRow
+
+                            required property int index
+                            required property string typeKey
+                            required property string source
+                            required property string destination
+                            required property string mode
+                            required property string volumeName
+                            required property string sourceStateKey
+                            required property bool openable
 
                             objectName: "mountEntry"
                             Layout.fillWidth: true
-                            spacing: 0
+                            spacing: Kirigami.Units.smallSpacing / 2
 
-                            QQC2.Label {
-                                text: label
-                                font.bold: true
-                                elide: Text.ElideMiddle
+                            /* 第一行：类型 + 读写模式 + 宿主路径缺失警告 */
+                            RowLayout {
                                 Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+
+                                Components.FieldChip {
+                                    objectName: "mountTypeChip"
+                                    text: mountRow.typeKey.length > 0 ? mountRow.typeKey : i18n("mount")
+                                }
+
+                                Components.FieldChip {
+                                    objectName: "mountModeChip"
+                                    text: mountRow.mode
+                                    muted: mountRow.mode === "ro"
+                                }
+
+                                // 命名卷显示卷名，否则用户只看到一个宿主路径
+                                Components.FieldChip {
+                                    objectName: "mountVolumeChip"
+                                    visible: mountRow.volumeName.length > 0
+                                    text: mountRow.volumeName
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+
+                                Components.StatusChip {
+                                    objectName: "mountSourceWarning"
+                                    visible: mountRow.sourceStateKey === "missing" || mountRow.sourceStateKey === "notADirectory"
+                                    semanticKey: "neutral"
+                                    iconName: "dialog-warning"
+                                    text: mountRow.sourceStateKey === "notADirectory" ? i18n("Not a directory") : i18n("Host path missing")
+                                }
                             }
-                            QQC2.Label {
-                                // 挂载源路径属于潜在敏感信息（§40）：只在详情页展示，不写日志
-                                text: value
-                                font: Kirigami.Theme.smallFont
-                                opacity: 0.7
-                                elide: Text.ElideMiddle
+
+                            /* 第二行：宿主路径 → 容器路径 */
+                            RowLayout {
                                 Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+                                visible: mountRow.source.length > 0
+
+                                QQC2.Label {
+                                    objectName: "mountSourceLabel"
+                                    // 挂载源路径属潜在敏感信息（§40）：只在详情页展示，不写日志
+                                    text: mountRow.source
+                                    font.family: "monospace"
+                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    elide: Text.ElideMiddle
+                                    Layout.fillWidth: true
+                                }
+
+                                Kirigami.Icon {
+                                    source: "go-next-symbolic"
+                                    Accessible.ignored: true
+                                    implicitWidth: Kirigami.Units.iconSizes.small
+                                    implicitHeight: Kirigami.Units.iconSizes.small
+                                    opacity: 0.6
+                                }
+
+                                QQC2.Label {
+                                    objectName: "mountDestinationLabel"
+                                    text: mountRow.destination
+                                    font.family: "monospace"
+                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    elide: Text.ElideMiddle
+                                    Layout.fillWidth: true
+                                }
                             }
-                            QQC2.Label {
-                                text: detail
-                                font: Kirigami.Theme.smallFont
-                                opacity: 0.6
+
+                            /* 第三行：动作（tmpfs 与缺失路径不提供打开动作） */
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+
+                                QQC2.Button {
+                                    objectName: "mountOpenButton"
+                                    visible: mountRow.openable
+                                    text: i18n("Open host folder")
+                                    icon.name: "folder-open"
+                                    onClicked: page.controller.openMountHostPath(mountRow.index)
+                                }
+
+                                Components.CopyButton {
+                                    visible: mountRow.source.length > 0
+                                    value: mountRow.source
+                                    fieldLabel: i18n("host path")
+                                }
+
+                                Components.CopyButton {
+                                    value: mountRow.destination
+                                    fieldLabel: i18n("container path")
+                                }
                             }
                         }
                     }

@@ -22,7 +22,7 @@ bool isFast(Section section)
 }
 } // namespace
 
-StatusController::StatusController(DockerBackendInterface *backend, QObject *parent)
+StatusController::StatusController(DockerBackendInterface *backend, HostPathService *hostPaths, QObject *parent)
     : QObject(parent)
     , m_backend(backend)
     , m_scheduler(new RefreshScheduler(backend, this))
@@ -32,7 +32,7 @@ StatusController::StatusController(DockerBackendInterface *backend, QObject *par
     , m_imageModel(new ImageModel(this))
     , m_containerFilter(new ContainerFilterModel(this))
     , m_imageFilter(new ImageFilterModel(this))
-    , m_containerDetail(new ContainerDetailController(backend, this))
+    , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
 {

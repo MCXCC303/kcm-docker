@@ -19,38 +19,43 @@ namespace Kontainer
 
 using Section = DockerBackendInterface::Section;
 
-namespace
-{
-
-QString portLabel(const Port &port)
-{
-    return QStringLiteral("%1/%2").arg(port.privatePort).arg(port.type.isEmpty() ? QStringLiteral("tcp") : port.type);
-}
-
-QString portValue(const Port &port)
-{
-    if (!port.isPublished()) {
-        return {};
-    }
-    const QString host = port.ip.isEmpty() || port.ip == QLatin1String("0.0.0.0") ? QString() : port.ip + QLatin1Char(':');
-    return host + QString::number(port.publicPort);
-}
-
-} // namespace
-
-ContainerDetailController::ContainerDetailController(DockerBackendInterface *backend, QObject *parent)
+ContainerDetailController::ContainerDetailController(DockerBackendInterface *backend, HostPathService *hostPaths, QObject *parent)
     : QObject(parent)
     , m_backend(backend)
+    , m_hostPaths(hostPaths)
     , m_reinspectTimer(new QTimer(this))
     , m_metrics(new MetricsModel(this))
-    , m_ports(new DetailListModel(this))
+    , m_publishedPorts(new PortMappingModel(this))
+    , m_unpublishedPorts(new PortMappingModel(this))
     , m_networks(new DetailListModel(this))
-    , m_mounts(new DetailListModel(this))
+    , m_mounts(new MountListModel(this))
     , m_labels(new DetailListModel(this))
     , m_environment(new DetailListModel(this))
 {
     Q_ASSERT(m_backend);
     m_metrics->setBackend(m_backend);
+
+    if (m_hostPaths) {
+        connect(m_hostPaths, &HostPathService::openFinished, this, [this](HostPathError error, const QString &detail) {
+            if (error == HostPathError::None) {
+                setMountActionError(QString());
+                return;
+            }
+            switch (error) {
+            case HostPathError::Missing:
+                setMountActionError(i18n("The host directory of this mount does not exist."));
+                break;
+            case HostPathError::NotADirectory:
+                setMountActionError(i18n("This mount has no host directory to open."));
+                break;
+            case HostPathError::LaunchFailed:
+                setMountActionError(i18n("Could not open the file manager: %1", detail));
+                break;
+            case HostPathError::None:
+                break;
+            }
+        });
+    }
 
     // 静态信息低频复核（§28）：动态数据由 metrics 负责
     m_reinspectTimer->setInterval(
@@ -202,12 +207,7 @@ void ContainerDetailController::onSectionFailed(Section section, const DockerErr
 
 void ContainerDetailController::rebuildLists()
 {
-    QList<DetailEntry> ports;
-    ports.reserve(m_detail.ports.size());
-    for (const Port &port : m_detail.ports) {
-        ports.append({portLabel(port), portValue(port), QString(), port.type.isEmpty() ? QStringLiteral("tcp") : port.type});
-    }
-    m_ports->setEntries(ports);
+    rebuildPorts();
 
     QList<DetailEntry> networks;
     networks.reserve(m_detail.networks.size());
@@ -223,19 +223,7 @@ void ContainerDetailController::rebuildLists()
     }
     m_networks->setEntries(networks);
 
-    QList<DetailEntry> mounts;
-    mounts.reserve(m_detail.mounts.size());
-    for (const ContainerMount &mount : m_detail.mounts) {
-        QString detail = mount.type;
-        if (!mount.mode.isEmpty()) {
-            detail += QLatin1Char(' ') + mount.mode;
-        }
-        if (mount.readOnly) {
-            detail += QStringLiteral(" (ro)");
-        }
-        mounts.append({mount.destination, mount.source, detail, mount.type});
-    }
-    m_mounts->setEntries(mounts);
+    m_mounts->setMounts(mountEntries());
 
     QList<DetailEntry> labels;
     labels.reserve(m_detail.labels.size());
@@ -255,6 +243,111 @@ void ContainerDetailController::rebuildLists()
         }
     }
     m_environment->setEntries(environment);
+}
+
+void ContainerDetailController::rebuildPorts()
+{
+    QList<PortMappingEntry> published;
+    QList<PortMappingEntry> unpublished;
+    for (const Port &port : m_detail.ports) {
+        PortMappingEntry entry;
+        entry.containerPort = port.privatePort;
+        entry.protocol = port.type.isEmpty() ? QStringLiteral("tcp") : port.type;
+        entry.hostIp = port.ip;
+        entry.hostPort = port.publicPort;
+        if (entry.isPublished()) {
+            published.append(entry);
+        } else {
+            unpublished.append(entry);
+        }
+    }
+
+    // 排序稳定：拓扑图的连线按行绘制，顺序抖动会让图形每次刷新都在跳
+    const auto byContainerPort = [](const PortMappingEntry &lhs, const PortMappingEntry &rhs) {
+        if (lhs.containerPort != rhs.containerPort) {
+            return lhs.containerPort < rhs.containerPort;
+        }
+        if (lhs.protocol != rhs.protocol) {
+            return lhs.protocol < rhs.protocol;
+        }
+        return lhs.hostPort < rhs.hostPort;
+    };
+    std::sort(published.begin(), published.end(), byContainerPort);
+    std::sort(unpublished.begin(), unpublished.end(), byContainerPort);
+
+    m_publishedPorts->setMappings(published);
+    m_unpublishedPorts->setMappings(unpublished);
+}
+
+QList<MountEntry> ContainerDetailController::mountEntries() const
+{
+    QList<MountEntry> entries;
+    entries.reserve(m_detail.mounts.size());
+    for (const ContainerMount &mount : m_detail.mounts) {
+        MountEntry entry;
+        entry.typeKey = mount.type;
+        entry.source = mount.source;
+        entry.destination = mount.destination;
+        entry.mode = mount.readOnly ? QStringLiteral("ro") : QStringLiteral("rw");
+        entry.volumeName = mount.name;
+        if (mount.type == QLatin1String("tmpfs") || mount.source.isEmpty()) {
+            entry.sourceStateKey = QStringLiteral("notApplicable");
+        } else if (!m_hostPaths) {
+            // 没有注入探测服务（例如某些测试）：不谎报「存在」，也不提供打开动作
+            entry.sourceStateKey = QStringLiteral("notApplicable");
+        } else {
+            switch (m_hostPaths->probe(mount.source)) {
+            case HostPathState::Directory:
+                entry.sourceStateKey = QStringLiteral("directory");
+                break;
+            case HostPathState::NotADirectory:
+                entry.sourceStateKey = QStringLiteral("notADirectory");
+                break;
+            case HostPathState::Missing:
+                entry.sourceStateKey = QStringLiteral("missing");
+                break;
+            case HostPathState::NotApplicable:
+                entry.sourceStateKey = QStringLiteral("notApplicable");
+                break;
+            }
+        }
+        entries.append(entry);
+    }
+    return entries;
+}
+
+void ContainerDetailController::openMountHostPath(int row)
+{
+    if (row < 0 || row >= m_mounts->count()) {
+        return;
+    }
+    const MountEntry &mount = m_mounts->mounts().at(row);
+    if (!mount.isOpenable()) {
+        // 按钮本不该出现；真被调用时给出原因，而不是静默什么都不做
+        setMountActionError(i18n("This mount has no host directory to open."));
+        return;
+    }
+    if (!m_hostPaths) {
+        setMountActionError(i18n("Opening host directories is not available in this environment."));
+        return;
+    }
+    setMountActionError(QString());
+    // 路径本身不进日志（ARCH_V2 §40）；结果经 openFinished 回来
+    m_hostPaths->openDirectory(mount.source);
+}
+
+void ContainerDetailController::setMountActionError(const QString &text)
+{
+    if (m_mountActionError == text) {
+        return;
+    }
+    m_mountActionError = text;
+    Q_EMIT mountActionErrorChanged();
+}
+
+void ContainerDetailController::dismissMountActionError()
+{
+    setMountActionError(QString());
 }
 
 } // namespace Kontainer

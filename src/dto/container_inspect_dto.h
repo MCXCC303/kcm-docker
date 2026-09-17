@@ -32,6 +32,8 @@ struct DockerNetworkDTO {
 /*! inspect → Mounts[]。 */
 struct DockerMountDTO {
     QString type;
+    /*! 命名卷名（Mounts[].Name）；bind 与匿名卷为空。 */
+    QString name;
     QString source;
     QString destination;
     QString mode;

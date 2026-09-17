@@ -21,6 +21,8 @@ add_library(kontainer_core STATIC
     backend/docker_error.h
     backend/http/http_response_parser.cpp
     backend/http/http_response_parser.h
+    backend/host_path_service.cpp
+    backend/host_path_service.h
     backend/http/json_line_reader.cpp
     backend/http/json_line_reader.h
 
@@ -81,8 +83,12 @@ add_library(kontainer_core STATIC
     model/image_model.h
     model/metrics_model.cpp
     model/metrics_model.h
+    model/mount_list_model.cpp
+    model/mount_list_model.h
     model/operation_controller.cpp
     model/operation_controller.h
+    model/port_mapping_model.cpp
+    model/port_mapping_model.h
     model/presentation.cpp
     model/presentation.h
     model/qml_registration.cpp
@@ -134,6 +140,10 @@ kcoreaddons_add_plugin(kcm_docker
         kcm/docker_kcm.cpp
         kcm/docker_kcm.h
         kcm/kcm_docker.json
+        # KIO 实现只进插件（不进 core）：单元测试不应该因为链接 KIO 而需要桌面服务。
+        # 「打开宿主目录」是四期唯一的外部动作，且被限制在这一个文件里（§2.1.1）。
+        backend/kio_host_path_service.cpp
+        backend/kio_host_path_service.h
 )
 
 target_link_libraries(kcm_docker PRIVATE
@@ -144,6 +154,7 @@ target_link_libraries(kcm_docker PRIVATE
     Qt6::Quick
     KF6::CoreAddons
     KF6::KCMUtilsQuick
+    KF6::KIOGui
 )
 
 # --- QML 界面 -----------------------------------------------------------------

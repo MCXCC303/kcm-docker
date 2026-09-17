@@ -6,6 +6,7 @@
 #pragma once
 
 #include "backend/docker_backend_interface.h"
+#include "support/fake_host_path_service.h"
 #include "model/status_controller.h"
 
 #include <QObject>
@@ -30,6 +31,12 @@ class QmlStubKcm : public QObject
 
 public:
     explicit QmlStubKcm(DockerBackendInterface *backend, QObject *parent = nullptr);
+
+    /*! 测试可以注入探测结果与打开失败（挂载分区的两种状态）。 */
+    FakeHostPathService *hostPaths() const
+    {
+        return m_hostPaths;
+    }
     ~QmlStubKcm() override;
 
     StatusController *controller() const
@@ -46,6 +53,7 @@ public:
     }
 
 private:
+    FakeHostPathService *m_hostPaths = nullptr;
     StatusController *m_controller = nullptr;
 };
 

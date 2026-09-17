@@ -96,6 +96,82 @@ void I18nConsistencyTest::translationsExistAndAreComplete()
  * 确实需要字面量时（例如纯符号占位），在该行加注释 `i18n-lint: allow <理由>`。
  * 这说明该例外是被审阅过的，而不是漏网。
  */
+namespace
+{
+
+/*!
+ * 把注释替换成空格（保持行号与字符串内容不变）。
+ *
+ * 为什么需要它：lint 是逐行正则，而文档注释里经常出现示例代码
+ * （例如组件用法里写 `text: "80/tcp"`）。那不是真的界面文案，
+ * 但如果不过滤注释，它会被当成违规——断言一旦开始误报，
+ * 下一个人就会选择把它关掉，而不是修它。
+ */
+QString stripComments(const QString &content)
+{
+    QString out;
+    out.reserve(content.size());
+    bool inBlock = false;
+    bool inLine = false;
+    bool inString = false;
+    QChar quote;
+
+    for (int i = 0; i < content.size(); ++i) {
+        const QChar c = content.at(i);
+        const QChar next = i + 1 < content.size() ? content.at(i + 1) : QChar();
+
+        if (inLine) {
+            if (c == QLatin1Char('\n')) {
+                inLine = false;
+                out.append(c);
+            } else {
+                out.append(QLatin1Char(' '));
+            }
+            continue;
+        }
+        if (inBlock) {
+            if (c == QLatin1Char('*') && next == QLatin1Char('/')) {
+                inBlock = false;
+                out.append(QLatin1String("  "));
+                ++i;
+            } else {
+                out.append(c == QLatin1Char('\n') ? c : QLatin1Char(' '));
+            }
+            continue;
+        }
+        if (inString) {
+            out.append(c);
+            if (c == QLatin1Char('\\') && i + 1 < content.size()) {
+                out.append(content.at(i + 1));
+                ++i;
+            } else if (c == quote) {
+                inString = false;
+            }
+            continue;
+        }
+        if (c == QLatin1Char('/') && next == QLatin1Char('/')) {
+            inLine = true;
+            out.append(QLatin1String("  "));
+            ++i;
+            continue;
+        }
+        if (c == QLatin1Char('/') && next == QLatin1Char('*')) {
+            inBlock = true;
+            out.append(QLatin1String("  "));
+            ++i;
+            continue;
+        }
+        if (c == QLatin1Char('"') || c == QLatin1Char('\'')) {
+            inString = true;
+            quote = c;
+        }
+        out.append(c);
+    }
+    return out;
+}
+
+} // namespace
+
 void I18nConsistencyTest::noUnwrappedUiStrings()
 {
     // 用普通字符串而不是原始字符串：正则本身以 )" 结尾，原始字符串容易踩到分隔符问题
@@ -114,7 +190,7 @@ void I18nConsistencyTest::noUnwrappedUiStrings()
         if (!file.open(QIODevice::ReadOnly)) {
             continue;
         }
-        const QStringList lines = QString::fromUtf8(file.readAll()).split(QLatin1Char('\n'));
+        const QStringList lines = stripComments(QString::fromUtf8(file.readAll())).split(QLatin1Char('\n'));
         for (int index = 0; index < lines.size(); ++index) {
             const QString &line = lines.at(index);
             if (line.contains(QLatin1String("i18n-lint: allow"))) {

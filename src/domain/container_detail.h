@@ -30,6 +30,7 @@ struct ContainerNetwork {
 /*! 容器挂载（inspect → Mounts）。 */
 struct ContainerMount {
     QString type; /*!< bind / volume / tmpfs */
+    QString name; /*!< 命名卷名；bind 与匿名卷为空 */
     QString source;
     QString destination;
     QString mode;

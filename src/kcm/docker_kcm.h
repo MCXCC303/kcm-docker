@@ -13,6 +13,7 @@ namespace Kontainer
 {
 
 class DockerBackend;
+class KioHostPathService;
 
 /*!
  * KCM Layer（ARCH_V1 §6.1）。
@@ -39,6 +40,8 @@ public:
 
 private:
     DockerBackend *m_backend = nullptr;
+    /*! 挂载分区「打开宿主目录」的生产实现（ARCH_V4 §2.1.1）。 */
+    KioHostPathService *m_hostPaths = nullptr;
     StatusController *m_controller = nullptr;
 };
 

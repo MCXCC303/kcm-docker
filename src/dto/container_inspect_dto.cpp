@@ -87,6 +87,7 @@ QList<DockerMountDTO> parseMounts(const QJsonObject &object)
         const QJsonObject mountObject = entry.toObject();
         DockerMountDTO mount;
         mount.type = stringValue(mountObject, QStringLiteral("Type"));
+        mount.name = stringValue(mountObject, QStringLiteral("Name"));
         mount.source = stringValue(mountObject, QStringLiteral("Source"));
         mount.destination = stringValue(mountObject, QStringLiteral("Destination"));
         mount.mode = stringValue(mountObject, QStringLiteral("Mode"));
@@ -245,6 +246,7 @@ ContainerDetail containerDetailFromDto(const DockerContainerInspectDTO &dto)
     for (const DockerMountDTO &mountDto : dto.mounts) {
         ContainerMount mount;
         mount.type = mountDto.type;
+        mount.name = mountDto.name;
         mount.source = mountDto.source;
         mount.destination = mountDto.destination;
         mount.mode = mountDto.mode;

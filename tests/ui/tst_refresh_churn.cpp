@@ -270,7 +270,7 @@ void RefreshChurnTest::containerDetailSurvivesDataChurn()
         detail.created = QDateTime::currentDateTimeUtc();
         detail.ports = {{QStringLiteral("0.0.0.0"), 80, quint16(8000 + iteration), QStringLiteral("tcp")}};
         detail.networks = {{QStringLiteral("bridge"), QStringLiteral("id"), QStringLiteral("172.17.0.%1").arg(iteration % 250), {}, {}, QStringLiteral("172.17.0.1")}};
-        detail.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/%1").arg(iteration), QStringLiteral("/data"), QStringLiteral("rw"), false}};
+        detail.mounts = {{QStringLiteral("bind"), QString(), QStringLiteral("/srv/%1").arg(iteration), QStringLiteral("/data"), QStringLiteral("rw"), false}};
         detail.environment = {QStringLiteral("A=%1").arg(iteration), QStringLiteral("B=2")};
         detail.labels = {{QStringLiteral("k%1").arg(iteration), QStringLiteral("v")}};
         m_backend->setContainerDetail(detail);

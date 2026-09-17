@@ -3,6 +3,8 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 
 # 测试用 mock backend：让 model / controller 测试不依赖真实 Docker daemon
 add_library(kontainer_test_support STATIC
+    support/fake_host_path_service.cpp
+    support/fake_host_path_service.h
     support/mock_docker_backend.cpp
     support/mock_docker_backend.h
     support/qml_stub_kcm.cpp
@@ -37,6 +39,8 @@ kontainer_add_test(tst_detail_controllers model/tst_detail_controllers.cpp)
 kontainer_add_test(tst_format model/tst_format.cpp)
 kontainer_add_test(tst_status_controller model/tst_status_controller.cpp)
 kontainer_add_test(tst_operation_controller model/tst_operation_controller.cpp)
+kontainer_add_test(tst_mount_list_model model/tst_mount_list_model.cpp)
+kontainer_add_test(tst_port_mapping_model model/tst_port_mapping_model.cpp)
 kontainer_add_test(tst_qml_load ui/tst_qml_load.cpp)
 
 # 从 qrc 加载界面（与插件运行时的加载路径完全一致）。

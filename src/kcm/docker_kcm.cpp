@@ -6,6 +6,7 @@
 #include "kcm/docker_kcm.h"
 
 #include "backend/docker_backend.h"
+#include "backend/kio_host_path_service.h"
 #include "i18n.h"
 #include "logging.h"
 #include "model/qml_registration.h"
@@ -19,7 +20,8 @@ K_PLUGIN_FACTORY_WITH_JSON(DockerKcmFactory, "kcm_docker.json", registerPlugin<K
 DockerKcm::DockerKcm(QObject *parent, const KPluginMetaData &metaData)
     : KQuickConfigModule(parent, metaData)
     , m_backend(new DockerBackend(this))
-    , m_controller(new StatusController(m_backend, this))
+    , m_hostPaths(new KioHostPathService(this))
+    , m_controller(new StatusController(m_backend, m_hostPaths, this))
 {
     setupTranslationDomain();
 

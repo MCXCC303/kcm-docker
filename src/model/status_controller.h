@@ -12,6 +12,7 @@
 #include "model/engine_status.h"
 #include "model/image_detail_controller.h"
 #include "model/image_filter_model.h"
+#include "backend/host_path_service.h"
 #include "model/operation_controller.h"
 #include "model/image_model.h"
 #include "model/refresh_scheduler.h"
@@ -128,7 +129,11 @@ public:
     /*!
      * backend 的生命周期由调用方负责：本对象只持有指针，不接管所有权。
      */
-    explicit StatusController(DockerBackendInterface *backend, QObject *parent = nullptr);
+    /*!
+     * `hostPaths` 由组合根注入（生产是 KioHostPathService，测试是 Fake）；为空时
+     * 容器详情的挂载行不提供「打开宿主目录」动作。
+     */
+    explicit StatusController(DockerBackendInterface *backend, HostPathService *hostPaths = nullptr, QObject *parent = nullptr);
     ~StatusController() override;
 
     State state() const

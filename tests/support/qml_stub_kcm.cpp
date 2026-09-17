@@ -12,7 +12,8 @@ namespace Kontainer
 
 QmlStubKcm::QmlStubKcm(DockerBackendInterface *backend, QObject *parent)
     : QObject(parent)
-    , m_controller(new StatusController(backend, this))
+    , m_hostPaths(new FakeHostPathService(this))
+    , m_controller(new StatusController(backend, m_hostPaths, this))
 {
 }
 

@@ -7,7 +7,10 @@
 
 #include "backend/docker_backend_interface.h"
 #include "domain/container_detail.h"
+#include "backend/host_path_service.h"
 #include "model/detail_list_model.h"
+#include "model/mount_list_model.h"
+#include "model/port_mapping_model.h"
 #include "model/metrics_model.h"
 
 #include <QDateTime>
@@ -71,9 +74,14 @@ class ContainerDetailController : public QObject
     Q_PROPERTY(QStringList environment READ environment NOTIFY changed)
 
     /* 结构化子列表 */
-    Q_PROPERTY(Kontainer::DetailListModel *ports READ ports CONSTANT)
+    /*! 已发布的端口映射：端口拓扑的数据源（ARCH_V4 §2.1.2）。 */
+    Q_PROPERTY(Kontainer::PortMappingModel *publishedPorts READ publishedPorts CONSTANT)
+    /*! 只 EXPOSE、没有映射到宿主的端口。 */
+    Q_PROPERTY(Kontainer::PortMappingModel *unpublishedPorts READ unpublishedPorts CONSTANT)
     Q_PROPERTY(Kontainer::DetailListModel *networks READ networks CONSTANT)
-    Q_PROPERTY(Kontainer::DetailListModel *mounts READ mounts CONSTANT)
+    Q_PROPERTY(Kontainer::MountListModel *mounts READ mounts CONSTANT)
+    /*! 最近一次「打开宿主目录」的失败说明；为空表示没有失败。 */
+    Q_PROPERTY(QString mountActionError READ mountActionError NOTIFY mountActionErrorChanged)
     Q_PROPERTY(Kontainer::DetailListModel *labels READ labels CONSTANT)
     Q_PROPERTY(Kontainer::DetailListModel *environmentVariables READ environmentVariables CONSTANT)
 
@@ -81,7 +89,11 @@ class ContainerDetailController : public QObject
     Q_PROPERTY(Kontainer::MetricsModel *metrics READ metrics CONSTANT)
 
 public:
-    explicit ContainerDetailController(DockerBackendInterface *backend, QObject *parent = nullptr);
+    /*!
+     * `hostPaths` 由组合根（DockerKcm）注入；测试传 Fake，因此单测不会真的弹出文件管理器。
+     * 允许为空：为空时挂载行不提供打开动作。
+     */
+    explicit ContainerDetailController(DockerBackendInterface *backend, HostPathService *hostPaths = nullptr, QObject *parent = nullptr);
     ~ContainerDetailController() override;
 
     void setContainerId(const QString &id);
@@ -191,17 +203,25 @@ public:
         return m_detail.environment;
     }
 
-    DetailListModel *ports() const
+    PortMappingModel *publishedPorts() const
     {
-        return m_ports;
+        return m_publishedPorts;
+    }
+    PortMappingModel *unpublishedPorts() const
+    {
+        return m_unpublishedPorts;
     }
     DetailListModel *networks() const
     {
         return m_networks;
     }
-    DetailListModel *mounts() const
+    MountListModel *mounts() const
     {
         return m_mounts;
+    }
+    QString mountActionError() const
+    {
+        return m_mountActionError;
     }
     DetailListModel *labels() const
     {
@@ -215,6 +235,11 @@ public:
     {
         return m_metrics;
     }
+
+    /*! 在系统文件管理器中打开第 `row` 条挂载的宿主目录（ARCH_V4 §2.1.1）。 */
+    Q_INVOKABLE void openMountHostPath(int row);
+    /*! 清掉打开失败的提示。 */
+    Q_INVOKABLE void dismissMountActionError();
 
 public Q_SLOTS:
     /*! 页面进入（§27）。 */
@@ -233,6 +258,7 @@ public Q_SLOTS:
 
 Q_SIGNALS:
     void containerIdChanged();
+    void mountActionErrorChanged();
     void stateChanged();
     void changed();
 
@@ -242,13 +268,21 @@ private:
     void onStatsUpdated();
     void setLoadState(const QString &stateKey, const QString &errorText = QString());
     void rebuildLists();
+    /*! 挂载行：把 domain 挂载 + 宿主路径探测结果合成 presentation 条目。 */
+    QList<MountEntry> mountEntries() const;
+    /*! 端口行：已发布 / 未发布两组，排序稳定。 */
+    void rebuildPorts();
+    void setMountActionError(const QString &text);
 
     DockerBackendInterface *m_backend = nullptr;
+    HostPathService *m_hostPaths = nullptr;
     QTimer *m_reinspectTimer = nullptr;
     MetricsModel *m_metrics = nullptr;
-    DetailListModel *m_ports = nullptr;
+    PortMappingModel *m_publishedPorts = nullptr;
+    PortMappingModel *m_unpublishedPorts = nullptr;
     DetailListModel *m_networks = nullptr;
-    DetailListModel *m_mounts = nullptr;
+    MountListModel *m_mounts = nullptr;
+    QString m_mountActionError;
     DetailListModel *m_labels = nullptr;
     DetailListModel *m_environment = nullptr;
 
