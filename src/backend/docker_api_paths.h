@@ -93,6 +93,30 @@ inline QString networks()
     return QStringLiteral("/networks");
 }
 
+/*! 创建网络（`POST /networks/create`，ARCH_V5_V8 §3.3）。 */
+inline QString networkCreate()
+{
+    return QStringLiteral("/networks/create");
+}
+
+/*! 删除网络（`DELETE /networks/{id}`）。 */
+inline QString network(const QString &id)
+{
+    return QStringLiteral("/networks/%1").arg(id);
+}
+
+/*! 把容器连接到网络（`POST /networks/{id}/connect`，§3.4）。 */
+inline QString networkConnect(const QString &id)
+{
+    return QStringLiteral("/networks/%1/connect").arg(id);
+}
+
+/*! 把容器从网络断开（`POST /networks/{id}/disconnect`，§3.4）。 */
+inline QString networkDisconnect(const QString &id)
+{
+    return QStringLiteral("/networks/%1/disconnect").arg(id);
+}
+
 /*!
  * 读取容器日志（ARCH_V5_V8 §3.1.1）。
  *

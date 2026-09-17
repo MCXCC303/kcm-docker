@@ -58,6 +58,9 @@ private Q_SLOTS:
     void failedPullKeepsTheReason();
     void clearFinishedPullsKeepsActiveOnes();
     void pullImageUsesTheStoredCredential();
+    void createNetworkValidatesInput();
+    void createNetworkRefreshesAndReports();
+    void removeNetworkIsGatedAndTracked();
     void invalidReferenceIsRejectedBeforeBackend();
 
 private:
@@ -359,6 +362,112 @@ void OperationControllerTest::pullImageUsesTheStoredCredential()
     m_operations->pullImage(QStringLiteral("ghcr.io/team/other:2.0"));
     QVERIFY(m_backend->lastPullCredential().isEmpty());
     QCOMPARE(m_backend->lastPullCredential().serverAddress, QString());
+}
+
+/*!
+ * 创建网络（ARCH_V5_V8 §3.3）：校验在 C++ 侧统一做，失败时给稳定 key、不发请求。
+ */
+void OperationControllerTest::createNetworkValidatesInput()
+{
+    QList<Network> existing;
+    Network bridge;
+    bridge.id = QString(64, QLatin1Char('b'));
+    bridge.name = QStringLiteral("bridge");
+    bridge.driver = QStringLiteral("bridge");
+    existing.append(bridge);
+    m_backend->setNetworks(existing);
+
+    // 名称：空、含空格、以数字开头以外的非法字符都要被挡下
+    QVERIFY(!m_operations->createNetwork(QString()));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameRequired"));
+    QVERIFY(!m_operations->createNetwork(QStringLiteral("my net")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameInvalid"));
+
+    // 子网 / 网关格式
+    QVERIFY(!m_operations->createNetwork(QStringLiteral("app_net"), QStringLiteral("not-a-cidr")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("subnetInvalid"));
+    QVERIFY(!m_operations->createNetwork(QStringLiteral("app_net"), QString(), QStringLiteral("172.30.0.1")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("gatewayNeedsSubnet"));
+    QVERIFY(!m_operations->createNetwork(QStringLiteral("app_net"), QStringLiteral("172.30.0.0/16"), QStringLiteral("not-an-ip")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("gatewayInvalid"));
+
+    // 与现有网络重名（大小写不敏感：daemon 也是这样判的）
+    QVERIFY(!m_operations->createNetwork(QStringLiteral("Bridge")));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameInUse"));
+
+    // 校验失败时一个请求都不该发出去
+    QCOMPARE(m_backend->mutationCalls().size(), 0);
+
+    // 合法输入：发出请求，字段如实传递
+    QVERIFY(m_operations->createNetwork(QStringLiteral(" app_net "),
+                                        QStringLiteral("172.30.0.0/16"),
+                                        QStringLiteral("172.30.0.1"),
+                                        true,
+                                        true,
+                                        {QVariantMap {{QStringLiteral("key"), QStringLiteral("owner")},
+                                                      {QStringLiteral("value"), QStringLiteral("team-a")}}}));
+    QCOMPARE(m_backend->lastNetworkCreate().name, QStringLiteral("app_net")); // 已 trim
+    QCOMPARE(m_backend->lastNetworkCreate().driver, QStringLiteral("bridge")); // 本轮只建 bridge
+    QCOMPARE(m_backend->lastNetworkCreate().subnet, QStringLiteral("172.30.0.0/16"));
+    QVERIFY(m_backend->lastNetworkCreate().internal);
+    QVERIFY(m_backend->lastNetworkCreate().attachable);
+    QCOMPARE(m_backend->lastNetworkCreate().labels.size(), 1);
+    QCOMPARE(m_backend->lastNetworkCreate().labels.first().first, QStringLiteral("owner"));
+}
+
+/*!
+ * 创建/删除网络走同一条结果通道，并在成功后触发"写后即读"。
+ */
+void OperationControllerTest::createNetworkRefreshesAndReports()
+{
+    QSignalSpy networksSpy(m_operations, &OperationController::networksChanged);
+    QSignalSpy messageSpy(m_operations, &OperationController::resultChanged);
+
+    QVERIFY(m_operations->createNetwork(QStringLiteral("app_net")));
+    QCOMPARE(m_backend->mutationCalls().size(), 1);
+    QVERIFY2(m_operations->isTargetBusy(OperationTarget::network(QStringLiteral("app_net"))),
+             "the target must be busy while the request is in flight");
+
+    m_backend->completeMutations(DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(networksSpy.count(), 1);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("app_net")),
+             qPrintable(m_operations->resultText()));
+    QVERIFY(!m_operations->isTargetBusy(OperationTarget::network(QStringLiteral("app_net"))));
+    QVERIFY(m_backend->refreshCount(DockerBackendInterface::Section::Networks) >= 1);
+
+    // 引擎拒绝（例如子网与现有网络重叠）：结果里带引擎原文，不改动任何本地状态
+    QVERIFY(m_operations->createNetwork(QStringLiteral("other_net")));
+    m_backend->completeMutations(DockerBackendInterface::MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::EngineError, QStringLiteral("Pool overlaps with other one")));
+    // 引擎原文进的是"技术细节"字段（文案按错误分级给），用户能看到具体原因
+    QVERIFY2(m_operations->resultDetailText().contains(QStringLiteral("Pool overlaps")),
+             qPrintable(m_operations->resultDetailText()));
+    QVERIFY(!m_operations->resultText().isEmpty());
+}
+
+/*!
+ * 删除网络：写权限门 + 目标忙碌跟踪（内置网络由界面挡住，daemon 也会拒绝）。
+ */
+void OperationControllerTest::removeNetworkIsGatedAndTracked()
+{
+    const QString id = QString(64, QLatin1Char('a'));
+    QSignalSpy networksSpy(m_operations, &OperationController::networksChanged);
+
+    m_operations->removeNetwork(id, QStringLiteral("app_net"));
+    QCOMPARE(m_backend->lastRemovedNetwork(), id);
+    QVERIFY(m_operations->isTargetBusy(OperationTarget::network(id)));
+    m_backend->completeMutation(OperationTarget::network(id), DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(networksSpy.count(), 1);
+    QVERIFY(!m_operations->isTargetBusy(OperationTarget::network(id)));
+
+    // 只读模式：不发请求，给出明确结果（界面本应隐藏入口，这里是兜底）
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
+    m_operations->refreshWriteAccess();
+    QVERIFY(!m_operations->writeAllowed());
+    const int callsBefore = m_backend->mutationCalls().size();
+    m_operations->removeNetwork(id, QStringLiteral("app_net"));
+    QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
+    QVERIFY(!m_operations->resultText().isEmpty());
 }
 
 void OperationControllerTest::cancelTargetsOnePull()

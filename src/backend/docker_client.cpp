@@ -136,10 +136,14 @@ void DockerReply::onConnected()
     request += "Accept: application/json\r\n";
     request += "User-Agent: kontainer/" KONTAINER_VERSION "\r\n";
     if (methodSendsBody(m_request.method)) {
-        // 四期的写操作都没有请求体；显式声明长度比留空更稳妥
-        request += "Content-Length: 0\r\n";
+        if (!m_request.body.isEmpty()) {
+            request += "Content-Type: application/json\r\n";
+        }
+        // 没有请求体时也显式声明长度（比留空更稳妥）
+        request += "Content-Length: " + QByteArray::number(m_request.body.size()) + "\r\n";
     }
     request += "Connection: close\r\n\r\n";
+    request += m_request.body;
 
     m_socket->write(request);
     m_socket->flush();
@@ -333,9 +337,13 @@ DockerReply *DockerClient::get(const QString &apiPath, const QUrlQuery &query)
     return request(DockerReply::Method::Get, apiPath, query, m_timeoutMs, false);
 }
 
-DockerReply *DockerClient::post(const QString &apiPath, const QUrlQuery &query, int timeoutMs, const QMap<QByteArray, QByteArray> &headers)
+DockerReply *DockerClient::post(const QString &apiPath,
+                               const QUrlQuery &query,
+                               int timeoutMs,
+                               const QMap<QByteArray, QByteArray> &headers,
+                               const QByteArray &body)
 {
-    return request(DockerReply::Method::Post, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false, headers);
+    return request(DockerReply::Method::Post, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false, headers, body);
 }
 
 DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, int timeoutMs)
@@ -359,7 +367,13 @@ DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &q
     return reply;
 }
 
-DockerReply *DockerClient::request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming, const QMap<QByteArray, QByteArray> &headers)
+DockerReply *DockerClient::request(DockerReply::Method method,
+                                  const QString &apiPath,
+                                  const QUrlQuery &query,
+                                  int timeoutMs,
+                                  bool streaming,
+                                  const QMap<QByteArray, QByteArray> &headers,
+                                  const QByteArray &body)
 {
     QString path = apiPath;
     if (m_apiVersion.isValid()) {
@@ -378,6 +392,8 @@ DockerReply *DockerClient::request(DockerReply::Method method, const QString &ap
     request.timeoutMs = timeoutMs <= 0 ? 0 : std::max(minimumTimeoutMs, timeoutMs);
     request.streaming = streaming;
     request.headers = headers;
+    // 请求体必须在 start() 之前放进 Request：start() 会立刻把请求写进 socket
+    request.body = body;
 
     auto *reply = new DockerReply(m_endpoint, request, this);
     reply->start();

@@ -325,6 +325,102 @@ void OperationController::setCredentialStore(CredentialStore *store)
     m_credentialStore = store;
 }
 
+bool OperationController::createNetwork(const QString &name,
+                                        const QString &subnet,
+                                        const QString &gateway,
+                                        bool internal,
+                                        bool attachable,
+                                        const QVariantList &labels)
+{
+    // 校验：名称规则 + 子网/网关格式 + 与现有网络重名（都在 C++ 侧，界面只显示 key）
+    const QString nameError = validateNetworkName(name);
+    if (!nameError.isEmpty()) {
+        setResult(Result::Error, i18n("The network was not created because the name is not valid."), nameError);
+        return false;
+    }
+    const QString subnetError = validateSubnet(subnet);
+    if (!subnetError.isEmpty()) {
+        setResult(Result::Error, i18n("The network was not created because the subnet is not valid."), subnetError);
+        return false;
+    }
+    const QString gatewayError = validateGateway(gateway, subnet);
+    if (!gatewayError.isEmpty()) {
+        setResult(Result::Error, i18n("The network was not created because the gateway is not valid."), gatewayError);
+        return false;
+    }
+
+    const QString trimmedName = name.trimmed();
+    for (const Network &existing : m_backend->networks()) {
+        if (existing.name.compare(trimmedName, Qt::CaseInsensitive) == 0) {
+            setResult(Result::Error,
+                      i18n("The network was not created because the name is already in use."),
+                      QStringLiteral("nameInUse"));
+            return false;
+        }
+    }
+
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("creating the network")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+
+    NetworkCreateRequest request;
+    request.name = trimmedName;
+    request.subnet = subnet.trimmed();
+    request.gateway = gateway.trimmed();
+    request.internal = internal;
+    request.attachable = attachable;
+    for (const QVariant &entry : labels) {
+        const QVariantMap map = entry.toMap();
+        const QString key = map.value(QStringLiteral("key")).toString().trimmed();
+        if (!key.isEmpty()) {
+            request.labels.append({key, map.value(QStringLiteral("value")).toString()});
+        }
+    }
+
+    // 同一个名字不允许并发提交两次
+    const QString targetKey = OperationTarget::network(request.name);
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+
+    beginOperation(Mutation::CreateNetwork, targetKey);
+    m_backend->createNetwork(request);
+    return true;
+}
+
+void OperationController::removeNetwork(const QString &id, const QString &name)
+{
+    if (id.isEmpty()) {
+        return;
+    }
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("removing the network")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return;
+    }
+    const QString targetKey = OperationTarget::network(id);
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return;
+    }
+    Q_UNUSED(name);
+    beginOperation(Mutation::RemoveNetwork, targetKey);
+    m_backend->removeNetwork(id);
+}
+
 void OperationController::cancelPull(const QString &reference)
 {
     const QString normalized = ImageReference::normalized(reference);
@@ -525,6 +621,16 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         Q_EMIT imageRemoved(id);
         break;
     }
+    case Mutation::CreateNetwork:
+        m_backend->refreshNetworks();
+        Q_EMIT networksChanged();
+        break;
+    case Mutation::RemoveNetwork:
+        m_backend->refreshNetworks();
+        // 网络被删掉后容器的网络信息也变了（详情页要重读）
+        m_backend->refreshContainers();
+        Q_EMIT networksChanged();
+        break;
     }
 }
 
@@ -545,6 +651,12 @@ QString OperationController::successText(Mutation mutation, const QString &targe
     }
     case Mutation::RemoveImage:
         return i18n("Image removed.");
+    case Mutation::CreateNetwork: {
+        const QString name = targetKey.section(QLatin1Char(':'), 1);
+        return i18n("Network created: %1", name);
+    }
+    case Mutation::RemoveNetwork:
+        return i18n("Network removed.");
     }
     return i18n("Done.");
 }

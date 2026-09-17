@@ -42,6 +42,11 @@ inline QString image(const QString &reference)
 {
     return QStringLiteral("image:") + reference;
 }
+/*! 网络：用**名字或 id** 都行（创建时只有名字，删除时用 id）。 */
+inline QString network(const QString &nameOrId)
+{
+    return QStringLiteral("network:") + nameOrId;
+}
 } // namespace OperationTarget
 
 /*!
@@ -80,6 +85,9 @@ public:
         RemoveContainer,
         PullImage,
         RemoveImage,
+        /*! 六期：创建 / 删除网络（§3.3）。语义化命名，界面文案不拼动词。 */
+        CreateNetwork,
+        RemoveNetwork,
     };
     Q_ENUM(Mutation)
 
@@ -168,6 +176,16 @@ public:
     virtual void cancelAllImagePulls() = 0;
     /*! `force=true` 用于多标签镜像的强制删除（引擎在 409 时要求）。 */
     virtual void removeImage(const QString &id, bool force) = 0;
+
+    /*!
+     * 创建一个网络（ARCH_V5_V8 §3.3）。
+     *
+     * 目前只做 bridge：请求结构里虽然带 `driver`，但界面只允许 bridge，
+     * 其它驱动"只识别不创建"（有意偏离，见 §3.3）。
+     */
+    virtual void createNetwork(const Kontainer::NetworkCreateRequest &request) = 0;
+    /*! 删除网络（`DELETE /networks/{id}`）。内置网络由 daemon 拒绝（403）。 */
+    virtual void removeNetwork(const QString &id) = 0;
 
     /*!
      * 日志流为什么结束（ARCH_V5_V8 §3.1.4）。

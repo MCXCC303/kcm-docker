@@ -39,6 +39,8 @@ public:
         QString query;
         /*! 原始请求头块（`\r\n` 分隔，未含请求行）：认证用例要断言 `X-Registry-Auth` 的内容。 */
         QByteArray headers;
+        /*! 请求体（创建网络的用例要断言提交给 daemon 的 JSON）。 */
+        QByteArray body;
     };
 
     explicit FakeEngine(QObject *parent = nullptr)
@@ -174,7 +176,7 @@ private:
                 }
                 const QString method = QString::fromLatin1(parts.at(0));
                 const QByteArray headers = buffer->mid(requestLine.size() + 2, headerEnd - requestLine.size() - 2);
-                respond(socket, method, QString::fromLatin1(parts.at(1)), headers);
+                respond(socket, method, QString::fromLatin1(parts.at(1)), headers, buffer->mid(headerEnd + 4));
             });
             connect(socket, &QLocalSocket::disconnected, socket, &QLocalSocket::deleteLater);
         }
@@ -189,12 +191,16 @@ private:
         return path;
     }
 
-    void respond(QLocalSocket *socket, const QString &method, const QString &rawTarget, const QByteArray &headers = {})
+    void respond(QLocalSocket *socket,
+                 const QString &method,
+                 const QString &rawTarget,
+                 const QByteArray &headers = {},
+                 const QByteArray &body = {})
     {
         const QString path = rawTarget.section(QLatin1Char('?'), 0, 0);
         const QString query = rawTarget.section(QLatin1Char('?'), 1, 1);
         m_counts[path] += 1;
-        m_requests.append({method, path, query, headers});
+        m_requests.append({method, path, query, headers, body});
         const QString bare = withoutVersionPrefix(path);
 
         if (const auto override = m_overrides.constFind(bare); override != m_overrides.constEnd()) {
@@ -448,6 +454,7 @@ private Q_SLOTS:
     void authCheckClassifiesFailures();
     void pullSendsCredentialsOnlyWhenPresent();
     void networksAreListedFromTheEngine();
+    void networkCreateSendsJsonBodyAndRemoveUsesDelete();
     void logStreamDemultiplexesAndEnds();
     void logStreamReportsEngineFailures();
     void logStreamCancelIsNotAnError();
@@ -1325,6 +1332,62 @@ void DockerBackendFakeEngineTest::concurrentPullsAreIndependent()
     backend.pullImage(QStringLiteral("alpine:3.19"));
     QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() == 3, 20000);
     QCOMPARE(finishedSpy.at(2).at(2).value<Outcome>(), Outcome::Succeeded);
+}
+
+/*!
+ * 网络写操作（ARCH_V5_V8 §3.3）：创建走 JSON 体，删除走 DELETE。
+ *
+ * 创建是四期以来**第一个带请求体的写操作**（之前都靠 query 参数），因此这里同时钉住
+ * "体真的发出去了"与"键名与 Docker API 一致"。
+ */
+void DockerBackendFakeEngineTest::networkCreateSendsJsonBodyAndRemoveUsesDelete()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    m_engine->setPathStatus(QStringLiteral("/networks/create"), 201,
+                            QByteArrayLiteral("{\"Id\":\"abc123\",\"Warning\":\"\"}"));
+    m_engine->setPathStatus(QStringLiteral("/networks/abc123"), 204, QByteArray());
+
+    QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
+
+    NetworkCreateRequest request;
+    request.name = QStringLiteral("app_net");
+    request.subnet = QStringLiteral("172.30.0.0/16");
+    request.gateway = QStringLiteral("172.30.0.1");
+    request.internal = true;
+    request.labels.append({QStringLiteral("com.example.owner"), QStringLiteral("team-a")});
+    backend.createNetwork(request);
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+
+    QCOMPARE(finishedSpy.at(0).at(0).value<DockerBackendInterface::Mutation>(), DockerBackendInterface::Mutation::CreateNetwork);
+    QCOMPARE(finishedSpy.at(0).at(1).toString(), QStringLiteral("network:app_net"));
+    QCOMPARE(finishedSpy.at(0).at(2).value<DockerBackendInterface::MutationOutcome>(),
+             DockerBackendInterface::MutationOutcome::Succeeded);
+
+    const FakeEngine::RequestRecord created = m_engine->lastRequest();
+    QCOMPARE(created.method, QStringLiteral("POST"));
+    QCOMPARE(created.path, QStringLiteral("/v1.56/networks/create"));
+    QVERIFY(created.headers.contains("Content-Type: application/json"));
+
+    const QJsonObject body = QJsonDocument::fromJson(created.body).object();
+    QCOMPARE(body.value(QStringLiteral("Name")).toString(), QStringLiteral("app_net"));
+    QCOMPARE(body.value(QStringLiteral("Driver")).toString(), QStringLiteral("bridge"));
+    QVERIFY(body.value(QStringLiteral("Internal")).toBool());
+    QVERIFY(!body.value(QStringLiteral("Attachable")).toBool());
+    QCOMPARE(body.value(QStringLiteral("Labels")).toObject().value(QStringLiteral("com.example.owner")).toString(),
+             QStringLiteral("team-a"));
+    const QJsonArray configs = body.value(QStringLiteral("IPAM")).toObject().value(QStringLiteral("Config")).toArray();
+    QCOMPARE(configs.size(), 1);
+    QCOMPARE(configs.at(0).toObject().value(QStringLiteral("Subnet")).toString(), QStringLiteral("172.30.0.0/16"));
+    QCOMPARE(configs.at(0).toObject().value(QStringLiteral("Gateway")).toString(), QStringLiteral("172.30.0.1"));
+
+    // 删除：DELETE /networks/{id}
+    backend.removeNetwork(QStringLiteral("abc123"));
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);
+    QCOMPARE(finishedSpy.at(1).at(0).value<DockerBackendInterface::Mutation>(), DockerBackendInterface::Mutation::RemoveNetwork);
+    const FakeEngine::RequestRecord removed = m_engine->lastRequest();
+    QCOMPARE(removed.method, QStringLiteral("DELETE"));
+    QCOMPARE(removed.path, QStringLiteral("/v1.56/networks/abc123"));
 }
 
 QTEST_GUILESS_MAIN(DockerBackendFakeEngineTest)

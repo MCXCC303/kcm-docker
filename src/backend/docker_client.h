@@ -67,6 +67,13 @@ public:
         QUrlQuery query;
         int timeoutMs = 0;
         /*!
+         * 请求体（JSON）。
+         *
+         * 四期的写操作都靠 query 参数；六期创建网络需要 `POST /networks/create`
+         * 带 JSON 体，因此在这里按需加上（并统一声明 `Content-Type: application/json`）。
+         */
+        QByteArray body;
+        /*!
          * 流式请求的「首个响应」超时：在收到响应头之前用这个值。
          *
          * 为什么需要两段超时：拉取镜像时引擎要先联系镜像仓库，如果仓库不可达
@@ -241,7 +248,11 @@ public:
      * 写请求（无请求体，带 Content-Length: 0）。
      * `timeoutMs <= 0` 时使用客户端默认超时。
      */
-    DockerReply *post(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
+    DockerReply *post(const QString &apiPath,
+                      const QUrlQuery &query = {},
+                      int timeoutMs = 0,
+                      const QMap<QByteArray, QByteArray> &headers = {},
+                      const QByteArray &body = {});
     DockerReply *del(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0);
     /*!
      * 流式读请求（日志跟随是 GET）。
@@ -257,7 +268,13 @@ public:
     DockerReply *postStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
 
     /*! 通用入口：路径拼接（版本前缀）、超时与流式标记都在这里统一处理。 */
-    DockerReply *request(DockerReply::Method method, const QString &apiPath, const QUrlQuery &query, int timeoutMs, bool streaming, const QMap<QByteArray, QByteArray> &headers = {});
+    DockerReply *request(DockerReply::Method method,
+                         const QString &apiPath,
+                         const QUrlQuery &query,
+                         int timeoutMs,
+                         bool streaming,
+                         const QMap<QByteArray, QByteArray> &headers = {},
+                         const QByteArray &body = {});
 
 private:
     DockerEndpoint m_endpoint = DockerEndpoint::fromEnvironment();

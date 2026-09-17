@@ -126,6 +126,21 @@ public:
     Q_INVOKABLE void clearFinishedPulls();
     Q_INVOKABLE void removeImage(const QString &id, bool force);
 
+    /*!
+     * 创建网络（ARCH_V5_V8 §3.3）。
+     *
+     * 校验在 C++ 侧统一做（名称规则、子网/网关格式、与现有网络重名），失败时给出稳定的
+     * 错误 key；界面把错误显示在对话框里。**只创建 bridge**：驱动由界面固定传入。
+     */
+    Q_INVOKABLE bool createNetwork(const QString &name,
+                                   const QString &subnet = {},
+                                   const QString &gateway = {},
+                                   bool internal = false,
+                                   bool attachable = false,
+                                   const QVariantList &labels = {});
+    /*! 删除网络（内置网络会被 daemon 拒绝，界面不提供入口）。 */
+    Q_INVOKABLE void removeNetwork(const QString &id, const QString &name = {});
+
     /*! 关掉结果提示（用户已读）。 */
     Q_INVOKABLE void dismissResult();
 
@@ -149,6 +164,8 @@ Q_SIGNALS:
     void containerStateChanged(const QString &id);
     /*! 镜像已删除。 */
     void imageRemoved(const QString &id);
+    /*! 网络集合变化（创建 / 删除成功）：网络页与容器详情据此重读。 */
+    void networksChanged();
 
 private:
     enum class Result {

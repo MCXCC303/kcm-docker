@@ -32,6 +32,16 @@ public:
     void setContainers(const QList<Container> &containers);
     void setImages(const QList<Image> &images);
     void setNetworks(const QList<Network> &networks);
+    /*! 最近一次创建网络请求（断言校验与请求内容）。 */
+    NetworkCreateRequest lastNetworkCreate() const
+    {
+        return m_lastNetworkCreate;
+    }
+    /*! 最近一次删除的网络 id。 */
+    QString lastRemovedNetwork() const
+    {
+        return m_lastRemovedNetwork;
+    }
     void setStorageUsage(const StorageUsage &usage);
     void setContainerDetail(const ContainerDetail &detail);
     void setImageDetail(const ImageDetail &detail);
@@ -101,6 +111,8 @@ public:
     void restartContainer(const QString &id) override;
     void removeContainer(const QString &id) override;
     void pullImage(const QString &reference, const Kontainer::RegistryCredential &credential = {}) override;
+    void createNetwork(const Kontainer::NetworkCreateRequest &request) override;
+    void removeNetwork(const QString &id) override;
     void cancelImagePull(const QString &reference) override;
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
@@ -192,6 +204,8 @@ private:
     QList<Container> m_containers;
     QList<Image> m_images;
     QList<Network> m_networks;
+    NetworkCreateRequest m_lastNetworkCreate;
+    QString m_lastRemovedNetwork;
     StorageUsage m_storageUsage;
     ContainerDetail m_containerDetail;
     ImageDetail m_imageDetail;

@@ -7,6 +7,9 @@
 
 #include "backend/docker_api_paths.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
+
 #include "dto/container_dto.h"
 #include "dto/container_inspect_dto.h"
 #include "dto/image_dto.h"
@@ -708,6 +711,10 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "pull-image";
     case DockerBackendInterface::Mutation::RemoveImage:
         return "remove-image";
+    case DockerBackendInterface::Mutation::CreateNetwork:
+        return "create-network";
+    case DockerBackendInterface::Mutation::RemoveNetwork:
+        return "remove-network";
     }
     return "mutation";
 }
@@ -1044,6 +1051,55 @@ void DockerBackend::stopContainerLogs(const QString &id)
         // cancel() 之后 finished 仍会来一次，届时按 Cancelled 收尾
         it->reply->cancel();
     }
+}
+
+void DockerBackend::createNetwork(const NetworkCreateRequest &request)
+{
+    // 目标键用网络名：同一个名字重复提交会被拒绝，而不是并发建出两个
+    const QString targetKey = OperationTarget::network(request.name);
+
+    runMutation(Mutation::CreateNetwork, targetKey, [this, request, targetKey] {
+        // 创建是 JSON 体（四期的写操作都靠 query）：见 DockerClient::post 的 body 参数
+        DockerReply *reply = m_client.post(ApiPaths::networkCreate(), QUrlQuery(), mutationTimeoutMs(), {}, request.toJson());
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerReply::State state = reply->state();
+            const DockerError error = reply->error();
+            const QByteArray body = reply->body();
+            reply->deleteLater();
+
+            if (state != DockerReply::State::Succeeded) {
+                emitMutationFinished(Mutation::CreateNetwork, targetKey, outcomeFor(reply), error);
+                return;
+            }
+
+            // 引擎可以在 201 里带一条 Warning（例如"这个名字会被截断"）：写进日志并透出给界面
+            const QJsonObject object = QJsonDocument::fromJson(body).object();
+            const QString warning = object.value(QStringLiteral("Warning")).toString();
+            if (!warning.isEmpty()) {
+                qCWarning(kontainerBackend) << "network create warning:" << warning;
+                emitMutationFinished(Mutation::CreateNetwork,
+                                     targetKey,
+                                     MutationOutcome::Succeeded,
+                                     DockerError(DockerError::Kind::None, warning));
+                return;
+            }
+            emitMutationFinished(Mutation::CreateNetwork, targetKey, MutationOutcome::Succeeded, DockerError());
+        });
+    });
+}
+
+void DockerBackend::removeNetwork(const QString &id)
+{
+    const QString targetKey = OperationTarget::network(id);
+
+    runMutation(Mutation::RemoveNetwork, targetKey, [this, id, targetKey] {
+        DockerReply *reply = m_client.del(ApiPaths::network(id), QUrlQuery(), mutationTimeoutMs());
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerError error = reply->error();
+            reply->deleteLater();
+            emitMutationFinished(Mutation::RemoveNetwork, targetKey, outcomeFor(reply), error);
+        });
+    });
 }
 
 void DockerBackend::pullImage(const QString &reference, const RegistryCredential &credential)

@@ -5,6 +5,11 @@
 
 #include "domain/network.h"
 
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QRegularExpression>
+
 namespace Kontainer
 {
 
@@ -48,6 +53,88 @@ int Network::memberCount() const
 int Network::extraMemberCount() const
 {
     return members.size() > 1 ? int(members.size()) - 1 : 0;
+}
+
+QByteArray NetworkCreateRequest::toJson() const
+{
+    QJsonObject root;
+    root.insert(QStringLiteral("Name"), name);
+    root.insert(QStringLiteral("Driver"), driver.isEmpty() ? QStringLiteral("bridge") : driver);
+    root.insert(QStringLiteral("Internal"), internal);
+    root.insert(QStringLiteral("Attachable"), attachable);
+
+    if (!labels.isEmpty()) {
+        QJsonObject labelObject;
+        for (const auto &label : labels) {
+            if (!label.first.isEmpty()) {
+                labelObject.insert(label.first, label.second);
+            }
+        }
+        root.insert(QStringLiteral("Labels"), labelObject);
+    }
+
+    if (!subnet.isEmpty() || !gateway.isEmpty()) {
+        QJsonObject config;
+        if (!subnet.isEmpty()) {
+            config.insert(QStringLiteral("Subnet"), subnet);
+        }
+        if (!gateway.isEmpty()) {
+            config.insert(QStringLiteral("Gateway"), gateway);
+        }
+        QJsonArray configs;
+        configs.append(config);
+        QJsonObject ipam;
+        ipam.insert(QStringLiteral("Driver"), QStringLiteral("default"));
+        ipam.insert(QStringLiteral("Config"), configs);
+        root.insert(QStringLiteral("IPAM"), ipam);
+    }
+
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+QString validateNetworkName(const QString &name)
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        return QStringLiteral("nameRequired");
+    }
+    // Docker 的网络名允许字母数字与 _ . -，且不能含空白（实测 daemon 会拒绝含空格的名称）
+    static const QRegularExpression allowed(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]*$"));
+    if (!allowed.match(trimmed).hasMatch()) {
+        return QStringLiteral("nameInvalid");
+    }
+    return {};
+}
+
+QString validateSubnet(const QString &subnet)
+{
+    const QString trimmed = subnet.trimmed();
+    if (trimmed.isEmpty()) {
+        return {};
+    }
+    // 只做"看起来像 CIDR"的检查：真正的合法性由 daemon 判定（它还要看是否与现有网络重叠）
+    static const QRegularExpression cidr(QStringLiteral("^[0-9a-fA-F:.]+/[0-9]{1,3}$"));
+    if (!cidr.match(trimmed).hasMatch()) {
+        return QStringLiteral("subnetInvalid");
+    }
+    return {};
+}
+
+QString validateGateway(const QString &gateway, const QString &subnet)
+{
+    const QString trimmed = gateway.trimmed();
+    if (trimmed.isEmpty()) {
+        return {};
+    }
+    // 网关必须落在子网里：否则 daemon 会报一条很难读懂的错误
+    if (subnet.trimmed().isEmpty()) {
+        return QStringLiteral("gatewayNeedsSubnet");
+    }
+    static const QRegularExpression address(QStringLiteral("^[0-9a-fA-F:.]+$"));
+    if (!address.match(trimmed).hasMatch()) {
+        return QStringLiteral("gatewayInvalid");
+    }
+    return {};
 }
 
 bool Network::operator==(const Network &other) const

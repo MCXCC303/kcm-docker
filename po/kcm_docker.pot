@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 03:17+0800\n"
+"POT-Creation-Date: 2026-09-18 03:32+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -184,10 +184,14 @@ msgstr ""
 
 #: src/model/operation_controller.cpp:187
 #: src/model/operation_controller.cpp:290
+#: src/model/operation_controller.cpp:364
+#: src/model/operation_controller.cpp:406
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr ""
 
 #: src/model/operation_controller.cpp:192
+#: src/model/operation_controller.cpp:388
+#: src/model/operation_controller.cpp:414
 msgid "Another operation on this object is still running."
 msgstr ""
 
@@ -219,62 +223,94 @@ msgstr ""
 msgid "This image is already being pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:403
+#: src/model/operation_controller.cpp:338
+msgid "The network was not created because the name is not valid."
+msgstr ""
+
+#: src/model/operation_controller.cpp:343
+msgid "The network was not created because the subnet is not valid."
+msgstr ""
+
+#: src/model/operation_controller.cpp:348
+msgid "The network was not created because the gateway is not valid."
+msgstr ""
+
+#: src/model/operation_controller.cpp:356
+msgid "The network was not created because the name is already in use."
+msgstr ""
+
+#: src/model/operation_controller.cpp:364
+msgid "creating the network"
+msgstr ""
+
+#: src/model/operation_controller.cpp:406
+msgid "removing the network"
+msgstr ""
+
+#: src/model/operation_controller.cpp:499
 msgid "removing the image"
 msgstr ""
 
-#: src/model/operation_controller.cpp:484
+#: src/model/operation_controller.cpp:580
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:484
+#: src/model/operation_controller.cpp:580
 msgid "Operation cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:535
+#: src/model/operation_controller.cpp:641
 msgid "Container started."
 msgstr ""
 
-#: src/model/operation_controller.cpp:537
+#: src/model/operation_controller.cpp:643
 msgid "Container stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:539
+#: src/model/operation_controller.cpp:645
 msgid "Container restarted."
 msgstr ""
 
-#: src/model/operation_controller.cpp:541
+#: src/model/operation_controller.cpp:647
 msgid "Container removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:544
+#: src/model/operation_controller.cpp:650
 msgid "Image pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:547
+#: src/model/operation_controller.cpp:653
 msgid "Image removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:549
+#: src/model/operation_controller.cpp:656
+msgid "Network created: %1"
+msgstr ""
+
+#: src/model/operation_controller.cpp:659
+msgid "Network removed."
+msgstr ""
+
+#: src/model/operation_controller.cpp:661
 msgid "Done."
 msgstr ""
 
-#: src/model/operation_controller.cpp:557
+#: src/model/operation_controller.cpp:669
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr ""
 
-#: src/model/operation_controller.cpp:567
+#: src/model/operation_controller.cpp:679
 msgid "The container is already running."
 msgstr ""
 
-#: src/model/operation_controller.cpp:569
+#: src/model/operation_controller.cpp:681
 msgid "The container is already stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:571
+#: src/model/operation_controller.cpp:683
 msgid "Nothing to do: the object is already in the requested state."
 msgstr ""
 

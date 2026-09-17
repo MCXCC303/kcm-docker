@@ -71,6 +71,8 @@ public:
     void restartContainer(const QString &id) override;
     void removeContainer(const QString &id) override;
     void pullImage(const QString &reference, const Kontainer::RegistryCredential &credential = {}) override;
+    void createNetwork(const Kontainer::NetworkCreateRequest &request) override;
+    void removeNetwork(const QString &id) override;
     void cancelImagePull(const QString &reference) override;
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;

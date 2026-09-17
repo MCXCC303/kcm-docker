@@ -86,6 +86,38 @@ struct Network {
     bool operator==(const Network &other) const;
 };
 
+/*!
+ * 创建网络时提交的内容（ARCH_V5_V8 §3.3）。
+ *
+ * 六期只创建 **bridge** 网络（用户已确认的范围）：`driver` 字段保留是为了让请求结构
+ * 如实反映"最终发给 daemon 的是什么"，但界面只会填 `bridge`。
+ */
+struct NetworkCreateRequest {
+    QString name;
+    /*! 固定 `bridge`；其它驱动本轮只识别不创建（§3.3 的有意偏离）。 */
+    QString driver = QStringLiteral("bridge");
+    /*! 可选子网（例如 `172.20.0.0/16`）与网关；留空则由 daemon 自动分配。 */
+    QString subnet;
+    QString gateway;
+    bool internal = false;
+    bool attachable = false;
+    QList<QPair<QString, QString>> labels;
+
+    /*! 提交给 daemon 的 JSON（键名与 Docker API 一致；空字段不写）。 */
+    QByteArray toJson() const;
+};
+
+/*!
+ * 网络名称的校验规则（界面与控制器共用一份）。
+ *
+ * 返回空字符串表示通过；否则返回**稳定的错误 key**（文案在 QML 侧），
+ * 与项目里其它校验一致（C++ 不拼用户可见文案）。
+ */
+QString validateNetworkName(const QString &name);
+/*! 子网 / 网关的格式校验（空字符串视为"不填"）。 */
+QString validateSubnet(const QString &subnet);
+QString validateGateway(const QString &gateway, const QString &subnet);
+
 } // namespace Kontainer
 
 Q_DECLARE_METATYPE(Kontainer::Network)

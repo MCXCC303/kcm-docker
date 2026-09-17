@@ -220,6 +220,18 @@ void MockDockerBackend::pullImage(const QString &reference, const RegistryCreden
     m_mutationCalls.append({Mutation::PullImage, QStringLiteral("image:") + reference, false});
 }
 
+void MockDockerBackend::createNetwork(const NetworkCreateRequest &request)
+{
+    m_lastNetworkCreate = request;
+    m_mutationCalls.append({Mutation::CreateNetwork, OperationTarget::network(request.name), false});
+}
+
+void MockDockerBackend::removeNetwork(const QString &id)
+{
+    m_lastRemovedNetwork = id;
+    m_mutationCalls.append({Mutation::RemoveNetwork, OperationTarget::network(id), false});
+}
+
 void MockDockerBackend::cancelImagePull(const QString &reference)
 {
     m_cancelledPulls.append(reference);
