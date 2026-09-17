@@ -65,8 +65,16 @@ Item {
 
     objectName: "portTopology"
 
-    /*! 单条绑定的行高：足够放下一枚芯片，且与主题字号相关。 */
+    /*! 容器端口那一行的高度（左侧芯片所在行）。 */
     readonly property real rowHeight: Math.ceil(Kirigami.Units.gridUnit * 1.6)
+    /*!
+     * 右侧**每条绑定**占的高度。
+     *
+     * 比容器端口行更高：右边是"一个端口可能挂好几条绑定"的密集区域，
+     * 行高与芯片一样高时上下会挤在一起（用户反馈）。分支终点按这个值居中，
+     * 因此加大它同时也让曲线更舒展。
+     */
+    readonly property real bindingRowHeight: Math.ceil(Kirigami.Units.gridUnit * 2.4)
     /*! 节点标题行的高度。 */
     readonly property real headerHeight: Math.ceil(Kirigami.Units.gridUnit * 2.2)
     /*! 中间连线区的左右缩进：芯片列宽度。 */
@@ -74,7 +82,7 @@ Item {
 
     // 高度按"行数 × 行高"算出（不读测量值）：连线几何与行位置由同一个数推导，
     // 刷新时不会出现"线已经画好、行还没布局"的错位（ARCH_V4 §2.1.2）
-    implicitHeight: headerHeight + model.bindingCount * rowHeight
+    implicitHeight: headerHeight + model.bindingCount * bindingRowHeight
 
     /* ---------- 两列的节点标题 ---------- */
     RowLayout {
@@ -179,7 +187,7 @@ Item {
 
                 objectName: "portMappingRow"
                 width: topology.width
-                height: Math.max(topology.rowHeight, group.hostChipTexts.length * topology.rowHeight)
+                height: Math.max(topology.rowHeight, group.hostChipTexts.length * topology.bindingRowHeight)
 
                 Canvas {
                     id: link
@@ -191,6 +199,8 @@ Item {
 
                     /*! 画了几条分支（= 该容器端口的绑定数）；用例据此断言"合并"确实发生。 */
                     readonly property int branchCount: group.hostChipTexts.length
+                    /*! 起点圆环的颜色（= 最下方分支的颜色）。 */
+                    readonly property color originColor: link.branchColor(group.hostChipTexts[group.hostChipTexts.length - 1])
                     /*! 每条分支的颜色（顺序与右侧芯片一致）：同一个容器 + 同一条映射永远同色。 */
                     readonly property var branchColors: {
                         const colors = [];
@@ -236,8 +246,8 @@ Item {
 
                         const count = group.hostChipTexts.length;
                         const originY = link.height / 2;
-                        // 分支的纵向间距与行高一致：终点对齐右侧芯片的中心
-                        const step = link.height / Math.max(1, count);
+                        // 分支的纵向间距 = 右侧绑定的行高：终点因此正好落在芯片中心
+                        const step = topology.bindingRowHeight;
 
                         ctx.lineWidth = link.lineWidth;
                         ctx.lineCap = "round";
@@ -265,8 +275,10 @@ Item {
                             ctx.fill();
                         }
 
-                        // 起点只画一次（多条分支共用），用第一条的颜色，避免叠加出杂色
-                        const originColor = link.branchColor(group.hostChipTexts[0]);
+                        // 起点只画一次（多条分支共用）。颜色取**最下方那条**分支：
+                        // 分支按顺序绘制，越靠下的越在上层，因此起点圆环与"穿过起点的
+                        // 那一条线"同色看起来才连贯（用户反馈：用最上面的颜色不协调）
+                        const originColor = link.branchColor(group.hostChipTexts[count - 1]);
                         ctx.fillStyle = originColor;
                         ctx.beginPath();
                         ctx.arc(originX, originY, link.dotRadius, 0, Math.PI * 2);
@@ -302,7 +314,8 @@ Item {
                             required property string modelData
 
                             width: hostChip.width
-                            height: topology.rowHeight
+                            // 与分支终点的间距一致：芯片中心 = bindingRowHeight * (i + 0.5)
+                            height: topology.bindingRowHeight
 
                             Local.FieldChip {
                                 id: hostChip

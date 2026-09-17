@@ -38,6 +38,29 @@ using MutationOutcome = DockerBackendInterface::MutationOutcome;
 namespace
 {
 
+/*!
+ * 挑两个"颜色不同"的宿主端口（用于端口拓扑的断言）。
+ *
+ * 颜色是纯函数（容器 id + 容器端口 + 该绑定的芯片文本）-> 色板下标，
+ * 因此直接在 C++ 里比较下标即可，不必去问 QML 的色板。
+ * 找不到就返回一对固定值（那时断言会退化为"只比较相等"，不至于误报失败）。
+ */
+QPair<quint16, quint16> distinctBranchPorts()
+{
+    const Presentation presentation;
+    // 与界面上的取色种子一致：容器 id + "|" + 容器端口芯片文本 + "|" + 该绑定的芯片文本
+    const auto indexFor = [&presentation](const QString &hostChip) {
+        return presentation.connectionColorIndex(QStringLiteral("cid-1|80/tcp|") + hostChip, 6);
+    };
+    const int first = indexFor(QStringLiteral("0.0.0.0:8080"));
+    for (quint16 port = 8081; port < 8200; ++port) {
+        if (indexFor(QStringLiteral("127.0.0.1:%1").arg(port)) != first) {
+            return {8080, port};
+        }
+    }
+    return {8080, 8081};
+}
+
 /*! 造一个当前进程可写的 socket 文件：权限门据此判定允许写。 */
 QString writableSocketPath()
 {
@@ -2168,9 +2191,12 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     detail.id = QStringLiteral("cid-1");
     detail.name = QStringLiteral("demo");
     detail.state = ContainerState::Running;
+    // 同一个容器端口的两条绑定：颜色要挑**不同**的一对，否则"起点取最下方分支颜色"
+    // 这条断言在色板碰撞时会失去判别力（色板是纯函数，查询结果确定）
+    const QPair<quint16, quint16> ports = distinctBranchPorts();
     detail.ports = {
-        Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
-        Port {QStringLiteral("127.0.0.1"), 80, 8081, QStringLiteral("tcp")},
+        Port {QStringLiteral("0.0.0.0"), 80, ports.first, QStringLiteral("tcp")},
+        Port {QStringLiteral("127.0.0.1"), 80, ports.second, QStringLiteral("tcp")},
         Port {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
     };
     m_backend->setContainerDetail(detail);
@@ -2196,8 +2222,12 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     QQuickItem *topology = childByObjectName(page, QStringLiteral("portTopology"));
     QVERIFY2(topology, "port topology not found");
     QVERIFY2(topology->property("visible").toBool(), "published ports must render the topology");
-    // 分组：80/tcp 有两条绑定、443/tcp 一条 → 高度之和仍与"一行一条"时相同
-    QCOMPARE(topology->property("implicitHeight").toReal(), topology->property("headerHeight").toReal() + 3 * topology->property("rowHeight").toReal());
+    // 分组：80/tcp 有两条绑定、443/tcp 一条 → 总高度 = 标题行 + 3 条绑定的行高
+    const qreal bindingRowHeight = topology->property("bindingRowHeight").toReal();
+    QVERIFY2(bindingRowHeight > topology->property("rowHeight").toReal(),
+             "binding rows must be taller than the container row (user feedback: the host-side chips were cramped)");
+    QCOMPARE(topology->property("implicitHeight").toReal(),
+             topology->property("headerHeight").toReal() + 3 * bindingRowHeight);
 
     int rows = 0;
     int containerChips = 0;
@@ -2241,11 +2271,10 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         QQuickItem *chip = row0 ? row0->childItems().value(0) : nullptr;
         QVERIFY(row0 && chip);
         const qreal headerHeight = topology->property("headerHeight").toReal();
-        const qreal rowHeight = topology->property("rowHeight").toReal();
         // 行的 y 是相对列定位器的，比较时换算到拓扑的坐标系
         QCOMPARE(row0->mapToItem(topology, QPointF(0, 0)).y(), headerHeight);
         // 两条绑定的分组占两行高；左侧芯片垂直居中于整组（连线起点也在组中心）
-        QCOMPARE(row0->height(), 2 * rowHeight);
+        QCOMPARE(row0->height(), 2 * bindingRowHeight);
         QVERIFY2(qAbs(chip->y() + chip->height() / 2 - row0->height() / 2) <= 1.0,
                  "the container chip must sit at the centre of its group");
     }
@@ -2274,6 +2303,31 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     // 每个分组一张 Canvas（两条分支共用同一张，起点只画一次）
     QCOMPARE(linkLayers, 2);
     QVERIFY2(linkColors.size() >= 2, "branches of different bindings must be distinguishable");
+
+    // 起点圆环的颜色取**最下方那条**分支：分支越靠下越在上层，
+    // 起点与"穿过起点的那条线"同色才连贯（用户反馈）
+    {
+        QQuickItem *link = nullptr;
+        std::function<void(QQuickItem *)> findLink = [&](QQuickItem *item) {
+            for (QQuickItem *child : item->childItems()) {
+                if (child->objectName() == QLatin1String("portMappingLink")
+                    && child->property("branchCount").toInt() == 2) {
+                    link = child;
+                    return;
+                }
+                findLink(child);
+            }
+        };
+        findLink(topology);
+        QVERIFY2(link, "the group with two bindings must be found");
+        const QVariantList colors = link->property("branchColors").toList();
+        QCOMPARE(colors.size(), 2);
+        QCOMPARE(link->property("originColor").value<QColor>().name(), colors.last().toString());
+        // 夹具特意挑了颜色不同的两条绑定：因此"起点用最上面那条的颜色"会立刻失败
+        QVERIFY2(colors.first().toString() != colors.last().toString(), "the fixture must use two distinct branch colours");
+        QVERIFY2(link->property("originColor").value<QColor>().name() != colors.first().toString(),
+                 "the origin ring must use the bottom branch's colour, not the top one");
+    }
 
     int nonEmptyChips = 0;
     std::function<void(QQuickItem *)> checkText = [&](QQuickItem *item) {
