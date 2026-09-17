@@ -19,6 +19,7 @@
 #include "dto/image_pull_dto.h"
 #include "dto/stats_dto.h"
 #include "dto/storage_dto.h"
+#include "dto/volume_dto.h"
 #include "domain/image_reference.h"
 #include "logging.h"
 #include "refresh_policy.h"
@@ -327,6 +328,9 @@ void DockerBackend::failSection(Section section, const DockerError &error)
     case Section::Networks:
         m_networksInFlight = false;
         break;
+    case Section::Volumes:
+        m_volumesInFlight = false;
+        break;
     case Section::Storage:
     case Section::ContainerDetail:
     case Section::ImageDetail:
@@ -498,6 +502,67 @@ void DockerBackend::startNetworksRequest()
         m_networksInFlight = false;
         updateLoading();
         Q_EMIT networksUpdated();
+    });
+}
+
+void DockerBackend::refreshVolumes(bool includeUsage)
+{
+    if (m_volumesInFlight) {
+        qCDebug(kontainerBackend) << "coalesced volume refresh";
+        return;
+    }
+    m_volumesInFlight = true;
+    updateLoading();
+    withApiVersion(Section::Volumes, [this, includeUsage] {
+        startVolumesRequest(includeUsage);
+    });
+}
+
+void DockerBackend::startVolumesRequest(bool includeUsage)
+{
+    // 不算占用：引擎不必去扫每个卷的大小（大环境下这一步很慢）
+    QUrlQuery query;
+    if (!includeUsage) {
+        query.addQueryItem(QStringLiteral("no-usage"), QStringLiteral("1"));
+    }
+
+    DockerReply *reply = m_client.get(ApiPaths::volumes(), query);
+    connect(reply, &DockerReply::finished, this, [this, reply] {
+        const bool failed = reply->state() != DockerReply::State::Succeeded;
+        const DockerError error = reply->error();
+        const QByteArray body = reply->body();
+        reply->deleteLater();
+
+        if (failed) {
+            // 与网络列表同一约定：低频数据读失败时保留上一次的列表，只把状态标成失败
+            m_volumesInFlight = false;
+            updateLoading();
+            failSection(Section::Volumes, error);
+            return;
+        }
+
+        QString parseError;
+        QStringList warnings;
+        int skipped = 0;
+        const QList<DockerVolumeDTO> dtos = DockerVolumeDTO::listFromPayload(body, &warnings, &parseError, &skipped);
+        if (!parseError.isEmpty()) {
+            m_volumesInFlight = false;
+            updateLoading();
+            failSection(Section::Volumes, DockerError(DockerError::Kind::UnexpectedPayload, parseError));
+            return;
+        }
+        for (const QString &warning : warnings) {
+            // 引擎的提醒（例如"某个卷的驱动不可用"）不该被丢掉
+            qCWarning(kontainerBackend) << "volume list warning:" << warning;
+        }
+        if (skipped > 0) {
+            qCWarning(kontainerBackend) << "skipped" << skipped << "malformed volume entries";
+        }
+
+        m_volumes = volumesFromDto(dtos);
+        m_volumesInFlight = false;
+        updateLoading();
+        Q_EMIT volumesUpdated();
     });
 }
 

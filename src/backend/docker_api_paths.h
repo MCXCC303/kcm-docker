@@ -93,6 +93,34 @@ inline QString networks()
     return QStringLiteral("/networks");
 }
 
+/*!
+ * 数据卷列表（`GET /volumes`，ARCH_V5_V8 §3.5）。
+ *
+ * 载荷是**对象**（`{Volumes, Warnings}`），与 `/networks` 的数组不同（实测）。
+ */
+inline QString volumes()
+{
+    return QStringLiteral("/volumes");
+}
+
+/*! 单个数据卷（`DELETE /volumes/{name}`；`GET /volumes/{name}` 按需）。 */
+inline QString volume(const QString &name)
+{
+    return QStringLiteral("/volumes/%1").arg(name);
+}
+
+/*! 清理未使用的数据卷（`POST /volumes/prune`，§3.5）。 */
+inline QString volumesPrune()
+{
+    return QStringLiteral("/volumes/prune");
+}
+
+/*! 创建数据卷（`POST /volumes/create`，§3.5）。 */
+inline QString volumeCreate()
+{
+    return QStringLiteral("/volumes/create");
+}
+
 /*! 创建网络（`POST /networks/create`，ARCH_V5_V8 §3.3）。 */
 inline QString networkCreate()
 {

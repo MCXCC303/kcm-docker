@@ -40,6 +40,7 @@ private Q_SLOTS:
     void readsHistoricalLogsOfAnExistingContainer();
     void readsNetworkList();
     void authCheckRequestIsWellFormed();
+    void readsVolumeList();
 };
 
 void DockerBackendIntegrationTest::initTestCase()
@@ -47,6 +48,8 @@ void DockerBackendIntegrationTest::initTestCase()
     setupTranslationDomain();
     qRegisterMetaType<Kontainer::DockerError>("Kontainer::DockerError");
     qRegisterMetaType<Kontainer::Network>("Kontainer::Network");
+    qRegisterMetaType<Kontainer::Volume>("Kontainer::Volume");
+    qRegisterMetaType<QList<Kontainer::Volume>>("QList<Kontainer::Volume>");
     qRegisterMetaType<QList<Kontainer::Network>>("QList<Kontainer::Network>");
     qRegisterMetaType<Kontainer::LogLine>("Kontainer::LogLine");
     qRegisterMetaType<QList<Kontainer::LogLine>>("QList<Kontainer::LogLine>");
@@ -344,6 +347,29 @@ void DockerBackendIntegrationTest::authCheckRequestIsWellFormed()
     QVERIFY2(result != DockerBackendInterface::AuthCheckResult::Failed,
              qPrintable(QStringLiteral("a well-formed request must not classify as a generic failure: ") + detail));
     qInfo("auth check result=%d (1=invalid credentials, 2=unreachable)", int(result));
+}
+
+/*!
+ * 真实 daemon 的数据卷列表（ARCH_V5_V8 §3.5）。只读 `GET /volumes`。
+ *
+ * 本机可能一个卷都没有（实测如此），因此断言的是"载荷形态被解析"而不是"一定有卷"。
+ */
+void DockerBackendIntegrationTest::readsVolumeList()
+{
+    DockerBackend backend;
+    QSignalSpy volumesSpy(&backend, &DockerBackend::volumesUpdated);
+    QSignalSpy failureSpy(&backend, &DockerBackend::sectionFailed);
+
+    backend.refreshVolumes(true);
+    QTRY_VERIFY_WITH_TIMEOUT(volumesSpy.count() + failureSpy.count() > 0, 20000);
+    QCOMPARE(failureSpy.count(), 0);
+
+    const QList<Volume> volumes = backend.volumes();
+    for (const Volume &volume : volumes) {
+        QVERIFY(!volume.name.isEmpty());
+        QVERIFY(!volume.driver.isEmpty());
+    }
+    qInfo("read %d volume(s)", int(volumes.size()));
 }
 
 QTEST_GUILESS_MAIN(DockerBackendIntegrationTest)

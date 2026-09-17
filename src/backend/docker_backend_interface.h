@@ -15,6 +15,7 @@
 #include "domain/engine_info.h"
 #include "domain/image.h"
 #include "domain/network.h"
+#include "domain/volume.h"
 #include "domain/image_detail.h"
 #include "domain/image_pull_progress.h"
 #include "domain/storage_usage.h"
@@ -74,6 +75,8 @@ public:
         Stats,
         /*! 网络列表（六期，§3.2）。 */
         Networks,
+        /*! 数据卷列表（六期，§3.5）。 */
+        Volumes,
     };
     Q_ENUM(Section)
 
@@ -129,6 +132,12 @@ public:
     virtual void refreshImages() = 0;
     /*! 网络列表（六期）。低频：变化只有"创建/删除/连接/断开"这几种，按需刷新即可。 */
     virtual void refreshNetworks() = 0;
+    /*!
+     * 数据卷列表（六期）。同样是低频数据，按需刷新即可。
+     *
+     * `includeUsage` 关掉时引擎不扫占用（快，但没有大小/引用数）——界面在只需要名字时用它。
+     */
+    virtual void refreshVolumes(bool includeUsage = true) = 0;
     /*! 高频数据集一起刷新（Engine + Containers + Images）。 */
     virtual void refreshAll();
 
@@ -259,6 +268,7 @@ public:
     virtual QList<Container> containers() const = 0;
     virtual QList<Image> images() const = 0;
     virtual QList<Network> networks() const = 0;
+    virtual QList<Volume> volumes() const = 0;
     virtual StorageUsage storageUsage() const = 0;
     virtual ContainerDetail containerDetail() const = 0;
     virtual ImageDetail imageDetail() const = 0;
@@ -271,6 +281,7 @@ Q_SIGNALS:
     void containersUpdated();
     void imagesUpdated();
     void networksUpdated();
+    void volumesUpdated();
     void storageUpdated();
     void containerDetailUpdated();
     void imageDetailUpdated();

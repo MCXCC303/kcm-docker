@@ -52,6 +52,8 @@ add_library(kontainer_core STATIC
     dto/container_inspect_dto.h
     dto/engine_dto.cpp
     dto/engine_dto.h
+    dto/volume_dto.cpp
+    dto/volume_dto.h
     dto/network_dto.cpp
     dto/network_dto.h
     dto/image_dto.cpp
@@ -72,6 +74,8 @@ add_library(kontainer_core STATIC
     domain/container_stats.cpp
     domain/container_stats.h
     domain/engine_info.h
+    domain/volume.cpp
+    domain/volume.h
     domain/network.cpp
     domain/network.h
     domain/image.cpp
@@ -107,6 +111,10 @@ add_library(kontainer_core STATIC
     model/image_filter_model.h
     model/network_detail_controller.cpp
     model/network_detail_controller.h
+    model/volume_filter_model.cpp
+    model/volume_filter_model.h
+    model/volume_model.cpp
+    model/volume_model.h
     model/network_filter_model.cpp
     model/network_filter_model.h
     model/network_model.cpp

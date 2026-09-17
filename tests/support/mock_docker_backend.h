@@ -32,6 +32,12 @@ public:
     void setContainers(const QList<Container> &containers);
     void setImages(const QList<Image> &images);
     void setNetworks(const QList<Network> &networks);
+    void setVolumes(const QList<Volume> &volumes);
+    /*! 最近一次刷新是否要求统计占用（界面在"只要名字"时可以关掉）。 */
+    bool lastVolumesRefreshUsedUsage() const
+    {
+        return m_lastVolumesIncludeUsage;
+    }
     /*! 最近一次创建网络请求（断言校验与请求内容）。 */
     NetworkCreateRequest lastNetworkCreate() const
     {
@@ -99,6 +105,7 @@ public:
     void refreshContainers() override;
     void refreshImages() override;
     void refreshNetworks() override;
+    void refreshVolumes(bool includeUsage = true) override;
     void refreshStorageUsage() override;
     void inspectContainer(const QString &id) override;
     void inspectImage(const QString &id) override;
@@ -206,6 +213,10 @@ public:
     {
         return m_networks;
     }
+    QList<Volume> volumes() const override
+    {
+        return m_volumes;
+    }
     QList<Image> images() const override;
     StorageUsage storageUsage() const override;
     ContainerDetail containerDetail() const override;
@@ -220,6 +231,8 @@ private:
     QList<Container> m_containers;
     QList<Image> m_images;
     QList<Network> m_networks;
+    QList<Volume> m_volumes;
+    bool m_lastVolumesIncludeUsage = true;
     NetworkCreateRequest m_lastNetworkCreate;
     QString m_lastRemovedNetwork;
     QPair<QString, QString> m_lastNetworkConnect;

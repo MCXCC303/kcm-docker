@@ -14,6 +14,7 @@
 #include "domain/engine_info.h"
 #include "domain/image.h"
 #include "domain/network.h"
+#include "domain/volume.h"
 #include "domain/image_detail.h"
 #include "domain/image_pull_progress.h"
 #include "domain/storage_usage.h"
@@ -57,6 +58,7 @@ public:
     void refreshContainers() override;
     void refreshImages() override;
     void refreshNetworks() override;
+    void refreshVolumes(bool includeUsage = true) override;
 
     void refreshStorageUsage() override;
     void inspectContainer(const QString &id) override;
@@ -99,6 +101,10 @@ public:
     QList<Network> networks() const override
     {
         return m_networks;
+    }
+    QList<Volume> volumes() const override
+    {
+        return m_volumes;
     }
     QList<Image> images() const override
     {
@@ -185,6 +191,7 @@ private:
     void startContainersRequest();
     void startImagesRequest();
     void startNetworksRequest();
+    void startVolumesRequest(bool includeUsage);
     void startStorageRequest();
     void startContainerInspectRequest(const QString &id);
     void startImageInspectRequest(const QString &id);
@@ -218,6 +225,9 @@ private:
     bool m_containersInFlight = false;
     bool m_imagesInFlight = false;
     bool m_networksInFlight = false;
+    bool m_volumesInFlight = false;
+    /*! 上一次成功读取的数据卷列表（刷新失败时保留）。 */
+    QList<Volume> m_volumes;
     /*! 上一次成功读取的网络列表（刷新失败时保留，界面不会突然空掉）。 */
     QList<Network> m_networks;
     bool m_handshakeInFlight = false;

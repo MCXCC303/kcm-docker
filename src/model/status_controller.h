@@ -21,6 +21,8 @@
 #include "model/network_filter_model.h"
 #include "model/network_detail_controller.h"
 #include "model/network_model.h"
+#include "model/volume_filter_model.h"
+#include "model/volume_model.h"
 #include "model/refresh_scheduler.h"
 #include "model/storage_status.h"
 
@@ -59,6 +61,7 @@ class StatusController : public QObject
     Q_PROPERTY(QString imagesStateKey READ imagesStateKey NOTIFY imagesStateChanged)
     Q_PROPERTY(QString storageStateKey READ storageStateKey NOTIFY storageStateChanged)
     Q_PROPERTY(QString networksStateKey READ networksStateKey NOTIFY networksStateChanged)
+    Q_PROPERTY(QString volumesStateKey READ volumesStateKey NOTIFY volumesStateChanged)
     /*!
      * Engine 连接状态的语义与图标（ARCH_V3 §2.1：语义判断属于 model 层，
      * QML 只把语义 key 翻译成主题颜色，不再自己 switch 状态字符串）。
@@ -72,6 +75,9 @@ class StatusController : public QObject
     Q_PROPERTY(QString imagesError READ imagesError NOTIFY imagesErrorChanged)
     Q_PROPERTY(QString storageError READ storageError NOTIFY storageErrorChanged)
     Q_PROPERTY(QString networksError READ networksError NOTIFY networksErrorChanged)
+    /*! 数据卷列表（六期 §3.5）：同样是低频数据，进页面时刷新。 */
+    Q_PROPERTY(ListState volumesState READ volumesState NOTIFY volumesStateChanged)
+    Q_PROPERTY(QString volumesError READ volumesError NOTIFY volumesErrorChanged)
 
     /*! 一期 endpoint 不可在运行时改变（没有配置写入口），因此是 CONSTANT。 */
     Q_PROPERTY(QString endpoint READ endpoint CONSTANT)
@@ -90,6 +96,9 @@ class StatusController : public QObject
     /*! 网络列表与过滤代理（六期 §3.2）。 */
     Q_PROPERTY(Kontainer::NetworkModel *networkModel READ networkModel CONSTANT)
     Q_PROPERTY(Kontainer::NetworkFilterModel *networkList READ networkList CONSTANT)
+    /*! 数据卷列表与过滤代理。 */
+    Q_PROPERTY(Kontainer::VolumeModel *volumeModel READ volumeModel CONSTANT)
+    Q_PROPERTY(Kontainer::VolumeFilterModel *volumeList READ volumeList CONSTANT)
     /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
     Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
@@ -191,12 +200,17 @@ public:
     {
         return m_networksState;
     }
+    ListState volumesState() const
+    {
+        return m_volumesState;
+    }
     QString stateKey() const;
     QString engineStateKey() const;
     QString containersStateKey() const;
     QString imagesStateKey() const;
     QString storageStateKey() const;
     QString networksStateKey() const;
+    QString volumesStateKey() const;
     /*!
      * Engine 状态的语义 key（positive / neutral / negative / disabled）。
      *
@@ -230,6 +244,10 @@ public:
     QString networksError() const
     {
         return m_networksError;
+    }
+    QString volumesError() const
+    {
+        return m_volumesError;
     }
     QString endpoint() const;
     /*! 形如 "0.3.0+1e3b56e (2026-09-17 08:50 UTC)"。 */
@@ -279,6 +297,14 @@ public:
     NetworkDetailController *networkDetail() const
     {
         return m_networkDetail;
+    }
+    VolumeModel *volumeModel() const
+    {
+        return m_volumeModel;
+    }
+    VolumeFilterModel *volumeList() const
+    {
+        return m_volumeFilter;
     }
     ContainerDetailController *containerDetail() const
     {
@@ -343,6 +369,8 @@ public Q_SLOTS:
     void retryStorage();
     /*! 网络列表是低频数据：只在进入网络页面时刷新（六期 §3.2）。 */
     void refreshNetworks();
+    /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
+    void refreshVolumes(bool includeUsage = true);
 
 Q_SIGNALS:
     void stateChanged();
@@ -352,6 +380,8 @@ Q_SIGNALS:
     void storageStateChanged();
     void networksStateChanged();
     void networksErrorChanged();
+    void volumesStateChanged();
+    void volumesErrorChanged();
     void busyChanged();
     void engineErrorChanged();
     void containersErrorChanged();
@@ -369,6 +399,7 @@ private:
     void onContainersUpdated();
     void onImagesUpdated();
     void onNetworksUpdated();
+    void onVolumesUpdated();
     void onStorageUpdated();
     void onLoadingChanged();
     void onSectionFailed(DockerBackendInterface::Section section, const DockerError &error);
@@ -387,6 +418,12 @@ private:
     StorageStatus *m_storage = nullptr;
     ContainerModel *m_containerModel = nullptr;
     ImageModel *m_imageModel = nullptr;
+    VolumeModel *m_volumeModel = nullptr;
+    VolumeFilterModel *m_volumeFilter = nullptr;
+    ListState m_volumesState = ListState::Idle;
+    QString m_volumesError;
+    bool m_volumesOk = false;
+    bool m_volumesFailed = false;
     NetworkModel *m_networkModel = nullptr;
     NetworkFilterModel *m_networkFilter = nullptr;
     NetworkDetailController *m_networkDetail = nullptr;

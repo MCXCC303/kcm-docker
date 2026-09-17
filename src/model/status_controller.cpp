@@ -38,6 +38,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_storage(new StorageStatus(this))
     , m_containerModel(new ContainerModel(this))
     , m_imageModel(new ImageModel(this))
+    , m_volumeModel(new VolumeModel(this))
+    , m_volumeFilter(new VolumeFilterModel(this))
     , m_networkModel(new NetworkModel(this))
     , m_networkFilter(new NetworkFilterModel(this))
     , m_networkDetail(new NetworkDetailController(backend, this))
@@ -61,6 +63,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_containerFilter->setSourceModel(m_containerModel);
     m_imageFilter->setSourceModel(m_imageModel);
     m_networkFilter->setSourceModel(m_networkModel);
+    m_volumeFilter->setSourceModel(m_volumeModel);
 
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
     // 配置页需要 /info 里的 SecurityOptions / RegistryConfig.Mirrors / LiveRestoreEnabled，
@@ -72,6 +75,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &StatusController::onContainersUpdated);
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &StatusController::onImagesUpdated);
     connect(m_backend, &DockerBackendInterface::networksUpdated, this, &StatusController::onNetworksUpdated);
+    connect(m_backend, &DockerBackendInterface::volumesUpdated, this, &StatusController::onVolumesUpdated);
     connect(m_backend, &DockerBackendInterface::storageUpdated, this, &StatusController::onStorageUpdated);
     connect(m_backend, &DockerBackendInterface::loadingChanged, this, &StatusController::onLoadingChanged);
     connect(m_backend, &DockerBackendInterface::sectionFailed, this, &StatusController::onSectionFailed);
@@ -154,6 +158,11 @@ bool StatusController::stale() const
 void StatusController::refreshNetworks()
 {
     m_backend->refreshNetworks();
+}
+
+void StatusController::refreshVolumes(bool includeUsage)
+{
+    m_backend->refreshVolumes(includeUsage);
 }
 
 void StatusController::refresh()
@@ -290,6 +299,11 @@ QString StatusController::networksStateKey() const
     return listStateKeyFor(m_networksState);
 }
 
+QString StatusController::volumesStateKey() const
+{
+    return listStateKeyFor(m_volumesState);
+}
+
 /* ------------------------------------------------------------------------- */
 /* backend 信号                                                                */
 /* ------------------------------------------------------------------------- */
@@ -349,6 +363,20 @@ void StatusController::onNetworksUpdated()
     }
 }
 
+void StatusController::onVolumesUpdated()
+{
+    m_volumeModel->setVolumes(m_backend->volumes());
+    if (!m_volumesOk) {
+        m_volumesOk = true;
+        m_volumesFailed = false;
+        updateStates();
+    }
+    if (!m_volumesError.isEmpty()) {
+        m_volumesError.clear();
+        Q_EMIT volumesErrorChanged();
+    }
+}
+
 void StatusController::onStorageUpdated()
 {
     m_storage->setUsage(m_backend->storageUsage());
@@ -394,6 +422,11 @@ void StatusController::onSectionFailed(Section section, const DockerError &error
         // 只把状态标成失败并在页面上提示，避免界面突然空掉
         m_networksOk = false;
         m_networksFailed = true;
+        break;
+    case Section::Volumes:
+        // 数据卷同理：保留列表，只标失败
+        m_volumesOk = false;
+        m_volumesFailed = true;
         break;
     case Section::ContainerDetail:
     case Section::ImageDetail:
@@ -446,6 +479,13 @@ void StatusController::setSectionError(Section section, const QString &text)
         }
         m_networksError = text;
         Q_EMIT networksErrorChanged();
+        return;
+    case Section::Volumes:
+        if (m_volumesError == text) {
+            return;
+        }
+        m_volumesError = text;
+        Q_EMIT volumesErrorChanged();
         return;
     case Section::ContainerDetail:
     case Section::ImageDetail:
@@ -522,6 +562,12 @@ void StatusController::updateStates()
     if (networksState != m_networksState) {
         m_networksState = networksState;
         Q_EMIT networksStateChanged();
+    }
+
+    const ListState volumesState = computeListState(m_volumesOk, m_volumesFailed, m_volumeModel->count());
+    if (volumesState != m_volumesState) {
+        m_volumesState = volumesState;
+        Q_EMIT volumesStateChanged();
     }
 
     State next = State::Idle;

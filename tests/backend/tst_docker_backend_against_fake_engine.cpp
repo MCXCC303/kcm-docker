@@ -455,6 +455,7 @@ private Q_SLOTS:
     void pullSendsCredentialsOnlyWhenPresent();
     void networksAreListedFromTheEngine();
     void networkCreateSendsJsonBodyAndRemoveUsesDelete();
+    void volumesAreListedFromTheEngine();
     void networkConnectAndDisconnectSendTheContainer();
     void logStreamDemultiplexesAndEnds();
     void logStreamReportsEngineFailures();
@@ -1432,6 +1433,54 @@ void DockerBackendFakeEngineTest::networkConnectAndDisconnectSendTheContainer()
     QCOMPARE(disconnectBody.value(QStringLiteral("Container")).toString(), QStringLiteral("cid-1"));
     // force 默认关闭：不强断正在使用的网络
     QVERIFY(!disconnectBody.value(QStringLiteral("Force")).toBool());
+}
+
+
+/*!
+ * 数据卷列表（ARCH_V5_V8 §3.5）：请求形态与解析。
+ *
+ * 与 `/networks` 不同的是载荷是**对象**（`{Volumes, Warnings}`），空列表时 `Volumes` 为 null。
+ */
+void DockerBackendFakeEngineTest::volumesAreListedFromTheEngine()
+{
+    const QByteArray payload = R"({
+        "Volumes": [
+            {"Name": "app_data", "Driver": "local",
+             "Mountpoint": "/var/lib/docker/volumes/app_data/_data",
+             "CreatedAt": "2026-09-16T17:44:09.395242226+08:00",
+             "Scope": "local", "Labels": {"com.example.owner": "team-a"},
+             "Options": {"type": "none"},
+             "UsageData": {"Size": 4096, "RefCount": 2}}
+        ],
+        "Warnings": ["volume driver nfs is not available"]
+    })";
+    m_engine->setPathStatus(QStringLiteral("/volumes"), 200, payload);
+
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    QSignalSpy updatedSpy(&backend, &DockerBackend::volumesUpdated);
+    QSignalSpy failureSpy(&backend, &DockerBackend::sectionFailed);
+
+    backend.refreshVolumes();
+    QTRY_COMPARE_WITH_TIMEOUT(updatedSpy.count(), 1, 10000);
+
+    QCOMPARE(failureSpy.count(), 0);
+    const QList<Volume> volumes = backend.volumes();
+    QCOMPARE(volumes.size(), 1);
+    QCOMPARE(volumes.first().name, QStringLiteral("app_data"));
+    QVERIFY(volumes.first().isInUse());
+    QCOMPARE(volumes.first().sizeBytes, 4096);
+
+    FakeEngine::RequestRecord request = m_engine->lastRequest();
+    QCOMPARE(request.method, QStringLiteral("GET"));
+    QCOMPARE(request.path, QStringLiteral("/v1.56/volumes"));
+    QVERIFY2(request.query.isEmpty(), "usage is included by default");
+
+    // 关闭占用统计：带上 no-usage（大环境下扫占用很慢）
+    backend.refreshVolumes(false);
+    QTRY_COMPARE_WITH_TIMEOUT(updatedSpy.count(), 2, 10000);
+    request = m_engine->lastRequest();
+    QVERIFY(request.query.contains(QStringLiteral("no-usage=1")));
 }
 
 QTEST_GUILESS_MAIN(DockerBackendFakeEngineTest)
