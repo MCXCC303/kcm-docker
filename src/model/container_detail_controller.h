@@ -11,6 +11,7 @@
 #include "model/detail_list_model.h"
 #include "model/mount_list_model.h"
 #include "model/port_mapping_model.h"
+#include "model/container_log_controller.h"
 #include "model/metrics_model.h"
 
 #include <QDateTime>
@@ -87,6 +88,8 @@ class ContainerDetailController : public QObject
 
     /* 资源（§22） */
     Q_PROPERTY(Kontainer::MetricsModel *metrics READ metrics CONSTANT)
+    /*! 日志控制台（§3.1）：文本、状态与暂停/清空都在它身上。 */
+    Q_PROPERTY(Kontainer::ContainerLogController *logs READ logs CONSTANT)
 
 public:
     /*!
@@ -231,6 +234,10 @@ public:
     {
         return m_environment;
     }
+    ContainerLogController *logs() const
+    {
+        return m_logs;
+    }
     MetricsModel *metrics() const
     {
         return m_metrics;
@@ -246,6 +253,15 @@ public Q_SLOTS:
     void start();
     /*! 页面离开（§27）。 */
     void stop();
+
+    /*!
+     * 进入 / 离开日志分区（ARCH_V5_V8 §3.1.4）。
+     *
+     * 进分区才连接、离开即断开：日志是长连接，不该在用户看别的分区时挂着。
+     * `tty` 取自容器详情（`Config.Tty`），判错会把 8 字节帧头当成日志正文。
+     */
+    Q_INVOKABLE void startLogs();
+    Q_INVOKABLE void stopLogs();
     /*! 详情加载失败后的重试（§31）。 */
     void refresh();
     /*!
@@ -278,6 +294,7 @@ private:
     HostPathService *m_hostPaths = nullptr;
     QTimer *m_reinspectTimer = nullptr;
     MetricsModel *m_metrics = nullptr;
+    ContainerLogController *m_logs = nullptr;
     PortMappingModel *m_publishedPorts = nullptr;
     PortMappingModel *m_unpublishedPorts = nullptr;
     DetailListModel *m_networks = nullptr;

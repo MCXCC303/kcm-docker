@@ -250,6 +250,15 @@ KCM.AbstractKCM {
             Layout.fillWidth: true
             visible: page.ready
 
+            // 日志是长连接：进分区才连、离开即断（§3.1.4）。索引 4 = 日志
+            onCurrentIndexChanged: {
+                if (currentIndex === 4) {
+                    page.controller.startLogs();
+                } else {
+                    page.controller.stopLogs();
+                }
+            }
+
             QQC2.TabButton {
                 text: i18nc("@title:tab container overview", "Overview")
             }
@@ -786,24 +795,14 @@ KCM.AbstractKCM {
                 }
             }
 
-            /* ============================ 日志（占位） ============================ */
+            /* ============================ 日志（§3.1） ============================ */
             ColumnLayout {
                 Layout.margins: Kirigami.Units.largeSpacing
 
-                Item {
-                    Layout.fillHeight: true
-                }
-
-                Components.EmptyPlaceholder {
-                    objectName: "logsPlaceholder"
+                Components.LogConsole {
                     Layout.fillWidth: true
-                    iconName: "view-list-text"
-                    message: i18n("Container logs are not available yet.")
-                    explanationText: i18n("Streaming logs will be added in a later version. Until then, use the docker CLI or your container's own log destination.")
-                }
-
-                Item {
                     Layout.fillHeight: true
+                    logs: page.controller.logs
                 }
             }
         }

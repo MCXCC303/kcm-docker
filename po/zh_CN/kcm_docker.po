@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.5.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 01:50+0800\n"
+"POT-Creation-Date: 2026-09-18 02:27+0800\n"
 "PO-Revision-Date: 2026-09-18 02:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -44,7 +44,7 @@ msgstr "已退出"
 msgid "Dead"
 msgstr "已失效"
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:319
+#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:328
 #: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
 #: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -75,7 +75,7 @@ msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
 #: src/model/status_controller.cpp:94
-#: src/model/container_detail_controller.cpp:52
+#: src/model/container_detail_controller.cpp:53
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
@@ -104,7 +104,7 @@ msgstr "该名称已被占用。"
 msgid "The Docker daemon rejected the request because of the current state."
 msgstr "由于当前状态，Docker 守护进程拒绝了该请求。"
 
-#: src/model/docker_error_text.cpp:52
+#: src/model/docker_error_text.cpp:52 src/ui/components/LogConsole.qml:67
 msgid "Docker Engine is not reachable."
 msgstr "无法连接到 Docker 引擎。"
 
@@ -276,28 +276,28 @@ msgstr "容器已经停止。"
 msgid "Nothing to do: the object is already in the requested state."
 msgstr "无需操作：对象已处于目标状态。"
 
-#: src/model/container_detail_controller.cpp:46
+#: src/model/container_detail_controller.cpp:47
 msgid "The host directory of this mount does not exist."
 msgstr "该挂载的宿主目录不存在。"
 
-#: src/model/container_detail_controller.cpp:49
-#: src/model/container_detail_controller.cpp:327
+#: src/model/container_detail_controller.cpp:50
+#: src/model/container_detail_controller.cpp:347
 msgid "This mount has no host directory to open."
 msgstr "该挂载没有可打开的宿主目录。"
 
-#: src/model/container_detail_controller.cpp:127
+#: src/model/container_detail_controller.cpp:132
 msgid "No container selected."
 msgstr "未选择容器。"
 
-#: src/model/container_detail_controller.cpp:218
+#: src/model/container_detail_controller.cpp:238
 msgid "IPv6"
 msgstr "IPv6"
 
-#: src/model/container_detail_controller.cpp:221
+#: src/model/container_detail_controller.cpp:241
 msgid "Gateway"
 msgstr "网关"
 
-#: src/model/container_detail_controller.cpp:331
+#: src/model/container_detail_controller.cpp:351
 msgid "Opening host directories is not available in this environment."
 msgstr "当前环境不支持打开宿主目录。"
 
@@ -553,6 +553,101 @@ msgstr "正在校验…"
 msgid "Log in"
 msgstr "登录"
 
+#: src/ui/components/LogConsole.qml:45
+msgid "Connecting…"
+msgstr "正在连接…"
+
+#: src/ui/components/LogConsole.qml:47
+msgid "Following"
+msgstr "跟随中"
+
+#: src/ui/components/LogConsole.qml:49
+msgid "Paused (output is buffered)"
+msgstr "已暂停（输出仍在缓冲）"
+
+#: src/ui/components/LogConsole.qml:51
+msgid "The log stream ended. The container may have stopped."
+msgstr "日志流已结束，容器可能已经停止。"
+
+#: src/ui/components/LogConsole.qml:55
+msgid "Not connected."
+msgstr "未连接。"
+
+#: src/ui/components/LogConsole.qml:63
+msgid "The container no longer exists."
+msgstr "容器已经不存在了。"
+
+#: src/ui/components/LogConsole.qml:65
+msgid ""
+"This container's logging driver does not support reading logs from the "
+"engine. Use the docker CLI or the container's own log destination."
+msgstr "该容器的日志驱动不支持从引擎读取日志。请使用 docker 命令行，或该容器自己的日志去处。"
+
+#: src/ui/components/LogConsole.qml:69
+msgid "Reading logs timed out."
+msgstr "读取日志超时。"
+
+#: src/ui/components/LogConsole.qml:71
+msgid "Reading this container's logs was denied."
+msgstr "读取该容器的日志被拒绝。"
+
+#: src/ui/components/LogConsole.qml:73
+msgid "Reading logs failed."
+msgstr "读取日志失败。"
+
+#: src/ui/components/LogConsole.qml:110
+msgid "Earlier output omitted (%1 line)"
+msgid_plural "Earlier output omitted (%1 lines)"
+msgstr[0] "较早的 %1 行已省略"
+
+#: src/ui/components/LogConsole.qml:118
+msgid "Follow"
+msgstr "跟随"
+
+#: src/ui/components/LogConsole.qml:125
+msgid "Resume"
+msgstr "继续"
+
+#: src/ui/components/LogConsole.qml:125
+msgid "Pause"
+msgstr "暂停"
+
+#: src/ui/components/LogConsole.qml:139
+msgid "Clear"
+msgstr "清空"
+
+#: src/ui/components/LogConsole.qml:148
+msgid "log output"
+msgstr "日志内容"
+
+#: src/ui/components/LogConsole.qml:155
+msgid "Reconnect"
+msgstr "重新连接"
+
+#: src/ui/components/LogConsole.qml:171
+msgid "Details: %1"
+msgstr "详情：%1"
+
+#: src/ui/components/LogConsole.qml:204
+msgid "Container log output"
+msgstr "容器日志输出"
+
+#: src/ui/components/LogConsole.qml:215
+msgid "No log output yet."
+msgstr "还没有日志输出。"
+
+#: src/ui/components/LogConsole.qml:217
+msgid "Waiting for the first log lines…"
+msgstr "正在等待第一批日志…"
+
+#: src/ui/components/LogConsole.qml:218
+msgid "This container has not written anything to stdout or stderr yet."
+msgstr "该容器还没有向标准输出或标准错误写入任何内容。"
+
+#: src/ui/components/LogConsole.qml:226
+msgid "Logs are read only while this tab is open."
+msgstr "只有在这个分区打开时才会读取日志。"
+
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr "悬空镜像 %1"
@@ -660,11 +755,11 @@ msgstr "完整引用："
 msgid "Image ID:"
 msgstr "镜像 ID："
 
-#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:337
+#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:346
 msgid "Created:"
 msgstr "创建时间："
 
-#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:345
+#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:354
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr "%1（%2前）"
@@ -717,7 +812,7 @@ msgstr[0] "显示全部 %1 层"
 msgid "No containers use this image."
 msgstr "没有容器使用该镜像。"
 
-#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:448
+#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:457
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
@@ -728,7 +823,7 @@ msgid "Delete all tags…"
 msgstr "删除全部标签…"
 
 #: src/ui/ImageDetail.qml:474 src/ui/ImageDetail.qml:491
-#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:820
+#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:819
 msgid "Delete"
 msgstr "删除"
 
@@ -796,7 +891,7 @@ msgstr "重启"
 msgid "Stop the container to delete it."
 msgstr "需要先停止容器才能删除。"
 
-#: src/ui/ContainerDetail.qml:197 src/ui/ContainerDetail.qml:592
+#: src/ui/ContainerDetail.qml:197 src/ui/ContainerDetail.qml:601
 msgid "Container"
 msgstr "容器"
 
@@ -812,198 +907,187 @@ msgstr "正在加载容器详情…"
 msgid "Unable to retrieve container details."
 msgstr "无法获取容器详情。"
 
-#: src/ui/ContainerDetail.qml:254
+#: src/ui/ContainerDetail.qml:263
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr "概览"
 
-#: src/ui/ContainerDetail.qml:257
+#: src/ui/ContainerDetail.qml:266
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr "资源"
 
-#: src/ui/ContainerDetail.qml:260
+#: src/ui/ContainerDetail.qml:269
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr "网络"
 
-#: src/ui/ContainerDetail.qml:263
+#: src/ui/ContainerDetail.qml:272
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:266
+#: src/ui/ContainerDetail.qml:275
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr "日志"
 
-#: src/ui/ContainerDetail.qml:302
+#: src/ui/ContainerDetail.qml:311
 msgid "State:"
 msgstr "状态："
 
-#: src/ui/ContainerDetail.qml:318
+#: src/ui/ContainerDetail.qml:327
 msgid "Status:"
 msgstr "状态描述："
 
-#: src/ui/ContainerDetail.qml:323
+#: src/ui/ContainerDetail.qml:332
 msgid "Image:"
 msgstr "镜像："
 
-#: src/ui/ContainerDetail.qml:330
+#: src/ui/ContainerDetail.qml:339
 msgid "Container ID:"
 msgstr "容器 ID："
 
-#: src/ui/ContainerDetail.qml:333 src/ui/ContainerCard.qml:187
+#: src/ui/ContainerDetail.qml:342 src/ui/ContainerCard.qml:187
 msgid "container ID"
 msgstr "容器 ID"
 
-#: src/ui/ContainerDetail.qml:343
+#: src/ui/ContainerDetail.qml:352
 msgid "Started:"
 msgstr "启动时间："
 
-#: src/ui/ContainerDetail.qml:349
+#: src/ui/ContainerDetail.qml:358
 msgid "Finished:"
 msgstr "结束时间："
 
-#: src/ui/ContainerDetail.qml:358
+#: src/ui/ContainerDetail.qml:367
 msgid "Runtime"
 msgstr "运行时"
 
-#: src/ui/ContainerDetail.qml:368
+#: src/ui/ContainerDetail.qml:377
 msgid "Restart count:"
 msgstr "重启次数："
 
-#: src/ui/ContainerDetail.qml:372
+#: src/ui/ContainerDetail.qml:381
 msgid "Exit code:"
 msgstr "退出码："
 
-#: src/ui/ContainerDetail.qml:376
+#: src/ui/ContainerDetail.qml:385
 msgid "OOM killed:"
 msgstr "因 OOM 被杀："
 
-#: src/ui/ContainerDetail.qml:378 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:387 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96
 msgid "Yes"
 msgstr "是"
 
-#: src/ui/ContainerDetail.qml:382
+#: src/ui/ContainerDetail.qml:391
 msgid "Process ID:"
 msgstr "进程 ID："
 
-#: src/ui/ContainerDetail.qml:387
+#: src/ui/ContainerDetail.qml:396
 msgid "Restart policy:"
 msgstr "重启策略："
 
-#: src/ui/ContainerDetail.qml:392
+#: src/ui/ContainerDetail.qml:401
 msgid "Platform:"
 msgstr "平台："
 
-#: src/ui/ContainerDetail.qml:401
+#: src/ui/ContainerDetail.qml:410
 msgid "Configuration"
 msgstr "配置"
 
-#: src/ui/ContainerDetail.qml:411
+#: src/ui/ContainerDetail.qml:420
 msgid "Entrypoint:"
 msgstr "入口点："
 
-#: src/ui/ContainerDetail.qml:419
+#: src/ui/ContainerDetail.qml:428
 msgid "Command:"
 msgstr "命令："
 
-#: src/ui/ContainerDetail.qml:427
+#: src/ui/ContainerDetail.qml:436
 msgid "Working directory:"
 msgstr "工作目录："
 
-#: src/ui/ContainerDetail.qml:433
+#: src/ui/ContainerDetail.qml:442
 msgid "User:"
 msgstr "用户："
 
-#: src/ui/ContainerDetail.qml:438
+#: src/ui/ContainerDetail.qml:447
 msgid "Hostname:"
 msgstr "主机名："
 
-#: src/ui/ContainerDetail.qml:458
+#: src/ui/ContainerDetail.qml:467
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] "标签（%1）"
 
-#: src/ui/ContainerDetail.qml:495
+#: src/ui/ContainerDetail.qml:504
 msgid "No network information."
 msgstr "没有网络信息。"
 
-#: src/ui/ContainerDetail.qml:523 src/ui/ResourceView.qml:128
+#: src/ui/ContainerDetail.qml:532 src/ui/ResourceView.qml:128
 msgid "Network:"
 msgstr "网络："
 
-#: src/ui/ContainerDetail.qml:559
+#: src/ui/ContainerDetail.qml:568
 msgid "MAC:"
 msgstr "MAC："
 
-#: src/ui/ContainerDetail.qml:575
+#: src/ui/ContainerDetail.qml:584
 msgid "Port mapping"
 msgstr "端口映射"
 
-#: src/ui/ContainerDetail.qml:584
+#: src/ui/ContainerDetail.qml:593
 msgid "No published ports."
 msgstr "没有已发布的端口。"
 
-#: src/ui/ContainerDetail.qml:603
+#: src/ui/ContainerDetail.qml:612
 msgid "Exposed but not published"
 msgstr "已暴露但未发布"
 
-#: src/ui/ContainerDetail.qml:622
+#: src/ui/ContainerDetail.qml:631
 msgid "%1, exposed but not published to the host"
 msgstr "%1，已暴露但未发布到宿主机"
 
-#: src/ui/ContainerDetail.qml:644
+#: src/ui/ContainerDetail.qml:653
 msgid "No mounts."
 msgstr "没有挂载。"
 
-#: src/ui/ContainerDetail.qml:688
+#: src/ui/ContainerDetail.qml:697
 msgid "mount"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:713
+#: src/ui/ContainerDetail.qml:722
 msgid "Not a directory"
 msgstr "不是目录"
 
-#: src/ui/ContainerDetail.qml:713
+#: src/ui/ContainerDetail.qml:722
 msgid "Host path missing"
 msgstr "宿主路径不存在"
 
-#: src/ui/ContainerDetail.qml:768
+#: src/ui/ContainerDetail.qml:777
 msgid "Open host folder"
 msgstr "打开宿主目录"
 
-#: src/ui/ContainerDetail.qml:776
+#: src/ui/ContainerDetail.qml:785
 msgid "host path"
 msgstr "宿主路径"
 
-#: src/ui/ContainerDetail.qml:781
+#: src/ui/ContainerDetail.qml:790
 msgid "container path"
 msgstr "容器路径"
 
-#: src/ui/ContainerDetail.qml:801
-msgid "Container logs are not available yet."
-msgstr "容器日志尚不可用。"
-
-#: src/ui/ContainerDetail.qml:802
-msgid ""
-"Streaming logs will be added in a later version. Until then, use the docker "
-"CLI or your container's own log destination."
-msgstr ""
-"日志流将在后续版本提供。在此之前，请使用 docker 命令行或容器自身的日志输出。"
-
-#: src/ui/ContainerDetail.qml:817
+#: src/ui/ContainerDetail.qml:816
 msgid "Delete container"
 msgstr "删除容器"
 
-#: src/ui/ContainerDetail.qml:818
+#: src/ui/ContainerDetail.qml:817
 msgid "Delete the container “%1”?"
 msgstr "确定要删除容器“%1”吗？"
 
-#: src/ui/ContainerDetail.qml:819
+#: src/ui/ContainerDetail.qml:818
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr "容器会被删除；它的匿名卷与命名卷都会保留。"
 
@@ -1847,6 +1931,9 @@ msgstr "移除为“%1”保存的凭据吗？"
 #: src/ui/RegistryAuthPage.qml:405
 msgid "Pulling private images from this registry will need a new login."
 msgstr "之后拉取该仓库的私有镜像需要重新登录。"
+
+#~ msgid "Container logs are not available yet."
+#~ msgstr "容器日志尚不可用。"
 
 #~ msgid "An image pull is already running."
 #~ msgstr "已有镜像正在拉取。"

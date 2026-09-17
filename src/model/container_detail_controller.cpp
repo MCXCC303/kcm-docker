@@ -25,6 +25,7 @@ ContainerDetailController::ContainerDetailController(DockerBackendInterface *bac
     , m_hostPaths(hostPaths)
     , m_reinspectTimer(new QTimer(this))
     , m_metrics(new MetricsModel(this))
+    , m_logs(new ContainerLogController(backend, this))
     , m_publishedPorts(new PortMappingModel(this))
     , m_unpublishedPorts(new PortMappingModel(this))
     , m_networks(new DetailListModel(this))
@@ -75,6 +76,10 @@ ContainerDetailController::~ContainerDetailController() = default;
 
 void ContainerDetailController::setContainerId(const QString &id)
 {
+    if (m_containerId != id) {
+        // 换容器：旧容器可能还挂着日志流
+        m_logs->disconnect();
+    }
     if (m_containerId == id) {
         return;
     }
@@ -138,6 +143,21 @@ void ContainerDetailController::stop()
     m_reinspectTimer->stop();
     // 离开页面：停止 stats 采样并释放历史（§27）
     m_metrics->stop();
+    // 日志是长连接：离开页面必须断开，否则会一直挂着（§3.1.4）
+    m_logs->disconnect();
+}
+
+void ContainerDetailController::startLogs()
+{
+    if (m_containerId.isEmpty()) {
+        return;
+    }
+    m_logs->connectTo(m_containerId, m_detail.tty);
+}
+
+void ContainerDetailController::stopLogs()
+{
+    m_logs->disconnect();
 }
 
 void ContainerDetailController::refresh()

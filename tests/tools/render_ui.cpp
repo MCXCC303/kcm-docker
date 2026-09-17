@@ -222,6 +222,16 @@ void fillFixture(MockDockerBackend &backend)
             detail.ports.append({QString(), quint16(9000 + i), 0, QStringLiteral("tcp")});
         }
     }
+    // KONTAINER_RENDER_BRANCH_PORTS=1：一个容器端口映射到多个宿主地址（含 IPv6 通配），
+    // 用来复核"同一端口的多条绑定"这一形态（用户实际容器的样子）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_BRANCH_PORTS")) {
+        detail.ports.clear();
+        detail.ports.append({QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")});
+        detail.ports.append({QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")});
+        detail.ports.append({QStringLiteral("127.0.0.1"), 8888, 20204, QStringLiteral("tcp")});
+        detail.ports.append({QStringLiteral("0.0.0.0"), 4800, 4800, QStringLiteral("tcp")});
+        detail.ports.append({QStringLiteral("::"), 4800, 4800, QStringLiteral("tcp")});
+    }
     detail.networks = {{QStringLiteral("bridge"),
                         QStringLiteral("a1b2c3d4e5f6"),
                         QStringLiteral("172.17.0.4"),
@@ -606,6 +616,34 @@ int main(int argc, char **argv)
         if (tabBar) {
             tabBar->setProperty("currentIndex", tabIndex);
         }
+    }
+
+    // KONTAINER_RENDER_LOGS=1：往日志控制台灌一些输出（复核等宽控制台与状态条）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LOGS")) {
+        QList<Kontainer::LogLine> lines;
+        const QStringList samples = {
+            QStringLiteral("$ docker-entrypoint.sh node server.js"),
+            QStringLiteral("info: listening on 0.0.0.0:8080"),
+            QStringLiteral("info: connected to redis at redis:6379"),
+            QStringLiteral("warn: cache miss for /api/v1/projects"),
+            QStringLiteral("info: GET /api/v1/projects 200 12ms"),
+            QStringLiteral("info: GET /api/v1/projects/42 200 7ms"),
+            QStringLiteral("warn: retrying upstream request (1/3)"),
+            QStringLiteral("error: upstream returned 503, serving cached response"),
+            QStringLiteral("info: GET /healthz 200 1ms"),
+            QStringLiteral("    at Object.<anonymous> (/app/server.js:118:22)"),
+        };
+        for (int round = 0; round < 3; ++round) {
+            for (const QString &sample : samples) {
+                Kontainer::LogLine line;
+                line.text = sample;
+                line.complete = true;
+                line.stream = sample.startsWith(QLatin1String("error")) ? Kontainer::LogLine::Stream::Stderr
+                                                                        : Kontainer::LogLine::Stream::Stdout;
+                lines.append(line);
+            }
+        }
+        backend->emitLogLines(QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"), lines);
     }
 
     // 等布局与 delegate 完成（一次事件循环 + 一小段等待即可）

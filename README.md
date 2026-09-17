@@ -28,7 +28,7 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 | Storage | Images / Containers / Volumes / Build cache / Total（来自结构化 API `GET /system/df`） |
 | 容器列表 | 名称、短 ID、镜像、状态、健康、创建时间（相对）、端口概要；**整卡可点击进入详情**；搜索 / 状态过滤 / 排序 |
 | 镜像列表 | 仓库标签、大小、创建时间、是否在用、是否悬空；搜索 / 过滤 / 排序；**整卡可点击进入详情** |
-| Container Detail | Overview（状态/健康/镜像/ID/创建·启动·结束时间；容器名称与 ID 可复制）、Runtime（重启次数/退出码/OOM/PID/重启策略/平台）、Resources（CPU/内存/网络/块 IO + 短期趋势）、Network（网络/IPv4/IPv6/网关/MAC）、Ports、Mounts、Configuration（Entrypoint/Command/工作目录/用户/主机名 + Environment/Labels 折叠） |
+| Container Detail | Overview（状态/健康/镜像/ID/创建·启动·结束时间；容器名称与 ID 可复制）、Runtime（重启次数/退出码/OOM/PID/重启策略/平台）、Resources（CPU/内存/网络/块 IO + 短期趋势）、Network（网络/IPv4/IPv6/网关/MAC）、Ports、Mounts、**Logs（流式控制台）**、Configuration（Entrypoint/Command/工作目录/用户/主机名 + Environment/Labels 折叠） |
 | Image Detail | Repository / Tag / 完整引用 / ID（均可一键复制）、Digest、创建时间、大小、架构、OS、作者、Tags、Digests、Layers（层摘要 + 说明）、使用该镜像的容器、Environment（折叠） |
 | 刷新 | 5 秒自动刷新（高频）+ 30 秒 storage（中频）+ 手动刷新；**自动刷新可关闭**（工具栏勾选项，关闭时页头提示）；Last Updated / Update failed / Data is stale；后台刷新不清空列表、不重置搜索/过滤/排序；数据未变时详情列表完全不动模型 |
 | 资源监控 | 每个详情页 5 秒采样一次，内存中保留 60 个采样点（约 5 分钟），离开页面立即停止采样并释放历史；趋势线按**固定槽位**渲染（最新采样贴右），因此采样不会创建/销毁任何条目 |
@@ -36,7 +36,8 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 | 状态徽标 | 所有状态统一由 `StatusChip` 呈现（图标 + 颜色 + 文字三重编码）；语义 key → 主题色的映射只在 `StatusPalette` 里存在一份 |
 | 可复制字段 | 容器名称/ID、镜像仓库/标签/完整引用/ID 统一使用 `CopyableText` / `CopyButton`；列表卡片也有复制入口 |
 | 空状态 | 统一使用 `EmptyPlaceholder`（`Kirigami.PlaceholderMessage`）；「没有数据」「搜索无结果」「过滤无结果」文案互不相同，后两者提供清除条件的入口 |
-| 容器详情分区 | 概览 / 资源 / 网络 / 挂载 / 日志（占位）五个分区，各自滚动；页面不再是一个超长滚动条 |
+| 容器详情分区 | 概览 / 资源 / 网络 / 挂载 / 日志五个分区，各自滚动；页面不再是一个超长滚动条 |
+| **容器日志** | 流式跟随（`GET /containers/{id}/logs`）：等宽控制台、跟随末尾、暂停（继续接收并缓冲，恢复时一次补上）、清空、复制全部、断开与重新连接；按 `Config.Tty` 分形态解复用，剥掉 ANSI 颜色、`\r` 进度条按"覆盖当前行"处理；行数/字节**双上限**（5000 行 / 512 KiB）并在超出时说明省略了多少行；容器停止是正常结束（给"重新连接"），日志驱动不支持读取时给出替代做法；**只在日志分区打开时读取** |
 | 镜像详情收敛 | 层列表默认只显示前 5 层、可展开全部；多 tag 以 chip 呈现 |
 | 存储可视化 | Overview 的存储区有横向堆叠条（镜像/容器/数据卷/构建缓存）+ 色块图例；不可用的类别显示 `—`，不伪装成 0 |
 | 数据可视化配色 | 趋势线与存储条使用 `ChartPalette` 的专用取色（亮/暗各一套，均通过 WCAG AA 4.5:1 校验），不再借用状态语义色 |

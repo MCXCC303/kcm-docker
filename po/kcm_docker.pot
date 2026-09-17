@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: kontainer 0.5.0\n"
+"Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 01:50+0800\n"
+"POT-Creation-Date: 2026-09-18 02:27+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,7 +50,7 @@ msgstr ""
 msgid "Dead"
 msgstr ""
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:319
+#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:328
 #: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
 #: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -81,7 +81,7 @@ msgid "The host path is not a directory."
 msgstr ""
 
 #: src/model/status_controller.cpp:94
-#: src/model/container_detail_controller.cpp:52
+#: src/model/container_detail_controller.cpp:53
 msgid "Could not open the file manager: %1"
 msgstr ""
 
@@ -110,7 +110,7 @@ msgstr ""
 msgid "The Docker daemon rejected the request because of the current state."
 msgstr ""
 
-#: src/model/docker_error_text.cpp:52
+#: src/model/docker_error_text.cpp:52 src/ui/components/LogConsole.qml:67
 msgid "Docker Engine is not reachable."
 msgstr ""
 
@@ -278,28 +278,28 @@ msgstr ""
 msgid "Nothing to do: the object is already in the requested state."
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:46
+#: src/model/container_detail_controller.cpp:47
 msgid "The host directory of this mount does not exist."
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:49
-#: src/model/container_detail_controller.cpp:327
+#: src/model/container_detail_controller.cpp:50
+#: src/model/container_detail_controller.cpp:347
 msgid "This mount has no host directory to open."
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:127
+#: src/model/container_detail_controller.cpp:132
 msgid "No container selected."
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:218
+#: src/model/container_detail_controller.cpp:238
 msgid "IPv6"
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:221
+#: src/model/container_detail_controller.cpp:241
 msgid "Gateway"
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:331
+#: src/model/container_detail_controller.cpp:351
 msgid "Opening host directories is not available in this environment."
 msgstr ""
 
@@ -555,6 +555,102 @@ msgstr ""
 msgid "Log in"
 msgstr ""
 
+#: src/ui/components/LogConsole.qml:45
+msgid "Connecting…"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:47
+msgid "Following"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:49
+msgid "Paused (output is buffered)"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:51
+msgid "The log stream ended. The container may have stopped."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:55
+msgid "Not connected."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:63
+msgid "The container no longer exists."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:65
+msgid ""
+"This container's logging driver does not support reading logs from the "
+"engine. Use the docker CLI or the container's own log destination."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:69
+msgid "Reading logs timed out."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:71
+msgid "Reading this container's logs was denied."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:73
+msgid "Reading logs failed."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:110
+msgid "Earlier output omitted (%1 line)"
+msgid_plural "Earlier output omitted (%1 lines)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/components/LogConsole.qml:118
+msgid "Follow"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:125
+msgid "Resume"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:125
+msgid "Pause"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:139
+msgid "Clear"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:148
+msgid "log output"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:155
+msgid "Reconnect"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:171
+msgid "Details: %1"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:204
+msgid "Container log output"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:215
+msgid "No log output yet."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:217
+msgid "Waiting for the first log lines…"
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:218
+msgid "This container has not written anything to stdout or stderr yet."
+msgstr ""
+
+#: src/ui/components/LogConsole.qml:226
+msgid "Logs are read only while this tab is open."
+msgstr ""
+
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr ""
@@ -663,11 +759,11 @@ msgstr ""
 msgid "Image ID:"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:337
+#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:346
 msgid "Created:"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:345
+#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:354
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr ""
@@ -722,7 +818,7 @@ msgstr[1] ""
 msgid "No containers use this image."
 msgstr ""
 
-#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:448
+#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:457
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
@@ -734,7 +830,7 @@ msgid "Delete all tags…"
 msgstr ""
 
 #: src/ui/ImageDetail.qml:474 src/ui/ImageDetail.qml:491
-#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:820
+#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:819
 msgid "Delete"
 msgstr ""
 
@@ -802,7 +898,7 @@ msgstr ""
 msgid "Stop the container to delete it."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:197 src/ui/ContainerDetail.qml:592
+#: src/ui/ContainerDetail.qml:197 src/ui/ContainerDetail.qml:601
 msgid "Container"
 msgstr ""
 
@@ -818,198 +914,188 @@ msgstr ""
 msgid "Unable to retrieve container details."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:254
+#: src/ui/ContainerDetail.qml:263
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:257
+#: src/ui/ContainerDetail.qml:266
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:260
+#: src/ui/ContainerDetail.qml:269
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:263
+#: src/ui/ContainerDetail.qml:272
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:266
+#: src/ui/ContainerDetail.qml:275
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:302
+#: src/ui/ContainerDetail.qml:311
 msgid "State:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:318
+#: src/ui/ContainerDetail.qml:327
 msgid "Status:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:323
+#: src/ui/ContainerDetail.qml:332
 msgid "Image:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:330
+#: src/ui/ContainerDetail.qml:339
 msgid "Container ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:333 src/ui/ContainerCard.qml:187
+#: src/ui/ContainerDetail.qml:342 src/ui/ContainerCard.qml:187
 msgid "container ID"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:343
+#: src/ui/ContainerDetail.qml:352
 msgid "Started:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:349
+#: src/ui/ContainerDetail.qml:358
 msgid "Finished:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:358
+#: src/ui/ContainerDetail.qml:367
 msgid "Runtime"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:368
+#: src/ui/ContainerDetail.qml:377
 msgid "Restart count:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:372
+#: src/ui/ContainerDetail.qml:381
 msgid "Exit code:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:376
+#: src/ui/ContainerDetail.qml:385
 msgid "OOM killed:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:378 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:387 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96
 msgid "Yes"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:382
+#: src/ui/ContainerDetail.qml:391
 msgid "Process ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:387
+#: src/ui/ContainerDetail.qml:396
 msgid "Restart policy:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:392
+#: src/ui/ContainerDetail.qml:401
 msgid "Platform:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:401
+#: src/ui/ContainerDetail.qml:410
 msgid "Configuration"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:411
+#: src/ui/ContainerDetail.qml:420
 msgid "Entrypoint:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:419
+#: src/ui/ContainerDetail.qml:428
 msgid "Command:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:427
+#: src/ui/ContainerDetail.qml:436
 msgid "Working directory:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:433
+#: src/ui/ContainerDetail.qml:442
 msgid "User:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:438
+#: src/ui/ContainerDetail.qml:447
 msgid "Hostname:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:458
+#: src/ui/ContainerDetail.qml:467
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/ContainerDetail.qml:495
+#: src/ui/ContainerDetail.qml:504
 msgid "No network information."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:523 src/ui/ResourceView.qml:128
+#: src/ui/ContainerDetail.qml:532 src/ui/ResourceView.qml:128
 msgid "Network:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:559
+#: src/ui/ContainerDetail.qml:568
 msgid "MAC:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:575
+#: src/ui/ContainerDetail.qml:584
 msgid "Port mapping"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:584
+#: src/ui/ContainerDetail.qml:593
 msgid "No published ports."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:603
+#: src/ui/ContainerDetail.qml:612
 msgid "Exposed but not published"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:622
+#: src/ui/ContainerDetail.qml:631
 msgid "%1, exposed but not published to the host"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:644
+#: src/ui/ContainerDetail.qml:653
 msgid "No mounts."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:688
+#: src/ui/ContainerDetail.qml:697
 msgid "mount"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:713
+#: src/ui/ContainerDetail.qml:722
 msgid "Not a directory"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:713
+#: src/ui/ContainerDetail.qml:722
 msgid "Host path missing"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:768
+#: src/ui/ContainerDetail.qml:777
 msgid "Open host folder"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:776
+#: src/ui/ContainerDetail.qml:785
 msgid "host path"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:781
+#: src/ui/ContainerDetail.qml:790
 msgid "container path"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:801
-msgid "Container logs are not available yet."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:802
-msgid ""
-"Streaming logs will be added in a later version. Until then, use the docker "
-"CLI or your container's own log destination."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:817
+#: src/ui/ContainerDetail.qml:816
 msgid "Delete container"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:818
+#: src/ui/ContainerDetail.qml:817
 msgid "Delete the container “%1”?"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:819
+#: src/ui/ContainerDetail.qml:818
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr ""
 

@@ -676,6 +676,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/StringListEditor.qml"),
         QStringLiteral("components/KeyValueListEditor.qml"),
         QStringLiteral("components/RegistryLoginDialog.qml"),
+        QStringLiteral("components/LogConsole.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
@@ -946,14 +947,50 @@ void QmlLoadTest::containerDetailHasSections()
     QVERIFY2(environment, "environment values container not found");
     QVERIFY2(!environment->isVisible(), "environment must stay collapsed (§40)");
 
-    // 切到「日志」分区：占位必须可见，且不重新 inspect、不改变折叠状态
+    // 日志是长连接：没进分区就不该开始读（§3.1.4）
+    QVERIFY2(m_backend->lastLogContainerId().isEmpty(), "logs must not be read before the tab is opened");
+
+    // 切到「日志」分区：开始读日志（用容器详情里的 TTY 标记），且不重新 inspect、不改变折叠状态
     QVERIFY(tabBar->setProperty("currentIndex", 4));
     QCOMPARE(stack->property("currentIndex").toInt(), 4);
-    QQuickItem *logsPlaceholder = childByObjectName(page, QStringLiteral("logsPlaceholder"));
-    QVERIFY2(logsPlaceholder, "logs placeholder not found");
-    QVERIFY2(!logsPlaceholder->property("message").toString().isEmpty(), "logs tab must explain that logs are not implemented yet");
+    QQuickItem *logConsoleItem = childByObjectName(page, QStringLiteral("logConsole"));
+    QVERIFY2(logConsoleItem, "the log console must replace the old placeholder");
+    QCOMPARE(m_backend->lastLogContainerId(), QStringLiteral("cid-1"));
+    QVERIFY2(!m_backend->lastLogTty(), "the TTY flag must come from the container detail (Config.Tty)");
+    QVERIFY(m_backend->lastLogFollow());
+    QCOMPARE(m_backend->lastLogTailLines(), 200);
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::ContainerDetail), 1);
     QVERIFY2(!environment->isVisible(), "switching sections must not expand environment (§40)");
+
+    // 引擎推来的日志出现在控制台里，暂停后继续接收但不追加
+    auto *logs = m_stubKcm->controller()->containerDetail()->logs();
+    QVERIFY(logs);
+    LogLine first;
+    first.text = QStringLiteral("boot ok");
+    first.complete = true;
+    m_backend->emitLogLines(QStringLiteral("cid-1"), {first});
+    QQuickItem *logText = childByObjectName(page, QStringLiteral("logTextArea"));
+    QVERIFY(logText);
+    QTRY_VERIFY(logText->property("text").toString().contains(QStringLiteral("boot ok")));
+    QQuickItem *stateLabel = childByObjectName(page, QStringLiteral("logStateLabel"));
+    QVERIFY(stateLabel);
+    QCOMPARE(stateLabel->property("text").toString(), QStringLiteral("Following"));
+
+    logs->pause();
+    QCOMPARE(stateLabel->property("text").toString(), QStringLiteral("Paused (output is buffered)"));
+    LogLine second;
+    second.text = QStringLiteral("while paused");
+    second.complete = true;
+    m_backend->emitLogLines(QStringLiteral("cid-1"), {second});
+    QVERIFY2(!logText->property("text").toString().contains(QStringLiteral("while paused")),
+             "paused output must stay buffered until resume");
+    logs->resume();
+    QTRY_VERIFY(logText->property("text").toString().contains(QStringLiteral("while paused")));
+
+    // 离开分区：必须断开（长连接不该挂着）
+    QVERIFY(tabBar->setProperty("currentIndex", 0));
+    QCOMPARE(m_backend->stopLogsCount(QStringLiteral("cid-1")), 1);
+    QCOMPARE(logs->stateKey(), QStringLiteral("idle"));
 }
 
 /*!
