@@ -26,6 +26,7 @@ endfunction()
 kontainer_add_test(tst_http_response_parser backend/tst_http_response_parser.cpp)
 kontainer_add_test(tst_json_line_reader backend/tst_json_line_reader.cpp)
 kontainer_add_test(tst_daemon_config backend/tst_daemon_config.cpp)
+kontainer_add_test(tst_daemon_deployment backend/tst_daemon_deployment.cpp)
 kontainer_add_test(tst_kontainer_helper backend/tst_kontainer_helper.cpp)
 kontainer_add_test(tst_docker_capabilities backend/tst_docker_capabilities.cpp)
 kontainer_add_test(tst_image_reference backend/tst_image_reference.cpp)
@@ -35,6 +36,15 @@ kontainer_add_test(tst_api_version backend/tst_api_version.cpp)
 kontainer_add_test(tst_container_model model/tst_container_model.cpp)
 kontainer_add_test(tst_filter_models model/tst_filter_models.cpp)
 kontainer_add_test(tst_i18n_consistency model/tst_i18n_consistency.cpp)
+# 译文是 ki18n 按 <XDG_DATA_DIRS>/locale/<lang>/LC_MESSAGES/<domain>.mo 找的：
+# 把构建目录（ki18n 在那里生成 .mo）加进去，测试才能真的走一遍加载路径
+target_compile_definitions(tst_i18n_consistency PRIVATE KONTAINER_BUILD_DIR="${CMAKE_BINARY_DIR}")
+set_tests_properties(tst_i18n_consistency PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;XDG_DATA_DIRS=${CMAKE_BINARY_DIR}:$ENV{XDG_DATA_DIRS};LANGUAGE=zh_CN")
+# 运行时用例读的是编译出来的 .mo：让它依赖 pofiles，避免改了 po 却拿旧 .mo 通过
+if(TARGET pofiles)
+    add_dependencies(tst_i18n_consistency pofiles)
+endif()
 kontainer_add_test(tst_source_conventions model/tst_source_conventions.cpp)
 kontainer_add_test(tst_metrics model/tst_metrics.cpp)
 kontainer_add_test(tst_detail_controllers model/tst_detail_controllers.cpp)

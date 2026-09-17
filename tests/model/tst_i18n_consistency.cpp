@@ -5,12 +5,18 @@
 
 #include "i18n.h"
 
+#include <KLocalizedString>
+
 #include <QDir>
 #include <QDirIterator>
 #include <QFile>
-#include <QRegularExpression>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QProcess>
+#include <QRegularExpression>
+#include <QSet>
+#include <QStandardPaths>
+#include <QTemporaryDir>
 #include <QtTest>
 
 using namespace Kontainer;
@@ -30,6 +36,8 @@ private Q_SLOTS:
     void domainMatchesPluginId();
     void metadataUsesSameDomain();
     void translationsExistAndAreComplete();
+    void templateMatchesSources();
+    void translationsLoadAtRuntime();
     void noUnwrappedUiStrings();
 };
 
@@ -171,6 +179,162 @@ QString stripComments(const QString &content)
 }
 
 } // namespace
+
+/*!
+ * 模板必须覆盖源码里的全部待译字符串。
+ *
+ * 为什么要有这条：五期一次就漏了 90 多条（新增界面文案没进 `po/`），
+ * 而"漏了"在界面上表现为英文与中文混排——只有真的有人切到中文才看得见。
+ * 这里直接跑一次 xgettext（与 `po/README.md` 里给译者的命令一致），
+ * 只比较 **msgctxt + msgid + msgid_plural** 集合，不比行号引用
+ * （引用行每次改代码都会变，比它只会制造噪音）。
+ */
+namespace
+{
+
+/*!
+ * 把 po/pot 解析成 `msgctxt\x1fmsgid\x1fmsgid_plural` 字符串集合。
+ *
+ * 只做这一个测试需要的事：按空行切块 → 取三个字段 → 去掉引号与续行。
+ * 不做通用解析（那需要一个完整的 gettext 实现，而这里的输入是我们自己的文件）。
+ */
+QSet<QString> potKeys(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    const QString content = QString::fromUtf8(file.readAll());
+
+    const auto field = [](const QStringList &block, const QString &key) {
+        QString value;
+        bool collecting = false;
+        for (const QString &line : block) {
+            if (line.startsWith(key + QLatin1Char(' '))) {
+                collecting = true;
+                value += line.mid(key.size() + 1).trimmed().mid(1, line.trimmed().size() - 2);
+            } else if (collecting && line.startsWith(QLatin1Char('"'))) {
+                value += line.trimmed().mid(1, line.trimmed().size() - 2);
+            } else if (collecting) {
+                break;
+            }
+        }
+        return value;
+    };
+
+    QSet<QString> keys;
+    const QStringList blocks = content.split(QStringLiteral("\n\n"));
+    for (const QString &raw : blocks) {
+        if (raw.startsWith(QLatin1String("#~"))) {
+            continue; // 已废弃的条目
+        }
+        const QStringList block = raw.split(QLatin1Char('\n'));
+        const QString id = field(block, QStringLiteral("msgid"));
+        if (id.isEmpty()) {
+            continue; // 头部元数据条目
+        }
+        keys.insert(field(block, QStringLiteral("msgctxt")) + QChar(0x1f) + id + QChar(0x1f)
+                    + field(block, QStringLiteral("msgid_plural")));
+    }
+    return keys;
+}
+
+} // namespace
+
+void I18nConsistencyTest::templateMatchesSources()
+{
+    const QString xgettext = QStandardPaths::findExecutable(QStringLiteral("xgettext"));
+    if (xgettext.isEmpty()) {
+        QSKIP("xgettext is not installed; cannot verify the translation template");
+    }
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString extracted = dir.filePath(QStringLiteral("extracted.pot"));
+
+    QStringList sources;
+    QDirIterator iterator(sourceDir() + QStringLiteral("/src"),
+                          {QStringLiteral("*.cpp"), QStringLiteral("*.h"), QStringLiteral("*.qml")},
+                          QDir::Files,
+                          QDirIterator::Subdirectories);
+    while (iterator.hasNext()) {
+        sources.append(iterator.next());
+    }
+    QVERIFY(!sources.isEmpty());
+
+    // 与 po/README.md 里写给译者的命令保持一致（否则两边会得出不同的集合）
+    QStringList arguments{QStringLiteral("--language=C++"),
+                          QStringLiteral("--from-code=UTF-8"),
+                          QStringLiteral("--keyword=i18n"),
+                          QStringLiteral("--keyword=i18nc:1c,2"),
+                          QStringLiteral("--keyword=i18np:1,2"),
+                          QStringLiteral("--keyword=i18ncp:1c,2,3"),
+                          QStringLiteral("--package-name=kontainer"),
+                          QStringLiteral("--output=") + extracted};
+    arguments += sources;
+    QProcess process;
+    process.start(xgettext, arguments);
+    QVERIFY2(process.waitForFinished(60000), "xgettext did not finish");
+    QCOMPARE(process.exitCode(), 0);
+
+    const QSet<QString> fromSources = potKeys(extracted);
+    const QSet<QString> fromTemplate = potKeys(sourceDir() + QStringLiteral("/po/kcm_docker.pot"));
+    QVERIFY(!fromTemplate.isEmpty());
+
+    QStringList missing;
+    for (const QString &key : fromSources) {
+        if (!fromTemplate.contains(key)) {
+            missing.append(key.section(QChar(0x1f), 1, 1));
+        }
+    }
+    missing.sort();
+    QVERIFY2(missing.isEmpty(),
+             qPrintable(QStringLiteral("po/kcm_docker.pot is out of date; missing %1 string(s):\n%2")
+                            .arg(missing.size())
+                            .arg(missing.mid(0, 10).join(QLatin1Char('\n')))));
+
+    QStringList stale;
+    for (const QString &key : fromTemplate) {
+        if (!fromSources.contains(key)) {
+            stale.append(key.section(QChar(0x1f), 1, 1));
+        }
+    }
+    stale.sort();
+    QVERIFY2(stale.isEmpty(),
+             qPrintable(QStringLiteral("po/kcm_docker.pot has %1 string(s) no longer in the sources:\n%2")
+                            .arg(stale.size())
+                            .arg(stale.mid(0, 10).join(QLatin1Char('\n')))));
+}
+
+/*!
+ * 译文真的能被 ki18n 读出来吗？
+ *
+ * 前三个用例查的是"文件里有没有"，这个用例查的是"运行时会显示什么"：
+ * 域、语言、安装目录、.mo 内容任何一环错了，界面都会静默退回英文，
+ * 而那种失败在 CI 里看不出来（除非有人真的切到中文看一眼）。
+ */
+void I18nConsistencyTest::translationsLoadAtRuntime()
+{
+    const QString moFile = QStringLiteral(KONTAINER_BUILD_DIR) + QStringLiteral("/locale/zh_CN/LC_MESSAGES/kcm_docker.mo");
+    if (!QFile::exists(moFile)) {
+        QSKIP("the compiled .mo does not exist yet; build the kcm_docker target first");
+    }
+
+    // 语言显式钉住：测试不该随开发者机器的 LANG 变化
+    // （XDG_DATA_DIRS 与 LANGUAGE 由 tests/CMakeLists.txt 注入进程环境，
+    //  QStandardPaths 在进程启动后只初始化一次，所以不能在测试体里 qputenv）
+    KLocalizedString::setLanguages({QStringLiteral("zh_CN")});
+    setupTranslationDomain();
+
+    // 抽三条覆盖不同来源（QML/C++、普通条目、复数条目）
+    QCOMPARE(i18n("Save"), QStringLiteral("保存"));
+    QCOMPARE(i18n("Unlock to edit"), QStringLiteral("解锁以编辑"));
+    QCOMPARE(i18ncp("@info image layer count", "Layers (%1)", "Layers (%1)", 3), QStringLiteral("层（3）"));
+
+    // 没有译文的字符串必须原样返回：返回空串会让界面出现空白按钮
+    const char *untranslated = "this string is intentionally not translated";
+    QCOMPARE(i18n(untranslated), QString::fromLatin1(untranslated));
+}
 
 void I18nConsistencyTest::noUnwrappedUiStrings()
 {

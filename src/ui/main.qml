@@ -83,7 +83,11 @@ KCM.AbstractKCM {
                         "imageId": imageId
                     });
                 }
-                onConfigureRuntimeRequested: stack.push(daemonConfigComponent)
+                onConfigureRuntimeRequested: function (scope) {
+                    stack.push(daemonConfigComponent, {
+                        "scope": scope
+                    });
+                }
             }
         }
 
@@ -99,6 +103,7 @@ KCM.AbstractKCM {
             id: daemonConfigComponent
 
             DaemonConfigPage {
+                scope: "system"
                 onCloseRequested: stack.pop()
             }
         }

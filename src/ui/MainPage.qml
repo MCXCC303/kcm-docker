@@ -29,8 +29,8 @@ Kirigami.Page {
 
     /*! 卡片被激活：由 main.qml 接到导航上（ARCH_V2 §43：导航属于 KCM 层） */
     signal containerActivated(string containerId)
-    /*! 请求打开「运行时配置」页（daemon.json）。 */
-    signal configureRuntimeRequested()
+    /*! 请求打开「运行时配置」页（daemon.json）；scope = user | system。 */
+    signal configureRuntimeRequested(string scope)
     signal imageActivated(string imageId)
 
     /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
@@ -657,15 +657,22 @@ Kirigami.Page {
                     spacing: Kirigami.Units.smallSpacing
 
                     QQC2.Button {
-                        objectName: "openRuntimeConfigButton"
-                        text: i18n("Runtime configuration…")
+                        objectName: "openUserRuntimeConfigButton"
+                        text: i18n("User configuration…")
                         icon.name: "settings-configure"
-                        onClicked: root.configureRuntimeRequested()
+                        onClicked: root.configureRuntimeRequested("user")
+                    }
+
+                    QQC2.Button {
+                        objectName: "openSystemRuntimeConfigButton"
+                        text: i18n("System configuration…")
+                        icon.name: "settings-configure"
+                        onClicked: root.configureRuntimeRequested("system")
                     }
 
                     QQC2.Label {
                         Layout.fillWidth: true
-                        text: i18n("Registry mirrors, insecure registries and other daemon settings.")
+                        text: i18n("Registry mirrors and other daemon settings. The system configuration needs administrator rights.")
                         font: Kirigami.Theme.smallFont
                         opacity: 0.7
                         elide: Text.ElideRight

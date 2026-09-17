@@ -4,6 +4,8 @@
 */
 
 #include "backend/daemon_config.h"
+#include "backend/privileged_config_client.h"
+#include "model/daemon_config_controller.h"
 #include "backend/daemon_deployment.h"
 
 #include <QDir>
@@ -15,38 +17,8 @@
 
 using namespace Kontainer;
 
-/*!
- * daemon 部署形态探测（ARCH_V5_V8 §2.2）。
- *
- * 探测决定"要不要提权"：判错会造成两种坏结果——该提权时不提权（功能不可用），
- * 或不该提权时弹授权框（打扰用户）。所以这里把矩阵钉死。
- */
-class DaemonDeploymentTest : public QObject
-{
-    Q_OBJECT
-
-private Q_SLOTS:
-    void systemDaemonNeedsPrivilegeWhenConfigIsNotWritable();
-    void rootlessDaemonUsesUserConfigWithoutPrivilege();
-    void userConfigWinsWhenFormIsUnknown();
-    void missingSecurityOptionsMeansUnknownForm();
-    void dataRootInHomeIsFlagged();
-    void configStatsAreReported();
-};
-
 namespace
 {
-
-EngineInfo engineWith(const QStringList &securityOptions, const QString &dockerRootDir = {})
-{
-    EngineInfo info;
-    info.available = true;
-    info.countsAvailable = true;
-    info.securityOptions = securityOptions;
-    info.dockerRootDir = dockerRootDir;
-    return info;
-}
-
 void writeFile(const QString &path, const QByteArray &content)
 {
     QDir().mkpath(QFileInfo(path).absolutePath());
@@ -57,95 +29,6 @@ void writeFile(const QString &path, const QByteArray &content)
 }
 
 } // namespace
-
-void DaemonDeploymentTest::systemDaemonNeedsPrivilegeWhenConfigIsNotWritable()
-{
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-
-    // 系统级 daemon：SecurityOptions 有内容但不含 rootless
-    const EngineInfo info = engineWith({QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")},
-                                       QStringLiteral("/home/someone/.local/share/docker"));
-
-    const DaemonDeployment deployment = DaemonDeploymentDetector::detect(info, dir.path());
-    QCOMPARE(deployment.formKey(), QStringLiteral("systemRoot"));
-    QCOMPARE(deployment.configPath, QStringLiteral("/etc/docker/daemon.json"));
-    // 真实机器上这个文件不属于当前用户 → 需要提权（本机实测正是这种形态）
-    QVERIFY2(deployment.requiresPrivilege() || deployment.configWritable,
-             "requiresPrivilege must be false only when the config is actually writable");
-    // 数据目录在家目录里：需要提示（用户容易误以为是 rootless）
-    QVERIFY(deployment.dataRootInHomeDir);
-}
-
-void DaemonDeploymentTest::rootlessDaemonUsesUserConfigWithoutPrivilege()
-{
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-    const QString userConfig = dir.path() + QStringLiteral("/.config/docker/daemon.json");
-    writeFile(userConfig, QByteArrayLiteral("{\"registry-mirrors\":[\"https://mirror.example.com\"]}"));
-
-    const EngineInfo info = engineWith({QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=rootless")});
-    const DaemonDeployment deployment = DaemonDeploymentDetector::detect(info, dir.path());
-
-    QCOMPARE(deployment.formKey(), QStringLiteral("rootless"));
-    QCOMPARE(deployment.configPath, userConfig);
-    QVERIFY(deployment.configExists);
-    QVERIFY(deployment.configWritable);
-    QVERIFY2(!deployment.requiresPrivilege(), "a rootless config owned by the user must not require privilege");
-}
-
-void DaemonDeploymentTest::userConfigWinsWhenFormIsUnknown()
-{
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-    const QString userConfig = dir.path() + QStringLiteral("/.config/docker/daemon.json");
-    writeFile(userConfig, QByteArrayLiteral("{}"));
-
-    // SecurityOptions 为空 → 形态未知，但用户配置存在 → 按用户配置处理
-    const DaemonDeployment deployment = DaemonDeploymentDetector::detect(engineWith({}), dir.path());
-    QCOMPARE(deployment.formKey(), QStringLiteral("unknown"));
-    QCOMPARE(deployment.configPath, userConfig);
-    QVERIFY(deployment.configExists);
-    QVERIFY2(!deployment.requiresPrivilege(), "an unknown form must never force privilege escalation");
-}
-
-void DaemonDeploymentTest::missingSecurityOptionsMeansUnknownForm()
-{
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-    // 引擎信息不完整（例如 /info 失败）：不得猜测形态，也不得提权
-    const EngineInfo info; // available=false
-    const DaemonDeployment deployment = DaemonDeploymentDetector::detect(info, dir.path());
-    QCOMPARE(deployment.formKey(), QStringLiteral("unknown"));
-    QVERIFY2(!deployment.requiresPrivilege(), "unknown form must not require privilege");
-    QVERIFY(!deployment.configExists);
-    QVERIFY(!deployment.configWritable);
-}
-
-void DaemonDeploymentTest::dataRootInHomeIsFlagged()
-{
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-
-    const EngineInfo inside = engineWith({QStringLiteral("name=rootless")}, dir.path() + QStringLiteral("/docker"));
-    QVERIFY(DaemonDeploymentDetector::detect(inside, dir.path()).dataRootInHomeDir);
-
-    const EngineInfo outside = engineWith({QStringLiteral("name=rootless")}, QStringLiteral("/var/lib/docker"));
-    QVERIFY(!DaemonDeploymentDetector::detect(outside, dir.path()).dataRootInHomeDir);
-}
-
-void DaemonDeploymentTest::configStatsAreReported()
-{
-    QTemporaryDir dir;
-    QVERIFY(dir.isValid());
-    const QString userConfig = dir.path() + QStringLiteral("/.config/docker/daemon.json");
-    writeFile(userConfig, QByteArrayLiteral("{\"log-driver\":\"json-file\"}"));
-
-    const EngineInfo info = engineWith({QStringLiteral("name=rootless")});
-    const DaemonDeployment deployment = DaemonDeploymentDetector::detect(info, dir.path());
-    QVERIFY(deployment.configSize > 0);
-    QVERIFY(deployment.configModified.isValid());
-}
 
 /*!
  * `daemon.json` 读写（ARCH_V5_V8 §2.3/§2.4）。
@@ -168,6 +51,14 @@ private Q_SLOTS:
     void refusingEmptyContent();
     void backupsAreListedNewestFirst();
     void readBackupRejectsBrokenContent();
+
+    /* 作用域与解锁状态机（ARCH_V5_V8 §2.2 修正 / 用户界面分离） */
+    void scopesPointAtDifferentFiles();
+    void protectedScopeIsLockedUntilAuthorized();
+    void authorizationExpiresAndLocksAgain();
+    void switchingScopeLocksAgain();
+    void privilegeDependsOnWritabilityOnly();
+    void manualCommandRestartsTheRightService();
 };
 
 void DaemonConfigTest::readsManagedKeys()
@@ -355,6 +246,141 @@ void DaemonConfigTest::readBackupRejectsBrokenContent()
     QVERIFY(!DaemonConfigWriter::readBackup(good).isEmpty());
 }
 
+/* --- 作用域与解锁状态机 --- */
+
+namespace
+{
+EngineInfo systemEngine()
+{
+    EngineInfo info;
+    info.available = true;
+    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
+    return info;
+}
+
+EngineInfo rootlessEngine()
+{
+    EngineInfo info;
+    info.available = true;
+    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=rootless")};
+    return info;
+}
+} // namespace
+
+void DaemonConfigTest::scopesPointAtDifferentFiles()
+{
+    DaemonConfigController controller;
+    controller.setEngineInfo(systemEngine());
+
+    controller.setScope(QStringLiteral("system"));
+    QCOMPARE(controller.configPath(), QStringLiteral("/etc/docker/daemon.json"));
+    // 系统级 daemon 正在运行 → 系统作用域是"生效的那个"
+    QVERIFY(controller.activeScope());
+
+    controller.setScope(QStringLiteral("user"));
+    QVERIFY2(controller.configPath().endsWith(QStringLiteral("/.config/docker/daemon.json")), qPrintable(controller.configPath()));
+    // rootless 才读用户配置：系统级 daemon 下这个作用域不生效（界面据此给横幅）
+    QVERIFY(!controller.activeScope());
+}
+
+void DaemonConfigTest::protectedScopeIsLockedUntilAuthorized()
+{
+    DaemonConfigController controller;
+    controller.setEngineInfo(systemEngine());
+    controller.setScope(QStringLiteral("system"));
+
+    // 本机 /etc/docker/daemon.json 属于 root → 受保护、默认锁定
+    QVERIFY(controller.requiresPrivilege());
+    QVERIFY2(!controller.unlocked(), "a protected scope starts locked");
+    QCOMPARE(controller.unlockSecondsRemaining(), 0);
+
+    // 未解锁时保存被拒绝（兜底：界面也会禁用按钮）
+    controller.setRegistryMirrors({QStringLiteral("https://mirror.example.com")});
+    QVERIFY(!controller.save());
+    QCOMPARE(controller.lastError(), QStringLiteral("locked"));
+}
+
+void DaemonConfigTest::authorizationExpiresAndLocksAgain()
+{
+    DaemonConfigController controller;
+    controller.setEngineInfo(systemEngine());
+    controller.setScope(QStringLiteral("system"));
+
+    PrivilegedConfigClient client;
+    controller.setPrivilegedClient(&client);
+
+    // 驱动解锁：直接发客户端的授权成功信号（测试不真的去走 polkit）
+    Q_EMIT client.finished(PrivilegedConfigClient::Operation::Authorize, true, QString());
+    QVERIFY(controller.unlocked());
+    QVERIFY2(controller.unlockSecondsRemaining() > 0, "unlocking must start the countdown");
+    QCOMPARE(controller.lastError(), QString());
+
+    // 主动上锁：界面上的「重新上锁」
+    controller.lock();
+    QVERIFY(!controller.unlocked());
+    QCOMPARE(controller.unlockSecondsRemaining(), 0);
+
+    // 取消授权是正常结果：保持锁定，但不应变成错误横幅
+    Q_EMIT client.finished(PrivilegedConfigClient::Operation::Authorize, false, QStringLiteral("cancelled"));
+    QVERIFY(!controller.unlocked());
+    QVERIFY2(controller.lastError().isEmpty(), "cancelling must not raise an error banner");
+}
+
+void DaemonConfigTest::switchingScopeLocksAgain()
+{
+    DaemonConfigController controller;
+    controller.setEngineInfo(systemEngine());
+    controller.setScope(QStringLiteral("system"));
+
+    PrivilegedConfigClient client;
+    controller.setPrivilegedClient(&client);
+    Q_EMIT client.finished(PrivilegedConfigClient::Operation::Authorize, true, QString());
+    QVERIFY(controller.unlocked());
+
+    // 授权是给"那个文件"的：换作用域必须重新授权
+    controller.setScope(QStringLiteral("user"));
+    QVERIFY2(!controller.unlocked(), "switching scope must drop the authorization");
+}
+
 QTEST_MAIN(DaemonConfigTest)
 
 #include "tst_daemon_config.moc"
+
+void DaemonConfigTest::privilegeDependsOnWritabilityOnly()
+{
+    DaemonConfigController controller;
+
+    // "要不要提权"只由这个文件能不能写决定，与部署形态无关：
+    // 形态只决定"改了会不会生效"。两者混起来就会出现
+    // "文件写不了却不给解锁入口"（保存必然失败）这类错误。
+    for (const EngineInfo &engine : {systemEngine(), rootlessEngine()}) {
+        controller.setEngineInfo(engine);
+        for (const QString &scope : {QStringLiteral("system"), QStringLiteral("user")}) {
+            controller.setScope(scope);
+            QVERIFY2(controller.requiresPrivilege() == !controller.configWritable(),
+                     qPrintable(QStringLiteral("%1/%2: requiresPrivilege must mirror configWritable")
+                                    .arg(engine.securityOptions.join(QLatin1Char(',')), scope)));
+        }
+    }
+}
+
+void DaemonConfigTest::manualCommandRestartsTheRightService()
+{
+    DaemonConfigController controller;
+
+    // rootless daemon 是用户自己的服务：降级命令里不能出现 sudo systemctl
+    // （那动的是系统服务，与本作用域无关，而且会平白多要一次 root）
+    controller.setEngineInfo(rootlessEngine());
+    controller.setScope(QStringLiteral("user"));
+    const QString rootless = controller.privilegedCommand();
+    QVERIFY2(rootless.contains(QStringLiteral("systemctl --user restart docker")), qPrintable(rootless));
+    QVERIFY2(!rootless.contains(QStringLiteral("sudo systemctl")), qPrintable(rootless));
+    // 写的是用户配置，不是 /etc
+    QVERIFY2(rootless.contains(QStringLiteral("/.config/docker/daemon.json")), qPrintable(rootless));
+
+    controller.setEngineInfo(systemEngine());
+    controller.setScope(QStringLiteral("system"));
+    const QString system = controller.privilegedCommand();
+    QVERIFY2(system.contains(QStringLiteral("sudo tee /etc/docker/daemon.json")), qPrintable(system));
+    QVERIFY2(system.contains(QStringLiteral("sudo systemctl restart docker")), qPrintable(system));
+}

@@ -217,6 +217,11 @@ QString DaemonConfigWriter::writeAtomically(const QString &path, const QByteArra
     }
 
     // 原子写入：QSaveFile 写临时文件 + rename，失败时原文件保持不变
+    // 目录不存在时先建出来：新装的 rootless daemon 往往还没有 ~/.config/docker/
+    const QString parentDir = QFileInfo(path).absolutePath();
+    if (!parentDir.isEmpty() && !QDir().mkpath(parentDir)) {
+        return QStringLiteral("cannot create directory %1").arg(parentDir);
+    }
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         return QStringLiteral("cannot open %1: %2").arg(path, file.errorString());

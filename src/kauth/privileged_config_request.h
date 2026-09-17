@@ -28,6 +28,8 @@ class PrivilegedConfigRequest
 public:
     /*! 白名单键（与 DaemonConfigDocument 的管理键一致）。 */
     static QStringList allowedKeys();
+    /*! 额外允许的参数键（不是 daemon.json 的键，而是请求本身的开关）。 */
+    static QStringList allowedControlKeys();
 
     /*! 日志驱动白名单：接受的值只有这些（其余一律拒绝）。 */
     static QStringList allowedLogDrivers();
@@ -44,6 +46,17 @@ public:
     bool isEmpty() const
     {
         return !m_setRegistryMirrors && !m_setInsecureRegistries && m_maxConcurrentDownloads <= 0 && m_logDriver.isEmpty();
+    }
+    /*!
+     * 只做校验、不写文件。
+     *
+     * 用途：界面上的「解锁」按钮发起一次授权（polkit 的 keep 是按**动作**记的，
+     * 因此必须打同一个 action id 才能真正预热后续保存），helper 收到 dryRun 后
+     * 校验完请求就返回成功，不碰磁盘。
+     */
+    bool dryRun() const
+    {
+        return m_dryRun;
     }
     bool setRegistryMirrors() const
     {
@@ -90,6 +103,7 @@ private:
     QStringList m_insecureRegistries;
     int m_maxConcurrentDownloads = 0;
     QString m_logDriver;
+    bool m_dryRun = false;
 };
 
 } // namespace Kontainer

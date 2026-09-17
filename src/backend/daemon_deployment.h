@@ -42,10 +42,16 @@ struct DaemonDeployment {
     qint64 configSize = 0;
     QDateTime configModified;
 
-    /*! 是否需要提权才能修改配置。 */
+    /*!
+     * 是否需要提权才能修改配置：**只看这个文件当前用户能不能写**，与部署形态无关。
+     *
+     * 系统级文件属于 root → 需要提权；rootless 的用户配置 → 不需要。
+     * 形态只决定"改了会不会生效"（界面上的另一条横幅），两件事不能混。
+     * 连路径都没有（形态未知且两个文件都不存在）时不做任何提权声明。
+     */
     bool requiresPrivilege() const
     {
-        return form == DaemonForm::SystemRoot && !configWritable;
+        return !configPath.isEmpty() && !configWritable;
     }
     /*! 数据目录落在用户家目录（"混合配置"）：值得给用户一条提示。 */
     bool dataRootInHomeDir = false;
@@ -71,6 +77,15 @@ public:
     static DaemonDeployment detect(const EngineInfo &info);
     /*! 可注入版本（测试用）。 */
     static DaemonDeployment detect(const EngineInfo &info, const QString &homeDir);
+
+    /*!
+     * 当前用户能否写这个配置文件（只读探测，绝不试写）。
+     *
+     * 文件存在 → 看它自己的权限位；不存在 → 看**最近的已存在父目录**能不能写
+     * （新装的 rootless daemon 往往还没有 `~/.config/docker/daemon.json`，
+     * 这时把它判成"需要 root"是错的：用户明明可以创建它）。
+     */
+    static bool configIsWritable(const QString &path);
 };
 
 } // namespace Kontainer

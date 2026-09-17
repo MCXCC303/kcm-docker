@@ -38,7 +38,8 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
     , m_hostPaths(hostPaths)
-    , m_daemonConfig(new DaemonConfigController(this))
+    , m_daemonConfigUser(new DaemonConfigController(this))
+    , m_daemonConfigSystem(new DaemonConfigController(this))
 {
     Q_ASSERT(m_backend);
     // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
@@ -50,7 +51,10 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
     // 配置页需要 /info 里的 SecurityOptions / RegistryConfig.Mirrors / LiveRestoreEnabled，
     // 因此引擎信息一到就同步给配置控制器
-    m_daemonConfig->setEngineInfo(m_backend->engineInfo());
+    m_daemonConfigUser->setScope(QStringLiteral("user"));
+    m_daemonConfigSystem->setScope(QStringLiteral("system"));
+    m_daemonConfigUser->setEngineInfo(m_backend->engineInfo());
+    m_daemonConfigSystem->setEngineInfo(m_backend->engineInfo());
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &StatusController::onContainersUpdated);
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &StatusController::onImagesUpdated);
     connect(m_backend, &DockerBackendInterface::storageUpdated, this, &StatusController::onStorageUpdated);
@@ -264,7 +268,8 @@ QString StatusController::storageStateKey() const
 
 void StatusController::onEngineUpdated()
 {
-    m_daemonConfig->setEngineInfo(m_backend->engineInfo());
+    m_daemonConfigUser->setEngineInfo(m_backend->engineInfo());
+    m_daemonConfigSystem->setEngineInfo(m_backend->engineInfo());
     const EngineInfo info = m_backend->engineInfo();
     if (info.available) {
         m_engine->setInfo(info);
@@ -282,7 +287,8 @@ void StatusController::onEngineUpdated()
 
 void StatusController::onContainersUpdated()
 {
-    m_daemonConfig->setRunningContainerCount(runningContainerCount());
+    m_daemonConfigUser->setRunningContainerCount(runningContainerCount());
+    m_daemonConfigSystem->setRunningContainerCount(runningContainerCount());
     m_containerModel->setContainers(m_backend->containers());
     m_containersOk = true;
     m_containersFailed = false;

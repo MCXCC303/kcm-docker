@@ -82,6 +82,17 @@ bool PrivilegedConfigClient::writeAvailable() const
     return action.isValid();
 }
 
+void PrivilegedConfigClient::requestAuthorization()
+{
+    if (m_inFlight) {
+        Q_EMIT finished(Operation::Authorize, false, QStringLiteral("helperBusy"));
+        return;
+    }
+    QVariantMap arguments;
+    arguments.insert(QStringLiteral("dryRun"), true);
+    runHelperAction(QString::fromLatin1(kWriteAction), arguments, Operation::Authorize);
+}
+
 void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
 {
     if (m_inFlight) {

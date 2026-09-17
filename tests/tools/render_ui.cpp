@@ -15,7 +15,15 @@
 
     用法：
         render_ui <page> <width> <height> <light|dark> <output.png>
-        page = main | container-detail | image-detail | engine
+        page = main | container-detail | image-detail | engine | daemon-config | daemon-config-user
+
+    环境变量 KONTAINER_RENDER_LANG=zh_CN 时按 `po/<lang>/kcm_docker.po` 的译文渲染：
+    中文文案普遍更长，横幅折行、按钮宽度、省略号是否合理只有看中文截图才知道
+    （真实会话的 LANG 就是 zh_CN，所以这其实是默认形态）。
+    注意：只有 QML 里的文案会变中文。C++ 组装的文本（"3 seconds ago"、"Restarting (1)"）
+    在截图里仍是英文——ki18n 不经过 `QCoreApplication` 的 translator 链（安装自定义
+    QTranslator 实测无效），而 Qt 的 QTranslator 又不认 gettext 的 .mo。
+    C++ 侧译文的正确性由 `tst_i18n_consistency` 的运行时用例负责（真的加载 .mo 并断言译文）。
 
     注意：注入的是 Kirigami.Theme 的颜色 token（Kirigami 允许应用覆盖它们），
     不会修改任何业务代码；字体的度量仍来自当前平台。
@@ -310,6 +318,83 @@ void applyIconTheme(bool dark)
 
 } // namespace
 
+namespace
+{
+
+/*!
+ * 读 `po/<lang>/kcm_docker.po`，返回 msgid → msgstr 表。
+ *
+ * 为什么不走 QTranslator：Qt 不认 gettext 的 .mo（实测 `QTranslator::load()` 返回 false），
+ * 而 ki18n 加载译文的路径在 KQuickConfigModule 里。渲染工具只需要"界面上显示什么字"，
+ * 直接读 .po 反而更贴近译者实际提交的内容。未设置 KONTAINER_RENDER_LANG 时返回空表
+ * （保持英文渲染，与之前的截图可比）。
+ */
+QVariantMap loadTranslations()
+{
+    const QString language = qEnvironmentVariable("KONTAINER_RENDER_LANG");
+    if (language.isEmpty()) {
+        return {};
+    }
+    QFile file(QStringLiteral(KONTAINER_SOURCE_DIR "/po/%1/kcm_docker.po").arg(language));
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning("cannot read translations for %s", qPrintable(language));
+        return {};
+    }
+
+    const QString content = QString::fromUtf8(file.readAll());
+    // 去掉首尾引号；`msgstr[0] "..."` 这类行要先切掉 key 本身
+    const auto unquote = [](const QString &raw) {
+        const QString text = raw.trimmed();
+        if (text.size() >= 2 && text.startsWith(QLatin1Char('"')) && text.endsWith(QLatin1Char('"'))) {
+            return text.mid(1, text.size() - 2);
+        }
+        return text;
+    };
+    const auto field = [&unquote](const QStringList &block, const QString &key) {
+        QString value;
+        bool collecting = false;
+        for (const QString &line : block) {
+            if (line.startsWith(key + QLatin1Char(' '))) {
+                collecting = true;
+                value += unquote(line.mid(key.size() + 1));
+            } else if (collecting && line.startsWith(QLatin1Char('"'))) {
+                value += unquote(line);
+            } else if (collecting) {
+                break;
+            }
+        }
+        return value;
+    };
+
+    QVariantMap translations;
+    const QStringList blocks = content.split(QStringLiteral("\n\n"));
+    for (const QString &raw : blocks) {
+        if (raw.startsWith(QLatin1String("#~"))) {
+            continue;
+        }
+        const QStringList block = raw.split(QLatin1Char('\n'));
+        const QString id = field(block, QStringLiteral("msgid"));
+        if (id.isEmpty()) {
+            continue; // 头部元数据
+        }
+        // 复数条目在 zh_CN 里只有一种形式，单复数都用它
+        const QString value = field(block, QStringLiteral("msgstr[0]")).isEmpty()
+            ? field(block, QStringLiteral("msgstr"))
+            : field(block, QStringLiteral("msgstr[0]"));
+        if (value.isEmpty()) {
+            continue; // 未翻译：保持英文，与真实界面一致
+        }
+        translations.insert(id, value);
+        const QString plural = field(block, QStringLiteral("msgid_plural"));
+        if (!plural.isEmpty()) {
+            translations.insert(plural, value);
+        }
+    }
+    return translations;
+}
+
+} // namespace
+
 int main(int argc, char **argv)
 {
     QGuiApplication app(argc, argv);
@@ -362,16 +447,25 @@ int main(int argc, char **argv)
     engine.rootContext()->setContextProperty(QStringLiteral("kcm"), stub.get());
     // i18n 桩必须做 %N 替换，否则渲染出来的文案是 "%1 · created %2 ago · ID %3"，
     // 与真实运行结果不符（真实运行时由 KLocalizedString 替换）。
+    // 译文表来自 .po（KONTAINER_RENDER_LANG）：没有它就只能渲染英文，
+    // 而真实会话是 zh_CN——中文更长，折行与截断只有看中文截图才看得出来。
+    // 必须挂在 JS 全局对象上：engine.evaluate() 里定义的函数看不到 context property
+    // （实测会抛 ReferenceError: ktTranslations is not defined，界面上的文案会整片消失）
+    engine.globalObject().setProperty(QStringLiteral("ktTranslations"), engine.toScriptValue(loadTranslations()));
     engine.evaluate(QStringLiteral("function _ktFormat(text, args) {\n"
                                    "    return String(text).replace(/%(\\d+)/g, function (match, index) {\n"
                                    "        const value = args[index - 1];\n"
                                    "        return value !== undefined ? value : match;\n"
                                    "    });\n"
                                    "}\n"
-                                   "function i18n(text) { return _ktFormat(text, Array.prototype.slice.call(arguments, 1)); }\n"
-                                   "function i18nc(context, text) { return _ktFormat(text, Array.prototype.slice.call(arguments, 2)); }\n"
-                                   "function i18np(singular, plural, count) { return _ktFormat(count === 1 ? singular : plural, [count]); }\n"
-                                   "function i18ncp(context, singular, plural, count) { return _ktFormat(count === 1 ? singular : plural, [count]); }\n"));
+                                   "function _ktText(text) {\n"
+                                   "    const translated = ktTranslations[text];\n"
+                                   "    return translated !== undefined ? translated : text;\n"
+                                   "}\n"
+                                   "function i18n(text) { return _ktFormat(_ktText(text), Array.prototype.slice.call(arguments, 1)); }\n"
+                                   "function i18nc(context, text) { return _ktFormat(_ktText(text), Array.prototype.slice.call(arguments, 2)); }\n"
+                                   "function i18np(singular, plural, count) { return _ktFormat(_ktText(count === 1 ? singular : plural), [count]); }\n"
+                                   "function i18ncp(context, singular, plural, count) { return _ktFormat(_ktText(count === 1 ? singular : plural), [count]); }\n"));
 
 
     // 先让 controller 完成一轮刷新，页面才有数据可渲染
@@ -412,6 +506,9 @@ int main(int argc, char **argv)
     } else if (page == QLatin1String("image-detail")) {
         qmlFile = QStringLiteral("ImageDetail.qml");
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    } else if (page == QLatin1String("daemon-config-user")) {
+        qmlFile = QStringLiteral("DaemonConfigPage.qml");
+        initialProperties.insert(QStringLiteral("scope"), QStringLiteral("user"));
     } else if (page == QLatin1String("daemon-config")) {
         // 运行时配置页（ARCH_V5_V8 §2.3）：内容来自真实文件系统，
         // 用 HOME 指向临时目录即可构造"用户可写"的 rootless 形态（见 render_ui.sh 的说明）

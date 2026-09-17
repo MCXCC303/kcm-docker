@@ -6,12 +6,14 @@
 #
 # 用法：
 #     tests/tools/render_ui.sh <page> <width> <height> <light|dark> <output.png>
-#     page = main | container-detail | image-detail | engine | daemon-config
+#     page = main | container-detail | image-detail | engine | daemon-config | daemon-config-user
 #
 # 另外两个可选环境变量（只影响截图内容，不影响产品行为）：
 #     KONTAINER_RENDER_PULLS=1       在镜像标签页造出「拉取中 + 拉取失败」两条记录
 #     KONTAINER_RENDER_MANY_PORTS=1  在容器详情造出 24 条端口映射
 #     KONTAINER_RENDER_ROOTLESS=1    让 fixture 报告 rootless 部署（配置页据此走用户配置路径）
+#     KONTAINER_RENDER_LANG=zh_CN    用 po/zh_CN 的译文渲染界面（只有 QML 文案会变中文：
+#                                    C++ 组装的文本走 ki18n，渲染工具喂不进去）
 #     HOME=<临时目录>                让 daemon-config 页读到该目录下的 daemon.json
 #                                    （用于复核"用户可写"形态；默认读真实系统配置）
 #

@@ -6,6 +6,9 @@
 #include "model/daemon_config_controller.h"
 
 #include "backend/privileged_config_client.h"
+
+#include <QFileInfo>
+#include <QTimer>
 #include "logging.h"
 
 namespace Kontainer
@@ -17,12 +20,92 @@ namespace
 constexpr auto kPrivilegeRequired = "privilegeRequired";
 /*! 没有提权通路（helper / policy 未安装）：界面据此直接给出可复制的命令。 */
 constexpr auto kHelperUnavailable = "helperUnavailable";
+/*! 未解锁（受保护作用域）：保存被拒绝。 */
+constexpr auto kLocked = "locked";
+/*!
+ * 解锁后的有效期（秒）。
+ *
+ * 这个值必须与 polkit 的 keep 窗口一致：`auth_admin_keep` 默认记住 5 分钟，
+ * 界面上的倒计时只是把这段时间显示出来；到期后我们主动上锁，让"还要不要继续"
+ * 这件事重新变成用户的显式动作（而不是等到保存时才失败）。
+ */
+constexpr int kUnlockKeepSeconds = 300;
 } // namespace
 
 DaemonConfigController::DaemonConfigController(QObject *parent)
     : QObject(parent)
+    , m_unlockTimer(new QTimer(this))
 {
+    m_unlockTimer->setInterval(1000);
+    connect(m_unlockTimer, &QTimer::timeout, this, [this] {
+        if (!m_unlocked) {
+            return;
+        }
+        if (m_unlockSecondsRemaining <= 1) {
+            lock();
+            return;
+        }
+        --m_unlockSecondsRemaining;
+        Q_EMIT authorizationChanged();
+    });
     refreshFromDisk();
+}
+
+void DaemonConfigController::setScope(const QString &scope)
+{
+    const QString normalized = scope == QLatin1String("user") ? QStringLiteral("user") : QStringLiteral("system");
+    if (m_scope == normalized) {
+        return;
+    }
+    m_scope = normalized;
+    lock(); // 换作用域必须重新授权：授权是给"那个文件"的
+    refreshFromDisk();
+}
+
+QString DaemonConfigController::scope() const
+{
+    return m_scope;
+}
+
+bool DaemonConfigController::activeScope() const
+{
+    return m_activeScope;
+}
+
+bool DaemonConfigController::unlocked() const
+{
+    return m_unlocked;
+}
+
+int DaemonConfigController::unlockSecondsRemaining() const
+{
+    return m_unlocked ? m_unlockSecondsRemaining : 0;
+}
+
+bool DaemonConfigController::privilegeAvailable() const
+{
+    return m_privilegedClient && m_privilegedClient->writeAvailable();
+}
+
+void DaemonConfigController::requestUnlock()
+{
+    if (!m_privilegedClient) {
+        setLastError(QString::fromLatin1(kHelperUnavailable));
+        return;
+    }
+    setLastError(QString());
+    m_privilegedClient->requestAuthorization();
+}
+
+void DaemonConfigController::lock()
+{
+    m_unlockTimer->stop();
+    m_unlockSecondsRemaining = 0;
+    if (!m_unlocked) {
+        return;
+    }
+    m_unlocked = false;
+    Q_EMIT authorizationChanged();
 }
 
 void DaemonConfigController::setPrivilegedClient(PrivilegedConfigClient *client)
@@ -32,6 +115,21 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedConfigClient *client)
         return;
     }
     connect(client, &PrivilegedConfigClient::finished, this, [this](PrivilegedConfigClient::Operation operation, bool success, const QString &errorKey) {
+        if (operation == PrivilegedConfigClient::Operation::Authorize) {
+            if (!success) {
+                // 取消授权是正常结果：保持锁定，不当作错误横幅（避免噪音）
+                if (errorKey != QLatin1String("cancelled")) {
+                    setLastError(errorKey);
+                }
+                return;
+            }
+            m_unlocked = true;
+            m_unlockSecondsRemaining = kUnlockKeepSeconds;
+            m_unlockTimer->start();
+            setLastError(QString());
+            Q_EMIT authorizationChanged();
+            return;
+        }
         if (operation == PrivilegedConfigClient::Operation::WriteConfig) {
             if (!success) {
                 setLastError(errorKey);
@@ -98,6 +196,7 @@ bool DaemonConfigController::configWritable() const
 
 bool DaemonConfigController::requiresPrivilege() const
 {
+    // 只看当前作用域的文件能不能写（形态判断在 DaemonDeployment 里，单一实现）
     return m_deployment.requiresPrivilege();
 }
 
@@ -195,8 +294,23 @@ void DaemonConfigController::reload()
 void DaemonConfigController::refreshFromDisk()
 {
     m_deployment = DaemonDeploymentDetector::detect(m_engine);
+
+    // 作用域决定看哪个文件：用户级 ~/.config/docker/daemon.json、系统级 /etc/docker/daemon.json。
+    // 这与"哪个 daemon 在读它"是两件事——后者由 activeScope 告诉界面（改了没生效的坑）。
+    const QString scopedPath = m_scope == QLatin1String("user") ? m_deployment.userConfigPath : m_deployment.systemConfigPath;
+    m_deployment.configPath = scopedPath;
+    const QFileInfo scopedInfo(scopedPath);
+    m_deployment.configExists = scopedInfo.exists();
+    m_deployment.configWritable = DaemonDeploymentDetector::configIsWritable(scopedPath);
+    m_deployment.configSize = m_deployment.configExists ? scopedInfo.size() : 0;
+    m_deployment.configModified = m_deployment.configExists ? scopedInfo.lastModified() : QDateTime();
+
+    const bool rootlessDaemon = m_deployment.form == DaemonForm::Rootless;
+    m_activeScope = (m_scope == QLatin1String("user")) == rootlessDaemon;
+
     m_document = DaemonConfigDocument::fromFile(m_deployment.configPath);
     m_backups = DaemonConfigWriter::listBackups(m_deployment.configPath);
+    m_unlockSecondsRemaining = m_unlocked ? m_unlockSecondsRemaining : 0;
     // 重新读盘后，编辑状态归零（磁盘值是新的基准）
     m_edits = DaemonConfigEdits();
     setDirty(false);
@@ -263,8 +377,13 @@ bool DaemonConfigController::save()
         return false;
     }
 
-    if (m_deployment.requiresPrivilege()) {
-        // 系统级且不可写：交给受限 helper。没有提权通路时明确告知（界面走降级命令），
+    if (requiresPrivilege()) {
+        // 受保护作用域：必须已解锁（界面在未解锁时也会禁用保存按钮，这里是兜底）
+        if (!m_unlocked) {
+            setLastError(QString::fromLatin1(kLocked));
+            return false;
+        }
+        // 交给受限 helper。没有提权通路时明确告知（界面走降级命令），
         // 绝不让用户以为"点了保存就是保存了"
         if (!m_privilegedClient) {
             setLastError(QString::fromLatin1(kHelperUnavailable));
@@ -308,7 +427,7 @@ bool DaemonConfigController::restoreBackup(const QString &backupPath)
         setLastError(QStringLiteral("backupUnreadable"));
         return false;
     }
-    if (m_deployment.requiresPrivilege()) {
+    if (requiresPrivilege()) {
         // 恢复也属于写系统文件：同样只能走 helper（这里不提供"绕过"的路径）
         setLastError(m_privilegedClient ? QString::fromLatin1(kPrivilegeRequired) : QString::fromLatin1(kHelperUnavailable));
         return false;
@@ -334,8 +453,12 @@ QString DaemonConfigController::privilegedCommand() const
     const QString path = m_deployment.configPath.isEmpty() ? QStringLiteral("/etc/docker/daemon.json") : m_deployment.configPath;
     // 用 tee + here-doc：用户复制到终端即可，内容与界面里预览的一致。
     // 注意：这里不生成 `sudo sh -c` 之类的"任意命令"形态，只是一个受限的写入动作。
-    return QStringLiteral("sudo tee %1 >/dev/null <<'EOF'\n%2EOF\nsudo systemctl restart docker")
-        .arg(path, QString::fromUtf8(merged));
+    // 重启那一步要看 daemon 形态：rootless daemon 是用户自己的服务，`systemctl --user`
+    // 即可，不需要（也不应该）用 sudo 去动系统服务。
+    const QString restart = m_deployment.form == DaemonForm::Rootless
+        ? QStringLiteral("systemctl --user restart docker")
+        : QStringLiteral("sudo systemctl restart docker");
+    return QStringLiteral("sudo tee %1 >/dev/null <<'EOF'\n%2EOF\n%3").arg(path, QString::fromUtf8(merged), restart);
 }
 
 void DaemonConfigController::setLastError(const QString &error)

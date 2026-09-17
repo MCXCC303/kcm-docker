@@ -71,6 +71,11 @@ public Q_SLOTS:
             return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::InvalidRequest));
         }
 
+        if (request.dryRun()) {
+            // 「解锁」路径：只做授权与校验，绝不写盘
+            return ActionReply::SuccessReply();
+        }
+
         const QByteArray existing = readConfigFile();
         const QByteArray merged = request.mergeInto(existing);
         if (merged.isEmpty()) {

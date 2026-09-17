@@ -249,8 +249,9 @@ LANGUAGE=zh_CN kcmshell6 kcm_docker     # 需要先 source build/prefix.sh
 ```
 
 新增语言与重新翻译见 `po/README.md`（`xgettext` 提取 → `msgmerge` 合并 → `msgfmt --check`）；
-`tst_i18n_consistency` 会校验「翻译域 == 插件 id == 元数据 TranslationDomain」以及
-「zh_CN 没有未翻译条目」，防止界面静默退回英文。
+`tst_i18n_consistency` 会校验「翻译域 == 插件 id == 元数据 TranslationDomain」「zh_CN 没有未翻译条目」
+「`po/kcm_docker.pot` 与源码同步（现场跑 `xgettext` 比对）」以及「运行时真的能加载 `.mo`」——
+这四件事任意一件坏了，界面都会静默退回英文，只有切到中文才看得出来。
 
 > 说明：`KLocalizedString::setApplicationDomain()` 是进程级全局设置。同一个宿主进程里加载
 > 多个 KCM 时，翻译域是「最后构造者生效」——这是 KDE 惯例（每个 KCM 用自己的域），
@@ -276,7 +277,6 @@ ctest --test-dir build --output-on-failure
 | `tst_metrics` | CPU 公式、零增量、计数器回绕、缺内存上限、page cache 扣除、首采样无速率、环形缓冲上限、离开页面释放历史、宿主内存视为无限制 |
 | `tst_detail_controllers` | 详情页生命周期（进入/离开）、列表构建、错误与重试、镜像与容器只读关联、停止采样 |
 | `tst_format` / `tst_status_controller` | 时间与体积格式化；整页/分区状态机、错误隔离、Last Updated 与 stale、刷新间隔来自 RefreshPolicy |
-| `tst_i18n_consistency` | 翻译域一致性、译文完整性、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
 | `tst_source_conventions` | 复制动作只有 `CopyButton` 一个实现；状态语义色只出现在 `StatusPalette`；**写操作咽喉点**（写动词只在 `docker_client.cpp`、REST 路径只在 `docker_api_paths.h`、QML 不碰传输层、`KIO::` 只在宿主路径服务里、`QProcess`/`KAuth` 全面禁止） |
 | `tst_json_line_reader` | 拉取流的行解析：一行跨多个 chunk、一个 chunk 多行、半行缓存、畸形行不中断流、超长行防御 |
 | `tst_image_reference` | 镜像引用解析与校验：裸名补 `latest`、`registry:port/repo:tag`、digest 形式、仓库名必须小写、非法输入拒绝 |
@@ -284,6 +284,10 @@ ctest --test-dir build --output-on-failure
 | `tst_operation_controller` | 写操作编排：同目标串行、不同目标并行、**多路拉取并发**、重复引用拒绝、每路独立取消、失败记录保留原因、清空已结束、写后即读、结果通道、403 → 会话降级为只读且不可逆 |
 | `tst_mount_list_model` | 挂载行字段映射、宿主路径探测（存在 / 缺失 / 不是目录 / 不适用）、命名卷、打开动作与失败提示、内容未变不重置模型 |
 | `tst_port_mapping_model` | 已发布 / 未发布分组、一对多映射、排序稳定、芯片文本、内容未变不重置模型 |
+| `tst_daemon_deployment` | 部署形态矩阵（系统级 / rootless / 未知）、配置路径选择、**形态未知时不猜系统路径**、可写性判定（已存在文件只看自身权限位；不存在则看最近的可创建父目录）、数据目录在家目录的提示 |
+| `tst_daemon_config` | `daemon.json` 读写：未知键原样保留、无法解析时只读且绝不覆盖、原子写 + 备份、空内容拒绝、**作用域与解锁状态机**（未解锁不得保存、授权超时自动上锁、换作用域即失效）、提权只取决于"这个文件能不能写"、降级命令按形态给出（rootless 用 `systemctl --user`） |
+| `tst_kontainer_helper` | 提权 helper 的安全边界：只接受白名单键、值校验在 helper 内再做一遍、超长内容拒绝、`dryRun` 不落盘、注入尝试（换行 / 任意路径 / 任意 systemd unit）一律拒绝 |
+| `tst_i18n_consistency` | 翻译域一致性、译文完整性、**模板与源码同步**（现场跑一次 `xgettext` 比对 `po/kcm_docker.pot`，漏提取或多提取都失败）、**运行时真的加载 `.mo`** 并断言几条译文（域 / 语言 / 安装目录任一环错都会静默退回英文）、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
 | `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
 | `tst_refresh_churn` / `tst_kcm_widget_churn` | 刷新抖动压力测试：数据、窗口尺寸、分区、页面进出反复变化；后者用 **QQuickWidget**（与 kcmshell6 相同的宿主形态）承载 `main.qml`，并断言「同一结构下的数值刷新不得重建统计块与存储图例的条目」——针对真实会话里出现过的布局 polish 段错误 |
 | `tst_qml_resource` | **从 qrc 加载界面**（与插件运行时完全一致的路径）：`main.qml` 能加载、源码目录里每个界面文件都在资源里且内容一致（期望值由扫描源码树得出，不维护第二份清单）、单例能从 qrc 解析。资源清单漏项这类问题不会被源码目录测试发现，只会让安装后的 KCM 打不开 |
@@ -358,9 +362,10 @@ src/
     └── components/         StatusChip / CopyButton / CopyableText / EmptyPlaceholder /
                             CollapsibleSection / KeyValueList / StatTile / MiniTrend /
                             StorageBar + 单例 StatusPalette / ChartPalette（qmldir）
-tests/                      19 个测试目标 + support（mock/stub/qml_item_utils.h）
+tests/                      27 个测试目标 + support（mock/stub/qml_item_utils.h）
 └── tools/                  fake_docker_server.py（假 Engine）
-                            render_ui.{cpp,sh}（离屏截图，亮/暗两套）
+                            render_ui.{cpp,sh}（离屏截图，亮/暗两套；
+                            `KONTAINER_RENDER_LANG=zh_CN` 时用 po 译文渲染中文）
                             vnc_grab.py（早期 VNC 抓图，本机不可用，见上）
 po/                         翻译（zh_CN 已完整）
 ```

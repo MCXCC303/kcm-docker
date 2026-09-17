@@ -31,6 +31,8 @@ class PrivilegedConfigClient : public QObject
 
 public:
     enum class Operation {
+        /*! 只请求授权（界面上的「解锁」）：校验但不写盘。 */
+        Authorize,
         WriteConfig,
         Restart,
     };
@@ -41,6 +43,13 @@ public:
     /*! 提权写入是否可用（尽力而为的判断：真正的结论来自执行结果）。 */
     bool writeAvailable() const;
 
+    /*!
+     * 请求授权（「解锁」）。
+     *
+     * 打的是**写配置**那个 action id：polkit 的 keep 按动作记忆，
+     * 只有这样才能让随后的保存与重启在 keep 窗口内不再询问。
+     */
+    void requestAuthorization();
     /*! 发起提权写入；结果经 finished() 回来（异步，不阻塞界面）。 */
     void writeConfig(const DaemonConfigEdits &edits);
     /*! 重启 Docker：系统级走 helper，rootless 走会话 systemd。 */

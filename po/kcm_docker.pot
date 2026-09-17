@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-17 18:46+0800\n"
+"POT-Creation-Date: 2026-09-17 23:33+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -36,11 +36,11 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
-#: src/model/state_text.cpp:19 src/ui/MainPage.qml:422
+#: src/model/state_text.cpp:19 src/ui/MainPage.qml:424
 msgid "Restarting"
 msgstr ""
 
-#: src/model/state_text.cpp:21 src/ui/MainPage.qml:43 src/ui/MainPage.qml:410
+#: src/model/state_text.cpp:21 src/ui/MainPage.qml:45 src/ui/MainPage.qml:412
 msgid "Running"
 msgstr ""
 
@@ -48,7 +48,7 @@ msgstr ""
 msgid "Removing"
 msgstr ""
 
-#: src/model/state_text.cpp:25 src/ui/MainPage.qml:49 src/ui/MainPage.qml:414
+#: src/model/state_text.cpp:25 src/ui/MainPage.qml:51 src/ui/MainPage.qml:416
 msgid "Paused"
 msgstr ""
 
@@ -56,13 +56,13 @@ msgstr ""
 msgid "Exited"
 msgstr ""
 
-#: src/model/state_text.cpp:29 src/ui/MainPage.qml:426
+#: src/model/state_text.cpp:29 src/ui/MainPage.qml:428
 msgid "Dead"
 msgstr ""
 
 #: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:319
 #: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
-#: src/ui/EngineStatusView.qml:42
+#: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:82
 msgid "Unknown"
 msgstr ""
 
@@ -80,6 +80,23 @@ msgstr ""
 
 #: src/model/state_text.cpp:46
 msgid "Unhealthy"
+msgstr ""
+
+#: src/model/status_controller.cpp:75
+msgid "The host path does not exist."
+msgstr ""
+
+#: src/model/status_controller.cpp:78
+msgid "The host path is not a directory."
+msgstr ""
+
+#: src/model/status_controller.cpp:81
+#: src/model/container_detail_controller.cpp:52
+msgid "Could not open the file manager: %1"
+msgstr ""
+
+#: src/model/status_controller.cpp:504
+msgid "Opening host paths is not available in this environment."
 msgstr ""
 
 #: src/model/docker_error_text.cpp:27
@@ -280,10 +297,6 @@ msgstr ""
 msgid "This mount has no host directory to open."
 msgstr ""
 
-#: src/model/container_detail_controller.cpp:52
-msgid "Could not open the file manager: %1"
-msgstr ""
-
 #: src/model/container_detail_controller.cpp:127
 msgid "No container selected."
 msgstr ""
@@ -314,18 +327,18 @@ msgid "Copy"
 msgstr ""
 
 #: src/ui/components/CopyableText.qml:50 src/ui/components/StorageBar.qml:85
-#: src/ui/StorageView.qml:33 src/ui/MainPage.qml:328 src/ui/ResourceView.qml:34
+#: src/ui/StorageView.qml:33 src/ui/MainPage.qml:330 src/ui/ResourceView.qml:34
 #: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
 msgid "—"
 msgstr ""
 
 #: src/ui/components/StorageBar.qml:46 src/ui/ImageDetail.qml:100
-#: src/ui/MainPage.qml:61
+#: src/ui/MainPage.qml:63
 msgid "Images"
 msgstr ""
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:352
-#: src/ui/ContainerDetail.qml:189 src/ui/MainPage.qml:37
+#: src/ui/ContainerDetail.qml:189 src/ui/MainPage.qml:39
 msgid "Containers"
 msgstr ""
 
@@ -368,42 +381,31 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:47 src/ui/MainPage.qml:511
+#: src/ui/components/PullImageDialog.qml:43 src/ui/MainPage.qml:513
 msgid "Pull image"
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:71
+#: src/ui/components/PullImageDialog.qml:67
 msgid ""
 "Image reference (for example “alpine:3.19” or “registry.example.com/team/"
 "app”)."
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:82
+#: src/ui/components/PullImageDialog.qml:78
+#: src/ui/components/ImageRefInput.qml:42
 msgid "alpine:3.19"
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:89
-msgid "This is not a valid image reference."
-msgstr ""
-
-#: src/ui/components/PullImageDialog.qml:99
-msgid "No tag given, “latest” will be pulled: %1"
-msgstr ""
-
-#: src/ui/components/PullImageDialog.qml:109
-msgid "This image is already being pulled."
-msgstr ""
-
-#: src/ui/components/PullImageDialog.qml:117
+#: src/ui/components/PullImageDialog.qml:84
 msgid ""
 "Pulling continues in the background; progress is shown in the image list."
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:129
+#: src/ui/components/PullImageDialog.qml:96
 msgid "Pull"
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:138
+#: src/ui/components/PullImageDialog.qml:105
 msgid "Close"
 msgstr ""
 
@@ -442,6 +444,63 @@ msgstr ""
 
 #: src/ui/components/PullProgressList.qml:168
 msgid "%1 of %2 layers"
+msgstr ""
+
+#: src/ui/components/ImageRefInput.qml:89
+msgid "This is not a valid image reference."
+msgstr ""
+
+#: src/ui/components/ImageRefInput.qml:100
+msgid "No tag given, “latest” will be pulled: %1"
+msgstr ""
+
+#: src/ui/components/ImageRefInput.qml:110
+msgid "This image is already being pulled."
+msgstr ""
+
+#: src/ui/components/ImageRefInput.qml:116
+msgid "Image reference"
+msgstr ""
+
+#: src/ui/components/StringListEditor.qml:45
+#: src/ui/components/KeyValueListEditor.qml:179
+msgid "Add"
+msgstr ""
+
+#: src/ui/components/StringListEditor.qml:113
+msgid "Move up"
+msgstr ""
+
+#: src/ui/components/StringListEditor.qml:126
+msgid "Move down"
+msgstr ""
+
+#: src/ui/components/StringListEditor.qml:137
+#: src/ui/components/KeyValueListEditor.qml:131
+msgid "Remove"
+msgstr ""
+
+#: src/ui/components/KeyValueListEditor.qml:123
+#: src/ui/components/KeyValueListEditor.qml:124
+msgid "Show value"
+msgstr ""
+
+#: src/ui/components/KeyValueListEditor.qml:145
+msgid ""
+"Invalid name: use letters, digits and underscore, and do not start with a "
+"digit."
+msgstr ""
+
+#: src/ui/components/KeyValueListEditor.qml:161
+msgid "Duplicate name."
+msgstr ""
+
+#: src/ui/components/KeyValueListEditor.qml:193
+msgid "Paste .env…"
+msgstr ""
+
+#: src/ui/components/KeyValueListEditor.qml:277
+msgid "Paste .env content"
 msgstr ""
 
 #: src/ui/ImageCard.qml:45
@@ -491,7 +550,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr ""
 
 #: src/ui/StorageView.qml:61 src/ui/ImageDetail.qml:139
-#: src/ui/ContainerDetail.qml:231 src/ui/MainPage.qml:265
+#: src/ui/ContainerDetail.qml:231 src/ui/MainPage.qml:267
 msgid "Retry"
 msgstr ""
 
@@ -512,6 +571,7 @@ msgid "Unable to retrieve image details."
 msgstr ""
 
 #: src/ui/ImageDetail.qml:144 src/ui/ContainerDetail.qml:236 src/ui/main.qml:37
+#: src/ui/DaemonConfigPage.qml:163
 msgid "Back"
 msgstr ""
 
@@ -678,7 +738,7 @@ msgstr ""
 msgid "Stop"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:133
+#: src/ui/ContainerDetail.qml:133 src/ui/DaemonConfigPage.qml:511
 msgid "Restart"
 msgstr ""
 
@@ -771,7 +831,8 @@ msgstr ""
 msgid "OOM killed:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:378
+#: src/ui/ContainerDetail.qml:378 src/ui/DaemonConfigPage.qml:90
+#: src/ui/DaemonConfigPage.qml:94
 msgid "Yes"
 msgstr ""
 
@@ -940,172 +1001,186 @@ msgctxt "@info build identification"
 msgid "Build: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:55 src/ui/MainPage.qml:418
+#: src/ui/MainPage.qml:57 src/ui/MainPage.qml:420
 msgid "Stopped"
 msgstr ""
 
-#: src/ui/MainPage.qml:76
+#: src/ui/MainPage.qml:78
 msgid "Loading Docker status…"
 msgstr ""
 
-#: src/ui/MainPage.qml:80
+#: src/ui/MainPage.qml:82
 msgid "Connected"
 msgstr ""
 
-#: src/ui/MainPage.qml:82
+#: src/ui/MainPage.qml:84
 msgid "Not connected"
 msgstr ""
 
-#: src/ui/MainPage.qml:99
+#: src/ui/MainPage.qml:101
 msgid "No containers found."
 msgstr ""
 
-#: src/ui/MainPage.qml:105
+#: src/ui/MainPage.qml:107
 msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:106 src/ui/MainPage.qml:132
+#: src/ui/MainPage.qml:108 src/ui/MainPage.qml:134
 msgid "Clear search"
 msgstr ""
 
-#: src/ui/MainPage.qml:110
+#: src/ui/MainPage.qml:112
 msgid "No containers match the current filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:111
+#: src/ui/MainPage.qml:113
 msgid "Show all containers"
 msgstr ""
 
-#: src/ui/MainPage.qml:124
+#: src/ui/MainPage.qml:126
 msgid "No images found."
 msgstr ""
 
-#: src/ui/MainPage.qml:126
+#: src/ui/MainPage.qml:128
 msgid "Pull an image"
 msgstr ""
 
-#: src/ui/MainPage.qml:131
+#: src/ui/MainPage.qml:133
 msgctxt "@info no image matches the search"
 msgid "No images match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:136
+#: src/ui/MainPage.qml:138
 msgid "No images match the current filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:137
+#: src/ui/MainPage.qml:139
 msgid "Show all images"
 msgstr ""
 
-#: src/ui/MainPage.qml:193
+#: src/ui/MainPage.qml:195
 msgctxt "@info last successful update"
 msgid "Updated %1 ago"
 msgstr ""
 
-#: src/ui/MainPage.qml:194
+#: src/ui/MainPage.qml:196
 msgid "Not updated yet"
 msgstr ""
 
-#: src/ui/MainPage.qml:200
+#: src/ui/MainPage.qml:202
 msgid "Update failed"
 msgstr ""
 
-#: src/ui/MainPage.qml:206
+#: src/ui/MainPage.qml:208
 msgid "Data is stale"
 msgstr ""
 
-#: src/ui/MainPage.qml:213
+#: src/ui/MainPage.qml:215
 msgid "Auto-refresh is off"
 msgstr ""
 
-#: src/ui/MainPage.qml:262
+#: src/ui/MainPage.qml:264
 msgid "Unable to connect to Docker Engine."
 msgstr ""
 
-#: src/ui/MainPage.qml:332
+#: src/ui/MainPage.qml:334
 msgid "Engine summary is unavailable"
 msgstr ""
 
-#: src/ui/MainPage.qml:340
+#: src/ui/MainPage.qml:342
 msgid ""
 "Container and image counts are unavailable because the engine summary could "
 "not be read."
 msgstr ""
 
-#: src/ui/MainPage.qml:362
+#: src/ui/MainPage.qml:364
 msgctxt "@title:tab container list"
 msgid "Containers (%1)"
 msgid_plural "Containers (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:365
+#: src/ui/MainPage.qml:367
 msgctxt "@title:tab image list"
 msgid "Images (%1)"
 msgid_plural "Images (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:368
+#: src/ui/MainPage.qml:370
 msgctxt "@title:tab engine information"
 msgid "Engine"
 msgstr ""
 
-#: src/ui/MainPage.qml:388
+#: src/ui/MainPage.qml:390
 msgid "Search containers (name, image, ID)…"
 msgstr ""
 
-#: src/ui/MainPage.qml:388
+#: src/ui/MainPage.qml:390
 msgid "Search images (repository, tag, ID)…"
 msgstr ""
 
-#: src/ui/MainPage.qml:406
+#: src/ui/MainPage.qml:408
 msgid "All states"
 msgstr ""
 
-#: src/ui/MainPage.qml:432
+#: src/ui/MainPage.qml:434
 msgid "All images"
 msgstr ""
 
-#: src/ui/MainPage.qml:436
+#: src/ui/MainPage.qml:438
 msgid "In use"
 msgstr ""
 
-#: src/ui/MainPage.qml:440
+#: src/ui/MainPage.qml:442
 msgid "Dangling"
 msgstr ""
 
-#: src/ui/MainPage.qml:464
+#: src/ui/MainPage.qml:466
 msgid "Sort: Name"
 msgstr ""
 
-#: src/ui/MainPage.qml:468
+#: src/ui/MainPage.qml:470
 msgid "Sort: State"
 msgstr ""
 
-#: src/ui/MainPage.qml:472 src/ui/MainPage.qml:482
+#: src/ui/MainPage.qml:474 src/ui/MainPage.qml:484
 msgid "Sort: Created"
 msgstr ""
 
-#: src/ui/MainPage.qml:478
+#: src/ui/MainPage.qml:480
 msgid "Sort: Repository"
 msgstr ""
 
-#: src/ui/MainPage.qml:486
+#: src/ui/MainPage.qml:488
 msgid "Sort: Size"
 msgstr ""
 
-#: src/ui/MainPage.qml:510
+#: src/ui/MainPage.qml:512
 msgid "Pull image (%1 running)"
 msgstr ""
 
-#: src/ui/MainPage.qml:537
+#: src/ui/MainPage.qml:539
 msgid "Unable to retrieve the container list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:595
+#: src/ui/MainPage.qml:597
 msgid "Unable to retrieve the image list: %1"
+msgstr ""
+
+#: src/ui/MainPage.qml:661
+msgid "User configuration…"
+msgstr ""
+
+#: src/ui/MainPage.qml:668
+msgid "System configuration…"
+msgstr ""
+
+#: src/ui/MainPage.qml:675
+msgid ""
+"Registry mirrors and other daemon settings. The system configuration needs "
+"administrator rights."
 msgstr ""
 
 #: src/ui/main.qml:50
@@ -1198,4 +1273,341 @@ msgstr ""
 
 #: src/ui/ContainerCard.qml:177
 msgid "Stop container %1"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:77
+msgid "Deployment"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:79
+msgid "Rootless (user-level daemon)"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:81
+msgid "System service (root daemon)"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:85
+msgid "Configuration file"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:89
+msgid "Writable by the current user"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:90 src/ui/DaemonConfigPage.qml:94
+msgid "No"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:93
+msgid "Needs administrator rights to change"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:99
+msgid "Concurrent downloads"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:100 src/ui/DaemonConfigPage.qml:104
+#: src/ui/DaemonConfigPage.qml:108
+msgid "default"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:103
+msgid "Log driver"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:107
+msgid "Data directory"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:111
+msgid "Storage driver"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:112
+msgid "from the engine"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:115
+msgid "Mirrors currently in effect"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:118
+msgid "none"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:127
+msgid "Enter a registry mirror address, for example %1"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:130
+msgid "Use an address of the form http(s)://host[:port]."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:138
+msgid "Use host[:port] only, without a scheme or path."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:148
+msgid ""
+"Configuration written. Docker must be restarted before the changes take "
+"effect."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:149
+msgid "Configuration written."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:155
+msgid "Reload from disk"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:189
+msgid "User runtime configuration"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:190
+msgid "System runtime configuration"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:201
+msgid ""
+"This file is not writable by the current user (it may belong to another "
+"user), so changing it needs administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:202
+msgid ""
+"These settings affect the Docker daemon for the whole machine and every "
+"user. Changing them needs administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:212
+msgid ""
+"The running Docker daemon is a system service, so it does not read this "
+"file. Changes here only affect a rootless daemon."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:213
+msgid ""
+"The running Docker daemon is rootless, so it does not read this file. "
+"Changes here only affect a system-wide daemon."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:222
+msgid ""
+"Settings are read-only until you unlock them. Unlocking asks for "
+"administrator rights; the authorization lasts about five minutes."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:230
+msgid ""
+"Unlocked. Saving and restarting will not ask again for about %1 seconds."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:244
+msgid ""
+"The Docker data directory is inside your home directory, but the daemon "
+"itself runs as a system service: changing this configuration needs "
+"administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:252
+msgid ""
+"The configuration file could not be parsed (%1). It is shown read-only; "
+"Kontainer will not overwrite it."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:261
+msgid ""
+"The saved registry mirrors are not active yet. Restart the Docker service to "
+"apply them (running containers are kept because live-restore is enabled)."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:262
+msgid ""
+"The saved registry mirrors are not active yet. Restarting the Docker service "
+"will stop running containers; those with a restart policy will come back "
+"automatically."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:282
+msgid "Changing this file needs administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:284
+msgid "Saving is disabled because the current file cannot be parsed."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:286
+msgid "Nothing to save: no setting was changed."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:288
+msgid "There is no backup to restore yet."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:290
+msgid "That backup cannot be used (it is unreadable or not valid JSON)."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:292
+msgid ""
+"Writing the configuration file failed. The previous file was left unchanged."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:294
+msgid ""
+"Administrator access is not available (the helper or its policy is not "
+"installed). Use the command below instead."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:296
+msgid "Authorization was cancelled; nothing was changed."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:298
+msgid "Authorization was denied; nothing was changed."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:300
+msgid "The helper rejected the request; nothing was changed."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:302
+msgid "Could not reach systemd to restart the Docker service."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:304
+msgid "Restarting the Docker service failed."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:306
+msgid "Unlock the settings before saving."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:321
+msgid "Registry mirrors"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:326
+msgid ""
+"Tried in the listed order. A mirror is useful when the registry itself is "
+"unreachable from this machine."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:340
+msgid "Add mirror"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:356
+msgid "Add registry"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:370
+msgid "Other settings"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:381
+msgid "Other keys in this file are shown read-only and kept as they are: %1"
+msgid_plural ""
+"Other keys in this file are shown read-only and kept as they are: %1"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/DaemonConfigPage.qml:395
+msgid ""
+"This build has no administrator helper installed, so the change must be "
+"applied manually."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:403
+msgid ""
+"This file is not writable by the current user, so saving requires "
+"administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:404
+msgid ""
+"This file belongs to the system, so saving requires administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:407
+msgid "Show command to run manually"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:440
+msgid "Unlock to edit"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:448
+msgid "Lock again"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:455
+msgid "Save"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:464
+msgid "Restart Docker…"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:472 src/ui/DaemonConfigPage.qml:531
+msgid "Restore previous version"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:485
+msgid "Writes to %1 (a backup is kept before every save)."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:493
+msgid "Unsaved changes"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:504
+msgid "Restart Docker"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:505
+msgid "Restart the Docker service now?"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:507
+msgid "Running containers are kept because live-restore is enabled."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:508
+msgid ""
+"One running container will be stopped; it comes back automatically if its "
+"restart policy says so."
+msgid_plural ""
+"%1 running containers will be stopped; they come back automatically if their "
+"restart policy says so."
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/DaemonConfigPage.qml:522
+msgid ""
+"Docker restarted. The page refreshes once the engine is reachable again."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:523
+msgid "Restarting Docker failed (%1)."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:532
+msgid "Replace the current configuration with the most recent backup?"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:533
+msgid ""
+"The current file is backed up first, so this can be undone the same way."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:534
+msgid "Restore"
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:539
+msgid "Previous configuration restored. Docker must be restarted to apply it."
 msgstr ""

@@ -34,6 +34,8 @@ private Q_SLOTS:
     void rejectsEmptyRequest();
     void mergesPreservingUnknownKeys();
     void refusesToMergeIntoUnparsableContent();
+    void dryRunIsAcceptedWithoutEdits();
+    void dryRunStillRejectsUnknownKeys();
 };
 
 namespace
@@ -195,6 +197,36 @@ void KontainerHelperTest::refusesToMergeIntoUnparsableContent()
 
     // 现有文件是坏 JSON：helper 必须拒绝写（否则会把用户可用的配置换成起不来的）
     QVERIFY2(request.mergeInto(QByteArrayLiteral("{ broken")).isEmpty(), "must not overwrite an unparsable config");
+}
+
+void KontainerHelperTest::dryRunIsAcceptedWithoutEdits()
+{
+    PrivilegedConfigRequest request;
+    QString errorKey;
+
+    // 「解锁」按钮：用户还没改任何东西，但需要一次针对同一 action 的授权
+    QVariantMap arguments;
+    arguments.insert(QStringLiteral("dryRun"), true);
+    QVERIFY2(PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey), qPrintable(errorKey));
+    QVERIFY(request.dryRun());
+    QVERIFY2(request.isEmpty(), "a dry run carries no edits");
+
+    // 没有 dryRun 的空请求仍然拒绝（避免"什么都没改却报告成功"）
+    QVERIFY(!PrivilegedConfigRequest::fromArguments(QVariantMap(), &request, &errorKey));
+    QCOMPARE(errorKey, QStringLiteral("noEdits"));
+}
+
+void KontainerHelperTest::dryRunStillRejectsUnknownKeys()
+{
+    PrivilegedConfigRequest request;
+    QString errorKey;
+
+    // dryRun 不是"放宽校验"的开关：越权键在解锁路径上同样被拒
+    QVariantMap arguments;
+    arguments.insert(QStringLiteral("dryRun"), true);
+    arguments.insert(QStringLiteral("data-root"), QStringLiteral("/tmp/evil"));
+    QVERIFY(!PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey));
+    QCOMPARE(errorKey, QStringLiteral("unknownKey"));
 }
 
 QTEST_MAIN(KontainerHelperTest)

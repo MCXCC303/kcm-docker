@@ -96,8 +96,10 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::ImageDetailController *imageDetail READ imageDetail CONSTANT)
     /*! 写操作编排与结果通道（ARCH_V4 §2.2.4）。 */
     Q_PROPERTY(Kontainer::OperationController *operations READ operations CONSTANT)
-    /*! 运行时配置（daemon.json）页面（ARCH_V5_V8 §2.2/§2.3）。 */
-    Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfig READ daemonConfig CONSTANT)
+    /*! 用户级运行时配置（rootless：~/.config/docker/daemon.json），不需要提权。 */
+    Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfigUser READ daemonConfigUser CONSTANT)
+    /*! 系统级运行时配置（/etc/docker/daemon.json），受保护区。 */
+    Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfigSystem READ daemonConfigSystem CONSTANT)
     /*! 最近一次「打开宿主路径」的失败说明；为空表示没有失败。 */
     Q_PROPERTY(QString hostPathError READ hostPathError NOTIFY hostPathErrorChanged)
 
@@ -245,9 +247,13 @@ public:
     {
         return m_operations;
     }
-    DaemonConfigController *daemonConfig() const
+    DaemonConfigController *daemonConfigUser() const
     {
-        return m_daemonConfig;
+        return m_daemonConfigUser;
+    }
+    DaemonConfigController *daemonConfigSystem() const
+    {
+        return m_daemonConfigSystem;
     }
     QString hostPathError() const
     {
@@ -333,7 +339,8 @@ private:
     ImageDetailController *m_imageDetail = nullptr;
     OperationController *m_operations = nullptr;
     HostPathService *m_hostPaths = nullptr;
-    DaemonConfigController *m_daemonConfig = nullptr;
+    DaemonConfigController *m_daemonConfigUser = nullptr;
+    DaemonConfigController *m_daemonConfigSystem = nullptr;
     QString m_hostPathError;
 
     State m_state = State::Idle;

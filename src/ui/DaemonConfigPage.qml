@@ -27,7 +27,18 @@ import "components" as Components
 KCM.AbstractKCM {
     id: page
 
-    readonly property var controller: kcm.controller.daemonConfig
+    /*! `user`（不需要提权）或 `system`（受保护区）。由入口决定。 */
+    property string scope: "system"
+
+    readonly property var controller: page.scope === "user"
+        ? kcm.controller.daemonConfigUser
+        : kcm.controller.daemonConfigSystem
+    /*! 受保护区且当前用户写不了这个文件：需要解锁。 */
+    readonly property bool protectedScope: page.controller.requiresPrivilege
+    /*! 是否有提权通路（helper/policy 已安装）。 */
+    readonly property bool privilegeAvailable: page.controller.privilegeAvailable
+    /*! 字段是否可编辑：受保护区必须已解锁。 */
+    readonly property bool editable: !page.protectedScope || page.controller.unlocked
     readonly property var engine: kcm.controller.engine
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
 
@@ -39,6 +50,7 @@ KCM.AbstractKCM {
     objectName: "daemonConfigPage"
 
     Component.onCompleted: {
+        controller.setScope(page.scope);
         controller.reload();
         page.refreshRows();
     }
@@ -110,7 +122,9 @@ KCM.AbstractKCM {
     function mirrorError(value: string): string {
         const key = Kontainer.Presentation.registryMirrorErrorKey(value);
         if (key === "emptyHost") {
-            return i18n("Enter a registry mirror address, for example https://mirror.example.com");
+            // 示例地址走参数而不是写进 msgid：gettext 不建议把 URL 放进待译字符串
+            //（URL 不需要翻译，混在里面只会让译者去改动它）
+            return i18n("Enter a registry mirror address, for example %1", QStringLiteral("https://mirror.example.com"));
         }
         if (key === "invalid") {
             return i18n("Use an address of the form http(s)://host[:port].");
@@ -171,7 +185,49 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     Layout.topMargin: Kirigami.Units.smallSpacing
                     level: 2
-                    text: i18n("Docker runtime configuration")
+                    text: page.scope === "user"
+                        ? i18n("User runtime configuration")
+                        : i18n("System runtime configuration")
+                }
+
+                /* 受保护区的总警示：措辞按作用域分开——系统级是"改的是整台机器"，
+                   用户级只是"这个文件不归你写"（例如曾经用 sudo 建过） */
+                Kirigami.InlineMessage {
+                    objectName: "protectedScopeBanner"
+                    Layout.fillWidth: true
+                    visible: page.protectedScope
+                    type: Kirigami.MessageType.Warning
+                    text: page.scope === "user"
+                        ? i18n("This file is not writable by the current user (it may belong to another user), so changing it needs administrator rights.")
+                        : i18n("These settings affect the Docker daemon for the whole machine and every user. Changing them needs administrator rights.")
+                }
+
+                /* 这个文件不是正在运行的 daemon 读的那个：改了不会生效 */
+                Kirigami.InlineMessage {
+                    objectName: "inactiveScopeBanner"
+                    Layout.fillWidth: true
+                    visible: !page.controller.activeScope
+                    type: Kirigami.MessageType.Information
+                    text: page.scope === "user"
+                        ? i18n("The running Docker daemon is a system service, so it does not read this file. Changes here only affect a rootless daemon.")
+                        : i18n("The running Docker daemon is rootless, so it does not read this file. Changes here only affect a system-wide daemon.")
+                }
+
+                /* 解锁状态 */
+                Kirigami.InlineMessage {
+                    objectName: "lockedMessage"
+                    Layout.fillWidth: true
+                    visible: page.protectedScope && !page.controller.unlocked && page.privilegeAvailable
+                    type: Kirigami.MessageType.Information
+                    text: i18n("Settings are read-only until you unlock them. Unlocking asks for administrator rights; the authorization lasts about five minutes.")
+                }
+
+                Kirigami.InlineMessage {
+                    objectName: "unlockedMessage"
+                    Layout.fillWidth: true
+                    visible: page.controller.unlocked
+                    type: Kirigami.MessageType.Positive
+                    text: i18n("Unlocked. Saving and restarting will not ask again for about %1 seconds.", page.controller.unlockSecondsRemaining)
                 }
 
                 Components.KeyValueList {
@@ -246,6 +302,8 @@ KCM.AbstractKCM {
                             return i18n("Could not reach systemd to restart the Docker service.");
                         case "restartFailed":
                             return i18n("Restarting the Docker service failed.");
+                        case "locked":
+                            return i18n("Unlock the settings before saving.");
                         default:
                             return "";
                         }
@@ -277,6 +335,7 @@ KCM.AbstractKCM {
                     objectName: "mirrorsEditor"
                     Layout.fillWidth: true
                     initialEntries: page.controller.registryMirrors
+                    editable: page.editable
                     placeholderText: "https://mirror.example.com" // i18n-lint: allow 示例地址（数据，不翻译）
                     addText: i18n("Add mirror")
                     validator: function (value) {
@@ -292,6 +351,7 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     visible: false
                     initialEntries: page.controller.insecureRegistries
+                    editable: page.editable
                     placeholderText: "registry.local:5000" // i18n-lint: allow 示例地址（数据，不翻译）
                     addText: i18n("Add registry")
                     validator: function (value) {
@@ -339,7 +399,9 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     visible: page.controller.requiresPrivilege
                     type: Kirigami.MessageType.Information
-                    text: i18n("This file belongs to the system, so saving requires administrator rights.")
+                    text: page.scope === "user"
+                        ? i18n("This file is not writable by the current user, so saving requires administrator rights.")
+                        : i18n("This file belongs to the system, so saving requires administrator rights.")
                     actions: [
                         Kirigami.Action {
                             text: i18n("Show command to run manually")
@@ -373,10 +435,26 @@ KCM.AbstractKCM {
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
+                objectName: "unlockButton"
+                visible: page.protectedScope && !page.controller.unlocked && page.privilegeAvailable
+                text: i18n("Unlock to edit")
+                icon.name: "lock-open"
+                onClicked: page.controller.requestUnlock()
+            }
+
+            QQC2.Button {
+                objectName: "lockButton"
+                visible: page.controller.unlocked
+                text: i18n("Lock again")
+                icon.name: "lock"
+                onClicked: page.controller.lock()
+            }
+
+            QQC2.Button {
                 objectName: "saveConfigButton"
                 text: i18n("Save")
                 icon.name: "document-save"
-                enabled: page.controller.dirty && page.controller.parseError.length === 0
+                enabled: page.editable && page.controller.dirty && page.controller.parseError.length === 0
                     && !mirrorsEditor.hasErrors() && !insecureEditor.hasErrors()
                 onClicked: page.saveAndReport()
             }
@@ -385,6 +463,7 @@ KCM.AbstractKCM {
                 objectName: "restartDockerButton"
                 text: i18n("Restart Docker…")
                 icon.name: "system-reboot"
+                enabled: !page.protectedScope || page.controller.unlocked
                 onClicked: restartDialog.open()
             }
 
@@ -392,7 +471,7 @@ KCM.AbstractKCM {
                 objectName: "restoreBackupButton"
                 text: i18n("Restore previous version")
                 icon.name: "document-revert"
-                enabled: page.controller.backups.length > 0
+                enabled: page.editable && page.controller.backups.length > 0
                 onClicked: restoreDialog.open()
             }
 
@@ -401,7 +480,16 @@ KCM.AbstractKCM {
             }
 
             QQC2.Label {
-                visible: page.controller.dirty && !page.controller.requiresPrivilege
+                Layout.fillWidth: true
+                visible: page.editable
+                text: i18n("Writes to %1 (a backup is kept before every save).", page.controller.configPath)
+                font: Kirigami.Theme.smallFont
+                opacity: 0.7
+                elide: Text.ElideMiddle
+            }
+
+            QQC2.Label {
+                visible: page.controller.dirty && page.editable
                 text: i18n("Unsaved changes")
                 font: Kirigami.Theme.smallFont
                 opacity: 0.7

@@ -12,6 +12,8 @@
 #include <QObject>
 #include <QStringList>
 
+class QTimer;
+
 namespace Kontainer
 {
 
@@ -32,6 +34,20 @@ class PrivilegedConfigClient;
 class DaemonConfigController : public QObject
 {
     Q_OBJECT
+
+    /* --- 作用域（ARCH_V5_V8 §2.2 修正：按"哪个 daemon 读这个文件"分离） --- */
+    /*! `user`（~/.config/docker/daemon.json）或 `system`（/etc/docker/daemon.json）。 */
+    Q_PROPERTY(QString scope READ scope NOTIFY changed)
+    /*! 这个作用域是否就是正在运行的 daemon 读取的那一个。 */
+    Q_PROPERTY(bool activeScope READ activeScope NOTIFY changed)
+
+    /* --- 解锁状态（受保护作用域） --- */
+    /*! 是否已通过 polkit 授权（受保护作用域才有意义）。 */
+    Q_PROPERTY(bool unlocked READ unlocked NOTIFY authorizationChanged)
+    /*! 授权还剩多少秒；0 表示未解锁。 */
+    Q_PROPERTY(int unlockSecondsRemaining READ unlockSecondsRemaining NOTIFY authorizationChanged)
+    /*! 当前环境是否具备提权通路（helper/policy 已安装）。 */
+    Q_PROPERTY(bool privilegeAvailable READ privilegeAvailable NOTIFY changed)
 
     /* --- 部署与文件状态 --- */
     Q_PROPERTY(QString formKey READ formKey NOTIFY changed)
@@ -70,6 +86,7 @@ class DaemonConfigController : public QObject
     Q_PROPERTY(bool dirty READ dirty NOTIFY dirtyChanged)
 
 public:
+    /*! 默认作用域：跟着正在运行的 daemon 走（rootless → user，系统级 → system）。 */
     explicit DaemonConfigController(QObject *parent = nullptr);
 
     /*! 引擎信息变化（`/info` 回来）时更新"生效状态"的对照基准。 */
@@ -113,6 +130,19 @@ public:
     /*! 重新探测 + 重新读文件（页面进入、保存/重启之后调用）。 */
     Q_INVOKABLE void reload();
 
+    /*! 切换作用域（界面按作用域分成两页/两个入口）。 */
+    Q_INVOKABLE void setScope(const QString &scope);
+    QString scope() const;
+    bool activeScope() const;
+
+    /*! 「解锁」：打一次写配置动作的授权（keep 按动作记忆，随后保存与重启不再询问）。 */
+    Q_INVOKABLE void requestUnlock();
+    /*! 手动上锁（用户主动收起权限）。 */
+    Q_INVOKABLE void lock();
+    bool unlocked() const;
+    int unlockSecondsRemaining() const;
+    bool privilegeAvailable() const;
+
     /* --- 编辑（界面把当前值塞回来；未调用的字段表示不修改） --- */
     Q_INVOKABLE void setRegistryMirrors(const QStringList &mirrors);
     Q_INVOKABLE void setInsecureRegistries(const QStringList &registries);
@@ -143,6 +173,8 @@ public:
 
 Q_SIGNALS:
     void changed();
+    /*! 解锁状态或剩余时间变化。 */
+    void authorizationChanged();
     void resultChanged();
     void dirtyChanged();
     /*! 保存成功（页面据此提示"待重启生效"或"已写入"）。 */
@@ -170,6 +202,13 @@ private:
     bool m_dirty = false;
     PrivilegedConfigClient *m_privilegedClient = nullptr;
     int m_runningContainers = 0;
+    /*! 当前作用域（user / system）与"是否就是运行中的 daemon 读的那个文件"。 */
+    QString m_scope = QStringLiteral("system");
+    bool m_activeScope = true;
+    /*! 解锁状态：到期后自动上锁（polkit 的 keep 窗口约 5 分钟）。 */
+    bool m_unlocked = false;
+    int m_unlockSecondsRemaining = 0;
+    QTimer *m_unlockTimer = nullptr;
 };
 
 } // namespace Kontainer

@@ -49,6 +49,9 @@ ColumnLayout {
     /*! 条目发生变化（增删改序）。 */
     signal changed
 
+    /*! 是否可编辑；受保护区未解锁时为 false（字段看得见但改不了）。 */
+    property bool editable: true
+
     spacing: Kirigami.Units.smallSpacing
 
     ListModel {
@@ -84,6 +87,7 @@ ColumnLayout {
                     objectName: "stringEntryField"
                     Layout.fillWidth: true
                     text: parent.parent.value
+                    readOnly: !root.editable
                     placeholderText: root.placeholderText
                     onTextEdited: {
                         root.changed();
@@ -105,7 +109,7 @@ ColumnLayout {
             QQC2.ToolButton {
                 objectName: "stringEntryUpButton"
                 icon.name: "go-up"
-                enabled: index > 0
+                enabled: root.editable && index > 0
                 Accessible.name: i18n("Move up")
                 onClicked: {
                     // 顺序很重要：先发信号，再改模型 —— remove()/move() 会同步销毁当前 delegate，
@@ -118,7 +122,7 @@ ColumnLayout {
             QQC2.ToolButton {
                 objectName: "stringEntryDownButton"
                 icon.name: "go-down"
-                enabled: index < entries.count - 1
+                enabled: root.editable && index < entries.count - 1
                 Accessible.name: i18n("Move down")
                 onClicked: {
                     root.changed();
@@ -129,6 +133,7 @@ ColumnLayout {
             QQC2.ToolButton {
                 objectName: "stringEntryRemoveButton"
                 icon.name: "list-remove"
+                enabled: root.editable
                 Accessible.name: i18n("Remove")
                 onClicked: {
                     root.changed();
@@ -143,6 +148,7 @@ ColumnLayout {
         Layout.alignment: Qt.AlignLeft
         text: root.addText
         icon.name: "list-add"
+        enabled: root.editable
         onClicked: {
             entries.append({
                 value: ""

@@ -57,6 +57,11 @@ bool parseStringList(const QVariant &value, QStringList *out)
 }
 } // namespace
 
+QStringList PrivilegedConfigRequest::allowedControlKeys()
+{
+    return {QStringLiteral("dryRun")};
+}
+
 QStringList PrivilegedConfigRequest::allowedKeys()
 {
     return {
@@ -94,11 +99,12 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
     PrivilegedConfigRequest parsed;
 
     for (auto it = arguments.constBegin(); it != arguments.constEnd(); ++it) {
-        if (!allowedKeys().contains(it.key())) {
+        if (!allowedKeys().contains(it.key()) && !allowedControlKeys().contains(it.key())) {
             // 未知键 → 整请求拒绝（"忽略未知参数"会让调用方以为生效了）
             return fail("unknownKey");
         }
     }
+    parsed.m_dryRun = arguments.value(QStringLiteral("dryRun")).toBool();
 
     if (arguments.contains(QLatin1String(kRegistryMirrors))) {
         QStringList mirrors;
@@ -151,7 +157,8 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
         parsed.m_logDriver = driver;
     }
 
-    if (parsed.isEmpty()) {
+    // dryRun 允许空编辑集（「解锁」时用户还没改任何东西）
+    if (parsed.isEmpty() && !parsed.m_dryRun) {
         return fail("noEdits");
     }
     if (errorKey) {
