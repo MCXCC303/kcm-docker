@@ -101,6 +101,17 @@ public:
         m_pullChunkDelayMs = delayMs;
     }
 
+    /*!
+     * 保持连接不结束（模拟 `follow=1` 的静默流）。
+     *
+     * 真实跟随流在容器没输出时会一直挂着：客户端只能靠取消结束，
+     * 而我们**不能**给它设静默超时（否则长任务日志会被误判失败）。
+     */
+    void setHoldConnection(bool hold)
+    {
+        m_holdConnection = hold;
+    }
+
     void setFailInfo(bool fail)
     {
         m_failInfo = fail;
@@ -118,6 +129,7 @@ public:
     /*! 用例之间清空注入的失败/覆盖与计数，避免状态泄漏。 */
     void reset()
     {
+        m_holdConnection = false;
         m_overrides.clear();
         m_counts.clear();
         m_apiVersion = QStringLiteral("1.56");
@@ -186,6 +198,16 @@ private:
         const QString bare = withoutVersionPrefix(path);
 
         if (const auto override = m_overrides.constFind(bare); override != m_overrides.constEnd()) {
+            if (m_holdConnection) {
+                // 只写响应头 + chunked 声明，永不发终止块：客户端会一直等（直到取消）
+                QByteArray head = "HTTP/1.1 " + QByteArray::number(override->first) + " OK\r\n";
+                head += "Content-Type: application/vnd.docker.raw-stream\r\n";
+                head += "Transfer-Encoding: chunked\r\n\r\n";
+                head += override->second; // 允许先给一段历史数据
+                socket->write(head);
+                socket->flush();
+                return;
+            }
             writeResponse(socket, override->first, override->second, false);
             return;
         }
@@ -380,6 +402,7 @@ private:
     QHash<QString, QPair<int, QByteArray>> m_overrides;
     QString m_apiVersion = QStringLiteral("1.56");
     bool m_failInfo = false;
+    bool m_holdConnection = false;
 
     QList<RequestRecord> m_requests;
     QHash<QString, QPair<int, QByteArray>> m_mutationResponses;
@@ -424,6 +447,10 @@ private Q_SLOTS:
     void authCheckSendsCredentialsOnlyInTheHeader();
     void authCheckClassifiesFailures();
     void pullSendsCredentialsOnlyWhenPresent();
+    void logStreamDemultiplexesAndEnds();
+    void logStreamReportsEngineFailures();
+    void logStreamCancelIsNotAnError();
+    void logStreamReconnectDropsTheOldStream();
 
 private:
     FakeEngine *m_engine = nullptr;
@@ -455,6 +482,122 @@ RegistryCredential sampleCredential()
  * 私有仓库拉取：凭据只走 `X-Registry-Auth` 头，且 `serveraddress` 必须是**镜像所在仓库**
  * （调用方给的凭据结构里可能写着别的地址）。
  */
+/* ============================================================================
+ * 容器日志（ARCH_V5_V8 §3.1）
+ * ==========================================================================*/
+
+namespace
+{
+using LogEnd = DockerBackendInterface::LogStreamEnd;
+
+QStringList logTexts(const QVariantList &lines)
+{
+    QStringList texts;
+    for (const QVariant &value : lines) {
+        texts.append(value.value<Kontainer::LogLine>().text);
+    }
+    return texts;
+}
+} // namespace
+
+/*!
+ * 历史 + 跟随：请求形态（stdout/stderr/follow/tail）与帧解复用都要对。
+ * 假引擎按容器日志的形态返回 stdcopy 帧流。
+ */
+void DockerBackendFakeEngineTest::logStreamDemultiplexesAndEnds()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+
+    // 服务端一次给两帧：stdout 一行、stderr 一行
+    QByteArray body;
+    body += QByteArray("\x01\x00\x00\x00\x00\x00\x00\x06hello\n", 14);
+    body += QByteArray("\x02\x00\x00\x00\x00\x00\x00\x07warning", 15);
+    m_engine->setPathStatus(QStringLiteral("/containers/logs-container/logs"), 200, body);
+
+    QSignalSpy linesSpy(&backend, &DockerBackend::containerLogLines);
+    QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
+
+    backend.startContainerLogs(QStringLiteral("logs-container"), false, true, 200);
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+
+    const FakeEngine::RequestRecord request = m_engine->lastRequest();
+    QCOMPARE(request.method, QStringLiteral("GET"));
+    QCOMPARE(request.path, QStringLiteral("/v1.56/containers/logs-container/logs"));
+    QVERIFY(request.query.contains(QStringLiteral("stdout=1")));
+    QVERIFY(request.query.contains(QStringLiteral("stderr=1")));
+    QVERIFY(request.query.contains(QStringLiteral("follow=1")));
+    QVERIFY(request.query.contains(QStringLiteral("tail=200")));
+
+    QVERIFY(linesSpy.count() >= 1);
+    QStringList texts;
+    for (const QVariantList &call : linesSpy) {
+        texts += logTexts(call.at(1).toList());
+    }
+    QCOMPARE(texts, QStringList({QStringLiteral("hello"), QStringLiteral("warning")}));
+
+    // 流自然结束（容器停止 / 历史读完）：Ended 而不是错误
+    QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Ended);
+}
+
+void DockerBackendFakeEngineTest::logStreamReportsEngineFailures()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    m_engine->setPathStatus(QStringLiteral("/containers/gone/logs"), 404, QByteArrayLiteral("{\"message\":\"No such container\"}"));
+
+    QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
+    backend.startContainerLogs(QStringLiteral("gone"), false, true, 100);
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+
+    QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Failed);
+    const DockerError error = finishedSpy.at(0).at(2).value<DockerError>();
+    QCOMPARE(error.kind(), DockerError::Kind::NotFound);
+}
+
+void DockerBackendFakeEngineTest::logStreamCancelIsNotAnError()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    // 跟随流：服务端保持连接（不结束），由我们取消
+    m_engine->setPathStatus(QStringLiteral("/containers/tailing/logs"), 200, QByteArrayLiteral(""));
+    m_engine->setHoldConnection(true);
+
+    QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
+    backend.startContainerLogs(QStringLiteral("tailing"), false, true, 50);
+    QTest::qWait(200); // 等请求真的发出去
+    backend.stopContainerLogs(QStringLiteral("tailing"));
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+
+    QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Cancelled);
+    m_engine->setHoldConnection(false);
+
+    // 幂等：再停一次不该再发信号
+    backend.stopContainerLogs(QStringLiteral("tailing"));
+    QTest::qWait(50);
+    QCOMPARE(finishedSpy.count(), 1);
+}
+
+void DockerBackendFakeEngineTest::logStreamReconnectDropsTheOldStream()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    m_engine->setPathStatus(QStringLiteral("/containers/reconnect/logs"), 200, QByteArrayLiteral(""));
+    m_engine->setHoldConnection(true);
+
+    QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
+    backend.startContainerLogs(QStringLiteral("reconnect"), false, true, 50);
+    QTest::qWait(200);
+    // 重连：先停旧的，再开新的。旧流的收尾不能把新流的状态擦掉
+    backend.startContainerLogs(QStringLiteral("reconnect"), true, false, 10);
+    QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() >= 1, 10000);
+    QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Cancelled);
+
+    m_engine->setHoldConnection(false);
+    backend.stopContainerLogs(QStringLiteral("reconnect"));
+    QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() >= 2, 10000);
+}
+
 void DockerBackendFakeEngineTest::pullSendsCredentialsOnlyWhenPresent()
 {
     DockerBackend backend;

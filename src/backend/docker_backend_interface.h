@@ -7,6 +7,7 @@
 
 #include "backend/docker_endpoint.h"
 #include "backend/docker_error.h"
+#include "backend/log_frame_reader.h"
 #include "backend/registry_auth.h"
 #include "domain/container.h"
 #include "domain/container_detail.h"
@@ -164,6 +165,33 @@ public:
     virtual void removeImage(const QString &id, bool force) = 0;
 
     /*!
+     * 日志流为什么结束（ARCH_V5_V8 §3.1.4）。
+     *
+     * 分三类而不是"成功/失败"：容器停下来导致的结束是**正常**的（可以重连），
+     * 被用户取消也不是错误，只有第三类才需要给出错误文案。
+     */
+    enum class LogStreamEnd {
+        /*! 流自然结束（容器停止、历史读完）。 */
+        Ended,
+        /*! 读取失败（容器不存在、日志驱动不支持读取、连接中断…）。 */
+        Failed,
+        /*! 用户取消（离开日志分区 / 点了停止）。 */
+        Cancelled,
+    };
+    Q_ENUM(LogStreamEnd)
+
+    /*!
+     * 开始读取日志。
+     *
+     * `tty` 必须来自容器详情（`Config.Tty`）：TTY 容器输出原始字节，
+     * 非 TTY 是 8 字节帧的 stdcopy 流（§3.1.1）。`follow` 为真时持续跟随，
+     * 且**不设静默超时**（follow 流可以合法地长时间没有数据）。
+     */
+    virtual void startContainerLogs(const QString &id, bool tty, bool follow, int tailLines) = 0;
+    /*! 停止读取（幂等；没有在跑的流也不报错）。 */
+    virtual void stopContainerLogs(const QString &id) = 0;
+
+    /*!
      * 校验一条仓库凭据（`POST /auth`）。
      *
      * 凭据**只走请求头**、只用于这一次请求：不落盘、不进日志、不进错误文案。
@@ -219,6 +247,13 @@ Q_SIGNALS:
                           const Kontainer::DockerError &error);
     /*! 拉取进度（引擎每报告一行就聚合一次）。 */
     void imagePullProgress(const Kontainer::ImagePullProgress &progress);
+
+    /*! 已经解复用好的日志行（按批发出，避免每个字节都惊动界面）。 */
+    void containerLogLines(const QString &id, const QList<Kontainer::LogLine> &lines);
+    /*! 日志流结束（含原因；`Failed` 时 `error` 是引擎/传输层给的分类）。 */
+    void containerLogsFinished(const QString &id,
+                               Kontainer::DockerBackendInterface::LogStreamEnd end,
+                               const Kontainer::DockerError &error);
 
     /*!
      * 仓库凭据校验的结果。

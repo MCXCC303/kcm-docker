@@ -876,6 +876,122 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
     });
 }
 
+int DockerBackend::logHistoryTimeoutMs() const
+{
+    // 历史日志（follow=0）用普通超时；follow 流交给取消与页面生命周期结束（§3.1.1）
+    return mutationTimeoutMs();
+}
+
+void DockerBackend::startContainerLogs(const QString &id, bool tty, bool follow, int tailLines)
+{
+    if (id.isEmpty()) {
+        Q_EMIT containerLogsFinished(id, LogStreamEnd::Failed,
+                                     DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("empty container id")));
+        return;
+    }
+
+    // 一个容器最多一路流：重连/换容器时先停掉旧的（旧流会以 Cancelled 结束，调用方据此忽略）
+    stopContainerLogs(id);
+
+    // 排队等握手时用户可能已经离开日志分区：那时不该再去开流
+    m_cancelledLogRequests.remove(id);
+
+    withApiVersion(Section::ContainerDetail, [this, id, tty, follow, tailLines] {
+        if (m_cancelledLogRequests.remove(id)) {
+            Q_EMIT containerLogsFinished(id, LogStreamEnd::Cancelled, DockerError());
+            return;
+        }
+
+        QUrlQuery query;
+        query.addQueryItem(QStringLiteral("stdout"), QStringLiteral("1"));
+        query.addQueryItem(QStringLiteral("stderr"), QStringLiteral("1"));
+        query.addQueryItem(QStringLiteral("timestamps"), QStringLiteral("0"));
+        query.addQueryItem(QStringLiteral("follow"), follow ? QStringLiteral("1") : QStringLiteral("0"));
+        if (tailLines > 0) {
+            query.addQueryItem(QStringLiteral("tail"), QString::number(tailLines));
+        }
+
+        LogStreamState state;
+        state.reader = LogFrameReader(tty);
+        state.reply = m_client.getStream(ApiPaths::containerLogs(id),
+                                         query,
+                                         follow ? 0 : logHistoryTimeoutMs());
+        const auto inserted = m_logStreams.insert(id, std::move(state));
+        DockerReply *reply = inserted->reply;
+
+        connect(reply, &DockerReply::bodyChunk, this, [this, reply, id] {
+            if (reply->httpStatus() >= 400) {
+                return; // 4xx/5xx 交给 finished 统一处理
+            }
+            const auto it = m_logStreams.find(id);
+            if (it == m_logStreams.end()) {
+                return;
+            }
+            const QList<LogLine> lines = it->reader.feed(reply->takeBody());
+            if (!lines.isEmpty()) {
+                Q_EMIT containerLogLines(id, lines);
+            }
+        });
+
+        connect(reply, &DockerReply::finished, this, [this, reply, id] {
+            const DockerReply::State replyState = reply->state();
+            const DockerError error = reply->error();
+            reply->deleteLater();
+
+            const auto it = m_logStreams.find(id);
+            if (it == m_logStreams.end() || it->reply != reply) {
+                // 已经被 stopContainerLogs 清算，或者已被新的流取代。
+                // 这一条是**防御性**的：`DockerReply::cancel()` 目前同步发 finished，
+                // 所以"旧流晚于新流收尾"的顺序今天构造不出来——但不要依赖这个实现细节，
+                // 一旦 cancel() 改成异步，旧流的收尾会把新流的状态擦掉。
+                return;
+            }
+            const bool cancelled = it->cancelled;
+            const qint64 discarded = it->reader.discardedBytes();
+            QList<LogLine> tail;
+            if (replyState != DockerReply::State::Cancelled) {
+                // 收尾：最后一行可能没有换行（容器输出提示符、或流被切断）
+                tail = it->reader.flush();
+            }
+            m_logStreams.erase(it);
+
+            if (discarded > 0) {
+                qCWarning(kontainerBackend) << "log stream for" << id << "discarded" << discarded << "bytes of malformed data";
+            }
+            if (!tail.isEmpty()) {
+                Q_EMIT containerLogLines(id, tail);
+            }
+
+            if (cancelled || replyState == DockerReply::State::Cancelled) {
+                Q_EMIT containerLogsFinished(id, LogStreamEnd::Cancelled, DockerError());
+                return;
+            }
+            if (replyState != DockerReply::State::Succeeded) {
+                Q_EMIT containerLogsFinished(id, LogStreamEnd::Failed, error);
+                return;
+            }
+            Q_EMIT containerLogsFinished(id, LogStreamEnd::Ended, DockerError());
+        });
+    });
+}
+
+void DockerBackend::stopContainerLogs(const QString &id)
+{
+    // 还在等版本握手的情况：记下来，让排队的 lambda 自己放弃
+    m_cancelledLogRequests.insert(id);
+
+    const auto it = m_logStreams.find(id);
+    if (it == m_logStreams.end()) {
+        return; // 幂等：没有在跑的流什么都不做
+    }
+    m_cancelledLogRequests.remove(id);
+    it->cancelled = true;
+    if (it->reply) {
+        // cancel() 之后 finished 仍会来一次，届时按 Cancelled 收尾
+        it->reply->cancel();
+    }
+}
+
 void DockerBackend::pullImage(const QString &reference, const RegistryCredential &credential)
 {
     const QString targetKey = OperationTarget::image(ImageReference::normalized(reference));

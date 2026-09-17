@@ -7,6 +7,7 @@
 
 #include <QByteArray>
 #include <QList>
+#include <QMetaType>
 #include <QString>
 
 namespace Kontainer
@@ -107,3 +108,5 @@ private:
 };
 
 } // namespace Kontainer
+
+Q_DECLARE_METATYPE(Kontainer::LogLine)

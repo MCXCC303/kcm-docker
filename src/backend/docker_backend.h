@@ -75,6 +75,9 @@ public:
 
     void checkRegistryAuth(const QString &serverAddress, const Kontainer::RegistryCredential &credential) override;
 
+    void startContainerLogs(const QString &id, bool tty, bool follow, int tailLines) override;
+    void stopContainerLogs(const QString &id) override;
+
     bool isLoading() const override;
     bool isRefreshingFastData() const override;
     QString endpointDisplayName() const override;
@@ -115,6 +118,20 @@ private:
     /*! `/auth` 的超时（引擎要联系仓库，与写操作同量级）。 */
     int authCheckTimeoutMs() const;
 
+
+    /* --- 容器日志（流式，ARCH_V5_V8 §3.1） --- */
+    struct LogStreamState {
+        DockerReply *reply = nullptr;
+        LogFrameReader reader;
+        /*! 用户是否已经要求停止（用于把结束原因归到"取消"）。 */
+        bool cancelled = false;
+    };
+    /*! 每个容器最多一路日志流（换容器或重连会先停掉旧的）。 */
+    QHash<QString, LogStreamState> m_logStreams;
+    /*! 历史（follow=0）读取的超时；follow 流不设静默超时。 */
+    int logHistoryTimeoutMs() const;
+    /*! 还在等版本握手时就被要求停止的日志请求（避免开了流没人收）。 */
+    QSet<QString> m_cancelledLogRequests;
 
     /* --- 镜像拉取（流式，可并发，ARCH_V4 §2.4） --- */
 

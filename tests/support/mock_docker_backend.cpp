@@ -250,6 +250,30 @@ void MockDockerBackend::completeAuthCheck()
     Q_EMIT registryAuthChecked(m_lastAuthServerAddress, m_authCheckResult, m_authCheckDetail);
 }
 
+void MockDockerBackend::startContainerLogs(const QString &id, bool tty, bool follow, int tailLines)
+{
+    // 记录参数即可：真实读取由真实后端负责，这里只让控制器/界面能跑起来
+    m_lastLogContainerId = id;
+    m_lastLogTty = tty;
+    m_lastLogFollow = follow;
+    m_lastLogTailLines = tailLines;
+}
+
+void MockDockerBackend::stopContainerLogs(const QString &id)
+{
+    ++m_stoppedLogStreams[id];
+}
+
+void MockDockerBackend::emitLogLines(const QString &id, const QList<LogLine> &lines)
+{
+    Q_EMIT containerLogLines(id, lines);
+}
+
+void MockDockerBackend::finishLogs(const QString &id, LogStreamEnd end, const DockerError &error)
+{
+    Q_EMIT containerLogsFinished(id, end, error);
+}
+
 void MockDockerBackend::completeRefresh()
 {
     const QList<Section> sections = {Section::Engine,

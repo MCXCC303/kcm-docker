@@ -83,6 +83,17 @@ inline QString imageCreate()
     return QStringLiteral("/images/create");
 }
 /*!
+ * 读取容器日志（ARCH_V5_V8 §3.1.1）。
+ *
+ * `stdout`/`stderr`/`follow`/`tail` 都由 query 给出；返回的是**流**
+ * （`application/vnd.docker.raw-stream`，chunked），因此走流式 GET。
+ */
+inline QString containerLogs(const QString &id)
+{
+    return QStringLiteral("/containers/%1/logs").arg(id);
+}
+
+/*!
  * 校验仓库凭据（`POST /auth`，ARCH_V5_V8 §2.6）。
  *
  * 凭据走 `X-Registry-Auth` 头：本机 API 1.56 实测，请求畸形时引擎回的是

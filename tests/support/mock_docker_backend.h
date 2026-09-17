@@ -103,6 +103,36 @@ public:
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
     void checkRegistryAuth(const QString &serverAddress, const Kontainer::RegistryCredential &credential) override;
+    void startContainerLogs(const QString &id, bool tty, bool follow, int tailLines) override;
+    void stopContainerLogs(const QString &id) override;
+
+    /* --- 日志流的注入与观察（ARCH_V5_V8 §3.1） --- */
+
+    /*! 把一段日志行当成"引擎推来的"发出去。 */
+    void emitLogLines(const QString &id, const QList<Kontainer::LogLine> &lines);
+    /*! 结束日志流（默认自然结束）。 */
+    void finishLogs(const QString &id, LogStreamEnd end = LogStreamEnd::Ended, const Kontainer::DockerError &error = {});
+    /*! 最近一次 startContainerLogs 的参数。 */
+    QString lastLogContainerId() const
+    {
+        return m_lastLogContainerId;
+    }
+    bool lastLogTty() const
+    {
+        return m_lastLogTty;
+    }
+    bool lastLogFollow() const
+    {
+        return m_lastLogFollow;
+    }
+    int lastLogTailLines() const
+    {
+        return m_lastLogTailLines;
+    }
+    int stopLogsCount(const QString &id) const
+    {
+        return m_stoppedLogStreams.value(id);
+    }
 
     /* --- 认证校验的注入与观察（ARCH_V5_V8 §2.6） --- */
 
@@ -169,6 +199,11 @@ private:
     RegistryCredential m_lastAuthCredential;
     int m_authCheckCount = 0;
     RegistryCredential m_lastPullCredential;
+    QString m_lastLogContainerId;
+    bool m_lastLogTty = false;
+    bool m_lastLogFollow = false;
+    int m_lastLogTailLines = 0;
+    QHash<QString, int> m_stoppedLogStreams;
 
     bool m_loading = false;
     QHash<int, bool> m_pending;
