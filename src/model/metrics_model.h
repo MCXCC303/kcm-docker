@@ -55,6 +55,13 @@ class MetricsModel : public QObject
     Q_PROPERTY(double blockReadPerSecond READ blockReadPerSecond NOTIFY updated)
     Q_PROPERTY(double blockWritePerSecond READ blockWritePerSecond NOTIFY updated)
     Q_PROPERTY(int sampleCount READ sampleCount NOTIFY updated)
+    /*!
+     * 环形缓冲容量（= RefreshPolicy::kMetricsHistorySamples）。
+     *
+     * 趋势图按固定条数渲染（不够的槽位留空），这样 Repeater 的 model 永远不变，
+     * 采样时不会销毁/创建任何柱子——这是 ARCH_V3 附录 A.1g 那条崩溃路径的根治办法。
+     */
+    Q_PROPERTY(int historyCapacity READ historyCapacity CONSTANT)
     Q_PROPERTY(QVariantList cpuHistory READ cpuHistory NOTIFY updated)
     Q_PROPERTY(QVariantList networkHistory READ networkHistory NOTIFY updated)
     Q_PROPERTY(QVariantList memoryHistory READ memoryHistory NOTIFY updated)
@@ -91,6 +98,7 @@ public:
     double networkTxPerSecond() const;
     double blockReadPerSecond() const;
     double blockWritePerSecond() const;
+    int historyCapacity() const;
     int sampleCount() const;
     QVariantList cpuHistory() const;
     QVariantList networkHistory() const;

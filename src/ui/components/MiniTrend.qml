@@ -29,7 +29,12 @@ RowLayout {
         「运行中」和「网络流量」。
     */
     property color barColor: Local.ChartPalette.cpuSeries
-    property int barWidth: 3
+    /*!
+        固定渲染多少个槽位（默认取 MetricsModel 的环形缓冲容量）。
+        条数固定 = Repeater 的 model 永远不变 = 采样不会销毁/创建任何柱子。
+    */
+    property int maxSamples: 60
+    property int barWidth: 2
 
     spacing: 1
     implicitHeight: Kirigami.Units.gridUnit * 1.5
@@ -45,11 +50,24 @@ RowLayout {
         return maximum > 0 ? maximum : 1;
     }
 
+    /*  固定条数渲染（经典 sparkline 做法）：
+        values（cpuHistory 等）是每 5 秒采样都会重新生成的 QVariantList，
+        任何"跟着数据变化"的 model（无论是数组本身还是它的长度）都会让 Repeater
+        销毁/创建柱子，而这些柱子正处在 Kirigami.FormLayout（GridLayout）的条目里——
+        真实会话的段错误恰好发生在「布局算尺寸时条目被销毁」的路径上
+        （ARCH_V3 附录 A.1d/A.1g）。条数固定后这条路径彻底消失，
+        数据不足的槽位留空，最新采样始终贴右显示。 */
     Repeater {
-        model: trend.values
+        model: trend.maxSamples
 
         delegate: Rectangle {
-            required property var modelData
+            required property int index
+
+            objectName: "trendBar"
+            /*! 该槽位对应的采样下标；不足时为负（槽位为空）。 */
+            readonly property int sampleIndex: trend.values.length - trend.maxSamples + index
+            readonly property bool hasSample: sampleIndex >= 0 && sampleIndex < trend.values.length
+            readonly property real sampleValue: hasSample ? trend.values[sampleIndex] : 0
 
             Layout.fillHeight: true
             Layout.preferredWidth: trend.barWidth
@@ -57,8 +75,8 @@ RowLayout {
             // 不做透明度衰减：ChartPalette 的取色已按对比度校验过（§1.8），
             // 再乘一个 alpha 会把有效对比度拉回不达标区间。
             color: trend.barColor
-            // 最低 1px，保证“有值但很小”也能看见
-            Layout.preferredHeight: Math.max(1, parent.height * Math.min(1, modelData / trend.effectiveMax))
+            // 最低 1px，保证“有值但很小”也能看见；空槽位不画
+            Layout.preferredHeight: hasSample ? Math.max(1, parent.height * Math.min(1, sampleValue / trend.effectiveMax)) : 0
             Layout.alignment: Qt.AlignBottom
         }
     }

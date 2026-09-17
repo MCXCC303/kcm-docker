@@ -6,6 +6,7 @@
 #include "i18n.h"
 #include "model/qml_registration.h"
 #include "support/qml_item_utils.h"
+#include "model/metrics_model.h"
 #include "model/status_controller.h"
 #include "support/mock_docker_backend.h"
 #include "support/qml_stub_kcm.h"
@@ -58,6 +59,8 @@ private Q_SLOTS:
     void delegatesSurviveDataChanges();
     void silentRefreshesDoNotRecreateDetailEntries_data();
     void silentRefreshesDoNotRecreateDetailEntries();
+    void statsSamplesDoNotRecreateTrendBars();
+    void statsSamplesDoNotDestroyAnyItem();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
@@ -483,6 +486,228 @@ void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
              qPrintable(QStringLiteral("%1 was recreated by a silent refresh: the detail lists must not reset "
                                        "the model when the data is unchanged (ARCH_V2 §32/§34)")
                             .arg(objectName)));
+
+    const QStringList errors = takeQmlErrors();
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char('\n'))));
+}
+
+/*!
+ * 崩溃路径的精确回归（ARCH_V3 附录 A.1g）：
+ * **资源采样的趋势柱不得被重建**。
+ *
+ * 容器详情页开着时，MetricsModel 每 5 秒产生一次新的 *History（QVariantList）。
+ * 如果趋势柱的 Repeater 直接以该数组为 model，每 5 秒就会销毁重建最多 60 个柱子；
+ * 这些柱子位于 Kirigami.FormLayout（GridLayout）的条目里，
+ * 正是真实会话中「布局算尺寸时条目被销毁 → qmlAttachedPropertiesObject 段错误」的形状。
+ * 这也是「点进详情页看一会儿才崩」的原因。
+ */
+void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
+{
+    fillData(0); // 容器状态为 Running，才会启动资源采样
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    QQuickWidget widget;
+    widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
+    widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
+                                            "function i18nc(context, text) { return text; }\n"
+                                            "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
+                                            "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
+    widget.resize(900, 700);
+    widget.show();
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    QTest::qWait(60);
+
+    QQuickItem *root = widget.rootObject();
+    QVERIFY(root);
+    QTRY_VERIFY_WITH_TIMEOUT(root->width() > 0, 5000);
+
+    // 进入容器详情
+    const QByteArray signalSignature("containerActivated(QString)");
+    const auto findMainPage = [root, &signalSignature]() -> QQuickItem * {
+        QQuickItem *found = nullptr;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            if (!item || found) {
+                return;
+            }
+            if (item->metaObject()->indexOfSignal(signalSignature.constData()) >= 0) {
+                found = item;
+                return;
+            }
+            const QList<QQuickItem *> children = item->childItems();
+            for (QQuickItem *child : children) {
+                walk(child);
+            }
+        };
+        walk(root);
+        return found;
+    };
+    QQuickItem *mainPage = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((mainPage = findMainPage()) != nullptr, 5000);
+    QVERIFY(QMetaObject::invokeMethod(mainPage, "containerActivated", Q_ARG(QString, QStringLiteral("cid-0"))));
+    m_backend->completeRefresh(); // 交付 inspect
+
+    // 切到「资源」分区（下标 1）
+    QQuickItem *detailTabs = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((detailTabs = TestSupport::findItemByObjectName(root, QStringLiteral("detailTabBar"))) != nullptr, 5000);
+    detailTabs->setProperty("currentIndex", 1);
+    QTest::qWait(50);
+
+    // 先喂几次采样，让趋势线出现（MiniTrend 在样本数 > 1 时才可见）
+    for (int sample = 0; sample < 3; ++sample) {
+        m_backend->requestContainerStats(QStringLiteral("cid-0"));
+        m_backend->completeRefresh();
+        QTest::qWait(30);
+    }
+
+    // 收集全部趋势柱（3 条趋势线各有自己的柱子），断言**已有实例不被销毁**：
+    // 断言"第一个实例不变"会被"新增柱子"误判，因此按集合判断。
+    const auto collectBars = [root]() -> QList<QQuickItem *> {
+        QList<QQuickItem *> bars;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            const QList<QQuickItem *> children = item->childItems();
+            for (QQuickItem *child : children) {
+                if (child->objectName() == QLatin1String("trendBar")) {
+                    bars.append(child);
+                }
+                walk(child);
+            }
+        };
+        walk(root);
+        return bars;
+    };
+
+    QList<QQuickItem *> before;
+    QTRY_VERIFY_WITH_TIMEOUT(!(before = collectBars()).isEmpty(), 5000);
+    const int sampleCountBefore = controller->containerDetail()->metrics()->sampleCount();
+
+    // 继续采样：每轮都是一次新的 *History 数组
+    for (int sample = 0; sample < 6; ++sample) {
+        m_backend->requestContainerStats(QStringLiteral("cid-0"));
+        m_backend->completeRefresh();
+        QTest::qWait(30);
+    }
+
+    const QList<QQuickItem *> after = collectBars();
+    const int sampleCountAfter = controller->containerDetail()->metrics()->sampleCount();
+    QVERIFY2(sampleCountAfter > sampleCountBefore, "stats samples were not delivered to the metrics model");
+
+    QStringList lost;
+    for (QQuickItem *bar : before) {
+        if (!after.contains(bar)) {
+            lost.append(QStringLiteral("%1").arg(reinterpret_cast<quintptr>(bar), 0, 16));
+        }
+    }
+    QVERIFY2(lost.isEmpty(),
+             qPrintable(QStringLiteral("%1 of %2 trend bars were destroyed by a stats sample "
+                                       "(sampleCount %3 → %4): the Repeater model must be the array length, "
+                                       "not the array itself (a new QVariantList arrives every 5 seconds)")
+                            .arg(lost.size())
+                            .arg(before.size())
+                            .arg(sampleCountBefore)
+                            .arg(sampleCountAfter)));
+
+    const QStringList errors = takeQmlErrors();
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char('\n'))));
+}
+
+/*!
+ * 更宽的不变量（ARCH_V3 附录 A.1g）：**只发生资源采样时，界面上不得有任何条目被销毁**。
+ *
+ * 容器详情页开着时，采样每 5 秒一次；只要有一次采样导致某个条目被销毁，
+ * 就可能撞上「布局算尺寸时条目被析构」的崩溃路径。这里把「保留所有已有条目」
+ * 直接断言出来，比逐个组件写断言更能覆盖到未来新加的界面元素。
+ */
+void KcmWidgetChurnTest::statsSamplesDoNotDestroyAnyItem()
+{
+    fillData(0);
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    QQuickWidget widget;
+    widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
+    widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
+                                            "function i18nc(context, text) { return text; }\n"
+                                            "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
+                                            "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
+    widget.resize(900, 700);
+    widget.show();
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    QTest::qWait(60);
+
+    QQuickItem *root = widget.rootObject();
+    QVERIFY(root);
+    QTRY_VERIFY_WITH_TIMEOUT(root->width() > 0, 5000);
+
+    const QByteArray signalSignature("containerActivated(QString)");
+    QQuickItem *mainPage = nullptr;
+    const auto findMainPage = [root, &signalSignature]() -> QQuickItem * {
+        QQuickItem *found = nullptr;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            if (!item || found) {
+                return;
+            }
+            if (item->metaObject()->indexOfSignal(signalSignature.constData()) >= 0) {
+                found = item;
+                return;
+            }
+            const QList<QQuickItem *> children = item->childItems();
+            for (QQuickItem *child : children) {
+                walk(child);
+            }
+        };
+        walk(root);
+        return found;
+    };
+    QTRY_VERIFY_WITH_TIMEOUT((mainPage = findMainPage()) != nullptr, 5000);
+    QVERIFY(QMetaObject::invokeMethod(mainPage, "containerActivated", Q_ARG(QString, QStringLiteral("cid-0"))));
+    m_backend->completeRefresh();
+
+    QQuickItem *detailTabs = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((detailTabs = TestSupport::findItemByObjectName(root, QStringLiteral("detailTabBar"))) != nullptr, 5000);
+    detailTabs->setProperty("currentIndex", 1); // 资源分区
+    QTest::qWait(50);
+
+    const auto collectItems = [root]() -> QSet<QQuickItem *> {
+        QSet<QQuickItem *> items;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            const QList<QQuickItem *> children = item->childItems();
+            for (QQuickItem *child : children) {
+                items.insert(child);
+                walk(child);
+            }
+        };
+        walk(root);
+        return items;
+    };
+
+    // 先喂两次采样，让趋势线进入"有数据"的状态
+    for (int sample = 0; sample < 2; ++sample) {
+        m_backend->requestContainerStats(QStringLiteral("cid-0"));
+        m_backend->completeRefresh();
+        QTest::qWait(30);
+    }
+
+    const QSet<QQuickItem *> before = collectItems();
+    QVERIFY(before.size() > 50);
+
+    for (int sample = 0; sample < 6; ++sample) {
+        m_backend->requestContainerStats(QStringLiteral("cid-0"));
+        m_backend->completeRefresh();
+        QTest::qWait(30);
+    }
+
+    const QSet<QQuickItem *> after = collectItems();
+    QSet<QQuickItem *> destroyed = before;
+    destroyed.subtract(after);
+    QVERIFY2(destroyed.isEmpty(),
+             qPrintable(QStringLiteral("%1 items were destroyed by stats samples; "
+                                       "any item destroyed during layout polish can hit the crash path "
+                                       "(see ARCH_V3 appendix A.1g)").arg(destroyed.size())));
 
     const QStringList errors = takeQmlErrors();
     QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char('\n'))));

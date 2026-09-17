@@ -25,7 +25,7 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 | Container Detail | Overview（状态/健康/镜像/ID/创建·启动·结束时间；容器名称与 ID 可复制）、Runtime（重启次数/退出码/OOM/PID/重启策略/平台）、Resources（CPU/内存/网络/块 IO + 短期趋势）、Network（网络/IPv4/IPv6/网关/MAC）、Ports、Mounts、Configuration（Entrypoint/Command/工作目录/用户/主机名 + Environment/Labels 折叠） |
 | Image Detail | Repository / Tag / 完整引用 / ID（均可一键复制）、Digest、创建时间、大小、架构、OS、作者、Tags、Digests、Layers（层摘要 + 说明）、使用该镜像的容器、Environment（折叠） |
 | 刷新 | 5 秒自动刷新（高频）+ 30 秒 storage（中频）+ 手动刷新；**自动刷新可关闭**（工具栏勾选项，关闭时页头提示）；Last Updated / Update failed / Data is stale；后台刷新不清空列表、不重置搜索/过滤/排序；数据未变时详情列表完全不动模型 |
-| 资源监控 | 每个详情页 5 秒采样一次，内存中保留 60 个采样点（约 5 分钟），离开页面立即停止采样并释放历史 |
+| 资源监控 | 每个详情页 5 秒采样一次，内存中保留 60 个采样点（约 5 分钟），离开页面立即停止采样并释放历史；趋势线按**固定槽位**渲染（最新采样贴右），因此采样不会创建/销毁任何条目 |
 | 状态体系 | State（机器可读）/ Status（Docker 摘要）/ Health（独立语义）严格分离；颜色只作辅助，始终配文本 + 图标 |
 | 状态徽标 | 所有状态统一由 `StatusChip` 呈现（图标 + 颜色 + 文字三重编码）；语义 key → 主题色的映射只在 `StatusPalette` 里存在一份 |
 | 可复制字段 | 容器名称/ID、镜像仓库/标签/完整引用/ID 统一使用 `CopyableText` / `CopyButton`；列表卡片也有复制入口 |
@@ -276,6 +276,7 @@ po/                         翻译（zh_CN 已完整）
 | 项 | 规范 | 实现 | 说明 |
 | --- | --- | --- | --- |
 | 卡片基类 | ARCH_V3_pre §1.3 建议统一用 `Kirigami.AbstractCard` | **列表行用 `QQC2.ItemDelegate`，统计卡用自绘容器**（颜色/圆角/字号全部取自主题） | `AbstractCard` 会接管 `contentItem`：把它包进 `KirigamiLayouts.Padding`（`visible: contentItem !== null`）并用 `onXChanged/onYChanged` 强制覆盖内容坐标（Kirigami 6.30 `templates/AbstractCard.qml:110-140`）。二期正是在这里踩到「折叠区与标题重叠」的 bug。列表行还需要 hover/focus/Enter 与 `Accessible.role`，`ItemDelegate` 更合适 |
+| 趋势图渲染 | ARCH_V2 §22 sparkline | 固定 `maxSamples` 个槽位（容量来自 `RefreshPolicy`），数据不足的槽位留空、最新采样贴右 | 数据驱动的 model（数组本身或它的长度）会在每 5 秒采样时销毁/创建柱子，而柱子位于 GridLayout 条目内——正是真实会话段错误的路径（ARCH_V3 附录 A.1g） |
 | 网络分区布局 | ARCH_V3_pre §1.9 未规定 | 每个网络条目为普通行布局（不再用 `Kirigami.FormLayout`） | core dump 指向「Repeater 里的 GridLayout + FormData 附加属性查找」，去掉该嵌套以消除这一形状 |
 | 自动刷新 | ARCH_V2 §13 默认自动刷新 | 默认开启，但提供可关闭的开关 | 关掉后无任何定时刷新；同时是定位「定时刷新触发界面重建」类问题的诊断开关 |
 | `Repeater` model | 无规定 | 一律使用稳定的数值（`xxx.length`）+ 索引取值 | JS 数组属性每次刷新都会重新求值，直接当 model 会销毁重建全部条目；「布局算尺寸时条目被销毁」正是实际会话段错误的触发条件（详见 ARCH_V3 附录 A.1d） |

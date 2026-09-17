@@ -80,6 +80,7 @@ ColumnLayout {
             Components.MiniTrend {
                 visible: view.metrics.sampleCount > 1
                 values: view.metrics.cpuHistory
+                maxSamples: view.metrics.historyCapacity
                 maxValue: 100
                 barColor: Components.ChartPalette.cpuSeries
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
@@ -117,6 +118,7 @@ ColumnLayout {
             Components.MiniTrend {
                 visible: view.metrics.sampleCount > 1
                 values: view.metrics.memoryHistory
+                maxSamples: view.metrics.historyCapacity
                 barColor: Components.ChartPalette.memorySeries
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             }
@@ -138,6 +140,7 @@ ColumnLayout {
             Components.MiniTrend {
                 visible: view.metrics.sampleCount > 1
                 values: view.metrics.networkHistory
+                maxSamples: view.metrics.historyCapacity
                 barColor: Components.ChartPalette.networkSeries
                 Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             }

@@ -206,6 +206,11 @@ double MetricsModel::blockWritePerSecond() const
     return m_points.isEmpty() ? -1.0 : m_points.last().blockWritePerSecond;
 }
 
+int MetricsModel::historyCapacity() const
+{
+    return RefreshPolicy::kMetricsHistorySamples;
+}
+
 int MetricsModel::sampleCount() const
 {
     return int(m_points.size());
