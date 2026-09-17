@@ -382,14 +382,16 @@ KCM.SimpleKCM {
                     Layout.fillWidth: true
                     spacing: 0
 
+                    /* 同 MainPage：model 用长度而不是 QStringList 属性本身，
+                       避免列表变化时在布局 polish 期间重建条目。 */
                     Repeater {
-                        model: controller.environment
+                        model: controller.environment.length
 
                         delegate: QQC2.Label {
-                            required property string modelData
+                            required property int index
 
                             Layout.fillWidth: true
-                            text: modelData
+                            text: controller.environment[index]
                             font.family: "monospace"
                             elide: Text.ElideMiddle
                         }

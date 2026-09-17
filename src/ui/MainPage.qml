@@ -238,6 +238,8 @@ Kirigami.Page {
         QQC2.ScrollView {
             id: overviewScroll
 
+            objectName: "overviewScroll"
+
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(overviewColumn.implicitHeight, root.height * 0.45)
             Layout.maximumHeight: root.height * 0.45
@@ -254,6 +256,8 @@ Kirigami.Page {
                 GridLayout {
                     id: tileGrid
 
+                    objectName: "tileGrid"
+
                     Layout.fillWidth: true
                     columnSpacing: Kirigami.Units.smallSpacing
                     rowSpacing: Kirigami.Units.smallSpacing
@@ -268,17 +272,22 @@ Kirigami.Page {
                         return 2;
                     }
 
+                    /*  model 必须是**稳定的数值**：root.tiles 是每次数据变化都会重新求值的
+                        JS 数组，直接当 model 会让 Repeater 在每次刷新时销毁并重建全部
+                        统计块。这类「布局正在算尺寸时条目被销毁」的情况会让 Qt 的布局
+                        引擎在 polish 阶段访问已析构的条目（实测在 kcmshell6 的
+                        QQuickWidget 宿主下会段错误），因此这里按索引取值。 */
                     Repeater {
-                        model: root.tiles
+                        model: root.tiles.length
 
                         delegate: Components.StatTile {
-                            required property var modelData
+                            required property int index
 
                             Layout.fillWidth: true
-                            label: modelData.label
-                            value: root.countsReady ? String(modelData.value) : i18n("—")
-                            iconName: modelData.icon
-                            semanticKey: modelData.semanticKey
+                            label: root.tiles[index].label
+                            value: root.countsReady ? String(root.tiles[index].value) : i18n("—")
+                            iconName: root.tiles[index].icon
+                            semanticKey: root.tiles[index].semanticKey
                             tintWhenNonZero: true
                             tooltip: root.countsReady ? "" : i18n("Engine summary is unavailable")
                         }

@@ -45,6 +45,13 @@ kontainer_add_test(tst_qml_load ui/tst_qml_load.cpp)
 # 注意：qt_add_resources 必须在目标已存在之后调用，
 # 否则 Qt 会按「<outfiles> 形式的旧签名」解析参数并给出难以理解的报错。
 kontainer_add_test(tst_qml_resource ui/tst_qml_resource.cpp)
+kontainer_add_test(tst_refresh_churn ui/tst_refresh_churn.cpp)
+
+# kcmshell6 用 QQuickWidget 承载 KCM 的 QML（离屏渲染 + 手动 polish），
+# 与 QQuickWindow 是两条不同的渲染路径，因此单独一个测试目标。
+find_package(Qt6 6.5 REQUIRED COMPONENTS QuickWidgets)
+kontainer_add_test(tst_kcm_widget_churn ui/tst_kcm_widget_churn.cpp)
+target_link_libraries(tst_kcm_widget_churn PRIVATE Qt6::QuickWidgets Qt6::Widgets)
 qt_add_resources(tst_qml_resource "tst_qml_resource_qml"
     PREFIX "/kcm/kcm_docker"
     BASE "${KONTAINER_QML_BASE_DIR}"

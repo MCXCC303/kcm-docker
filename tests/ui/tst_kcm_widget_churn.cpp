@@ -1,0 +1,364 @@
+/*
+    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-License-Identifier: GPL-2.0-or-later
+*/
+
+#include "i18n.h"
+#include "model/qml_registration.h"
+#include "support/qml_item_utils.h"
+#include "model/status_controller.h"
+#include "support/mock_docker_backend.h"
+#include "support/qml_stub_kcm.h"
+
+#include <QQmlContext>
+#include <QQmlEngine>
+#include <QQmlError>
+#include <QQuickItem>
+#include <QQuickWidget>
+#include <QtTest>
+
+#include <functional>
+#include <memory>
+
+using namespace Kontainer;
+
+/*!
+ * kcmshell6 宿主形态下的刷新抖动测试（复现真实会话里的段错误）。
+ *
+ * 为什么需要单独一个测试文件：kcmshell6 把 KCM 的 QML 放进 **QQuickWidget**
+ * （core dump 的调用栈里能看到 libQt6QuickWidgets → QQuickRenderControl::polishItems
+ * → QQuickWindowPrivate::polishItems → QQuickLayout::updatePolish）。
+ * QQuickWidget 走的是离屏渲染 + 手动 polish 的路径，与 QQuickWindow 不同；
+ * 只用 QQuickWindow 的压力测试（tst_refresh_churn）无法覆盖这条路径。
+ *
+ * 崩溃点（用户实际 core dump）：
+ *
+ *     qmlAttachedPropertiesObject ← QQuickLayoutAttached::sizeHint
+ *     ← QGridLayoutEngine::fillRowData ← QQuickLayout::effectiveSizeHints_helper
+ *
+ * 即在布局 polish 期间访问布局条目的附加属性时踩到悬空指针——
+ * 典型触发条件是「布局正在算尺寸时，里面的条目被销毁重建」。
+ *
+ * 本测试因此做两件事：
+ *   1. 用 QQuickWidget 承载真实入口 main.qml（含 StackView 导航）；
+ *   2. 在总览 ↔ 容器详情之间反复进出，同时让数据持续变化、窗口反复缩放。
+ * 任何一步再踩到悬空指针，进程都会在这里直接崩掉，而不是等到用户会话里。
+ */
+class KcmWidgetChurnTest : public QObject
+{
+    Q_OBJECT
+
+private Q_SLOTS:
+    void initTestCase();
+    void init();
+    void cleanup();
+
+    void widgetHostedKcmSurvivesNavigationChurn();
+    void delegatesSurviveDataChanges_data();
+    void delegatesSurviveDataChanges();
+
+private:
+    static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
+    static QStringList takeQmlErrors();
+    static QQuickItem *childByObjectName(QQuickItem *root, const QString &objectName);
+
+    void fillData(int iteration);
+    /*!
+     * 只改数值、不改结构（存储段数恒为 4、统计块恒为 5）：
+     * 用来断言「同一结构下的数值刷新不得重建条目」。
+     */
+    void fillDataStableStructure(int iteration);
+
+    std::unique_ptr<MockDockerBackend> m_backend;
+    std::unique_ptr<QmlStubKcm> m_stubKcm;
+};
+
+namespace
+{
+QStringList g_messages;
+QtMessageHandler g_previousHandler = nullptr;
+} // namespace
+
+void KcmWidgetChurnTest::captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message)
+{
+    Q_UNUSED(type)
+    Q_UNUSED(context)
+    g_messages.append(message);
+}
+
+QStringList KcmWidgetChurnTest::takeQmlErrors()
+{
+    QStringList errors;
+    for (const QString &message : std::as_const(g_messages)) {
+        if (message.contains(QLatin1String("ReferenceError")) || message.contains(QLatin1String("TypeError"))
+            || message.contains(QLatin1String("is not defined")) || message.contains(QLatin1String("Unable to assign"))
+            || message.contains(QLatin1String("Binding loop"))) {
+            errors.append(message);
+        }
+    }
+    g_messages.clear();
+    return errors;
+}
+
+QQuickItem *KcmWidgetChurnTest::childByObjectName(QQuickItem *root, const QString &objectName)
+{
+    // 走可视树：Repeater 创建的 delegate 不在 QObject 树里（详见该助手头文件说明）
+    return TestSupport::findItemByObjectName(root, objectName);
+}
+
+void KcmWidgetChurnTest::initTestCase()
+{
+    setupTranslationDomain();
+    registerKontainerQmlTypes();
+    g_previousHandler = qInstallMessageHandler(&KcmWidgetChurnTest::captureMessages);
+}
+
+void KcmWidgetChurnTest::init()
+{
+    m_backend = std::make_unique<MockDockerBackend>();
+    m_stubKcm = std::make_unique<QmlStubKcm>(m_backend.get());
+    g_messages.clear();
+}
+
+void KcmWidgetChurnTest::cleanup()
+{
+    if (g_previousHandler) {
+        qInstallMessageHandler(g_previousHandler);
+        g_previousHandler = nullptr;
+    }
+    m_stubKcm.reset();
+    m_backend.reset();
+}
+
+void KcmWidgetChurnTest::fillData(int iteration)
+{
+    EngineInfo engine;
+    engine.available = true;
+    engine.countsAvailable = (iteration % 4) != 3;
+    engine.serverVersion = QStringLiteral("29.8.0");
+    engine.apiVersion = QStringLiteral("1.56");
+    engine.osType = QStringLiteral("linux");
+    engine.architecture = QStringLiteral("x86_64");
+    engine.containerTotal = 1 + (iteration % 5);
+    engine.containersRunning = iteration % 4;
+    engine.containersPaused = iteration % 2;
+    engine.containersStopped = iteration % 3;
+    engine.imageCount = 1 + (iteration % 6);
+    m_backend->setEngineInfo(engine);
+
+    QList<Container> containers;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const int containerCount = 1 + (iteration % 7);
+    for (int i = 0; i < containerCount; ++i) {
+        Container container;
+        container.id = QStringLiteral("cid-%1").arg(i);
+        container.name = QStringLiteral("container-%1").arg(i);
+        container.image = QStringLiteral("alpine:latest");
+        container.status = QStringLiteral("Up %1 minutes").arg(i);
+        container.state = (i % 3 == 0) ? ContainerState::Running : ((i % 3 == 1) ? ContainerState::Paused : ContainerState::Exited);
+        container.health = (i % 2 == 0) ? HealthState::Healthy : HealthState::Unhealthy;
+        container.created = now.addSecs(-60ll * (i + 1));
+        containers.append(container);
+    }
+    m_backend->setContainers(containers);
+
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-0");
+    detail.name = QStringLiteral("container-0");
+    detail.state = (iteration % 2 == 0) ? ContainerState::Running : ContainerState::Exited;
+    detail.health = (iteration % 3 == 0) ? HealthState::Healthy : HealthState::None;
+    detail.status = QStringLiteral("Up %1 minutes").arg(iteration);
+    detail.created = now;
+    detail.started = now;
+    detail.environment = {QStringLiteral("A=%1").arg(iteration), QStringLiteral("B=2"), QStringLiteral("C=3")};
+    detail.labels = {{QStringLiteral("k%1").arg(iteration), QStringLiteral("v")}};
+    detail.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/%1").arg(iteration), QStringLiteral("/data"), QStringLiteral("rw"), false}};
+    detail.networks = {{QStringLiteral("bridge"), QStringLiteral("id"), QStringLiteral("172.17.0.%1").arg(iteration % 250), {}, {}, QStringLiteral("172.17.0.1")}};
+    m_backend->setContainerDetail(detail);
+
+    StorageUsage storage;
+    storage.valid = true;
+    storage.buildCacheAvailable = (iteration % 3) != 1;
+    storage.imagesBytes = (iteration % 4 == 2) ? -1 : (iteration + 1) * 100ll * 1024 * 1024;
+    storage.containersBytes = (iteration + 1) * 20ll * 1024 * 1024;
+    storage.volumesBytes = (iteration + 1) * 300ll * 1024 * 1024;
+    storage.buildCacheBytes = (iteration + 1) * 10ll * 1024 * 1024;
+    m_backend->setStorageUsage(storage);
+}
+
+void KcmWidgetChurnTest::fillDataStableStructure(int iteration)
+{
+    fillData(iteration);
+
+    StorageUsage storage;
+    storage.valid = true;
+    // 段数保持 4（构建缓存始终存在），且所有取值都有效 → 结构不变、只有数值在变
+    storage.buildCacheAvailable = true;
+    storage.imagesBytes = (iteration + 1) * 111ll * 1024 * 1024;
+    storage.containersBytes = (iteration + 1) * 22ll * 1024 * 1024;
+    storage.volumesBytes = (iteration + 1) * 333ll * 1024 * 1024;
+    storage.buildCacheBytes = (iteration + 1) * 11ll * 1024 * 1024;
+    storage.imageCount = 1 + (iteration % 6);
+    storage.containerCount = 1 + (iteration % 5);
+    storage.volumeCount = 1 + (iteration % 4);
+    storage.buildCacheCount = 1 + (iteration % 7);
+    m_backend->setStorageUsage(storage);
+}
+
+/*!
+ * 用 QQuickWidget 承载 main.qml，然后反复：
+ *   - 刷新数据（统计块、列表、存储区都会变）
+ *   - 缩放窗口（统计块在 5/3/2 列之间切换、详情页正文在限宽与非限宽之间切换）
+ *   - 进入 / 离开容器详情（页面创建与销毁）
+ *   - 在详情分区之间切换
+ */
+void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
+{
+    fillData(0);
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    QQuickWidget widget;
+    widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
+    // QQuickWidget 自带一个 QQmlEngine：i18n 桩与 kcm 上下文都必须注入到它上面
+    // （真实运行时由 KCMUtils 的 KLocalizedQmlContext 提供 i18n）。
+    widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
+                                            "function i18nc(context, text) { return text; }\n"
+                                            "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
+                                            "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
+    widget.resize(900, 700);
+    widget.show();
+
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    QVERIFY2(widget.status() != QQuickWidget::Error, qPrintable(widget.errors().isEmpty() ? QStringLiteral("failed to load main.qml") : widget.errors().constFirst().toString()));
+
+    QQuickItem *root = widget.rootObject();
+    QVERIFY(root);
+    QTRY_VERIFY(root->width() > 0);
+
+    const QList<int> widths = {900, 640, 420, 1120, 520, 780};
+    for (int iteration = 1; iteration <= 40; ++iteration) {
+        fillData(iteration);
+        controller->refresh();
+        m_backend->completeRefresh();
+        QCoreApplication::processEvents();
+
+        // 进入容器详情：由 MainPage 发出导航信号（main.qml 里接到 StackView.push）
+        QQuickItem *stack = childByObjectName(root, QStringLiteral("pageStack"));
+        QVERIFY2(stack, "pageStack not found");
+        QQuickItem *mainPage = nullptr;
+        // 同样必须走可视树：main.qml 的 MainPage 在 StackView 内部
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
+            if (!item || mainPage) {
+                return;
+            }
+            if (item->metaObject()->indexOfSignal("containerActivated(QString)") >= 0) {
+                mainPage = item;
+                return;
+            }
+            const QList<QQuickItem *> children = item->childItems();
+            for (QQuickItem *child : children) {
+                walk(child);
+            }
+        };
+        walk(root);
+        QVERIFY2(mainPage, "MainPage not found");
+        QVERIFY(QMetaObject::invokeMethod(mainPage, "containerActivated", Q_ARG(QString, QStringLiteral("cid-0"))));
+        QCoreApplication::processEvents();
+
+        // 详情页里切换分区（QQuickWidget 下每一帧都要手动 polish）
+        if (QQuickItem *detailTabs = childByObjectName(root, QStringLiteral("detailTabBar"))) {
+            detailTabs->setProperty("currentIndex", iteration % 5);
+            QCoreApplication::processEvents();
+        }
+
+        // 每两轮返回列表页（页面销毁），再重新进入
+        if (iteration % 2 == 0) {
+            QMetaObject::invokeMethod(stack, "pop");
+            QCoreApplication::processEvents();
+        }
+
+        if (iteration % 3 == 0) {
+            const int width = widths.at(iteration % widths.size());
+            widget.resize(width, 700);
+            QCoreApplication::processEvents();
+        }
+    }
+
+    const QStringList errors = takeQmlErrors();
+    QVERIFY2(errors.isEmpty(), qPrintable(errors.join(QLatin1Char('\n'))));
+}
+
+/*!
+ * 用户 core dump 的根因是「布局正在算尺寸时，布局内的条目被销毁重建」。
+ * 因此这里把不变量直接断言出来：**数据变化不得重建统计块与存储图例的条目**。
+ *
+ * 只要有人再次把 JS 数组直接当作 Repeater 的 model（数组每次刷新都会重新求值），
+ * 条目实例就会变，测试立刻失败——比「跑到用户那里崩溃」早得多。
+ */
+void KcmWidgetChurnTest::delegatesSurviveDataChanges_data()
+{
+    QTest::addColumn<QString>("objectName");
+
+    QTest::newRow("statTile") << QStringLiteral("statTile");
+    QTest::newRow("storageLegendSwatch") << QStringLiteral("storageLegendEntry");
+}
+
+void KcmWidgetChurnTest::delegatesSurviveDataChanges()
+{
+    QFETCH(QString, objectName);
+
+    fillDataStableStructure(0);
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    QQuickWidget widget;
+    widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
+    widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
+                                            "function i18nc(context, text) { return text; }\n"
+                                            "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
+                                            "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
+    widget.resize(900, 700);
+    widget.show();
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QTest::qWait(50);
+
+    QQuickItem *page = widget.rootObject();
+    QVERIFY(page);
+    // 必须等根条目真正拿到尺寸：ScrollView 的 contentItem 在尺寸为 0 时不会建立内容树
+    QTRY_VERIFY_WITH_TIMEOUT(page->width() > 0 && page->height() > 0, 5000);
+    QTest::qWait(100);
+
+    // 必须走可视树：Repeater 创建的 delegate 不在 QObject 树里
+    const auto firstEntry = [page, &objectName]() -> QQuickItem * {
+        return TestSupport::findItemByObjectName(page, objectName);
+    };
+
+    QQuickItem *before = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((before = firstEntry()) != nullptr, 5000);
+
+    // 只让**数值**连续变化：结构（条目数量）不变，因此条目实例必须复用。
+    // 条目数量变化时重建是正常的（那是另一回事，由导航抖动用例覆盖）。
+    for (int iteration = 1; iteration <= 6; ++iteration) {
+        fillDataStableStructure(iteration);
+        controller->refresh();
+        m_backend->completeRefresh();
+        QTest::qWait(20);
+    }
+
+    QQuickItem *after = firstEntry();
+    QVERIFY2(after, qPrintable(objectName + QStringLiteral(" disappeared")));
+    QVERIFY2(after == before,
+             qPrintable(QStringLiteral("%1 was recreated on data change: a Repeater model is not stable "
+                                       "(a JS array re-evaluates on every refresh and destroys its delegates "
+                                       "during layout polish)")
+                            .arg(objectName)));
+}
+
+QTEST_MAIN(KcmWidgetChurnTest)
+
+#include "tst_kcm_widget_churn.moc"

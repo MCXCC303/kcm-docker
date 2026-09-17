@@ -39,6 +39,8 @@ KCM.AbstractKCM {
     QQC2.StackView {
         id: stack
 
+        objectName: "pageStack"
+
         anchors.fill: parent
         initialItem: mainPageComponent
         // 页面切换时不做花哨动画，保持 KCM 内的稳定感

@@ -117,16 +117,19 @@ ColumnLayout {
         Row {
             anchors.fill: parent
 
+            /* model 用长度而不是 JS 数组：数组每次刷新都会重新求值，
+               直接当 model 会导致条目被销毁重建（见 MainPage 里同样的说明）。 */
             Repeater {
-                model: bar.drawableSegments
+                model: bar.drawableSegments.length
 
                 delegate: Rectangle {
-                    required property var modelData
                     required property int index
 
-                    width: bar.drawableTotal > 0 ? track.width * (modelData.value / bar.drawableTotal) : 0
+                    readonly property var segment: bar.drawableSegments[index]
+
+                    width: bar.drawableTotal > 0 ? track.width * (segment.value / bar.drawableTotal) : 0
                     height: track.height
-                    color: modelData.color
+                    color: segment.color
 
                     // 相邻段的明度差只有约 1.2:1，必须有分隔线才能稳定区分（§1.8）
                     Rectangle {
@@ -157,10 +160,13 @@ ColumnLayout {
         spacing: 0
 
         Repeater {
-            model: bar.segments
+            model: bar.segments.length
 
             delegate: RowLayout {
-                required property var modelData
+                required property int index
+
+                objectName: "storageLegendEntry"
+                readonly property var segment: bar.segments[index]
 
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
@@ -170,21 +176,21 @@ ColumnLayout {
                     implicitWidth: Kirigami.Units.gridUnit * 0.6
                     implicitHeight: Kirigami.Units.gridUnit * 0.6
                     radius: width / 4
-                    color: modelData.value >= 0 ? modelData.color : "transparent"
-                    border.width: modelData.value >= 0 ? 0 : 1
+                    color: segment.value >= 0 ? segment.color : "transparent"
+                    border.width: segment.value >= 0 ? 0 : 1
                     border.color: Local.StatusPalette.color("disabled")
                 }
 
                 QQC2.Label {
                     Layout.fillWidth: true
-                    text: modelData.label
-                    opacity: modelData.value >= 0 ? 0.75 : 0.5
+                    text: segment.label
+                    opacity: segment.value >= 0 ? 0.75 : 0.5
                 }
 
                 QQC2.Label {
-                    text: bar.sizeText(modelData.value)
+                    text: bar.sizeText(segment.value)
                     horizontalAlignment: Text.AlignRight
-                    opacity: modelData.value >= 0 ? 1.0 : 0.5
+                    opacity: segment.value >= 0 ? 1.0 : 0.5
                 }
             }
         }

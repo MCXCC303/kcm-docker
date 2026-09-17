@@ -5,6 +5,7 @@
 
 #include "i18n.h"
 #include "model/qml_registration.h"
+#include "support/qml_item_utils.h"
 #include "support/mock_docker_backend.h"
 #include "support/qml_stub_kcm.h"
 
@@ -12,6 +13,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QSignalSpy>
+#include <QAccessible>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QQmlContext>
@@ -340,16 +342,8 @@ void QmlLoadTest::sensitiveSectionsAreCollapsedByDefault()
 
 QQuickItem *QmlLoadTest::childByObjectName(QQuickItem *root, const QString &objectName)
 {
-    if (!root) {
-        return nullptr;
-    }
-    const QList<QQuickItem *> items = root->findChildren<QQuickItem *>();
-    for (QQuickItem *item : items) {
-        if (item->objectName() == objectName) {
-            return item;
-        }
-    }
-    return nullptr;
+    // 走可视树：Repeater 创建的 delegate 不在 QObject 树里（详见该助手头文件说明）
+    return TestSupport::findItemByObjectName(root, objectName);
 }
 
 /*!
@@ -622,12 +616,14 @@ void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
         QVERIFY2(view->property("keyNavigationEnabled").toBool(), qPrintable(viewName + QStringLiteral(" must support arrow-key navigation")));
     }
 
-    // 统计卡：颜色之外必须有可访问名（§1.8 三重编码）
+    // 统计卡：颜色之外必须有可访问名（§1.8 三重编码）。
+    // 注意 Accessible.* 是附加属性，不能用 property("Accessible.name") 读，
+    // 必须通过 QAccessible 接口查询。
     QQuickItem *tile = childByObjectName(page, QStringLiteral("statTile"));
-    if (tile) {
-        const QString accessibleName = tile->property("Accessible.name").toString();
-        QVERIFY2(!accessibleName.isEmpty(), "stat tiles need an accessible name");
-    }
+    QVERIFY2(tile, "stat tile not found (visual tree search)");
+    QAccessibleInterface *tileInterface = QAccessible::queryAccessibleInterface(tile);
+    QVERIFY2(tileInterface, "stat tile has no accessible interface");
+    QVERIFY2(!tileInterface->text(QAccessible::Name).isEmpty(), "stat tiles need an accessible name");
 }
 
 QTEST_MAIN(QmlLoadTest)

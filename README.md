@@ -189,6 +189,7 @@ ctest --test-dir build --output-on-failure
 | `tst_i18n_consistency` | 翻译域一致性、译文完整性、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
 | `tst_source_conventions` | 复制动作只有 `CopyButton` 一个实现；状态语义色只出现在 `StatusPalette`；**只读边界**（生产代码不得出现写请求动词 / `QProcess` / `KAuth`） |
 | `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
+| `tst_refresh_churn` / `tst_kcm_widget_churn` | 刷新抖动压力测试：数据、窗口尺寸、分区、页面进出反复变化；后者用 **QQuickWidget**（与 kcmshell6 相同的宿主形态）承载 `main.qml`，并断言「同一结构下的数值刷新不得重建统计块与存储图例的条目」——针对真实会话里出现过的布局 polish 段错误 |
 | `tst_qml_resource` | **从 qrc 加载界面**（与插件运行时完全一致的路径）：`main.qml` 能加载、源码目录里每个界面文件都在资源里且内容一致（期望值由扫描源码树得出，不维护第二份清单）、单例能从 qrc 解析。资源清单漏项这类问题不会被源码目录测试发现，只会让安装后的 KCM 打不开 |
 | `tst_docker_backend_against_fake_engine` | 进程内假 Engine：协商、chunked、去重、inspect/stats/df 解析、`/info` 失败后计数作废、版本不匹配、stats 生命周期 |
 | `tst_docker_backend_integration` | 真实 Docker 只读端到端（无 socket 时自动跳过） |
@@ -259,7 +260,7 @@ src/
     └── components/         StatusChip / CopyButton / CopyableText / EmptyPlaceholder /
                             CollapsibleSection / KeyValueList / StatTile / MiniTrend /
                             StorageBar + 单例 StatusPalette / ChartPalette（qmldir）
-tests/                      17 个测试目标 + support（mock/stub）
+tests/                      19 个测试目标 + support（mock/stub/qml_item_utils.h）
 └── tools/                  fake_docker_server.py（假 Engine）
                             render_ui.{cpp,sh}（离屏截图，亮/暗两套）
                             vnc_grab.py（早期 VNC 抓图，本机不可用，见上）
@@ -274,7 +275,8 @@ po/                         翻译（zh_CN 已完整）
 
 | 项 | 规范 | 实现 | 说明 |
 | --- | --- | --- | --- |
-| 卡片基类 | ARCH_V3_pre §1.3 建议统一用 `Kirigami.AbstractCard` | 统计卡用 `AbstractCard`；**列表行保留 `QQC2.ItemDelegate`** | `AbstractCard` 会接管 `contentItem`：把它包进 `KirigamiLayouts.Padding`（`visible: contentItem !== null`）并用 `onXChanged/onYChanged` 强制覆盖内容坐标（Kirigami 6.30 `templates/AbstractCard.qml:110-140`）。二期正是在这里踩到「折叠区与标题重叠」的 bug。列表行还需要 hover/focus/Enter 与 `Accessible.role`，`ItemDelegate` 更合适 |
+| 卡片基类 | ARCH_V3_pre §1.3 建议统一用 `Kirigami.AbstractCard` | **列表行用 `QQC2.ItemDelegate`，统计卡用自绘容器**（颜色/圆角/字号全部取自主题） | `AbstractCard` 会接管 `contentItem`：把它包进 `KirigamiLayouts.Padding`（`visible: contentItem !== null`）并用 `onXChanged/onYChanged` 强制覆盖内容坐标（Kirigami 6.30 `templates/AbstractCard.qml:110-140`）。二期正是在这里踩到「折叠区与标题重叠」的 bug。列表行还需要 hover/focus/Enter 与 `Accessible.role`，`ItemDelegate` 更合适 |
+| `Repeater` model | 无规定 | 一律使用稳定的数值（`xxx.length`）+ 索引取值 | JS 数组属性每次刷新都会重新求值，直接当 model 会销毁重建全部条目；「布局算尺寸时条目被销毁」正是实际会话段错误的触发条件（详见 ARCH_V3 附录 A.1d） |
 | 页面过渡 | ARCH_V3_pre §1.7 用 Kirigami 自带过渡 | 页内 `StackView` 显式使用空 `Transition {}`（`main.qml`） | KCM 是配置界面而非内容浏览界面，切换动效会带来「窗口在跳」的观感；四期若加入日志流等长驻页面可重新评估 |
 | 数值精度 | ARCH_V3 §2.5 原计划新增定精度字节格式化变体 | **未新增**，沿用 `KFormat::formatByteSize` | 实测 `KFormat` 的默认精度就是 1 位小数（`formatByteSize(100) == "100 B"`），再加一层变体属于重复实现且偏离 KDE 惯例；三期的实际问题是**对齐**而不是小数位，已通过右对齐解决 |
 | 端口「两行并一行」 | ARCH_V3_pre §1.9 | 现状本就每端口一行；本次收敛标签列宽与省略，避免折行 | 原截图所指待与讨论方确认 |
@@ -299,12 +301,13 @@ po/                         翻译（zh_CN 已完整）
 ## 三期完成定义（DoD）自查
 
 - 界面：`StatusChip` 是状态呈现的唯一实现 ✅、状态色 token 只在 `StatusPalette` ✅、
+  `Repeater` 不再直接以 JS 数组为 model（数值刷新不重建条目）✅、
   `CopyableText`/`CopyButton` 覆盖全部标识字段且列表卡片有复制入口 ✅、
   `EmptyPlaceholder` 覆盖列表与详情空状态且四态文案互不相同 ✅、
   容器详情五分区（含日志占位）✅、Environment/Labels 默认折叠保持 ✅、
   镜像层默认前 5 层可展开 ✅、多 tag chip ✅、
   存储堆叠条 + 图例且缺项不伪装成 0 ✅、
-  详情页限宽居中 + 资源数值右对齐 ✅、统计卡 `AbstractCard` + `Heading` + 5/3/2 列重排 ✅、
+  详情页限宽居中 + 资源数值右对齐 ✅、统计卡 `Heading` + 5/3/2 列重排（自绘容器，见偏离登记）✅、
   数据可视化色板与状态语义色分离且过 AA 对比度 ✅
 - 工程：i18n lint 生效（人为插入裸字符串会被抓出并给出位置）✅、`CHANGELOG.md` 建立 ✅、
   zh_CN 译文完整（185 条、0 fuzzy、0 未翻译）✅、全部 17 个测试通过 ✅、

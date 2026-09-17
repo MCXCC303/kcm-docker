@@ -4,12 +4,25 @@
 
     Overview 统计块（仪表盘）。
 
-    - 基类是 Kirigami.AbstractCard 而不是自绘 Rectangle：
-      圆角（Units.cornerRadius）、边框、内边距、阴影、View 配色集都跟随主题
-      （ARCH_V3 §2.5 / ARCH_V3_pre §1.3）。
-    - 颜色不在这里拼：语义 key → 颜色的映射统一在 StatusPalette（ARCH_V3 §2.1）。
-      没有状态语义的统计项（容器总数、镜像数）semanticKey 留空，用普通文字色。
-    - 数值字号用 Kirigami.Heading，不再手写 pointSize 倍数。
+    取色与排版全部跟随主题：圆角用 Kirigami.Units.cornerRadius、背景用
+    Kirigami.Theme.backgroundColor、边框由 textColor 派生、数值字号用
+    Kirigami.Heading；语义 key → 颜色的映射统一在 StatusPalette（ARCH_V3 §2.1）。
+
+    ## 为什么不用 Kirigami.AbstractCard（ARCH_V3 §四）
+
+    §2.5 原本按 ARCH_V3_pre §1.3 把统计卡改成 AbstractCard，但实际会话中出现了
+    段错误，core dump 的栈落在**嵌套布局的尺寸计算**上：
+
+        qmlAttachedPropertiesObject ← QQuickLayoutAttached::sizeHint
+        ← QGridLayoutEngine::fillRowData ← QQuickLayout::effectiveSizeHints_helper
+        ← QQuickLayout::updatePolish
+
+    AbstractCard 内部会再套三层布局（Padding → HeaderFooterLayout → Padding），
+    并且用 `Connections` 在 contentItem 的 x/y 上挂了一个读取布局属性的
+    `Qt.binding`（Kirigami 6.30 templates/AbstractCard.qml:110-140）。
+    统计块是**静态展示**元素，不需要卡片的 hover/点击反馈，
+    因此这里改回自绘容器：只保留一层内容布局，颜色仍全部取自主题，
+    视觉与卡片一致但不再往 GridLayout 里塞嵌套布局树。
 */
 
 import QtQuick
@@ -20,7 +33,7 @@ import org.kde.kirigami as Kirigami
 
 import "." as Local
 
-Kirigami.AbstractCard {
+Rectangle {
     id: tile
 
     objectName: "statTile"
@@ -47,60 +60,51 @@ Kirigami.AbstractCard {
     implicitWidth: Kirigami.Units.gridUnit * 7
     implicitHeight: Kirigami.Units.gridUnit * 4.5
 
-    contentItem: Item {
-        implicitWidth: Kirigami.Units.gridUnit * 7 - tile.leftPadding - tile.rightPadding
-        implicitHeight: Kirigami.Units.gridUnit * 4.5 - tile.topPadding - tile.bottomPadding
+    // 圆角与边框跟随主题（与 Kirigami 卡片的观感一致）
+    radius: Kirigami.Units.cornerRadius
+    color: tile.tinted ? Local.StatusPalette.tintColor(tile.semanticKey) : Kirigami.Theme.backgroundColor
+    border.width: 1
+    border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
 
-        // 着色层：向外扩到卡片边缘内 1px，这样卡片的主题边框仍然可见，
-        // 圆角也与卡片一致（AbstractCard 的 contentItem 位于内边距之内）。
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -(tile.leftPadding - 1)
-            z: -1
-            visible: tile.tinted
-            radius: Math.max(0, Kirigami.Units.cornerRadius - 1)
-            color: Local.StatusPalette.tintColor(tile.semanticKey)
-        }
+    HoverHandler {
+        id: hoverHandler
+    }
 
-        HoverHandler {
-            id: hoverHandler
-        }
+    QQC2.ToolTip.visible: tile.tooltip.length > 0 && hoverHandler.hovered
+    QQC2.ToolTip.text: tile.tooltip
+    QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
 
-        QQC2.ToolTip.visible: tile.tooltip.length > 0 && hoverHandler.hovered
-        QQC2.ToolTip.text: tile.tooltip
-        QQC2.ToolTip.delay: Kirigami.Units.toolTipDelay
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: Kirigami.Units.largeSpacing
+        spacing: 0
 
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
+        RowLayout {
+            spacing: Kirigami.Units.smallSpacing
 
-            RowLayout {
-                spacing: Kirigami.Units.smallSpacing
-
-                Kirigami.Icon {
-                    source: tile.iconName
-                    color: tile.accentColor
-                    implicitWidth: Kirigami.Units.iconSizes.small
-                    implicitHeight: Kirigami.Units.iconSizes.small
-                }
-                QQC2.Label {
-                    text: tile.label
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.75
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
-                }
-            }
-
-            Item {
-                Layout.fillHeight: true
-            }
-
-            Kirigami.Heading {
-                level: 1
-                text: tile.value
+            Kirigami.Icon {
+                source: tile.iconName
                 color: tile.accentColor
+                implicitWidth: Kirigami.Units.iconSizes.small
+                implicitHeight: Kirigami.Units.iconSizes.small
             }
+            QQC2.Label {
+                text: tile.label
+                font: Kirigami.Theme.smallFont
+                opacity: 0.75
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+            }
+        }
+
+        Item {
+            Layout.fillHeight: true
+        }
+
+        Kirigami.Heading {
+            level: 1
+            text: tile.value
+            color: tile.accentColor
         }
     }
 
