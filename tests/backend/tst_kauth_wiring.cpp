@@ -171,6 +171,23 @@ void KauthWiringTest::installScriptInstallsEveryRequiredFile()
     QVERIFY2(!script.contains(QStringLiteral("src/kauth/org.kde.kontainer.policy")),
              "the script must install the generated policy, not a hand-written one");
 
+    // 卸载分支必须存在，且删的是同一组变量（README 里不再抄一份路径清单）
+    const int uninstall = script.indexOf(QLatin1String("uninstall)"));
+    QVERIFY2(uninstall > 0, "the script must support uninstalling what it installed");
+    // 只看 rm 那一行：四个文件必须都在同一条 rm 里
+    QString removeLine;
+    for (const QString &line : script.mid(uninstall).split(QLatin1Char('\n'))) {
+        if (line.contains(QLatin1String("rm -f"))) {
+            removeLine = line;
+            break;
+        }
+    }
+    QVERIFY2(!removeLine.isEmpty(), "the uninstall branch must remove files");
+    for (const char *variable : {"$HELPER", "$POLICY", "$SERVICE", "$BUSCONF"}) {
+        QVERIFY2(removeLine.contains(QString::fromLatin1(variable)),
+                 qPrintable(QStringLiteral("%1 is not removed: %2").arg(QString::fromLatin1(variable), removeLine)));
+    }
+
     // D-Bus 系统策略的内容必须是"打洞"而不是空文件
     QVERIFY2(script.contains(QStringLiteral("<allow own=\"org.kde.kontainer\"/>")), qPrintable(script));
     QVERIFY2(script.contains(QStringLiteral("<allow send_destination=\"org.kde.kontainer\"/>")), qPrintable(script));

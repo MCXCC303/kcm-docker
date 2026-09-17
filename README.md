@@ -120,8 +120,24 @@ journalctl -b -t dbus-daemon --no-pager | tail -30    # own / send_destination �
 busctl --system monitor org.kde.kontainer             # helper 侧是否真的被调用
 ```
 
-验证完可以卸载：`sudo rm` 那四个文件，再 `sudo systemctl restart polkit dbus`；
+验证完可以卸载：
+
+```bash
+sudo build/install-privileged-helper.sh uninstall
+```
+
+它删的就是上面那四个文件（路径只有一份定义，不会漏），之后执行
+`sudo systemctl reload dbus` 让 D-Bus 策略失效（polkit 会自己重载动作目录）。
 卸载后配置页会自动退回"手动执行命令"的降级形态。
+
+> ⚠️ **`cmake --build build --target uninstall` 不管这四个文件**。那个目标是 ECM 提供的，
+> 只删 `install_manifest.txt` 里记录的、由 `cmake --install` 装进前缀的东西
+> （本机前缀安装只有 KCM 插件、`.mo` 和 `bin/kontainer_helper` 三个）。
+> 提权组件是 `install-privileged-helper.sh` 直接写进 `/usr` 的，不在清单里；
+> 前缀里那份 `kontainer_helper` 被删掉也不影响授权——D-Bus 激活用的是
+> `/usr/lib/kf6/kauth/kontainer_helper`。只有打包路径
+> （`-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON` + 系统前缀安装）才会把这些文件
+> 纳入清单，那时才需要 `sudo cmake --build <build> --target uninstall`。
 
 > 前提：polkit 的认证代理（`polkit-kde-agent-1` 等）必须在当前会话里运行，
 > 否则授权请求会以 `NoResponder` 直接失败，而不是弹框。
