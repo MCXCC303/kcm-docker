@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.5.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 04:14+0800\n"
+"POT-Creation-Date: 2026-09-18 05:00+0800\n"
 "PO-Revision-Date: 2026-09-18 02:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -44,7 +44,7 @@ msgstr "已退出"
 msgid "Dead"
 msgstr "已失效"
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:359
+#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:401
 #: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
 #: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -406,7 +406,7 @@ msgid "Images"
 msgstr "镜像"
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:359
-#: src/ui/ContainerDetail.qml:220 src/ui/MainPage.qml:44
+#: src/ui/ContainerDetail.qml:257 src/ui/MainPage.qml:44
 #: src/ui/MainPage.qml:745
 msgid "Containers"
 msgstr "容器"
@@ -438,7 +438,7 @@ msgid "Continue"
 msgstr "继续"
 
 #: src/ui/components/ConfirmDialog.qml:69
-#: src/ui/components/PullProgressList.qml:123
+#: src/ui/components/PullProgressList.qml:123 src/ui/ContainerDetail.qml:588
 msgid "Cancel"
 msgstr "取消"
 
@@ -794,40 +794,6 @@ msgstr "标签"
 msgid "Create"
 msgstr "创建"
 
-#: src/ui/components/ConnectNetworkDialog.qml:33
-msgid "Connect to a network"
-msgstr "连接到网络"
-
-#: src/ui/components/ConnectNetworkDialog.qml:110
-msgid ""
-"This container is already connected to every network. Create another network "
-"first."
-msgstr "这个容器已经连接了所有网络。请先创建新的网络。"
-
-#: src/ui/components/ConnectNetworkDialog.qml:116
-msgid "Choose a network:"
-msgstr "选择网络："
-
-#: src/ui/components/ConnectNetworkDialog.qml:138
-msgid "already connected"
-msgstr "已连接"
-
-#: src/ui/components/ConnectNetworkDialog.qml:149
-msgid "Aliases (optional, comma separated)"
-msgstr "别名（可选，用逗号分隔）"
-
-#: src/ui/components/ConnectNetworkDialog.qml:150
-msgid "Aliases"
-msgstr "别名"
-
-#: src/ui/components/ConnectNetworkDialog.qml:156
-msgid "Other containers on the same network can reach this one by its aliases."
-msgstr "同一网络里的其它容器可以用这些别名访问它。"
-
-#: src/ui/components/ConnectNetworkDialog.qml:166
-msgid "Connect"
-msgstr "连接"
-
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr "悬空镜像 %1"
@@ -874,7 +840,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr "无法读取 Docker 磁盘占用：%1"
 
 #: src/ui/StorageView.qml:61 src/ui/ImageDetail.qml:146
-#: src/ui/ContainerDetail.qml:262 src/ui/MainPage.qml:272
+#: src/ui/ContainerDetail.qml:299 src/ui/MainPage.qml:272
 msgid "Retry"
 msgstr "重试"
 
@@ -898,7 +864,7 @@ msgstr "无法获取镜像详情。"
 msgid "Registry logins…"
 msgstr "仓库登录…"
 
-#: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:267 src/ui/main.qml:37
+#: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:304 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59
 msgid "Back"
@@ -936,12 +902,12 @@ msgstr "完整引用："
 msgid "Image ID:"
 msgstr "镜像 ID："
 
-#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:377
+#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:419
 #: src/ui/NetworkDetail.qml:166
 msgid "Created:"
 msgstr "创建时间："
 
-#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:385
+#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:427
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr "%1（%2前）"
@@ -994,7 +960,7 @@ msgstr[0] "显示全部 %1 层"
 msgid "No containers use this image."
 msgstr "没有容器使用该镜像。"
 
-#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:488
+#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:530
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
@@ -1005,7 +971,7 @@ msgid "Delete all tags…"
 msgstr "删除全部标签…"
 
 #: src/ui/ImageDetail.qml:474 src/ui/ImageDetail.qml:491
-#: src/ui/ContainerDetail.qml:194 src/ui/ContainerDetail.qml:884
+#: src/ui/ContainerDetail.qml:231 src/ui/ContainerDetail.qml:1009
 msgid "Delete"
 msgstr "删除"
 
@@ -1055,243 +1021,273 @@ msgstr "网关："
 msgid "IPv4:"
 msgstr "IPv4："
 
-#: src/ui/ContainerDetail.qml:113
+#: src/ui/ContainerDetail.qml:150
 msgid "Disconnect from network"
 msgstr "从网络断开"
 
-#: src/ui/ContainerDetail.qml:114
+#: src/ui/ContainerDetail.qml:151
 msgid "Disconnect this container from “%1”?"
 msgstr "把这个容器从“%1”断开吗？"
 
-#: src/ui/ContainerDetail.qml:116
+#: src/ui/ContainerDetail.qml:153
 msgid ""
 "The container loses this network's addresses and aliases; connections "
 "through it may be interrupted."
 msgstr "容器会失去这个网络上的地址与别名，经由该网络的连接可能中断。"
 
-#: src/ui/ContainerDetail.qml:117 src/ui/ContainerDetail.qml:600
+#: src/ui/ContainerDetail.qml:154 src/ui/ContainerDetail.qml:725
 msgid "Disconnect"
 msgstr "断开"
 
-#: src/ui/ContainerDetail.qml:148 src/ui/ContainerCard.qml:161
+#: src/ui/ContainerDetail.qml:185 src/ui/ContainerCard.qml:161
 #: src/ui/ContainerCard.qml:165
 msgid "Start"
 msgstr "启动"
 
-#: src/ui/ContainerDetail.qml:156 src/ui/ContainerCard.qml:174
+#: src/ui/ContainerDetail.qml:193 src/ui/ContainerCard.qml:174
 #: src/ui/ContainerCard.qml:178
 msgid "Stop"
 msgstr "停止"
 
-#: src/ui/ContainerDetail.qml:164 src/ui/DaemonConfigPage.qml:578
+#: src/ui/ContainerDetail.qml:201 src/ui/DaemonConfigPage.qml:578
 msgid "Restart"
 msgstr "重启"
 
-#: src/ui/ContainerDetail.qml:182
+#: src/ui/ContainerDetail.qml:219
 msgid "Stop the container to delete it."
 msgstr "需要先停止容器才能删除。"
 
-#: src/ui/ContainerDetail.qml:228 src/ui/ContainerDetail.qml:666
+#: src/ui/ContainerDetail.qml:265 src/ui/ContainerDetail.qml:791
 msgid "Container"
 msgstr "容器"
 
-#: src/ui/ContainerDetail.qml:232
+#: src/ui/ContainerDetail.qml:269
 msgid "container name"
 msgstr "容器名称"
 
-#: src/ui/ContainerDetail.qml:250
+#: src/ui/ContainerDetail.qml:287
 msgid "Loading container details…"
 msgstr "正在加载容器详情…"
 
-#: src/ui/ContainerDetail.qml:259
+#: src/ui/ContainerDetail.qml:296
 msgid "Unable to retrieve container details."
 msgstr "无法获取容器详情。"
 
-#: src/ui/ContainerDetail.qml:294
+#: src/ui/ContainerDetail.qml:336
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr "概览"
 
-#: src/ui/ContainerDetail.qml:297
+#: src/ui/ContainerDetail.qml:339
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr "资源"
 
-#: src/ui/ContainerDetail.qml:300
+#: src/ui/ContainerDetail.qml:342
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr "网络"
 
-#: src/ui/ContainerDetail.qml:303
+#: src/ui/ContainerDetail.qml:345
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:306
+#: src/ui/ContainerDetail.qml:348
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr "日志"
 
-#: src/ui/ContainerDetail.qml:342
+#: src/ui/ContainerDetail.qml:384
 msgid "State:"
 msgstr "状态："
 
-#: src/ui/ContainerDetail.qml:358
+#: src/ui/ContainerDetail.qml:400
 msgid "Status:"
 msgstr "状态描述："
 
-#: src/ui/ContainerDetail.qml:363
+#: src/ui/ContainerDetail.qml:405
 msgid "Image:"
 msgstr "镜像："
 
-#: src/ui/ContainerDetail.qml:370
+#: src/ui/ContainerDetail.qml:412
 msgid "Container ID:"
 msgstr "容器 ID："
 
-#: src/ui/ContainerDetail.qml:373 src/ui/ContainerCard.qml:187
+#: src/ui/ContainerDetail.qml:415 src/ui/ContainerCard.qml:187
 msgid "container ID"
 msgstr "容器 ID"
 
-#: src/ui/ContainerDetail.qml:383
+#: src/ui/ContainerDetail.qml:425
 msgid "Started:"
 msgstr "启动时间："
 
-#: src/ui/ContainerDetail.qml:389
+#: src/ui/ContainerDetail.qml:431
 msgid "Finished:"
 msgstr "结束时间："
 
-#: src/ui/ContainerDetail.qml:398
+#: src/ui/ContainerDetail.qml:440
 msgid "Runtime"
 msgstr "运行时"
 
-#: src/ui/ContainerDetail.qml:408
+#: src/ui/ContainerDetail.qml:450
 msgid "Restart count:"
 msgstr "重启次数："
 
-#: src/ui/ContainerDetail.qml:412
+#: src/ui/ContainerDetail.qml:454
 msgid "Exit code:"
 msgstr "退出码："
 
-#: src/ui/ContainerDetail.qml:416
+#: src/ui/ContainerDetail.qml:458
 msgid "OOM killed:"
 msgstr "因 OOM 被杀："
 
-#: src/ui/ContainerDetail.qml:418 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:460 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:172
 msgid "Yes"
 msgstr "是"
 
-#: src/ui/ContainerDetail.qml:422
+#: src/ui/ContainerDetail.qml:464
 msgid "Process ID:"
 msgstr "进程 ID："
 
-#: src/ui/ContainerDetail.qml:427
+#: src/ui/ContainerDetail.qml:469
 msgid "Restart policy:"
 msgstr "重启策略："
 
-#: src/ui/ContainerDetail.qml:432
+#: src/ui/ContainerDetail.qml:474
 msgid "Platform:"
 msgstr "平台："
 
-#: src/ui/ContainerDetail.qml:441
+#: src/ui/ContainerDetail.qml:483
 msgid "Configuration"
 msgstr "配置"
 
-#: src/ui/ContainerDetail.qml:451
+#: src/ui/ContainerDetail.qml:493
 msgid "Entrypoint:"
 msgstr "入口点："
 
-#: src/ui/ContainerDetail.qml:459
+#: src/ui/ContainerDetail.qml:501
 msgid "Command:"
 msgstr "命令："
 
-#: src/ui/ContainerDetail.qml:467
+#: src/ui/ContainerDetail.qml:509
 msgid "Working directory:"
 msgstr "工作目录："
 
-#: src/ui/ContainerDetail.qml:473
+#: src/ui/ContainerDetail.qml:515
 msgid "User:"
 msgstr "用户："
 
-#: src/ui/ContainerDetail.qml:478
+#: src/ui/ContainerDetail.qml:520
 msgid "Hostname:"
 msgstr "主机名："
 
-#: src/ui/ContainerDetail.qml:498
+#: src/ui/ContainerDetail.qml:540
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] "标签（%1）"
 
-#: src/ui/ContainerDetail.qml:535
+#: src/ui/ContainerDetail.qml:577
 msgid "No network information."
 msgstr "没有网络信息。"
 
-#: src/ui/ContainerDetail.qml:546
+#: src/ui/ContainerDetail.qml:588
 msgid "Connect to a network…"
 msgstr "连接到网络…"
 
-#: src/ui/ContainerDetail.qml:584 src/ui/ResourceView.qml:128
+#: src/ui/ContainerDetail.qml:625
+msgid ""
+"This container is already connected to every network. Create another network "
+"first."
+msgstr "这个容器已经连接了所有网络。请先创建新的网络。"
+
+#: src/ui/ContainerDetail.qml:631
+msgid "Choose a network:"
+msgstr "选择网络："
+
+#: src/ui/ContainerDetail.qml:648
+msgid "already connected"
+msgstr "已连接"
+
+#: src/ui/ContainerDetail.qml:657
+msgid "Aliases (optional, comma separated)"
+msgstr "别名（可选，用逗号分隔）"
+
+#: src/ui/ContainerDetail.qml:658
+msgid "Aliases"
+msgstr "别名"
+
+#: src/ui/ContainerDetail.qml:668
+msgid "Connect"
+msgstr "连接"
+
+#: src/ui/ContainerDetail.qml:676
+msgid "Other containers on the same network can reach this one by its aliases."
+msgstr "同一网络里的其它容器可以用这些别名访问它。"
+
+#: src/ui/ContainerDetail.qml:709 src/ui/ResourceView.qml:128
 msgid "Network:"
 msgstr "网络："
 
-#: src/ui/ContainerDetail.qml:632
+#: src/ui/ContainerDetail.qml:757
 msgid "MAC:"
 msgstr "MAC："
 
-#: src/ui/ContainerDetail.qml:648
+#: src/ui/ContainerDetail.qml:773
 msgid "Port mapping"
 msgstr "端口映射"
 
-#: src/ui/ContainerDetail.qml:657
+#: src/ui/ContainerDetail.qml:782
 msgid "No published ports."
 msgstr "没有已发布的端口。"
 
-#: src/ui/ContainerDetail.qml:677
+#: src/ui/ContainerDetail.qml:802
 msgid "Exposed but not published"
 msgstr "已暴露但未发布"
 
-#: src/ui/ContainerDetail.qml:696
+#: src/ui/ContainerDetail.qml:821
 msgid "%1, exposed but not published to the host"
 msgstr "%1，已暴露但未发布到宿主机"
 
-#: src/ui/ContainerDetail.qml:718
+#: src/ui/ContainerDetail.qml:843
 msgid "No mounts."
 msgstr "没有挂载。"
 
-#: src/ui/ContainerDetail.qml:762
+#: src/ui/ContainerDetail.qml:887
 msgid "mount"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:787
+#: src/ui/ContainerDetail.qml:912
 msgid "Not a directory"
 msgstr "不是目录"
 
-#: src/ui/ContainerDetail.qml:787
+#: src/ui/ContainerDetail.qml:912
 msgid "Host path missing"
 msgstr "宿主路径不存在"
 
-#: src/ui/ContainerDetail.qml:842
+#: src/ui/ContainerDetail.qml:967
 msgid "Open host folder"
 msgstr "打开宿主目录"
 
-#: src/ui/ContainerDetail.qml:850
+#: src/ui/ContainerDetail.qml:975
 msgid "host path"
 msgstr "宿主路径"
 
-#: src/ui/ContainerDetail.qml:855
+#: src/ui/ContainerDetail.qml:980
 msgid "container path"
 msgstr "容器路径"
 
-#: src/ui/ContainerDetail.qml:881
+#: src/ui/ContainerDetail.qml:1006
 msgid "Delete container"
 msgstr "删除容器"
 
-#: src/ui/ContainerDetail.qml:882
+#: src/ui/ContainerDetail.qml:1007
 msgid "Delete the container “%1”?"
 msgstr "确定要删除容器“%1”吗？"
 
-#: src/ui/ContainerDetail.qml:883
+#: src/ui/ContainerDetail.qml:1008
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr "容器会被删除；它的匿名卷与命名卷都会保留。"
 
@@ -2273,6 +2269,9 @@ msgctxt "@info network removal consequence"
 msgid "One connected container loses this network."
 msgid_plural "%1 connected containers lose this network."
 msgstr[0] "有 %1 个已连接的容器会失去这个网络。"
+
+#~ msgid "Connect to a network"
+#~ msgstr "连接到网络"
 
 #~ msgid "Container logs are not available yet."
 #~ msgstr "容器日志尚不可用。"

@@ -85,6 +85,27 @@ KCM.AbstractKCM {
 
     /*! 正在等待"断开"确认的网络名（确认对话框要用）。 */
     property string pendingNetworkName: ""
+    /*! 连接网络的内联面板是否展开（以及当前选中的网络 Id / 别名）。 */
+    property bool connectPanelOpen: false
+    property string connectNetworkId: ""
+    property string connectAliases: ""
+
+    /*! 这个网络能不能连（已经连上的当然不能再连一次）。 */
+    function isConnectable(networkName: string): bool {
+        return page.controller.connectedNetworkNames().indexOf(networkName) < 0;
+    }
+
+    /*! 提交内联面板上的连接（失败原因由控制器给出用户文案）。 */
+    function submitConnectNetwork(): void {
+        if (page.connectNetworkId.length === 0) {
+            return;
+        }
+        if (page.operations.connectContainerToNetwork(page.connectNetworkId, page.containerId, page.connectAliases)) {
+            page.connectPanelOpen = false;
+            page.connectNetworkId = "";
+            page.connectAliases = "";
+        }
+    }
 
     /*!
      * 网络摘要（`{id, name, driver}`）：连接对话框的数据源。
@@ -92,6 +113,18 @@ KCM.AbstractKCM {
      * 每次求值都会读一次 `networkModel.count`，因此模型刷新后对话框能跟上
      * （QML 不追踪函数调用，必须显式读一个属性建立依赖）。
      */
+    /*! 还能连的网络数（0 = 没有可连的，面板据此给出说明）。 */
+    function connectableNetworkCount(): int {
+        const summaries = page.networkSummaries();
+        let count = 0;
+        for (let i = 0; i < summaries.length; ++i) {
+            if (page.isConnectable(summaries[i].name)) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
     function networkSummaries(): var {
         const model = kcm.controller.networkModel;
         if (!model || model.count === 0) {
@@ -110,17 +143,6 @@ KCM.AbstractKCM {
     }
 
     // 离开页面：停止 stats 采样并释放指标历史（§27）
-    Components.ConnectNetworkDialog {
-        id: connectNetworkDialog
-
-        operations: page.operations
-        containerId: page.containerId
-        // 普通数组（不是模型对象）：弹层里的内容有自己的实例树，递数组最可靠
-        networks: page.networkSummaries()
-        connectedNames: page.controller.connectedNetworkNames()
-        onConnected: page.controller.refresh()
-    }
-
     Components.ConfirmDialog {
         id: disconnectNetworkDialog
 
@@ -563,16 +585,99 @@ KCM.AbstractKCM {
                         QQC2.Button {
                             objectName: "connectNetworkEntryButton"
                             visible: page.operations.writeAllowed
-                            text: i18n("Connect to a network…")
+                            text: page.connectPanelOpen ? i18n("Cancel") : i18n("Connect to a network…")
                             icon.name: "network-connect"
                             onClicked: {
-                                connectNetworkDialog.reset();
-                                connectNetworkDialog.open();
+                                page.connectPanelOpen = !page.connectPanelOpen;
+                                page.connectNetworkId = "";
+                                page.connectAliases = "";
                             }
                         }
 
                         Item {
                             Layout.fillWidth: true
+                        }
+                    }
+
+                    /* 连接网络：**内联面板**而不是弹窗。
+                       弹层（Kirigami.Dialog）的内容在窗口之外还有一份实例，模型驱动的
+                       子项在离屏与尚未显示时可能一条都建不出来（实测过：对话框打开着，
+                       里面是空的）；连接本来是"就地选一个网络"的动作，内联更直接。 */
+                    ColumnLayout {
+                        objectName: "connectNetworkPanel"
+                        Layout.fillWidth: true
+                        visible: page.connectPanelOpen && page.operations.writeAllowed
+                        spacing: Kirigami.Units.smallSpacing
+
+                        Kirigami.InlineMessage {
+                            objectName: "connectNetworkError"
+                            Layout.fillWidth: true
+                            visible: page.operations.resultKey === "error" && page.operations.resultText.length > 0
+                            type: Kirigami.MessageType.Error
+                            text: page.operations.resultText
+                        }
+
+                        Kirigami.InlineMessage {
+                            objectName: "connectNetworkEmptyMessage"
+                            Layout.fillWidth: true
+                            visible: page.connectableNetworkCount() === 0
+                            type: Kirigami.MessageType.Information
+                            text: i18n("This container is already connected to every network. Create another network first.")
+                        }
+
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            visible: page.connectableNetworkCount() > 0
+                            text: i18n("Choose a network:")
+                            font.bold: true
+                        }
+
+                        Repeater {
+                            model: page.networkSummaries()
+
+                            delegate: QQC2.RadioButton {
+                                id: networkOption
+
+                                required property var modelData
+
+                                objectName: "connectNetworkOption"
+                                Layout.fillWidth: true
+                                // 已经连上的网络：标注出来但不可再选（避免"再连一次"这种无意义操作）
+                                enabled: page.isConnectable(networkOption.modelData.name)
+                                text: networkOption.modelData.name + " · " + networkOption.modelData.driver
+                                    + (networkOption.enabled ? "" : " — " + i18n("already connected"))
+                                onClicked: page.connectNetworkId = networkOption.modelData.id
+                            }
+                        }
+
+                        QQC2.TextField {
+                            objectName: "connectNetworkAliasesField"
+                            Layout.fillWidth: true
+                            visible: page.connectableNetworkCount() > 0
+                            placeholderText: i18n("Aliases (optional, comma separated)")
+                            Accessible.name: i18n("Aliases")
+                            onTextChanged: page.connectAliases = text
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            QQC2.Button {
+                                objectName: "connectNetworkButton"
+                                text: i18n("Connect")
+                                icon.name: "network-connect"
+                                enabled: page.connectNetworkId.length > 0
+                                onClicked: page.submitConnectNetwork()
+                            }
+
+                            QQC2.Label {
+                                Layout.fillWidth: true
+                                text: i18n("Other containers on the same network can reach this one by its aliases.")
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.75
+                                elide: Text.ElideRight
+                            }
                         }
                     }
 

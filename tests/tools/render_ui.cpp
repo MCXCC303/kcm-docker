@@ -626,71 +626,11 @@ int main(int argc, char **argv)
     window.show();
 
     // 可选：切到指定分区/标签页，便于逐页复核（例如容器详情的「网络」分区）
-    // KONTAINER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_LOGIN")) {
-        QMetaObject::invokeMethod(item, "openLoginDialog", Q_ARG(QString, QString()));
-    }
-
-    if (tabIndex > 0) {
-        QQuickItem *tabBar = nullptr;
-        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
-            if (!node || tabBar) {
-                return;
-            }
-            if (node->objectName() == QLatin1String("detailTabBar") || node->objectName() == QLatin1String("tabBar")) {
-                tabBar = node;
-                return;
-            }
-            const QList<QQuickItem *> children = node->childItems();
-            for (QQuickItem *child : children) {
-                walk(child);
-            }
-        };
-        walk(item);
-        if (tabBar) {
-            tabBar->setProperty("currentIndex", tabIndex);
-        }
-    }
-
-    // 切到某个分区会触发按需刷新（例如网络页）：让假后端把这次刷新也完成掉，
-    // 否则截图上会停在"还没有数据"的中间态（真实环境里刷新是异步完成的）
-    backend->completeRefresh();
-
     // KONTAINER_RENDER_REMOVE_NETWORK=1：打开删除网络的确认对话框（复核后果说明）
     if (qEnvironmentVariableIsSet("KONTAINER_RENDER_REMOVE_NETWORK")) {
         QObject *removeDialog = item->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
         if (removeDialog) {
             QMetaObject::invokeMethod(removeDialog, "open");
-        }
-    }
-
-    // KONTAINER_RENDER_CONNECT_NETWORK=1：打开"连接到网络"对话框（复核选项与别名输入）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CONNECT_NETWORK")) {
-        QObject *connectDialog = item->findChild<QObject *>(QStringLiteral("connectNetworkDialog"));
-        if (connectDialog) {
-            QMetaObject::invokeMethod(connectDialog, "open");
-        }
-    }
-
-    // KONTAINER_RENDER_CREATE_NETWORK=1：打开创建网络对话框（复核表单排版与校验提示）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CREATE_NETWORK")) {
-        QQuickItem *createButton = nullptr;
-        std::function<void(QQuickItem *)> walkCreate = [&](QQuickItem *node) {
-            if (!node || createButton) {
-                return;
-            }
-            if (node->objectName() == QLatin1String("createNetworkEntryButton")) {
-                createButton = node;
-                return;
-            }
-            const QList<QQuickItem *> children = node->childItems();
-            for (QQuickItem *child : children) {
-                walkCreate(child);
-            }
-        };
-        walkCreate(item);
-        if (createButton) {
-            QMetaObject::invokeMethod(createButton, "clicked");
         }
     }
 
@@ -730,8 +670,88 @@ int main(int argc, char **argv)
         }
     });
 
+    // 对话框（弹层）**必须在窗口就绪之后**才打开：它的内容在打开时创建，
+    // 若此时还没有窗口，内容永远不会被布局，截图上就是一片空白（实测踩过）
+    QTimer::singleShot(600, &app, [&]() {
+        // KONTAINER_RENDER_CONNECT_NETWORK=1：展开"连接到网络"内联面板
+        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CONNECT_NETWORK")) {
+            QQuickItem *connectEntry = nullptr;
+            std::function<void(QQuickItem *)> walkConnect = [&](QQuickItem *node) {
+                if (!node || connectEntry) {
+                    return;
+                }
+                if (node->objectName() == QLatin1String("connectNetworkEntryButton")) {
+                    connectEntry = node;
+                    return;
+                }
+                const QList<QQuickItem *> children = node->childItems();
+                for (QQuickItem *child : children) {
+                    walkConnect(child);
+                }
+            };
+            walkConnect(item);
+            if (connectEntry) {
+                QMetaObject::invokeMethod(connectEntry, "clicked");
+            }
+        }
+
+        // KONTAINER_RENDER_CREATE_NETWORK=1：打开创建网络对话框（复核表单排版与校验提示）
+        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CREATE_NETWORK")) {
+            QQuickItem *createButton = nullptr;
+            std::function<void(QQuickItem *)> walkCreate = [&](QQuickItem *node) {
+                if (!node || createButton) {
+                    return;
+                }
+                if (node->objectName() == QLatin1String("createNetworkEntryButton")) {
+                    createButton = node;
+                    return;
+                }
+                const QList<QQuickItem *> children = node->childItems();
+                for (QQuickItem *child : children) {
+                    walkCreate(child);
+                }
+            };
+            walkCreate(item);
+            if (createButton) {
+                QMetaObject::invokeMethod(createButton, "clicked");
+            }
+        }
+
+
+        // KONTAINER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
+        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_LOGIN")) {
+            QMetaObject::invokeMethod(item, "openLoginDialog", Q_ARG(QString, QString()));
+        }
+
+        if (tabIndex > 0) {
+            QQuickItem *tabBar = nullptr;
+            std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+                if (!node || tabBar) {
+                    return;
+                }
+                if (node->objectName() == QLatin1String("detailTabBar") || node->objectName() == QLatin1String("tabBar")) {
+                    tabBar = node;
+                    return;
+                }
+                const QList<QQuickItem *> children = node->childItems();
+                for (QQuickItem *child : children) {
+                    walk(child);
+                }
+            };
+            walk(item);
+            if (tabBar) {
+                tabBar->setProperty("currentIndex", tabIndex);
+            }
+        }
+
+        // 切到某个分区会触发按需刷新（例如网络页）：让假后端把这次刷新也完成掉，
+        // 否则截图上会停在"还没有数据"的中间态（真实环境里刷新是异步完成的）
+        backend->completeRefresh();
+
+    });
+
     // 等布局与 delegate 完成（一次事件循环 + 一小段等待即可）
-    QTimer::singleShot(900, &app, [&]() {
+    QTimer::singleShot(1200, &app, [&]() {
         const QImage image = window.grabWindow();
         if (image.isNull() || !image.save(output)) {
             std::fprintf(stderr, "failed to save %s\n", qPrintable(output));

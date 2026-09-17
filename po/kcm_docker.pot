@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 04:14+0800\n"
+"POT-Creation-Date: 2026-09-18 05:00+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,7 +50,7 @@ msgstr ""
 msgid "Dead"
 msgstr ""
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:359
+#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:401
 #: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
 #: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -408,7 +408,7 @@ msgid "Images"
 msgstr ""
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:359
-#: src/ui/ContainerDetail.qml:220 src/ui/MainPage.qml:44
+#: src/ui/ContainerDetail.qml:257 src/ui/MainPage.qml:44
 #: src/ui/MainPage.qml:745
 msgid "Containers"
 msgstr ""
@@ -440,7 +440,7 @@ msgid "Continue"
 msgstr ""
 
 #: src/ui/components/ConfirmDialog.qml:69
-#: src/ui/components/PullProgressList.qml:123
+#: src/ui/components/PullProgressList.qml:123 src/ui/ContainerDetail.qml:588
 msgid "Cancel"
 msgstr ""
 
@@ -794,40 +794,6 @@ msgstr ""
 msgid "Create"
 msgstr ""
 
-#: src/ui/components/ConnectNetworkDialog.qml:33
-msgid "Connect to a network"
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:110
-msgid ""
-"This container is already connected to every network. Create another network "
-"first."
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:116
-msgid "Choose a network:"
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:138
-msgid "already connected"
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:149
-msgid "Aliases (optional, comma separated)"
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:150
-msgid "Aliases"
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:156
-msgid "Other containers on the same network can reach this one by its aliases."
-msgstr ""
-
-#: src/ui/components/ConnectNetworkDialog.qml:166
-msgid "Connect"
-msgstr ""
-
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr ""
@@ -875,7 +841,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr ""
 
 #: src/ui/StorageView.qml:61 src/ui/ImageDetail.qml:146
-#: src/ui/ContainerDetail.qml:262 src/ui/MainPage.qml:272
+#: src/ui/ContainerDetail.qml:299 src/ui/MainPage.qml:272
 msgid "Retry"
 msgstr ""
 
@@ -899,7 +865,7 @@ msgstr ""
 msgid "Registry logins…"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:267 src/ui/main.qml:37
+#: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:304 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59
 msgid "Back"
@@ -937,12 +903,12 @@ msgstr ""
 msgid "Image ID:"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:377
+#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:419
 #: src/ui/NetworkDetail.qml:166
 msgid "Created:"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:385
+#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:427
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr ""
@@ -997,7 +963,7 @@ msgstr[1] ""
 msgid "No containers use this image."
 msgstr ""
 
-#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:488
+#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:530
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
@@ -1009,7 +975,7 @@ msgid "Delete all tags…"
 msgstr ""
 
 #: src/ui/ImageDetail.qml:474 src/ui/ImageDetail.qml:491
-#: src/ui/ContainerDetail.qml:194 src/ui/ContainerDetail.qml:884
+#: src/ui/ContainerDetail.qml:231 src/ui/ContainerDetail.qml:1009
 msgid "Delete"
 msgstr ""
 
@@ -1059,244 +1025,274 @@ msgstr ""
 msgid "IPv4:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:113
+#: src/ui/ContainerDetail.qml:150
 msgid "Disconnect from network"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:114
+#: src/ui/ContainerDetail.qml:151
 msgid "Disconnect this container from “%1”?"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:116
+#: src/ui/ContainerDetail.qml:153
 msgid ""
 "The container loses this network's addresses and aliases; connections "
 "through it may be interrupted."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:117 src/ui/ContainerDetail.qml:600
+#: src/ui/ContainerDetail.qml:154 src/ui/ContainerDetail.qml:725
 msgid "Disconnect"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:148 src/ui/ContainerCard.qml:161
+#: src/ui/ContainerDetail.qml:185 src/ui/ContainerCard.qml:161
 #: src/ui/ContainerCard.qml:165
 msgid "Start"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:156 src/ui/ContainerCard.qml:174
+#: src/ui/ContainerDetail.qml:193 src/ui/ContainerCard.qml:174
 #: src/ui/ContainerCard.qml:178
 msgid "Stop"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:164 src/ui/DaemonConfigPage.qml:578
+#: src/ui/ContainerDetail.qml:201 src/ui/DaemonConfigPage.qml:578
 msgid "Restart"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:182
+#: src/ui/ContainerDetail.qml:219
 msgid "Stop the container to delete it."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:228 src/ui/ContainerDetail.qml:666
+#: src/ui/ContainerDetail.qml:265 src/ui/ContainerDetail.qml:791
 msgid "Container"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:232
+#: src/ui/ContainerDetail.qml:269
 msgid "container name"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:250
+#: src/ui/ContainerDetail.qml:287
 msgid "Loading container details…"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:259
+#: src/ui/ContainerDetail.qml:296
 msgid "Unable to retrieve container details."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:294
+#: src/ui/ContainerDetail.qml:336
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:297
+#: src/ui/ContainerDetail.qml:339
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:300
+#: src/ui/ContainerDetail.qml:342
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:303
+#: src/ui/ContainerDetail.qml:345
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:306
+#: src/ui/ContainerDetail.qml:348
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:342
+#: src/ui/ContainerDetail.qml:384
 msgid "State:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:358
+#: src/ui/ContainerDetail.qml:400
 msgid "Status:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:363
+#: src/ui/ContainerDetail.qml:405
 msgid "Image:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:370
+#: src/ui/ContainerDetail.qml:412
 msgid "Container ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:373 src/ui/ContainerCard.qml:187
+#: src/ui/ContainerDetail.qml:415 src/ui/ContainerCard.qml:187
 msgid "container ID"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:383
+#: src/ui/ContainerDetail.qml:425
 msgid "Started:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:389
+#: src/ui/ContainerDetail.qml:431
 msgid "Finished:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:398
+#: src/ui/ContainerDetail.qml:440
 msgid "Runtime"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:408
+#: src/ui/ContainerDetail.qml:450
 msgid "Restart count:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:412
+#: src/ui/ContainerDetail.qml:454
 msgid "Exit code:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:416
+#: src/ui/ContainerDetail.qml:458
 msgid "OOM killed:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:418 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:460 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:172
 msgid "Yes"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:422
+#: src/ui/ContainerDetail.qml:464
 msgid "Process ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:427
+#: src/ui/ContainerDetail.qml:469
 msgid "Restart policy:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:432
+#: src/ui/ContainerDetail.qml:474
 msgid "Platform:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:441
+#: src/ui/ContainerDetail.qml:483
 msgid "Configuration"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:451
+#: src/ui/ContainerDetail.qml:493
 msgid "Entrypoint:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:459
+#: src/ui/ContainerDetail.qml:501
 msgid "Command:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:467
+#: src/ui/ContainerDetail.qml:509
 msgid "Working directory:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:473
+#: src/ui/ContainerDetail.qml:515
 msgid "User:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:478
+#: src/ui/ContainerDetail.qml:520
 msgid "Hostname:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:498
+#: src/ui/ContainerDetail.qml:540
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/ContainerDetail.qml:535
+#: src/ui/ContainerDetail.qml:577
 msgid "No network information."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:546
+#: src/ui/ContainerDetail.qml:588
 msgid "Connect to a network…"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:584 src/ui/ResourceView.qml:128
-msgid "Network:"
+#: src/ui/ContainerDetail.qml:625
+msgid ""
+"This container is already connected to every network. Create another network "
+"first."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:632
-msgid "MAC:"
+#: src/ui/ContainerDetail.qml:631
+msgid "Choose a network:"
 msgstr ""
 
 #: src/ui/ContainerDetail.qml:648
-msgid "Port mapping"
+msgid "already connected"
 msgstr ""
 
 #: src/ui/ContainerDetail.qml:657
+msgid "Aliases (optional, comma separated)"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:658
+msgid "Aliases"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:668
+msgid "Connect"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:676
+msgid "Other containers on the same network can reach this one by its aliases."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:709 src/ui/ResourceView.qml:128
+msgid "Network:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:757
+msgid "MAC:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:773
+msgid "Port mapping"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:782
 msgid "No published ports."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:677
+#: src/ui/ContainerDetail.qml:802
 msgid "Exposed but not published"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:696
+#: src/ui/ContainerDetail.qml:821
 msgid "%1, exposed but not published to the host"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:718
+#: src/ui/ContainerDetail.qml:843
 msgid "No mounts."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:762
+#: src/ui/ContainerDetail.qml:887
 msgid "mount"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:787
+#: src/ui/ContainerDetail.qml:912
 msgid "Not a directory"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:787
+#: src/ui/ContainerDetail.qml:912
 msgid "Host path missing"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:842
+#: src/ui/ContainerDetail.qml:967
 msgid "Open host folder"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:850
+#: src/ui/ContainerDetail.qml:975
 msgid "host path"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:855
+#: src/ui/ContainerDetail.qml:980
 msgid "container path"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:881
+#: src/ui/ContainerDetail.qml:1006
 msgid "Delete container"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:882
+#: src/ui/ContainerDetail.qml:1007
 msgid "Delete the container “%1”?"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:883
+#: src/ui/ContainerDetail.qml:1008
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr ""
 

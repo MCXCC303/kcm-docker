@@ -1039,47 +1039,35 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QVERIFY2(!disconnectDialog->property("consequenceText").toString().isEmpty(),
              "the disconnect dialog must always carry a consequence");
 
-    QObject *connectDialog = page->findChild<QObject *>(QStringLiteral("connectNetworkDialog"));
-    QVERIFY2(connectDialog, "the connect dialog must exist");
-    // 名称 → Id 的转换（断开接口的路径参数用 Id）
-    QCOMPARE(m_stubKcm->controller()->networkModel()->idForName(QStringLiteral("app_default")), app.id);
-    QCOMPARE(m_stubKcm->controller()->networkModel()->idForName(QStringLiteral("nope")), QString());
+    // 连接入口是**内联面板**（不是弹窗）：点按钮把它展开
+    QQuickItem *connectEntry = findItemByName(page, QStringLiteral("connectNetworkEntryButton"));
+    QVERIFY2(connectEntry, "the connect entry must exist");
+    QVERIFY2(!page->property("connectPanelOpen").toBool(), "the panel starts collapsed");
+    QVERIFY(QMetaObject::invokeMethod(connectEntry, "clicked"));
+    QVERIFY(page->property("connectPanelOpen").toBool());
+    QQuickItem *panel = findItemByName(page, QStringLiteral("connectNetworkPanel"));
+    QVERIFY2(panel, "the inline connect panel must exist");
 
-    // 连接对话框：可用网络 = 未连接的（这里只有 app_default）
-    QVariantMap initial;
-    initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
-    initial.insert(QStringLiteral("containerId"), QStringLiteral("cid-1"));
-    // 对话框收的是普通数组（模型对象的 summaries）
-    initial.insert(QStringLiteral("networks"), m_stubKcm->controller()->networkModel()->summaries());
-    initial.insert(QStringLiteral("connectedNames"), connected);
-    QQmlComponent dialogComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ConnectNetworkDialog.qml")));
-    QVERIFY2(!dialogComponent.isError(), qPrintable(dialogComponent.errorString()));
-    QScopedPointer<QObject> dialog(dialogComponent.createWithInitialProperties(initial, m_engine->rootContext()));
-    QVERIFY2(!dialog.isNull(), qPrintable(dialogComponent.errorString()));
-    // 对话框的内容（含 Repeater 的 delegate）在打开时才真正建立
-    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "open"));
-    QTRY_COMPARE(dialog->property("availableCount").toInt(), 1);
-
-    QSignalSpy connectedSpy(dialog.data(), SIGNAL(connected(QString)));
     // 已连接的网络不能再选、未连接的可以（delegate 的 enabled 用的就是这个函数）
     bool connectable = true;
-    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "isConnectable", Q_RETURN_ARG(bool, connectable),
+    QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectable),
                                       Q_ARG(QString, QStringLiteral("bridge"))));
     QVERIFY2(!connectable, "an already connected network must not be selectable");
-    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "isConnectable", Q_RETURN_ARG(bool, connectable),
+    QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectable),
                                       Q_ARG(QString, QStringLiteral("app_default"))));
     QVERIFY(connectable);
+    QCOMPARE(page->property("connectableNetworkCount").isValid(), false); // 它是函数，不是属性
 
     // 选中未连接的网络并提交：请求带上网络 Id、容器 Id 与别名
-    dialog->setProperty("selectedNetworkId", app.id);
-    QQuickItem *aliases = findItemByName(dialog.data(), QStringLiteral("connectNetworkAliasesField"));
-    QVERIFY(aliases);
+    page->setProperty("connectNetworkId", app.id);
+    QQuickItem *aliases = findItemByName(page, QStringLiteral("connectNetworkAliasesField"));
+    QVERIFY2(aliases, "the aliases field must be in the panel");
     aliases->setProperty("text", QStringLiteral("demo, api"));
-    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "submit"));
-    QTRY_COMPARE(connectedSpy.count(), 1);
-    QCOMPARE(m_backend->lastNetworkConnect().second, QStringLiteral("cid-1"));
+    QVERIFY(QMetaObject::invokeMethod(page, "submitConnectNetwork"));
+    QTRY_COMPARE(m_backend->lastNetworkConnect().second, QStringLiteral("cid-1"));
     QCOMPARE(m_backend->lastNetworkConnect().first, app.id);
     QCOMPARE(m_backend->lastNetworkConnectAliases(), QStringList({QStringLiteral("demo"), QStringLiteral("api")}));
+    QVERIFY2(!page->property("connectPanelOpen").toBool(), "the panel closes after a successful connect");
 }
 
 void QmlLoadTest::loadsAllQmlFiles_data()
@@ -1123,7 +1111,6 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/RegistryLoginDialog.qml"),
         QStringLiteral("components/LogConsole.qml"),
         QStringLiteral("components/CreateNetworkDialog.qml"),
-        QStringLiteral("components/ConnectNetworkDialog.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
