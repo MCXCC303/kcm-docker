@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 00:29+0800\n"
+"POT-Creation-Date: 2026-09-18 00:38+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -739,7 +739,7 @@ msgstr ""
 msgid "Stop"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:133 src/ui/DaemonConfigPage.qml:570
+#: src/ui/ContainerDetail.qml:133 src/ui/DaemonConfigPage.qml:576
 msgid "Restart"
 msgstr ""
 
@@ -1119,15 +1119,15 @@ msgid "No"
 msgstr ""
 
 #: src/ui/DaemonConfigPage.qml:95
-msgid "Needs administrator rights to change"
+msgid "Needs administrator rights to change the file"
 msgstr ""
 
 #: src/ui/DaemonConfigPage.qml:101
 msgid "Data directory"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:102 src/ui/DaemonConfigPage.qml:396
-#: src/ui/DaemonConfigPage.qml:421
+#: src/ui/DaemonConfigPage.qml:102 src/ui/DaemonConfigPage.qml:402
+#: src/ui/DaemonConfigPage.qml:427
 msgid "default"
 msgstr ""
 
@@ -1196,7 +1196,8 @@ msgstr ""
 #: src/ui/DaemonConfigPage.qml:212
 msgid ""
 "The running Docker daemon is a system service, so it does not read this "
-"file. Changes here only affect a rootless daemon."
+"file. Making changes here take effect needs administrator rights (or a "
+"rootless daemon)."
 msgstr ""
 
 #: src/ui/DaemonConfigPage.qml:213
@@ -1216,186 +1217,192 @@ msgid ""
 "Unlocked. Saving and restarting will not ask again for about %1 seconds."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:244
+#: src/ui/DaemonConfigPage.qml:246
 msgid ""
-"The Docker data directory is inside your home directory, but the daemon "
-"itself runs as a system service: changing this configuration needs "
-"administrator rights."
+"This file is yours to change. The running daemon is a system service, so "
+"making the change take effect needs administrator rights."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:252
+#: src/ui/DaemonConfigPage.qml:247
+msgid ""
+"The Docker data directory is inside your home directory, but the daemon "
+"itself runs as a system service: this file belongs to the system, so "
+"changing it needs administrator rights."
+msgstr ""
+
+#: src/ui/DaemonConfigPage.qml:255
 msgid ""
 "The configuration file could not be parsed (%1). It is shown read-only; "
 "Kontainer will not overwrite it."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:261
+#: src/ui/DaemonConfigPage.qml:264
 msgid ""
 "The saved registry mirrors are not active yet. Restart the Docker service to "
 "apply them (running containers are kept because live-restore is enabled)."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:262
+#: src/ui/DaemonConfigPage.qml:265
 msgid ""
 "The saved registry mirrors are not active yet. Restarting the Docker service "
 "will stop running containers; those with a restart policy will come back "
 "automatically."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:282
+#: src/ui/DaemonConfigPage.qml:285
 msgid "Changing this file needs administrator rights."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:284
+#: src/ui/DaemonConfigPage.qml:287
 msgid "Saving is disabled because the current file cannot be parsed."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:286
+#: src/ui/DaemonConfigPage.qml:289
 msgid "Nothing to save: no setting was changed."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:288
+#: src/ui/DaemonConfigPage.qml:291
 msgid "There is no backup to restore yet."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:290
+#: src/ui/DaemonConfigPage.qml:293
 msgid "That backup cannot be used (it is unreadable or not valid JSON)."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:292
+#: src/ui/DaemonConfigPage.qml:295
 msgid ""
 "Writing the configuration file failed. The previous file was left unchanged."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:294
+#: src/ui/DaemonConfigPage.qml:297
 msgid ""
 "Administrator access is not available (the helper or its policy is not "
 "installed). Use the command below instead."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:296
+#: src/ui/DaemonConfigPage.qml:299
 msgid "Authorization was cancelled; nothing was changed."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:298
+#: src/ui/DaemonConfigPage.qml:301
 msgid "Authorization was denied; nothing was changed."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:300
+#: src/ui/DaemonConfigPage.qml:303
 msgid "The helper rejected the request; nothing was changed."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:302
+#: src/ui/DaemonConfigPage.qml:305
 msgid "Could not reach systemd to restart the Docker service."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:304
+#: src/ui/DaemonConfigPage.qml:307
 msgid "Restarting the Docker service failed."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:306
+#: src/ui/DaemonConfigPage.qml:309
 msgid "Unlock the settings before saving."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:321
+#: src/ui/DaemonConfigPage.qml:324
 msgid "Registry mirrors"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:326
+#: src/ui/DaemonConfigPage.qml:329
 msgid ""
 "Tried in the listed order. A mirror is useful when the registry itself is "
 "unreachable from this machine."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:340
+#: src/ui/DaemonConfigPage.qml:343
 msgid "Add mirror"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:356
+#: src/ui/DaemonConfigPage.qml:359
 msgid "Add registry"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:370
+#: src/ui/DaemonConfigPage.qml:373
 msgid "Other settings"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:383 src/ui/DaemonConfigPage.qml:404
+#: src/ui/DaemonConfigPage.qml:386 src/ui/DaemonConfigPage.qml:410
 msgid "Concurrent downloads"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:409 src/ui/DaemonConfigPage.qml:428
+#: src/ui/DaemonConfigPage.qml:415 src/ui/DaemonConfigPage.qml:434
 msgid "Log driver"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:440
+#: src/ui/DaemonConfigPage.qml:446
 msgid "Other keys in this file are shown read-only and kept as they are: %1"
 msgid_plural ""
 "Other keys in this file are shown read-only and kept as they are: %1"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/DaemonConfigPage.qml:454
+#: src/ui/DaemonConfigPage.qml:460
 msgid ""
 "This build has no administrator helper installed, so the change must be "
 "applied manually."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:462
+#: src/ui/DaemonConfigPage.qml:468
 msgid ""
 "This file is not writable by the current user, so saving requires "
 "administrator rights."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:463
+#: src/ui/DaemonConfigPage.qml:469
 msgid ""
 "This file belongs to the system, so saving requires administrator rights."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:466
+#: src/ui/DaemonConfigPage.qml:472
 msgid "Show command to run manually"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:499
+#: src/ui/DaemonConfigPage.qml:505
 msgid "Unlock to edit"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:507
+#: src/ui/DaemonConfigPage.qml:513
 msgid "Lock again"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:514
+#: src/ui/DaemonConfigPage.qml:520
 msgid "Save"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:523
+#: src/ui/DaemonConfigPage.qml:529
 msgid "Restart Docker…"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:531 src/ui/DaemonConfigPage.qml:606
+#: src/ui/DaemonConfigPage.qml:537 src/ui/DaemonConfigPage.qml:612
 msgid "Restore previous version"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:544
+#: src/ui/DaemonConfigPage.qml:550
 msgid "Writes to %1 (a backup is kept before every save)."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:552
+#: src/ui/DaemonConfigPage.qml:558
 msgid "Unsaved changes"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:563
+#: src/ui/DaemonConfigPage.qml:569
 msgid "Restart Docker"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:564
+#: src/ui/DaemonConfigPage.qml:570
 msgid "Restart the Docker service now?"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:566
+#: src/ui/DaemonConfigPage.qml:572
 msgid "Running containers are kept because live-restore is enabled."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:567
+#: src/ui/DaemonConfigPage.qml:573
 msgid ""
 "One running container will be stopped; it comes back automatically if its "
 "restart policy says so."
@@ -1405,47 +1412,47 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/DaemonConfigPage.qml:581
+#: src/ui/DaemonConfigPage.qml:587
 msgid ""
 "Docker restarted. The page refreshes once the engine is reachable again."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:582
+#: src/ui/DaemonConfigPage.qml:588
 msgid "Restarting Docker failed (%1)."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:591
+#: src/ui/DaemonConfigPage.qml:597
 msgid "Discard the unsaved changes?"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:592
+#: src/ui/DaemonConfigPage.qml:598
 msgid ""
 "Reloading reads the file from disk again and drops what you have changed "
 "here."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:593
+#: src/ui/DaemonConfigPage.qml:599
 msgid "The file on disk is not touched."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:594
+#: src/ui/DaemonConfigPage.qml:600
 msgid "Discard and reload"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:607
+#: src/ui/DaemonConfigPage.qml:613
 msgid "Replace the current configuration with the most recent backup?"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:608
+#: src/ui/DaemonConfigPage.qml:614
 msgid ""
 "The current file is backed up first, so this can be undone the same way."
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:609
+#: src/ui/DaemonConfigPage.qml:615
 msgid "Restore"
 msgstr ""
 
-#: src/ui/DaemonConfigPage.qml:614
+#: src/ui/DaemonConfigPage.qml:620
 msgid "Previous configuration restored. Docker must be restarted to apply it."
 msgstr ""
 

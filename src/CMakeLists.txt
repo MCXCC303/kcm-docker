@@ -29,6 +29,7 @@ add_library(kontainer_core STATIC
     backend/host_path_service.h
     backend/http/json_line_reader.cpp
     backend/http/json_line_reader.h
+    backend/privileged_client.h
     backend/privileged_config_client.cpp
     backend/privileged_config_client.h
 

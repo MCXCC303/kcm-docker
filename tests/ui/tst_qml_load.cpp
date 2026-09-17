@@ -69,6 +69,7 @@ private Q_SLOTS:
     void instantiatesPages_data();
     void instantiatesPages();
     void configPageEditorsWriteThroughToTheController();
+    void configPageWordingAndLocksPerScope();
     void sensitiveSectionsAreCollapsedByDefault();
     void delegateActivationIsWired();
     void statusChipMapsSemanticKeys_data();
@@ -355,6 +356,80 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
     QTRY_VERIFY(controller->dirty());
     QCOMPARE(spin->property("value").toInt(), 0);
     QCOMPARE(combo->property("currentIndex").toInt(), 0);
+}
+
+/*!
+ * 配置页的两个作用域在"能不能编辑"与"提示措辞"上的差别（用户实测反馈）。
+ *
+ *  1) 系统级未解锁时**每个**编辑控件都必须禁用——只设 `editable` 是不够的：
+ *     SpinBox 的文本框会只读，但上下箭头仍然能改值。
+ *  2) 用户级的提示必须说"让改动生效需要管理员权限"，而不是"改这份配置需要管理员权限"：
+ *     文件本来就是用户自己的，只有"生效"（重启系统级守护进程 / 改用 rootless）需要权限。
+ */
+void QmlLoadTest::configPageWordingAndLocksPerScope()
+{
+    auto *user = m_stubKcm->controller()->daemonConfigUser();
+    auto *system = m_stubKcm->controller()->daemonConfigSystem();
+
+    // 造出用户的真实形态：系统级守护进程 + 数据目录在家目录里（"看起来像 rootless"）
+    Kontainer::EngineInfo info;
+    info.available = true;
+    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
+    info.dockerRootDir = QDir::homePath() + QStringLiteral("/.local/share/docker");
+    system->setEngineInfo(info);
+    user->setEngineInfo(info);
+
+    QQmlComponent component(m_engine.get(),
+                            QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+
+    // ---- 系统级：受保护、未解锁 → 一切编辑控件禁用 ----
+    QVariantMap systemInitial;
+    systemInitial.insert(QStringLiteral("scope"), QStringLiteral("system"));
+    QScopedPointer<QObject> systemPage(component.createWithInitialProperties(systemInitial, m_engine->rootContext()));
+    QVERIFY(!systemPage.isNull());
+    QVERIFY2(system->requiresPrivilege(), "this test assumes the system config is not writable");
+
+    QQuickItem *systemSpin = findItemByName(systemPage.data(), QStringLiteral("concurrentDownloadsSpin"));
+    QQuickItem *systemCombo = findItemByName(systemPage.data(), QStringLiteral("logDriverCombo"));
+    QQuickItem *systemMirrors = findItemByName(systemPage.data(), QStringLiteral("mirrorsEditor"));
+    QVERIFY(systemSpin && systemCombo && systemMirrors);
+    QVERIFY2(!systemSpin->property("enabled").toBool(), "the spin box must be disabled while locked");
+    QVERIFY2(!systemSpin->property("editable").toBool(), "the spin box text field must be read-only while locked");
+    QVERIFY2(!systemCombo->property("enabled").toBool(), "the combo box must be disabled while locked");
+    QVERIFY2(!systemMirrors->property("editable").toBool(), "the mirror editor must be read-only while locked");
+
+    // ---- 用户级：文件属于用户 → 可编辑，且**没有**解锁相关的界面 ----
+    QVariantMap userInitial;
+    userInitial.insert(QStringLiteral("scope"), QStringLiteral("user"));
+    QScopedPointer<QObject> userPage(component.createWithInitialProperties(userInitial, m_engine->rootContext()));
+    QVERIFY(!userPage.isNull());
+    QVERIFY2(user->dataRootInHomeDir(), "the data-root hint precondition is not met");
+
+    QQuickItem *userSpin = findItemByName(userPage.data(), QStringLiteral("concurrentDownloadsSpin"));
+    QVERIFY(userSpin);
+    QVERIFY2(userSpin->property("enabled").toBool(), "the user scope is editable without unlocking");
+    for (const char *name : {"unlockButton", "lockButton", "lockedMessage", "unlockedMessage"}) {
+        QQuickItem *item = findItemByName(userPage.data(), QString::fromLatin1(name));
+        QVERIFY2(item, name);
+        QVERIFY2(!item->property("visible").toBool(),
+                 qPrintable(QStringLiteral("%1 must not appear on the user scope page").arg(QString::fromLatin1(name))));
+    }
+
+    // 数据目录提示：用户级说的是"生效需要权限"
+    QQuickItem *hint = findItemByName(userPage.data(), QStringLiteral("dataRootHint"));
+    QVERIFY(hint);
+    QVERIFY(hint->property("visible").toBool());
+    const QString hintText = hint->property("text").toString();
+    QVERIFY2(hintText.contains(QStringLiteral("take effect")), qPrintable(hintText));
+    QVERIFY2(!hintText.contains(QStringLiteral("changing this configuration needs")), qPrintable(hintText));
+
+    // 系统级那条说的仍然是"改这份配置需要权限"（文件属于系统）
+    QQuickItem *systemHint = findItemByName(systemPage.data(), QStringLiteral("dataRootHint"));
+    QVERIFY(systemHint);
+    QVERIFY(systemHint->property("visible").toBool());
+    QVERIFY2(systemHint->property("text").toString().contains(QStringLiteral("belongs to the system")),
+             qPrintable(systemHint->property("text").toString()));
 }
 
 void QmlLoadTest::loadsAllQmlFiles_data()

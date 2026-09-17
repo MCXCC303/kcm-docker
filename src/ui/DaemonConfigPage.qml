@@ -92,7 +92,7 @@ KCM.AbstractKCM {
             value: page.controller.configWritable ? i18n("Yes") : i18n("No")
         });
         deploymentRows.append({
-            label: i18n("Needs administrator rights to change"),
+            label: i18n("Needs administrator rights to change the file"),
             value: page.controller.requiresPrivilege ? i18n("Yes") : i18n("No")
         });
 
@@ -209,7 +209,7 @@ KCM.AbstractKCM {
                     visible: !page.controller.activeScope
                     type: Kirigami.MessageType.Information
                     text: page.scope === "user"
-                        ? i18n("The running Docker daemon is a system service, so it does not read this file. Changes here only affect a rootless daemon.")
+                        ? i18n("The running Docker daemon is a system service, so it does not read this file. Making changes here take effect needs administrator rights (or a rootless daemon).")
                         : i18n("The running Docker daemon is rootless, so it does not read this file. Changes here only affect a system-wide daemon.")
                 }
 
@@ -241,7 +241,10 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     visible: page.controller.dataRootInHomeDir && page.controller.formKey === "systemRoot"
                     type: Kirigami.MessageType.Information
-                    text: i18n("The Docker data directory is inside your home directory, but the daemon itself runs as a system service: changing this configuration needs administrator rights.")
+                    text: page.scope === "user"
+                        // 用户级这一页：文件是自己的，改它不需要权限；需要权限的是"让改动生效"
+                        ? i18n("This file is yours to change. The running daemon is a system service, so making the change take effect needs administrator rights.")
+                        : i18n("The Docker data directory is inside your home directory, but the daemon itself runs as a system service: this file belongs to the system, so changing it needs administrator rights.")
                 }
 
                 Kirigami.InlineMessage {
@@ -390,6 +393,9 @@ KCM.AbstractKCM {
                         // 0 = 使用 daemon 默认（保存时把这个键删掉，而不是写一个 0）
                         from: 0
                         to: 1024
+                        // enabled 管整个控件；只设 editable 的话文本框虽只读，
+                        // 但上下箭头仍然能改值（未解锁时不该能改）
+                        enabled: page.editable
                         editable: page.editable
                         value: page.controller.maxConcurrentDownloads
                         textFromValue: function (value) {

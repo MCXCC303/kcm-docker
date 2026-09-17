@@ -5,6 +5,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Test)
 add_library(kontainer_test_support STATIC
     support/fake_host_path_service.cpp
     support/fake_host_path_service.h
+    support/fake_privileged_client.h
     support/mock_docker_backend.cpp
     support/mock_docker_backend.h
     support/qml_stub_kcm.cpp

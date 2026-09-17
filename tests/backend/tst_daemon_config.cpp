@@ -4,7 +4,8 @@
 */
 
 #include "backend/daemon_config.h"
-#include "backend/privileged_config_client.h"
+#include "backend/privileged_client.h"
+#include "support/fake_privileged_client.h"
 #include "model/daemon_config_controller.h"
 #include "backend/daemon_deployment.h"
 
@@ -77,6 +78,7 @@ private Q_SLOTS:
     void protectedScopeIsLockedUntilAuthorized();
     void authorizationExpiresAndLocksAgain();
     void switchingScopeLocksAgain();
+    void unlockOnlyAffectsTheRequestingScope();
     void privilegeDependsOnWritabilityOnly();
     void manualCommandRestartsTheRightService();
 };
@@ -372,11 +374,14 @@ void DaemonConfigTest::authorizationExpiresAndLocksAgain()
     controller.setEngineInfo(systemEngine());
     controller.setScope(QStringLiteral("system"));
 
-    PrivilegedConfigClient client;
+    FakePrivilegedClient client;
     controller.setPrivilegedClient(&client);
 
-    // 驱动解锁：直接发客户端的授权成功信号（测试不真的去走 polkit）
-    Q_EMIT client.finished(PrivilegedConfigClient::Operation::Authorize, true, QString());
+    // 驱动解锁：界面点「解锁」→ 客户端发起请求 → 授权成功（测试不真的去走 polkit）。
+    // 必须先 requestUnlock()：共享客户端的 finished() 是广播，controller 只认自己发起的请求
+    controller.requestUnlock();
+    QCOMPARE(client.authorizeRequests, 1);
+    Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
     QVERIFY(controller.unlocked());
     QVERIFY2(controller.unlockSecondsRemaining() > 0, "unlocking must start the countdown");
     QCOMPARE(controller.lastError(), QString());
@@ -387,7 +392,8 @@ void DaemonConfigTest::authorizationExpiresAndLocksAgain()
     QCOMPARE(controller.unlockSecondsRemaining(), 0);
 
     // 取消授权是正常结果：保持锁定，但不应变成错误横幅
-    Q_EMIT client.finished(PrivilegedConfigClient::Operation::Authorize, false, QStringLiteral("cancelled"));
+    controller.requestUnlock();
+    Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, false, QStringLiteral("cancelled"));
     QVERIFY(!controller.unlocked());
     QVERIFY2(controller.lastError().isEmpty(), "cancelling must not raise an error banner");
 }
@@ -398,9 +404,10 @@ void DaemonConfigTest::switchingScopeLocksAgain()
     controller.setEngineInfo(systemEngine());
     controller.setScope(QStringLiteral("system"));
 
-    PrivilegedConfigClient client;
+    FakePrivilegedClient client;
     controller.setPrivilegedClient(&client);
-    Q_EMIT client.finished(PrivilegedConfigClient::Operation::Authorize, true, QString());
+    controller.requestUnlock();
+    Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
     QVERIFY(controller.unlocked());
 
     // 授权是给"那个文件"的：换作用域必须重新授权
@@ -411,6 +418,59 @@ void DaemonConfigTest::switchingScopeLocksAgain()
 QTEST_MAIN(DaemonConfigTest)
 
 #include "tst_daemon_config.moc"
+
+void DaemonConfigTest::unlockOnlyAffectsTheRequestingScope()
+{
+    // DockerKcm 只建一个 PrivilegedConfigClient，两个作用域共享它，而它的
+    // finished() 是广播。真实反馈：系统级页面解锁→锁定后进用户级页面，仍显示已解锁。
+    FakePrivilegedClient client;
+    DaemonConfigController user;
+    DaemonConfigController system;
+    user.setEngineInfo(systemEngine());
+    system.setEngineInfo(systemEngine());
+    user.setScope(QStringLiteral("user"));
+    system.setScope(QStringLiteral("system"));
+    user.setPrivilegedClient(&client);
+    system.setPrivilegedClient(&client);
+
+    // 系统级页面发起解锁
+    system.requestUnlock();
+    QCOMPARE(client.authorizeRequests, 1);
+    Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
+    QVERIFY2(system.unlocked(), "the requesting scope must be unlocked");
+    QVERIFY2(!user.unlocked(), "an unlock started elsewhere must not unlock this scope");
+
+    // 系统级页面重新上锁；迟到的授权结果不能把它又改回已解锁
+    system.lock();
+    Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
+    QVERIFY2(!system.unlocked(), "a late result must not re-unlock after an explicit lock");
+
+    // 写入结果同理：只有发起方收到 saved()，另一方不该冒出"配置已写入"
+    DaemonConfigController writer;
+    DaemonConfigController bystander;
+    writer.setEngineInfo(systemEngine());
+    bystander.setEngineInfo(systemEngine());
+    writer.setScope(QStringLiteral("system"));
+    bystander.setScope(QStringLiteral("system"));
+    writer.setPrivilegedClient(&client);
+    bystander.setPrivilegedClient(&client);
+
+    writer.requestUnlock();
+    Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
+    QVERIFY(writer.unlocked());
+    QVERIFY2(!bystander.unlocked(), "the bystander must stay locked");
+
+    writer.setRegistryMirrors({QStringLiteral("https://mirror.example.com")});
+    QSignalSpy writerSaved(&writer, &DaemonConfigController::saved);
+    QSignalSpy bystanderSaved(&bystander, &DaemonConfigController::saved);
+    QVERIFY2(!writer.save(), "the privileged write is asynchronous");
+    QCOMPARE(client.writeRequests, 1);
+    QCOMPARE(writerSaved.count(), 0);
+    Q_EMIT client.finished(PrivilegedClient::Operation::WriteConfig, true, QString());
+    QCOMPARE(writerSaved.count(), 1);
+    QCOMPARE(bystanderSaved.count(), 0);
+    QVERIFY2(bystander.lastError().isEmpty(), "the bystander must not show an error banner for someone else's result");
+}
 
 void DaemonConfigTest::privilegeDependsOnWritabilityOnly()
 {

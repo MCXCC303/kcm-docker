@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "backend/daemon_config.h"
+#include "backend/privileged_client.h"
 
 #include <QObject>
 #include <QString>
@@ -14,7 +14,7 @@ namespace Kontainer
 {
 
 /*!
- * 提权客户端（ARCH_V5_V8 §2.4）。
+ * 基于 KAuth 的提权客户端（ARCH_V5_V8 §2.4）。
  *
  * 把"写系统 daemon.json"与"重启 docker.service"包装成两个动作，
  * 通过 KAuth 交给受限 helper 执行：
@@ -24,39 +24,23 @@ namespace Kontainer
  *    或 `cancelled`，界面据此走"自己动手"的降级路径（功能不静默失败）
  *  - rootless 部署的重启不需要提权：直接与会话总线上的 systemd 通信
  *    （不调用 `systemctl` 二进制，保持"不执行外部程序"的约束）
+ *
+ * 接口在 `PrivilegedClient`：控制器只依赖接口，单测注入 fake（见该头文件的说明）。
  */
-class PrivilegedConfigClient : public QObject
+class PrivilegedConfigClient : public PrivilegedClient
 {
     Q_OBJECT
 
 public:
-    enum class Operation {
-        /*! 只请求授权（界面上的「解锁」）：校验但不写盘。 */
-        Authorize,
-        WriteConfig,
-        Restart,
-    };
-    Q_ENUM(Operation)
+    /*! 与接口同一套操作枚举（保留 `PrivilegedConfigClient::Operation::X` 的写法）。 */
+    using Operation = PrivilegedClient::Operation;
 
     explicit PrivilegedConfigClient(QObject *parent = nullptr);
 
-    /*! 提权写入是否可用（尽力而为的判断：真正的结论来自执行结果）。 */
-    bool writeAvailable() const;
-
-    /*!
-     * 请求授权（「解锁」）。
-     *
-     * 打的是**写配置**那个 action id：polkit 的 keep 按动作记忆，
-     * 只有这样才能让随后的保存与重启在 keep 窗口内不再询问。
-     */
-    void requestAuthorization();
-    /*! 发起提权写入；结果经 finished() 回来（异步，不阻塞界面）。 */
-    void writeConfig(const DaemonConfigEdits &edits);
-    /*! 重启 Docker：系统级走 helper，rootless 走会话 systemd。 */
-    void restartDocker(bool systemService);
-
-Q_SIGNALS:
-    void finished(Kontainer::PrivilegedConfigClient::Operation operation, bool success, const QString &errorKey);
+    bool writeAvailable() const override;
+    void requestAuthorization() override;
+    void writeConfig(const DaemonConfigEdits &edits) override;
+    void restartDocker(bool systemService) override;
 
 private:
     void runHelperAction(const QString &actionName, const QVariantMap &arguments, Operation operation);

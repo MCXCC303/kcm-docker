@@ -9,7 +9,7 @@
 
 #include <algorithm>
 
-#include "backend/privileged_config_client.h"
+#include "backend/privileged_client.h"
 
 #include <QFileInfo>
 #include <QTimer>
@@ -112,6 +112,7 @@ void DaemonConfigController::requestUnlock()
         return;
     }
     setLastError(QString());
+    m_awaitingAuthorize = true;
     m_privilegedClient->requestAuthorization();
 }
 
@@ -123,17 +124,24 @@ void DaemonConfigController::lock()
         return;
     }
     m_unlocked = false;
+    // 上锁后迟到的授权结果不再接受：用户已经明确表示不要授权了
+    m_awaitingAuthorize = false;
     Q_EMIT authorizationChanged();
 }
 
-void DaemonConfigController::setPrivilegedClient(PrivilegedConfigClient *client)
+void DaemonConfigController::setPrivilegedClient(PrivilegedClient *client)
 {
     m_privilegedClient = client;
     if (!client) {
         return;
     }
-    connect(client, &PrivilegedConfigClient::finished, this, [this](PrivilegedConfigClient::Operation operation, bool success, const QString &errorKey) {
-        if (operation == PrivilegedConfigClient::Operation::Authorize) {
+    connect(client, &PrivilegedClient::finished, this, [this](PrivilegedClient::Operation operation, bool success, const QString &errorKey) {
+        if (operation == PrivilegedClient::Operation::Authorize) {
+            if (!m_awaitingAuthorize) {
+                // 别的页面发起的授权：与我无关（共享客户端会广播结果）
+                return;
+            }
+            m_awaitingAuthorize = false;
             if (!success) {
                 // 取消授权是正常结果：保持锁定，不当作错误横幅（避免噪音）
                 if (errorKey != QLatin1String("cancelled")) {
@@ -148,7 +156,11 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedConfigClient *client)
             Q_EMIT authorizationChanged();
             return;
         }
-        if (operation == PrivilegedConfigClient::Operation::WriteConfig) {
+        if (operation == PrivilegedClient::Operation::WriteConfig) {
+            if (!m_awaitingWrite) {
+                return; // 别的页面发起的写入
+            }
+            m_awaitingWrite = false;
             if (!success) {
                 setLastError(errorKey);
                 return;
@@ -158,6 +170,10 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedConfigClient *client)
             Q_EMIT saved();
             return;
         }
+        if (!m_awaitingRestart) {
+            return; // 别的页面发起的重启
+        }
+        m_awaitingRestart = false;
         Q_EMIT restarted(success, errorKey);
     });
 }
@@ -182,6 +198,7 @@ void DaemonConfigController::restartDocker()
         Q_EMIT restarted(false, QStringLiteral("helperUnavailable"));
         return;
     }
+    m_awaitingRestart = true;
     m_privilegedClient->restartDocker(m_deployment.form != DaemonForm::Rootless);
 }
 
@@ -445,6 +462,7 @@ bool DaemonConfigController::save()
             setLastError(QString::fromLatin1(kHelperUnavailable));
             return false;
         }
+        m_awaitingWrite = true;
         m_privilegedClient->writeConfig(buildEdits());
         return false; // 结果经 finished() 异步回来（成功后发 saved()）
     }

@@ -17,7 +17,7 @@ class QTimer;
 namespace Kontainer
 {
 
-class PrivilegedConfigClient;
+class PrivilegedClient;
 
 /*!
  * 运行时配置页的控制器（ARCH_V5_V8 §2.2/§2.3/§2.4）。
@@ -96,7 +96,7 @@ public:
      * 注入提权客户端（组合根负责；为空表示当前环境没有提权通路）。
      * 为空时需要提权的保存会直接给出降级命令，而不是静默失败。
      */
-    void setPrivilegedClient(PrivilegedConfigClient *client);
+    void setPrivilegedClient(PrivilegedClient *client);
     /*! 运行中的容器数（重启影响提示用）。由 StatusController 提供。 */
     void setRunningContainerCount(int count);
 
@@ -216,7 +216,16 @@ private:
     QString m_lastError;
     QString m_lastBackupPath;
     bool m_dirty = false;
-    PrivilegedConfigClient *m_privilegedClient = nullptr;
+    PrivilegedClient *m_privilegedClient = nullptr;
+    /*
+     * KAuth 客户端是**共享**的（DockerKcm 只建一个，两个作用域各有一个 controller），
+     * 而它的 finished() 是广播：谁发的请求它不区分。因此每个 controller 必须自己记住
+     * "我发起过什么"，否则在系统级页面解锁会把用户级页面也标成已解锁
+     * （真实反馈：解锁→锁定后进用户设置，仍显示已解锁）。
+     */
+    bool m_awaitingAuthorize = false;
+    bool m_awaitingWrite = false;
+    bool m_awaitingRestart = false;
     int m_runningContainers = 0;
     /*! 当前作用域（user / system）与"是否就是运行中的 daemon 读的那个文件"。 */
     QString m_scope = QStringLiteral("system");

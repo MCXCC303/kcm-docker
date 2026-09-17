@@ -5,6 +5,8 @@
 
 #include "backend/privileged_config_client.h"
 
+#include "backend/privileged_client.h"
+
 #include "kauth/privileged_config_request.h"
 #include "logging.h"
 
@@ -69,7 +71,7 @@ QString errorKeyForJob(KAuth::ExecuteJob *job)
 } // namespace
 
 PrivilegedConfigClient::PrivilegedConfigClient(QObject *parent)
-    : QObject(parent)
+    : PrivilegedClient(parent)
 {
 }
 
