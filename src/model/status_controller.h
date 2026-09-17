@@ -13,8 +13,10 @@
 #include "model/image_detail_controller.h"
 #include "model/image_filter_model.h"
 #include "backend/host_path_service.h"
+#include "backend/credential_store.h"
 #include "model/daemon_config_controller.h"
 #include "model/operation_controller.h"
+#include "model/registry_auth_controller.h"
 #include "model/image_model.h"
 #include "model/refresh_scheduler.h"
 #include "model/storage_status.h"
@@ -100,6 +102,8 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfigUser READ daemonConfigUser CONSTANT)
     /*! 系统级运行时配置（/etc/docker/daemon.json），受保护区。 */
     Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfigSystem READ daemonConfigSystem CONSTANT)
+    /*! 仓库认证（KWallet 凭据 + /auth 校验 + CLI 导入，ARCH_V5_V8 §2.6/§2.7）。 */
+    Q_PROPERTY(Kontainer::RegistryAuthController *registryAuth READ registryAuth CONSTANT)
     /*! 最近一次「打开宿主路径」的失败说明；为空表示没有失败。 */
     Q_PROPERTY(QString hostPathError READ hostPathError NOTIFY hostPathErrorChanged)
 
@@ -140,7 +144,16 @@ public:
      * `hostPaths` 由组合根注入（生产是 KioHostPathService，测试是 Fake）；为空时
      * 容器详情的挂载行不提供「打开宿主目录」动作。
      */
-    explicit StatusController(DockerBackendInterface *backend, HostPathService *hostPaths = nullptr, QObject *parent = nullptr);
+    /*!
+     * `credentialBackend` 为空时使用 KWallet（生产路径）。
+     *
+     * 注入点是给测试与离屏渲染用的：KWallet 会弹解锁框、写入用户真实钱包，
+     * 自动化流程里既不确定也不该发生。
+     */
+    explicit StatusController(DockerBackendInterface *backend,
+                              HostPathService *hostPaths = nullptr,
+                              QObject *parent = nullptr,
+                              CredentialBackend *credentialBackend = nullptr);
     ~StatusController() override;
 
     State state() const
@@ -255,6 +268,10 @@ public:
     {
         return m_daemonConfigSystem;
     }
+    RegistryAuthController *registryAuth() const
+    {
+        return m_registryAuth;
+    }
     QString hostPathError() const
     {
         return m_hostPathError;
@@ -341,6 +358,10 @@ private:
     HostPathService *m_hostPaths = nullptr;
     DaemonConfigController *m_daemonConfigUser = nullptr;
     DaemonConfigController *m_daemonConfigSystem = nullptr;
+    /*! 凭据后端（KWallet）：只在 core 里构造一次，存储与控制器共用。 */
+    CredentialBackend *m_credentialBackend = nullptr;
+    CredentialStore *m_credentialStore = nullptr;
+    RegistryAuthController *m_registryAuth = nullptr;
     QString m_hostPathError;
 
     State m_state = State::Idle;

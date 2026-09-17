@@ -10,6 +10,39 @@
 namespace Kontainer
 {
 
+QString DockerError::kindKey(Kind kind)
+{
+    switch (kind) {
+    case Kind::None:
+        return QStringLiteral("none");
+    case Kind::DockerUnavailable:
+        return QStringLiteral("dockerUnavailable");
+    case Kind::ConnectionFailed:
+        return QStringLiteral("connectionFailed");
+    case Kind::PermissionDenied:
+        return QStringLiteral("permissionDenied");
+    case Kind::Timeout:
+        return QStringLiteral("timeout");
+    case Kind::ApiVersionMismatch:
+        return QStringLiteral("apiVersionMismatch");
+    case Kind::NotFound:
+        return QStringLiteral("notFound");
+    case Kind::Conflict:
+        return QStringLiteral("conflict");
+    case Kind::PreconditionFailed:
+        return QStringLiteral("preconditionFailed");
+    case Kind::HttpError:
+        return QStringLiteral("httpError");
+    case Kind::EngineError:
+        return QStringLiteral("engineError");
+    case Kind::InvalidResponse:
+        return QStringLiteral("invalidResponse");
+    case Kind::UnexpectedPayload:
+        return QStringLiteral("unexpectedPayload");
+    }
+    return QStringLiteral("unknown");
+}
+
 DockerError::DockerError(Kind kind, QString detail, int httpStatus)
     : m_kind(kind)
     , m_detail(std::move(detail))

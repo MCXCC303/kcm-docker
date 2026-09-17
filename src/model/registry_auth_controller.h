@@ -103,6 +103,14 @@ public:
     Q_INVOKABLE void importFromCli(const QStringList &serverAddresses = {});
     /*! 清掉最近一次结果（关闭提示条时用）。 */
     Q_INVOKABLE void clearResult();
+    /*!
+     * 该镜像所在的仓库是否已有凭据（拉取前提示用）。
+     *
+     * 仓库解析走 `RegistryAuth::serverAddressForImage`：界面不该自己拆引用。
+     */
+    Q_INVOKABLE bool hasCredentialForImage(const QString &imageReference) const;
+    /*! 该镜像对应的仓库地址（界面上预填登录对话框）。 */
+    Q_INVOKABLE QString serverAddressForImage(const QString &imageReference) const;
 
 Q_SIGNALS:
     void changed();

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.4.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 00:38+0800\n"
+"POT-Creation-Date: 2026-09-18 01:50+0800\n"
 "PO-Revision-Date: 2026-09-17 04:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -20,11 +20,11 @@ msgstr "未选择镜像。"
 msgid "Created"
 msgstr "已创建"
 
-#: src/model/state_text.cpp:19 src/ui/MainPage.qml:424
+#: src/model/state_text.cpp:19 src/ui/MainPage.qml:426
 msgid "Restarting"
 msgstr "重启中"
 
-#: src/model/state_text.cpp:21 src/ui/MainPage.qml:45 src/ui/MainPage.qml:412
+#: src/model/state_text.cpp:21 src/ui/MainPage.qml:47 src/ui/MainPage.qml:414
 msgid "Running"
 msgstr "运行中"
 
@@ -32,7 +32,7 @@ msgstr "运行中"
 msgid "Removing"
 msgstr "删除中"
 
-#: src/model/state_text.cpp:25 src/ui/MainPage.qml:51 src/ui/MainPage.qml:416
+#: src/model/state_text.cpp:25 src/ui/MainPage.qml:53 src/ui/MainPage.qml:418
 msgid "Paused"
 msgstr "已暂停"
 
@@ -40,7 +40,7 @@ msgstr "已暂停"
 msgid "Exited"
 msgstr "已退出"
 
-#: src/model/state_text.cpp:29 src/ui/MainPage.qml:428
+#: src/model/state_text.cpp:29 src/ui/MainPage.qml:430
 msgid "Dead"
 msgstr "已失效"
 
@@ -66,20 +66,20 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:75
+#: src/model/status_controller.cpp:88
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:78
+#: src/model/status_controller.cpp:91
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:81
+#: src/model/status_controller.cpp:94
 #: src/model/container_detail_controller.cpp:52
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:504
+#: src/model/status_controller.cpp:517
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -153,7 +153,7 @@ msgstr "Docker 守护进程返回了意外数据。"
 msgid "Unknown Docker error."
 msgstr "未知的 Docker 错误。"
 
-#: src/model/operation_controller.cpp:119
+#: src/model/operation_controller.cpp:122
 msgid ""
 "The Docker daemon refused the last write operation because of missing "
 "permissions. Kontainer switched to read-only for this session."
@@ -161,7 +161,7 @@ msgstr ""
 "由于权限不足，Docker 守护进程拒绝了下一次写操作。Kontainer 已在本次会话中切换"
 "为只读。"
 
-#: src/model/operation_controller.cpp:121
+#: src/model/operation_controller.cpp:124
 msgid ""
 "Kontainer can only read from this Docker socket: the current user is not "
 "allowed to write it. Add the user to the group that owns the socket, or use "
@@ -170,109 +170,109 @@ msgstr ""
 "Kontainer 只能读取该 Docker socket：当前用户没有写权限。请把该用户加入 "
 "socket 所属的组，或改用 rootless Docker 部署。"
 
-#: src/model/operation_controller.cpp:124
+#: src/model/operation_controller.cpp:127
 msgid ""
 "The Docker socket does not exist, so containers and images cannot be managed."
 msgstr "Docker socket 不存在，因此无法管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:126
+#: src/model/operation_controller.cpp:129
 msgid ""
 "Managing containers and images is only available for the local Docker socket."
 msgstr "仅本机 Docker socket 支持管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:184
-#: src/model/operation_controller.cpp:287
+#: src/model/operation_controller.cpp:187
+#: src/model/operation_controller.cpp:290
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr "Kontainer 处于只读模式，因此未执行%1。"
 
-#: src/model/operation_controller.cpp:189
+#: src/model/operation_controller.cpp:192
 msgid "Another operation on this object is still running."
 msgstr "该对象上仍有操作在进行中。"
 
-#: src/model/operation_controller.cpp:238
+#: src/model/operation_controller.cpp:241
 msgid "starting the container"
 msgstr "启动容器"
 
-#: src/model/operation_controller.cpp:248
+#: src/model/operation_controller.cpp:251
 msgid "stopping the container"
 msgstr "停止容器"
 
-#: src/model/operation_controller.cpp:258
+#: src/model/operation_controller.cpp:261
 msgid "restarting the container"
 msgstr "重启容器"
 
-#: src/model/operation_controller.cpp:268
+#: src/model/operation_controller.cpp:271
 msgid "removing the container"
 msgstr "删除容器"
 
-#: src/model/operation_controller.cpp:279
+#: src/model/operation_controller.cpp:282
 msgid "“%1” is not a valid image reference."
 msgstr "“%1”不是合法的镜像引用。"
 
-#: src/model/operation_controller.cpp:287
+#: src/model/operation_controller.cpp:290
 msgid "pulling the image"
 msgstr "拉取镜像"
 
-#: src/model/operation_controller.cpp:294
+#: src/model/operation_controller.cpp:297
 msgid "This image is already being pulled: %1"
 msgstr "该镜像已经在拉取中：%1"
 
-#: src/model/operation_controller.cpp:388
+#: src/model/operation_controller.cpp:403
 msgid "removing the image"
 msgstr "删除镜像"
 
-#: src/model/operation_controller.cpp:468
-#: src/ui/components/PullProgressList.qml:161
+#: src/model/operation_controller.cpp:484
+#: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr "已取消镜像拉取。"
 
-#: src/model/operation_controller.cpp:468
+#: src/model/operation_controller.cpp:484
 msgid "Operation cancelled."
 msgstr "已取消操作。"
 
-#: src/model/operation_controller.cpp:519
+#: src/model/operation_controller.cpp:535
 msgid "Container started."
 msgstr "容器已启动。"
 
-#: src/model/operation_controller.cpp:521
+#: src/model/operation_controller.cpp:537
 msgid "Container stopped."
 msgstr "容器已停止。"
 
-#: src/model/operation_controller.cpp:523
+#: src/model/operation_controller.cpp:539
 msgid "Container restarted."
 msgstr "容器已重启。"
 
-#: src/model/operation_controller.cpp:525
+#: src/model/operation_controller.cpp:541
 msgid "Container removed."
 msgstr "容器已删除。"
 
-#: src/model/operation_controller.cpp:528
+#: src/model/operation_controller.cpp:544
 msgid "Image pulled: %1"
 msgstr "已拉取镜像：%1"
 
-#: src/model/operation_controller.cpp:531
+#: src/model/operation_controller.cpp:547
 msgid "Image removed."
 msgstr "镜像已删除。"
 
-#: src/model/operation_controller.cpp:533
+#: src/model/operation_controller.cpp:549
 msgid "Done."
 msgstr "完成。"
 
-#: src/model/operation_controller.cpp:541
+#: src/model/operation_controller.cpp:557
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr "%1 Docker 守护进程可能无法访问镜像仓库（网络、代理或 IPv6 路由问题）。"
 
-#: src/model/operation_controller.cpp:551
+#: src/model/operation_controller.cpp:567
 msgid "The container is already running."
 msgstr "容器已经在运行。"
 
-#: src/model/operation_controller.cpp:553
+#: src/model/operation_controller.cpp:569
 msgid "The container is already stopped."
 msgstr "容器已经停止。"
 
-#: src/model/operation_controller.cpp:555
+#: src/model/operation_controller.cpp:571
 msgid "Nothing to do: the object is already in the requested state."
 msgstr "无需操作：对象已处于目标状态。"
 
@@ -327,17 +327,17 @@ msgstr "复制"
 #: src/ui/components/CopyableText.qml:50 src/ui/components/StorageBar.qml:85
 #: src/ui/StorageView.qml:33 src/ui/ResourceView.qml:34
 #: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
-#: src/ui/MainPage.qml:330
+#: src/ui/MainPage.qml:332
 msgid "—"
 msgstr "—"
 
-#: src/ui/components/StorageBar.qml:46 src/ui/ImageDetail.qml:100
-#: src/ui/MainPage.qml:63
+#: src/ui/components/StorageBar.qml:46 src/ui/ImageDetail.qml:102
+#: src/ui/MainPage.qml:65
 msgid "Images"
 msgstr "镜像"
 
-#: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:352
-#: src/ui/ContainerDetail.qml:189 src/ui/MainPage.qml:39
+#: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:359
+#: src/ui/ContainerDetail.qml:189 src/ui/MainPage.qml:41
 msgid "Containers"
 msgstr "容器"
 
@@ -368,7 +368,7 @@ msgid "Continue"
 msgstr "继续"
 
 #: src/ui/components/ConfirmDialog.qml:69
-#: src/ui/components/PullProgressList.qml:118
+#: src/ui/components/PullProgressList.qml:123
 msgid "Cancel"
 msgstr "取消"
 
@@ -380,109 +380,108 @@ msgstr "刷新"
 msgid "Dismiss"
 msgstr "关闭提示"
 
-#: src/ui/components/PullImageDialog.qml:43 src/ui/MainPage.qml:513
+#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:524
 msgid "Pull image"
 msgstr "拉取镜像"
 
-#: src/ui/components/PullImageDialog.qml:67
+#: src/ui/components/PullImageDialog.qml:75
 msgid ""
 "Image reference (for example “alpine:3.19” or “registry.example.com/team/"
 "app”)."
 msgstr "镜像引用（例如 “alpine:3.19” 或 “registry.example.com/team/app”）。"
 
-#: src/ui/components/PullImageDialog.qml:78
+#: src/ui/components/PullImageDialog.qml:86
 #: src/ui/components/ImageRefInput.qml:42
 msgid "alpine:3.19"
 msgstr "alpine:3.19"
 
-#: src/ui/components/PullImageDialog.qml:84
+#: src/ui/components/PullImageDialog.qml:96
+msgid ""
+"No credentials are stored for this registry. A private image will fail to "
+"pull until you log in."
+msgstr "这个仓库还没有保存凭据。私有镜像在登录前会拉取失败。"
+
+#: src/ui/components/PullImageDialog.qml:99
+#: src/ui/components/PullProgressList.qml:133 src/ui/RegistryAuthPage.qml:147
+msgid "Log in…"
+msgstr "登录…"
+
+#: src/ui/components/PullImageDialog.qml:111
 msgid ""
 "Pulling continues in the background; progress is shown in the image list."
 msgstr "拉取会在后台继续；进度显示在镜像列表中。"
 
-#: src/ui/components/PullImageDialog.qml:96
+#: src/ui/components/PullImageDialog.qml:123
 msgid "Pull"
 msgstr "拉取"
 
-#: src/ui/components/PullImageDialog.qml:105
+#: src/ui/components/PullImageDialog.qml:132
 msgid "Close"
 msgstr "关闭"
 
-#: src/ui/components/PullProgressList.qml:44
+#: src/ui/components/PullProgressList.qml:47
 msgid "Pulling images (%1)"
 msgstr "正在拉取镜像（%1）"
 
-#: src/ui/components/PullProgressList.qml:45
+#: src/ui/components/PullProgressList.qml:48
 msgid "Recent pulls"
 msgstr "最近的拉取"
 
-#: src/ui/components/PullProgressList.qml:53
+#: src/ui/components/PullProgressList.qml:56
 msgid "Clear finished"
 msgstr "清空已结束"
 
-#: src/ui/components/PullProgressList.qml:130
+#: src/ui/components/PullProgressList.qml:145
 msgid "Remove this entry from the list"
 msgstr "从列表中移除这条记录"
 
-#: src/ui/components/PullProgressList.qml:131
+#: src/ui/components/PullProgressList.qml:146
 msgid "Remove this entry"
 msgstr "移除这条记录"
 
-#: src/ui/components/PullProgressList.qml:154
-#: src/ui/components/PullProgressList.qml:180
+#: src/ui/components/PullProgressList.qml:169
+#: src/ui/components/PullProgressList.qml:195
 msgid "Pull failed: %1"
 msgstr "拉取失败：%1"
 
-#: src/ui/components/PullProgressList.qml:155
+#: src/ui/components/PullProgressList.qml:170
 msgid "Pull failed."
 msgstr "拉取失败。"
 
-#: src/ui/components/PullProgressList.qml:158
+#: src/ui/components/PullProgressList.qml:173
 msgid "Image pulled."
 msgstr "镜像已拉取。"
 
-#: src/ui/components/PullProgressList.qml:168
+#: src/ui/components/PullProgressList.qml:183
 msgid "%1 of %2 layers"
 msgstr "第 %1 / %2 层"
 
-#: src/ui/components/ImageRefInput.qml:89
+#: src/ui/components/ImageRefInput.qml:91
 msgid "This is not a valid image reference."
 msgstr "这不是合法的镜像引用。"
 
-#: src/ui/components/ImageRefInput.qml:100
+#: src/ui/components/ImageRefInput.qml:102
 msgid "No tag given, “latest” will be pulled: %1"
 msgstr "未指定标签，将拉取 “latest”：%1"
 
-#: src/ui/components/ImageRefInput.qml:110
+#: src/ui/components/ImageRefInput.qml:112
 msgid "This image is already being pulled."
 msgstr "该镜像正在拉取中。"
 
-#: src/ui/components/ImageRefInput.qml:116
+#: src/ui/components/ImageRefInput.qml:118
 msgid "Image reference"
 msgstr "镜像引用"
-
-#: src/ui/components/StringListEditor.qml:45
-#: src/ui/components/KeyValueListEditor.qml:179
-msgid "Add"
-msgstr "添加"
-
-#: src/ui/components/StringListEditor.qml:143
-msgid "Move up"
-msgstr "上移"
-
-#: src/ui/components/StringListEditor.qml:156
-msgid "Move down"
-msgstr "下移"
-
-#: src/ui/components/StringListEditor.qml:167
-#: src/ui/components/KeyValueListEditor.qml:131
-msgid "Remove"
-msgstr "删除"
 
 #: src/ui/components/KeyValueListEditor.qml:123
 #: src/ui/components/KeyValueListEditor.qml:124
 msgid "Show value"
 msgstr "显示值"
+
+#: src/ui/components/KeyValueListEditor.qml:131
+#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:286
+#: src/ui/RegistryAuthPage.qml:406
+msgid "Remove"
+msgstr "删除"
 
 #: src/ui/components/KeyValueListEditor.qml:145
 msgid ""
@@ -494,6 +493,11 @@ msgstr "名称无效：只能使用字母、数字与下划线，且不能以数
 msgid "Duplicate name."
 msgstr "名称重复。"
 
+#: src/ui/components/KeyValueListEditor.qml:179
+#: src/ui/components/StringListEditor.qml:45
+msgid "Add"
+msgstr "添加"
+
 #: src/ui/components/KeyValueListEditor.qml:193
 msgid "Paste .env…"
 msgstr "粘贴 .env…"
@@ -501,6 +505,53 @@ msgstr "粘贴 .env…"
 #: src/ui/components/KeyValueListEditor.qml:277
 msgid "Paste .env content"
 msgstr "粘贴 .env 内容"
+
+#: src/ui/components/StringListEditor.qml:148
+msgid "Move up"
+msgstr "上移"
+
+#: src/ui/components/StringListEditor.qml:161
+msgid "Move down"
+msgstr "下移"
+
+#: src/ui/components/RegistryLoginDialog.qml:42
+msgid "Log in to a registry"
+msgstr "登录镜像仓库"
+
+#: src/ui/components/RegistryLoginDialog.qml:81
+msgid "Credentials are stored in KWallet, never in a plain-text file."
+msgstr "凭据保存在 KWallet 中，绝不写入明文文件。"
+
+#: src/ui/components/RegistryLoginDialog.qml:94
+msgid "Registry"
+msgstr "仓库"
+
+#: src/ui/components/RegistryLoginDialog.qml:102
+msgid "Use an access token instead of a password"
+msgstr "使用访问令牌代替密码"
+
+#: src/ui/components/RegistryLoginDialog.qml:112
+#: src/ui/components/RegistryLoginDialog.qml:113
+msgid "User name"
+msgstr "用户名"
+
+#: src/ui/components/RegistryLoginDialog.qml:125
+#: src/ui/components/RegistryLoginDialog.qml:126
+msgid "Password"
+msgstr "密码"
+
+#: src/ui/components/RegistryLoginDialog.qml:138
+#: src/ui/components/RegistryLoginDialog.qml:139
+msgid "Access token"
+msgstr "访问令牌"
+
+#: src/ui/components/RegistryLoginDialog.qml:147
+msgid "Checking…"
+msgstr "正在校验…"
+
+#: src/ui/components/RegistryLoginDialog.qml:147
+msgid "Log in"
+msgstr "登录"
 
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
@@ -530,12 +581,12 @@ msgctxt "@info additional image tags"
 msgid "Tags: %1"
 msgstr "标签：%1"
 
-#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:112
-#: src/ui/ImageDetail.qml:183
+#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:114
+#: src/ui/ImageDetail.qml:190
 msgid "image reference"
 msgstr "镜像引用"
 
-#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:190
+#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:197
 msgid "image ID"
 msgstr "镜像 ID"
 
@@ -547,8 +598,8 @@ msgstr "存储"
 msgid "Unable to read Docker disk usage: %1"
 msgstr "无法读取 Docker 磁盘占用：%1"
 
-#: src/ui/StorageView.qml:61 src/ui/ImageDetail.qml:139
-#: src/ui/ContainerDetail.qml:231 src/ui/MainPage.qml:267
+#: src/ui/StorageView.qml:61 src/ui/ImageDetail.qml:146
+#: src/ui/ContainerDetail.qml:231 src/ui/MainPage.qml:269
 msgid "Retry"
 msgstr "重试"
 
@@ -556,152 +607,156 @@ msgstr "重试"
 msgid "Total"
 msgstr "合计"
 
-#: src/ui/ImageDetail.qml:108
+#: src/ui/ImageDetail.qml:110
 msgid "Image"
 msgstr "镜像"
 
-#: src/ui/ImageDetail.qml:127
+#: src/ui/ImageDetail.qml:129
 msgid "Loading image details…"
 msgstr "正在加载镜像详情…"
 
-#: src/ui/ImageDetail.qml:136
+#: src/ui/ImageDetail.qml:138
 msgid "Unable to retrieve image details."
 msgstr "无法获取镜像详情。"
 
-#: src/ui/ImageDetail.qml:144 src/ui/ContainerDetail.qml:236 src/ui/main.qml:37
-#: src/ui/DaemonConfigPage.qml:163
+#: src/ui/ImageDetail.qml:141 src/ui/MainPage.qml:512
+msgid "Registry logins…"
+msgstr "仓库登录…"
+
+#: src/ui/ImageDetail.qml:151 src/ui/ContainerDetail.qml:236 src/ui/main.qml:37
+#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 msgid "Back"
 msgstr "返回"
 
-#: src/ui/ImageDetail.qml:166
+#: src/ui/ImageDetail.qml:173
 msgid "Repository:"
 msgstr "仓库："
 
-#: src/ui/ImageDetail.qml:168
+#: src/ui/ImageDetail.qml:175
 msgid "<none> (dangling)"
 msgstr "<none>（悬空）"
 
-#: src/ui/ImageDetail.qml:169
+#: src/ui/ImageDetail.qml:176
 msgid "repository"
 msgstr "仓库"
 
-#: src/ui/ImageDetail.qml:173
+#: src/ui/ImageDetail.qml:180
 msgid "Tag:"
 msgstr "标签："
 
-#: src/ui/ImageDetail.qml:175 src/ui/ImageDetail.qml:182
+#: src/ui/ImageDetail.qml:182 src/ui/ImageDetail.qml:189
 msgid "<none>"
 msgstr "<none>"
 
-#: src/ui/ImageDetail.qml:176
+#: src/ui/ImageDetail.qml:183
 msgid "tag"
 msgstr "标签"
 
-#: src/ui/ImageDetail.qml:180
+#: src/ui/ImageDetail.qml:187
 msgid "Full reference:"
 msgstr "完整引用："
 
-#: src/ui/ImageDetail.qml:187
+#: src/ui/ImageDetail.qml:194
 msgid "Image ID:"
 msgstr "镜像 ID："
 
-#: src/ui/ImageDetail.qml:194 src/ui/ContainerDetail.qml:337
+#: src/ui/ImageDetail.qml:201 src/ui/ContainerDetail.qml:337
 msgid "Created:"
 msgstr "创建时间："
 
-#: src/ui/ImageDetail.qml:196 src/ui/ContainerDetail.qml:345
+#: src/ui/ImageDetail.qml:203 src/ui/ContainerDetail.qml:345
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr "%1（%2前）"
 
-#: src/ui/ImageDetail.qml:199
+#: src/ui/ImageDetail.qml:206
 msgid "Size:"
 msgstr "大小："
 
-#: src/ui/ImageDetail.qml:203
+#: src/ui/ImageDetail.qml:210
 msgid "Architecture:"
 msgstr "架构："
 
-#: src/ui/ImageDetail.qml:208
+#: src/ui/ImageDetail.qml:215
 msgid "OS:"
 msgstr "操作系统："
 
-#: src/ui/ImageDetail.qml:213
+#: src/ui/ImageDetail.qml:220
 msgid "Author:"
 msgstr "作者："
 
-#: src/ui/ImageDetail.qml:223
+#: src/ui/ImageDetail.qml:230
 msgid "Tags"
 msgstr "标签"
 
-#: src/ui/ImageDetail.qml:253
+#: src/ui/ImageDetail.qml:260
 msgid "Digests"
 msgstr "摘要"
 
-#: src/ui/ImageDetail.qml:297
+#: src/ui/ImageDetail.qml:304
 msgctxt "@info image layer count"
 msgid "Layers (%1)"
 msgid_plural "Layers (%1)"
 msgstr[0] "层（%1）"
 
-#: src/ui/ImageDetail.qml:305
+#: src/ui/ImageDetail.qml:312
 msgid "The Docker API reports layer digests, not per-layer sizes."
 msgstr "Docker API 只提供层摘要，不提供单层大小。"
 
-#: src/ui/ImageDetail.qml:344
+#: src/ui/ImageDetail.qml:351
 msgid "Show fewer layers"
 msgstr "收起层列表"
 
-#: src/ui/ImageDetail.qml:344
+#: src/ui/ImageDetail.qml:351
 msgctxt "@info show all image layers"
 msgid "Show all %1 layers"
 msgid_plural "Show all %1 layers"
 msgstr[0] "显示全部 %1 层"
 
-#: src/ui/ImageDetail.qml:360
+#: src/ui/ImageDetail.qml:367
 msgid "No containers use this image."
 msgstr "没有容器使用该镜像。"
 
-#: src/ui/ImageDetail.qml:404 src/ui/ContainerDetail.qml:448
+#: src/ui/ImageDetail.qml:411 src/ui/ContainerDetail.qml:448
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
 msgstr[0] "环境变量（%1 个）"
 
-#: src/ui/ImageDetail.qml:459
+#: src/ui/ImageDetail.qml:466
 msgid "Delete all tags…"
 msgstr "删除全部标签…"
 
-#: src/ui/ImageDetail.qml:467 src/ui/ImageDetail.qml:484
-#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:809
+#: src/ui/ImageDetail.qml:474 src/ui/ImageDetail.qml:491
+#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:820
 msgid "Delete"
 msgstr "删除"
 
-#: src/ui/ImageDetail.qml:479
+#: src/ui/ImageDetail.qml:486
 msgid "Delete image tag"
 msgstr "删除镜像标签"
 
-#: src/ui/ImageDetail.qml:481
+#: src/ui/ImageDetail.qml:488
 msgid "Delete the tag “%1”?"
 msgstr "确定要删除标签“%1”吗？"
 
-#: src/ui/ImageDetail.qml:482
+#: src/ui/ImageDetail.qml:489
 msgid "Delete the image “%1”?"
 msgstr "确定要删除镜像“%1”吗？"
 
-#: src/ui/ImageDetail.qml:483
+#: src/ui/ImageDetail.qml:490
 msgid "Only this tag is removed. Layers shared with other images are kept."
 msgstr "只会移除该标签；与其他镜像共享的层会保留。"
 
-#: src/ui/ImageDetail.qml:500 src/ui/ImageDetail.qml:503
+#: src/ui/ImageDetail.qml:507 src/ui/ImageDetail.qml:510
 msgid "Delete all tags"
 msgstr "删除全部标签"
 
-#: src/ui/ImageDetail.qml:501
+#: src/ui/ImageDetail.qml:508
 msgid "Delete every tag of this image (%1 tags)?"
 msgstr "确定要删除该镜像的全部标签（共 %1 个）吗？"
 
-#: src/ui/ImageDetail.qml:502
+#: src/ui/ImageDetail.qml:509
 msgid ""
 "All tags of this image are removed. Containers that reference it can no "
 "longer be started."
@@ -733,7 +788,7 @@ msgstr "启动"
 msgid "Stop"
 msgstr "停止"
 
-#: src/ui/ContainerDetail.qml:133 src/ui/DaemonConfigPage.qml:576
+#: src/ui/ContainerDetail.qml:133 src/ui/DaemonConfigPage.qml:578
 msgid "Restart"
 msgstr "重启"
 
@@ -893,62 +948,62 @@ msgstr "端口映射"
 msgid "No published ports."
 msgstr "没有已发布的端口。"
 
-#: src/ui/ContainerDetail.qml:601
+#: src/ui/ContainerDetail.qml:603
 msgid "Exposed but not published"
 msgstr "已暴露但未发布"
 
-#: src/ui/ContainerDetail.qml:620
+#: src/ui/ContainerDetail.qml:622
 msgid "%1, exposed but not published to the host"
 msgstr "%1，已暴露但未发布到宿主机"
 
-#: src/ui/ContainerDetail.qml:642
+#: src/ui/ContainerDetail.qml:644
 msgid "No mounts."
 msgstr "没有挂载。"
 
-#: src/ui/ContainerDetail.qml:686
+#: src/ui/ContainerDetail.qml:688
 msgid "mount"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:711
+#: src/ui/ContainerDetail.qml:713
 msgid "Not a directory"
 msgstr "不是目录"
 
-#: src/ui/ContainerDetail.qml:711
+#: src/ui/ContainerDetail.qml:713
 msgid "Host path missing"
 msgstr "宿主路径不存在"
 
-#: src/ui/ContainerDetail.qml:757
+#: src/ui/ContainerDetail.qml:768
 msgid "Open host folder"
 msgstr "打开宿主目录"
 
-#: src/ui/ContainerDetail.qml:765
+#: src/ui/ContainerDetail.qml:776
 msgid "host path"
 msgstr "宿主路径"
 
-#: src/ui/ContainerDetail.qml:770
+#: src/ui/ContainerDetail.qml:781
 msgid "container path"
 msgstr "容器路径"
 
-#: src/ui/ContainerDetail.qml:790
+#: src/ui/ContainerDetail.qml:801
 msgid "Container logs are not available yet."
 msgstr "容器日志尚不可用。"
 
-#: src/ui/ContainerDetail.qml:791
+#: src/ui/ContainerDetail.qml:802
 msgid ""
 "Streaming logs will be added in a later version. Until then, use the docker "
 "CLI or your container's own log destination."
 msgstr ""
 "日志流将在后续版本提供。在此之前，请使用 docker 命令行或容器自身的日志输出。"
 
-#: src/ui/ContainerDetail.qml:806
+#: src/ui/ContainerDetail.qml:817
 msgid "Delete container"
 msgstr "删除容器"
 
-#: src/ui/ContainerDetail.qml:807
+#: src/ui/ContainerDetail.qml:818
 msgid "Delete the container “%1”?"
 msgstr "确定要删除容器“%1”吗？"
 
-#: src/ui/ContainerDetail.qml:808
+#: src/ui/ContainerDetail.qml:819
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr "容器会被删除；它的匿名卷与命名卷都会保留。"
 
@@ -1087,6 +1142,186 @@ msgstr "启动容器 %1"
 msgid "Stop container %1"
 msgstr "停止容器 %1"
 
+#: src/ui/MainPage.qml:59 src/ui/MainPage.qml:422
+msgid "Stopped"
+msgstr "已停止"
+
+#: src/ui/MainPage.qml:80
+msgid "Loading Docker status…"
+msgstr "正在加载 Docker 状态…"
+
+#: src/ui/MainPage.qml:84
+msgid "Connected"
+msgstr "已连接"
+
+#: src/ui/MainPage.qml:86
+msgid "Not connected"
+msgstr "未连接"
+
+#: src/ui/MainPage.qml:103
+msgid "No containers found."
+msgstr "没有容器。"
+
+#: src/ui/MainPage.qml:109
+msgctxt "@info no container matches the search"
+msgid "No containers match “%1”."
+msgstr "没有匹配“%1”的容器。"
+
+#: src/ui/MainPage.qml:110 src/ui/MainPage.qml:136
+msgid "Clear search"
+msgstr "清除搜索"
+
+#: src/ui/MainPage.qml:114
+msgid "No containers match the current filter."
+msgstr "没有符合当前过滤条件的容器。"
+
+#: src/ui/MainPage.qml:115
+msgid "Show all containers"
+msgstr "显示全部容器"
+
+#: src/ui/MainPage.qml:128
+msgid "No images found."
+msgstr "没有镜像。"
+
+#: src/ui/MainPage.qml:130
+msgid "Pull an image"
+msgstr "拉取一个镜像"
+
+#: src/ui/MainPage.qml:135
+msgctxt "@info no image matches the search"
+msgid "No images match “%1”."
+msgstr "没有匹配“%1”的镜像。"
+
+#: src/ui/MainPage.qml:140
+msgid "No images match the current filter."
+msgstr "没有符合当前过滤条件的镜像。"
+
+#: src/ui/MainPage.qml:141
+msgid "Show all images"
+msgstr "显示全部镜像"
+
+#: src/ui/MainPage.qml:197
+msgctxt "@info last successful update"
+msgid "Updated %1 ago"
+msgstr "更新于 %1前"
+
+#: src/ui/MainPage.qml:198
+msgid "Not updated yet"
+msgstr "尚未更新"
+
+#: src/ui/MainPage.qml:204
+msgid "Update failed"
+msgstr "更新失败"
+
+#: src/ui/MainPage.qml:210
+msgid "Data is stale"
+msgstr "数据已过期"
+
+#: src/ui/MainPage.qml:217
+msgid "Auto-refresh is off"
+msgstr "自动刷新已关闭"
+
+#: src/ui/MainPage.qml:266
+msgid "Unable to connect to Docker Engine."
+msgstr "无法连接到 Docker 引擎。"
+
+#: src/ui/MainPage.qml:336
+msgid "Engine summary is unavailable"
+msgstr "引擎概要不可用"
+
+#: src/ui/MainPage.qml:344
+msgid ""
+"Container and image counts are unavailable because the engine summary could "
+"not be read."
+msgstr "无法读取引擎概要，容器与镜像数量暂不可用。"
+
+#: src/ui/MainPage.qml:366
+msgctxt "@title:tab container list"
+msgid "Containers (%1)"
+msgid_plural "Containers (%1)"
+msgstr[0] "容器（%1）"
+
+#: src/ui/MainPage.qml:369
+msgctxt "@title:tab image list"
+msgid "Images (%1)"
+msgid_plural "Images (%1)"
+msgstr[0] "镜像（%1）"
+
+#: src/ui/MainPage.qml:372
+msgctxt "@title:tab engine information"
+msgid "Engine"
+msgstr "引擎"
+
+#: src/ui/MainPage.qml:392
+msgid "Search containers (name, image, ID)…"
+msgstr "搜索容器（名称、镜像、ID）…"
+
+#: src/ui/MainPage.qml:392
+msgid "Search images (repository, tag, ID)…"
+msgstr "搜索镜像（仓库、标签、ID）…"
+
+#: src/ui/MainPage.qml:410
+msgid "All states"
+msgstr "所有状态"
+
+#: src/ui/MainPage.qml:436
+msgid "All images"
+msgstr "所有镜像"
+
+#: src/ui/MainPage.qml:440
+msgid "In use"
+msgstr "使用中"
+
+#: src/ui/MainPage.qml:444
+msgid "Dangling"
+msgstr "悬空"
+
+#: src/ui/MainPage.qml:468
+msgid "Sort: Name"
+msgstr "排序：名称"
+
+#: src/ui/MainPage.qml:472
+msgid "Sort: State"
+msgstr "排序：状态"
+
+#: src/ui/MainPage.qml:476 src/ui/MainPage.qml:486
+msgid "Sort: Created"
+msgstr "排序：创建时间"
+
+#: src/ui/MainPage.qml:482
+msgid "Sort: Repository"
+msgstr "排序：仓库"
+
+#: src/ui/MainPage.qml:490
+msgid "Sort: Size"
+msgstr "排序：大小"
+
+#: src/ui/MainPage.qml:523
+msgid "Pull image (%1 running)"
+msgstr "拉取镜像（%1 个进行中）"
+
+#: src/ui/MainPage.qml:550
+msgid "Unable to retrieve the container list: %1"
+msgstr "无法获取容器列表：%1"
+
+#: src/ui/MainPage.qml:608
+msgid "Unable to retrieve the image list: %1"
+msgstr "无法获取镜像列表：%1"
+
+#: src/ui/MainPage.qml:676
+msgid "User configuration…"
+msgstr "用户级配置…"
+
+#: src/ui/MainPage.qml:683
+msgid "System configuration…"
+msgstr "系统级配置…"
+
+#: src/ui/MainPage.qml:690
+msgid ""
+"Registry mirrors and other daemon settings. The system configuration needs "
+"administrator rights."
+msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
+
 #: src/ui/DaemonConfigPage.qml:79
 msgid "Deployment"
 msgstr "部署形态"
@@ -1119,8 +1354,8 @@ msgstr "修改这个文件需要管理员权限"
 msgid "Data directory"
 msgstr "数据目录"
 
-#: src/ui/DaemonConfigPage.qml:102 src/ui/DaemonConfigPage.qml:402
-#: src/ui/DaemonConfigPage.qml:427
+#: src/ui/DaemonConfigPage.qml:102 src/ui/DaemonConfigPage.qml:404
+#: src/ui/DaemonConfigPage.qml:429
 msgid "default"
 msgstr "默认"
 
@@ -1140,62 +1375,64 @@ msgstr "当前生效的加速器"
 msgid "none"
 msgstr "无"
 
-#: src/ui/DaemonConfigPage.qml:121
+#: src/ui/DaemonConfigPage.qml:123
 msgid "Enter a registry mirror address, for example %1"
 msgstr "请输入镜像加速器地址，例如 %1"
 
-#: src/ui/DaemonConfigPage.qml:124
+#: src/ui/DaemonConfigPage.qml:126
 msgid "Use an address of the form http(s)://host[:port]."
 msgstr "请使用 http(s)://主机[:端口] 形式的地址。"
 
-#: src/ui/DaemonConfigPage.qml:132
+#: src/ui/DaemonConfigPage.qml:134
 msgid "Use host[:port] only, without a scheme or path."
 msgstr "只填「主机[:端口]」，不要带协议或路径。"
 
-#: src/ui/DaemonConfigPage.qml:142
+#: src/ui/DaemonConfigPage.qml:144
 msgid ""
 "Configuration written. Docker must be restarted before the changes take "
 "effect."
 msgstr "配置已写入。需要重启 Docker 后才会生效。"
 
-#: src/ui/DaemonConfigPage.qml:143
+#: src/ui/DaemonConfigPage.qml:145
 msgid "Configuration written."
 msgstr "配置已写入。"
 
-#: src/ui/DaemonConfigPage.qml:149
+#: src/ui/DaemonConfigPage.qml:151
 msgid "Reload from disk"
 msgstr "从磁盘重新读取"
 
-#: src/ui/DaemonConfigPage.qml:189
+#: src/ui/DaemonConfigPage.qml:191
 msgid "User runtime configuration"
 msgstr "用户级运行时配置"
 
-#: src/ui/DaemonConfigPage.qml:190
+#: src/ui/DaemonConfigPage.qml:192
 msgid "System runtime configuration"
 msgstr "系统级运行时配置"
 
-#: src/ui/DaemonConfigPage.qml:201
+#: src/ui/DaemonConfigPage.qml:203
 msgid ""
 "This file is not writable by the current user (it may belong to another "
 "user), so changing it needs administrator rights."
 msgstr ""
 "当前用户不能写这个配置文件（它可能属于其他用户），因此修改需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:202
+#: src/ui/DaemonConfigPage.qml:204
 msgid ""
 "These settings affect the Docker daemon for the whole machine and every "
 "user. Changing them needs administrator rights."
 msgstr ""
 "这些设置影响整台机器、所有用户共用的 Docker 守护进程，修改需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:212
+#: src/ui/DaemonConfigPage.qml:214
 msgid ""
 "The running Docker daemon is a system service, so it does not read this "
 "file. Making changes here take effect needs administrator rights (or a "
 "rootless daemon)."
-msgstr "正在运行的 Docker 守护进程是系统服务，不会读取这个文件。要让这里的改动生效需要管理员权限（或改用 rootless 守护进程）。"
+msgstr ""
+"正在运行的 Docker 守护进程是系统服务，不会读取这个文件。要让这里的改动生效需"
+"要管理员权限（或改用 rootless 守护进程）。"
 
-#: src/ui/DaemonConfigPage.qml:213
+#: src/ui/DaemonConfigPage.qml:215
 msgid ""
 "The running Docker daemon is rootless, so it does not read this file. "
 "Changes here only affect a system-wide daemon."
@@ -1203,37 +1440,41 @@ msgstr ""
 "正在运行的 Docker 守护进程是 rootless 的，不会读取这个文件。这里的修改只对系"
 "统级守护进程生效。"
 
-#: src/ui/DaemonConfigPage.qml:222
+#: src/ui/DaemonConfigPage.qml:224
 msgid ""
 "Settings are read-only until you unlock them. Unlocking asks for "
 "administrator rights; the authorization lasts about five minutes."
 msgstr "解锁前这些设置是只读的。解锁需要管理员权限，授权大约持续五分钟。"
 
-#: src/ui/DaemonConfigPage.qml:230
+#: src/ui/DaemonConfigPage.qml:232
 msgid ""
 "Unlocked. Saving and restarting will not ask again for about %1 seconds."
 msgstr "已解锁。约 %1 秒内的保存与重启不会再询问授权。"
 
-#: src/ui/DaemonConfigPage.qml:246
+#: src/ui/DaemonConfigPage.qml:248
 msgid ""
 "This file is yours to change. The running daemon is a system service, so "
 "making the change take effect needs administrator rights."
-msgstr "这份配置属于你自己，可以直接修改；但正在运行的是系统级守护进程，要让改动生效需要管理员权限。"
+msgstr ""
+"这份配置属于你自己，可以直接修改；但正在运行的是系统级守护进程，要让改动生效"
+"需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:247
+#: src/ui/DaemonConfigPage.qml:249
 msgid ""
 "The Docker data directory is inside your home directory, but the daemon "
 "itself runs as a system service: this file belongs to the system, so "
 "changing it needs administrator rights."
-msgstr "Docker 数据目录位于你的家目录中，但守护进程本身以系统服务运行：这份配置属于系统，修改它需要管理员权限。"
+msgstr ""
+"Docker 数据目录位于你的家目录中，但守护进程本身以系统服务运行：这份配置属于系"
+"统，修改它需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:255
+#: src/ui/DaemonConfigPage.qml:257
 msgid ""
 "The configuration file could not be parsed (%1). It is shown read-only; "
 "Kontainer will not overwrite it."
 msgstr "无法解析该配置文件（%1）。它只会以只读方式展示；Kontainer 不会覆盖它。"
 
-#: src/ui/DaemonConfigPage.qml:264
+#: src/ui/DaemonConfigPage.qml:266
 msgid ""
 "The saved registry mirrors are not active yet. Restart the Docker service to "
 "apply them (running containers are kept because live-restore is enabled)."
@@ -1241,7 +1482,7 @@ msgstr ""
 "已保存的镜像加速器尚未生效。重启 Docker 服务即可应用（已启用 live-restore，运"
 "行中的容器会保留）。"
 
-#: src/ui/DaemonConfigPage.qml:265
+#: src/ui/DaemonConfigPage.qml:267
 msgid ""
 "The saved registry mirrors are not active yet. Restarting the Docker service "
 "will stop running containers; those with a restart policy will come back "
@@ -1250,159 +1491,159 @@ msgstr ""
 "已保存的镜像加速器尚未生效。重启 Docker 服务会停止正在运行的容器；设置了重启"
 "策略的容器会自动恢复。"
 
-#: src/ui/DaemonConfigPage.qml:285
+#: src/ui/DaemonConfigPage.qml:287
 msgid "Changing this file needs administrator rights."
 msgstr "修改这个文件需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:287
+#: src/ui/DaemonConfigPage.qml:289
 msgid "Saving is disabled because the current file cannot be parsed."
 msgstr "当前文件无法解析，因此不能保存。"
 
-#: src/ui/DaemonConfigPage.qml:289
+#: src/ui/DaemonConfigPage.qml:291
 msgid "Nothing to save: no setting was changed."
 msgstr "没有需要保存的内容：没有改动任何设置。"
 
-#: src/ui/DaemonConfigPage.qml:291
+#: src/ui/DaemonConfigPage.qml:293
 msgid "There is no backup to restore yet."
 msgstr "还没有可恢复的备份。"
 
-#: src/ui/DaemonConfigPage.qml:293
+#: src/ui/DaemonConfigPage.qml:295
 msgid "That backup cannot be used (it is unreadable or not valid JSON)."
 msgstr "该备份不可用（无法读取，或不是合法的 JSON）。"
 
-#: src/ui/DaemonConfigPage.qml:295
+#: src/ui/DaemonConfigPage.qml:297
 msgid ""
 "Writing the configuration file failed. The previous file was left unchanged."
 msgstr "写入配置文件失败。原文件保持不变。"
 
-#: src/ui/DaemonConfigPage.qml:297
+#: src/ui/DaemonConfigPage.qml:299
 msgid ""
 "Administrator access is not available (the helper or its policy is not "
 "installed). Use the command below instead."
 msgstr "无法获得管理员权限（没有安装提权组件或其策略文件）。请改用下面的命令。"
 
-#: src/ui/DaemonConfigPage.qml:299
+#: src/ui/DaemonConfigPage.qml:301
 msgid "Authorization was cancelled; nothing was changed."
 msgstr "授权已取消，未做任何修改。"
 
-#: src/ui/DaemonConfigPage.qml:301
+#: src/ui/DaemonConfigPage.qml:303
 msgid "Authorization was denied; nothing was changed."
 msgstr "授权被拒绝，未做任何修改。"
 
-#: src/ui/DaemonConfigPage.qml:303
+#: src/ui/DaemonConfigPage.qml:305
 msgid "The helper rejected the request; nothing was changed."
 msgstr "提权组件拒绝了这个请求，未做任何修改。"
 
-#: src/ui/DaemonConfigPage.qml:305
+#: src/ui/DaemonConfigPage.qml:307
 msgid "Could not reach systemd to restart the Docker service."
 msgstr "无法连接到 systemd 来重启 Docker 服务。"
 
-#: src/ui/DaemonConfigPage.qml:307
+#: src/ui/DaemonConfigPage.qml:309
 msgid "Restarting the Docker service failed."
 msgstr "重启 Docker 服务失败。"
 
-#: src/ui/DaemonConfigPage.qml:309
+#: src/ui/DaemonConfigPage.qml:311
 msgid "Unlock the settings before saving."
 msgstr "请先解锁这些设置再保存。"
 
-#: src/ui/DaemonConfigPage.qml:324
+#: src/ui/DaemonConfigPage.qml:326
 msgid "Registry mirrors"
 msgstr "镜像加速器"
 
-#: src/ui/DaemonConfigPage.qml:329
+#: src/ui/DaemonConfigPage.qml:331
 msgid ""
 "Tried in the listed order. A mirror is useful when the registry itself is "
 "unreachable from this machine."
 msgstr "按列表顺序尝试。当镜像仓库本身从本机无法访问时，加速器会有帮助。"
 
-#: src/ui/DaemonConfigPage.qml:343
+#: src/ui/DaemonConfigPage.qml:345
 msgid "Add mirror"
 msgstr "添加加速器"
 
-#: src/ui/DaemonConfigPage.qml:359
+#: src/ui/DaemonConfigPage.qml:361
 msgid "Add registry"
 msgstr "添加仓库"
 
-#: src/ui/DaemonConfigPage.qml:373
+#: src/ui/DaemonConfigPage.qml:375
 msgid "Other settings"
 msgstr "其他设置"
 
-#: src/ui/DaemonConfigPage.qml:386 src/ui/DaemonConfigPage.qml:410
+#: src/ui/DaemonConfigPage.qml:388 src/ui/DaemonConfigPage.qml:412
 msgid "Concurrent downloads"
 msgstr "并发下载数"
 
-#: src/ui/DaemonConfigPage.qml:415 src/ui/DaemonConfigPage.qml:434
+#: src/ui/DaemonConfigPage.qml:417 src/ui/DaemonConfigPage.qml:436
 msgid "Log driver"
 msgstr "日志驱动"
 
-#: src/ui/DaemonConfigPage.qml:446
+#: src/ui/DaemonConfigPage.qml:448
 msgid "Other keys in this file are shown read-only and kept as they are: %1"
 msgid_plural ""
 "Other keys in this file are shown read-only and kept as they are: %1"
 msgstr[0] "这个文件里的其他键会以只读方式展示并原样保留：%1"
 
-#: src/ui/DaemonConfigPage.qml:460
+#: src/ui/DaemonConfigPage.qml:462
 msgid ""
 "This build has no administrator helper installed, so the change must be "
 "applied manually."
 msgstr "这个版本没有安装提权组件，因此只能手动应用修改。"
 
-#: src/ui/DaemonConfigPage.qml:468
+#: src/ui/DaemonConfigPage.qml:470
 msgid ""
 "This file is not writable by the current user, so saving requires "
 "administrator rights."
 msgstr "当前用户不能写这个文件，因此保存需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:469
+#: src/ui/DaemonConfigPage.qml:471
 msgid ""
 "This file belongs to the system, so saving requires administrator rights."
 msgstr "这个文件属于系统，因此保存需要管理员权限。"
 
-#: src/ui/DaemonConfigPage.qml:472
+#: src/ui/DaemonConfigPage.qml:474
 msgid "Show command to run manually"
 msgstr "显示可手动执行的命令"
 
-#: src/ui/DaemonConfigPage.qml:505
+#: src/ui/DaemonConfigPage.qml:507
 msgid "Unlock to edit"
 msgstr "解锁以编辑"
 
-#: src/ui/DaemonConfigPage.qml:513
+#: src/ui/DaemonConfigPage.qml:515
 msgid "Lock again"
 msgstr "重新锁定"
 
-#: src/ui/DaemonConfigPage.qml:520
+#: src/ui/DaemonConfigPage.qml:522
 msgid "Save"
 msgstr "保存"
 
-#: src/ui/DaemonConfigPage.qml:529
+#: src/ui/DaemonConfigPage.qml:531
 msgid "Restart Docker…"
 msgstr "重启 Docker…"
 
-#: src/ui/DaemonConfigPage.qml:537 src/ui/DaemonConfigPage.qml:612
+#: src/ui/DaemonConfigPage.qml:539 src/ui/DaemonConfigPage.qml:614
 msgid "Restore previous version"
 msgstr "恢复上一版本"
 
-#: src/ui/DaemonConfigPage.qml:550
+#: src/ui/DaemonConfigPage.qml:552
 msgid "Writes to %1 (a backup is kept before every save)."
 msgstr "写入 %1（每次保存前都会保留一份备份）。"
 
-#: src/ui/DaemonConfigPage.qml:558
+#: src/ui/DaemonConfigPage.qml:560
 msgid "Unsaved changes"
 msgstr "未保存的修改"
 
-#: src/ui/DaemonConfigPage.qml:569
+#: src/ui/DaemonConfigPage.qml:571
 msgid "Restart Docker"
 msgstr "重启 Docker"
 
-#: src/ui/DaemonConfigPage.qml:570
+#: src/ui/DaemonConfigPage.qml:572
 msgid "Restart the Docker service now?"
 msgstr "现在重启 Docker 服务吗？"
 
-#: src/ui/DaemonConfigPage.qml:572
+#: src/ui/DaemonConfigPage.qml:574
 msgid "Running containers are kept because live-restore is enabled."
 msgstr "已启用 live-restore，运行中的容器会保留。"
 
-#: src/ui/DaemonConfigPage.qml:573
+#: src/ui/DaemonConfigPage.qml:575
 msgid ""
 "One running container will be stopped; it comes back automatically if its "
 "restart policy says so."
@@ -1412,229 +1653,200 @@ msgid_plural ""
 msgstr[0] ""
 "有 %1 个正在运行的容器会被停止；如果设置了重启策略，它们会自动恢复。"
 
-#: src/ui/DaemonConfigPage.qml:587
+#: src/ui/DaemonConfigPage.qml:589
 msgid ""
 "Docker restarted. The page refreshes once the engine is reachable again."
 msgstr "Docker 已重启。引擎恢复可访问后页面会自动刷新。"
 
-#: src/ui/DaemonConfigPage.qml:588
+#: src/ui/DaemonConfigPage.qml:590
 msgid "Restarting Docker failed (%1)."
 msgstr "重启 Docker 失败（%1）。"
 
-#: src/ui/DaemonConfigPage.qml:597
+#: src/ui/DaemonConfigPage.qml:599
 msgid "Discard the unsaved changes?"
 msgstr "未保存的修改"
 
-#: src/ui/DaemonConfigPage.qml:598
+#: src/ui/DaemonConfigPage.qml:600
 msgid ""
 "Reloading reads the file from disk again and drops what you have changed "
 "here."
 msgstr "重新读盘会以磁盘上的内容为准，这里改动的内容会被丢弃。"
 
-#: src/ui/DaemonConfigPage.qml:599
+#: src/ui/DaemonConfigPage.qml:601
 msgid "The file on disk is not touched."
 msgstr "磁盘上的文件不会被改动。"
 
-#: src/ui/DaemonConfigPage.qml:600
+#: src/ui/DaemonConfigPage.qml:602
 msgid "Discard and reload"
 msgstr "放弃修改并重新读取"
 
-#: src/ui/DaemonConfigPage.qml:613
+#: src/ui/DaemonConfigPage.qml:615
 msgid "Replace the current configuration with the most recent backup?"
 msgstr "用最近的备份替换当前配置吗？"
 
-#: src/ui/DaemonConfigPage.qml:614
+#: src/ui/DaemonConfigPage.qml:616
 msgid ""
 "The current file is backed up first, so this can be undone the same way."
 msgstr "当前文件会先被备份，因此同样可以再撤回来。"
 
-#: src/ui/DaemonConfigPage.qml:615
+#: src/ui/DaemonConfigPage.qml:617
 msgid "Restore"
 msgstr "恢复"
 
-#: src/ui/DaemonConfigPage.qml:620
+#: src/ui/DaemonConfigPage.qml:622
 msgid "Previous configuration restored. Docker must be restarted to apply it."
 msgstr "已恢复上一份配置。需要重启 Docker 后才会生效。"
 
-#: src/ui/MainPage.qml:57 src/ui/MainPage.qml:420
-msgid "Stopped"
-msgstr "已停止"
+#: src/ui/RegistryAuthPage.qml:57
+msgid "Logged in. The credentials are stored in KWallet."
+msgstr "已登录，凭据已保存到 KWallet。"
 
-#: src/ui/MainPage.qml:78
-msgid "Loading Docker status…"
-msgstr "正在加载 Docker 状态…"
+#: src/ui/RegistryAuthPage.qml:59
+msgid "The connection was verified with the stored credentials."
+msgstr "已用保存的凭据验证连接。"
 
-#: src/ui/MainPage.qml:82
-msgid "Connected"
-msgstr "已连接"
+#: src/ui/RegistryAuthPage.qml:61
+msgid "The credentials were removed."
+msgstr "凭据已移除。"
 
-#: src/ui/MainPage.qml:84
-msgid "Not connected"
-msgstr "未连接"
+#: src/ui/RegistryAuthPage.qml:63
+msgid "Imported %1 credentials from the Docker CLI configuration."
+msgstr "已从 Docker CLI 配置导入 %1 条凭据。"
 
-#: src/ui/MainPage.qml:101
-msgid "No containers found."
-msgstr "没有容器。"
+#: src/ui/RegistryAuthPage.qml:65
+msgid "Nothing to import: those registries are already stored."
+msgstr "没有可导入的内容：这些仓库都已经保存过了。"
 
-#: src/ui/MainPage.qml:107
-msgctxt "@info no container matches the search"
-msgid "No containers match “%1”."
-msgstr "没有匹配“%1”的容器。"
+#: src/ui/RegistryAuthPage.qml:67
+msgid "The registry rejected these credentials (user name, password or token)."
+msgstr "仓库拒绝了这组凭据（用户名、密码或令牌不正确）。"
 
-#: src/ui/MainPage.qml:108 src/ui/MainPage.qml:134
-msgid "Clear search"
-msgstr "清除搜索"
+#: src/ui/RegistryAuthPage.qml:69
+msgid "The registry could not be reached: check the network, DNS or a proxy."
+msgstr "无法连接到该仓库：请检查网络、DNS 或代理。"
 
-#: src/ui/MainPage.qml:112
-msgid "No containers match the current filter."
-msgstr "没有符合当前过滤条件的容器。"
+#: src/ui/RegistryAuthPage.qml:71
+msgid "The registry check failed."
+msgstr "仓库校验失败。"
 
-#: src/ui/MainPage.qml:113
-msgid "Show all containers"
-msgstr "显示全部容器"
+#: src/ui/RegistryAuthPage.qml:73
+msgid "No credentials are stored for this registry yet."
+msgstr "还没有为这个仓库保存凭据。"
 
-#: src/ui/MainPage.qml:126
-msgid "No images found."
-msgstr "没有镜像。"
+#: src/ui/RegistryAuthPage.qml:75
+msgid "KWallet is not available, so credentials cannot be read or saved."
+msgstr "KWallet 不可用，因此无法读取或保存凭据。"
 
-#: src/ui/MainPage.qml:128
-msgid "Pull an image"
-msgstr "拉取一个镜像"
+#: src/ui/RegistryAuthPage.qml:77
+msgid "Enter a registry address."
+msgstr "请填写仓库地址。"
 
-#: src/ui/MainPage.qml:133
-msgctxt "@info no image matches the search"
-msgid "No images match “%1”."
-msgstr "没有匹配“%1”的镜像。"
+#: src/ui/RegistryAuthPage.qml:79
+msgid "Enter a user name and password, or switch to token login."
+msgstr "请填写用户名与密码，或改用令牌登录。"
 
-#: src/ui/MainPage.qml:138
-msgid "No images match the current filter."
-msgstr "没有符合当前过滤条件的镜像。"
+#: src/ui/RegistryAuthPage.qml:81
+msgid "The credentials could not be written to KWallet."
+msgstr "无法把凭据写入 KWallet。"
 
-#: src/ui/MainPage.qml:139
-msgid "Show all images"
-msgstr "显示全部镜像"
+#: src/ui/RegistryAuthPage.qml:83
+msgid "The credentials could not be removed."
+msgstr "无法移除凭据。"
 
-#: src/ui/MainPage.qml:195
-msgctxt "@info last successful update"
-msgid "Updated %1 ago"
-msgstr "更新于 %1前"
+#: src/ui/RegistryAuthPage.qml:85
+msgid "Some credentials could not be imported."
+msgstr "有部分凭据无法导入。"
 
-#: src/ui/MainPage.qml:196
-msgid "Not updated yet"
-msgstr "尚未更新"
-
-#: src/ui/MainPage.qml:202
-msgid "Update failed"
-msgstr "更新失败"
-
-#: src/ui/MainPage.qml:208
-msgid "Data is stale"
-msgstr "数据已过期"
-
-#: src/ui/MainPage.qml:215
-msgid "Auto-refresh is off"
-msgstr "自动刷新已关闭"
-
-#: src/ui/MainPage.qml:264
-msgid "Unable to connect to Docker Engine."
-msgstr "无法连接到 Docker 引擎。"
-
-#: src/ui/MainPage.qml:334
-msgid "Engine summary is unavailable"
-msgstr "引擎概要不可用"
-
-#: src/ui/MainPage.qml:342
+#: src/ui/RegistryAuthPage.qml:95
 msgid ""
-"Container and image counts are unavailable because the engine summary could "
-"not be read."
-msgstr "无法读取引擎概要，容器与镜像数量暂不可用。"
+"KWallet is disabled in the system settings. Kontainer does not fall back to "
+"plain-text storage."
+msgstr "系统设置里关闭了 KWallet。Kontainer 不会退回到明文存储。"
 
-#: src/ui/MainPage.qml:364
-msgctxt "@title:tab container list"
-msgid "Containers (%1)"
-msgid_plural "Containers (%1)"
-msgstr[0] "容器（%1）"
+#: src/ui/RegistryAuthPage.qml:97
+msgid "KWallet is open, but the Kontainer folder could not be created."
+msgstr "KWallet 已打开，但无法创建 Kontainer 文件夹。"
 
-#: src/ui/MainPage.qml:367
-msgctxt "@title:tab image list"
-msgid "Images (%1)"
-msgid_plural "Images (%1)"
-msgstr[0] "镜像（%1）"
-
-#: src/ui/MainPage.qml:370
-msgctxt "@title:tab engine information"
-msgid "Engine"
-msgstr "引擎"
-
-#: src/ui/MainPage.qml:390
-msgid "Search containers (name, image, ID)…"
-msgstr "搜索容器（名称、镜像、ID）…"
-
-#: src/ui/MainPage.qml:390
-msgid "Search images (repository, tag, ID)…"
-msgstr "搜索镜像（仓库、标签、ID）…"
-
-#: src/ui/MainPage.qml:408
-msgid "All states"
-msgstr "所有状态"
-
-#: src/ui/MainPage.qml:434
-msgid "All images"
-msgstr "所有镜像"
-
-#: src/ui/MainPage.qml:438
-msgid "In use"
-msgstr "使用中"
-
-#: src/ui/MainPage.qml:442
-msgid "Dangling"
-msgstr "悬空"
-
-#: src/ui/MainPage.qml:466
-msgid "Sort: Name"
-msgstr "排序：名称"
-
-#: src/ui/MainPage.qml:470
-msgid "Sort: State"
-msgstr "排序：状态"
-
-#: src/ui/MainPage.qml:474 src/ui/MainPage.qml:484
-msgid "Sort: Created"
-msgstr "排序：创建时间"
-
-#: src/ui/MainPage.qml:480
-msgid "Sort: Repository"
-msgstr "排序：仓库"
-
-#: src/ui/MainPage.qml:488
-msgid "Sort: Size"
-msgstr "排序：大小"
-
-#: src/ui/MainPage.qml:512
-msgid "Pull image (%1 running)"
-msgstr "拉取镜像（%1 个进行中）"
-
-#: src/ui/MainPage.qml:539
-msgid "Unable to retrieve the container list: %1"
-msgstr "无法获取容器列表：%1"
-
-#: src/ui/MainPage.qml:597
-msgid "Unable to retrieve the image list: %1"
-msgstr "无法获取镜像列表：%1"
-
-#: src/ui/MainPage.qml:661
-msgid "User configuration…"
-msgstr "用户级配置…"
-
-#: src/ui/MainPage.qml:668
-msgid "System configuration…"
-msgstr "系统级配置…"
-
-#: src/ui/MainPage.qml:675
+#: src/ui/RegistryAuthPage.qml:99
 msgid ""
-"Registry mirrors and other daemon settings. The system configuration needs "
-"administrator rights."
-msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
+"KWallet could not be opened (the unlock request may have been cancelled)."
+msgstr "无法打开 KWallet（可能取消了授权）。"
+
+#: src/ui/RegistryAuthPage.qml:177
+msgid "Registry credentials"
+msgstr "仓库凭据"
+
+#: src/ui/RegistryAuthPage.qml:216
+msgid "Waiting for KWallet to be unlocked…"
+msgstr "正在等待 KWallet 解锁…"
+
+#: src/ui/RegistryAuthPage.qml:222
+msgid "Try again"
+msgstr "重试"
+
+#: src/ui/RegistryAuthPage.qml:234
+msgid "Stored credentials"
+msgstr "已保存的凭据"
+
+#: src/ui/RegistryAuthPage.qml:240
+msgid "No credentials stored."
+msgstr "没有保存任何凭据。"
+
+#: src/ui/RegistryAuthPage.qml:242
+msgid ""
+"Log in to a registry to pull private images. Credentials are kept in KWallet "
+"only."
+msgstr "要拉取私有镜像，请先登录对应的仓库。凭据只保存在 KWallet 里。"
+
+#: src/ui/RegistryAuthPage.qml:269
+msgid "token"
+msgstr "令牌"
+
+#: src/ui/RegistryAuthPage.qml:278
+msgid "Test"
+msgstr "测试连接"
+
+#: src/ui/RegistryAuthPage.qml:305
+msgid "Import from the Docker CLI"
+msgstr "从 Docker CLI 导入"
+
+#: src/ui/RegistryAuthPage.qml:310
+msgid "Read-only import from %1. The file itself is never modified."
+msgstr "从 %1 只读导入，不会修改该文件。"
+
+#: src/ui/RegistryAuthPage.qml:321
+msgid "No Docker CLI configuration was found (or it could not be read)."
+msgstr "没有找到 Docker CLI 配置（或无法读取）。"
+
+#: src/ui/RegistryAuthPage.qml:329
+msgid ""
+"Some credentials are managed by an external credential helper (%1). "
+"Kontainer does not run external credential programs; log in to those "
+"registries manually."
+msgstr ""
+"有凭据由外部凭据程序管理（%1）。Kontainer 不执行外部凭据程序，请手动登录这些"
+"仓库。"
+
+#: src/ui/RegistryAuthPage.qml:337
+msgid "One entry in the Docker CLI configuration cannot be imported."
+msgid_plural "%1 entries in the Docker CLI configuration cannot be imported."
+msgstr[0] "Docker CLI 配置里有 %1 条无法导入。"
+
+#: src/ui/RegistryAuthPage.qml:371
+msgid "Import selected"
+msgstr "导入所选"
+
+#: src/ui/RegistryAuthPage.qml:403
+msgid "Remove credentials"
+msgstr "移除凭据"
+
+#: src/ui/RegistryAuthPage.qml:404
+msgid "Remove the stored credentials for “%1”?"
+msgstr "移除为“%1”保存的凭据吗？"
+
+#: src/ui/RegistryAuthPage.qml:405
+msgid "Pulling private images from this registry will need a new login."
+msgstr "之后拉取该仓库的私有镜像需要重新登录。"
 
 #~ msgid "An image pull is already running."
 #~ msgstr "已有镜像正在拉取。"

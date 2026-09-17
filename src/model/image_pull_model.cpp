@@ -27,6 +27,8 @@ QVariant ImagePullModel::data(const QModelIndex &index, int role) const
     switch (role) {
     case ReferenceRole:
         return entry.reference;
+    case ErrorKindKeyRole:
+        return entry.errorKindKey;
     case StatusKeyRole:
         return entry.statusKey;
     case StatusTextRole:
@@ -53,6 +55,7 @@ QHash<int, QByteArray> ImagePullModel::roleNames() const
     return {
         {ReferenceRole, QByteArrayLiteral("reference")},
         {StatusKeyRole, QByteArrayLiteral("statusKey")},
+        {ErrorKindKeyRole, QByteArrayLiteral("errorKindKey")},
         {StatusTextRole, QByteArrayLiteral("statusText")},
         {DetailTextRole, QByteArrayLiteral("detailText")},
         {ProgressRole, QByteArrayLiteral("progress")},

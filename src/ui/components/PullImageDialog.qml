@@ -37,6 +37,14 @@ Kirigami.Dialog {
     readonly property bool alreadyPulling: referenceInput.alreadyPulling
 
     signal pullRequested(string reference)
+    /*! 「先去登录…」：把该镜像对应的仓库带到认证页（ARCH_V5_V8 §2.7）。 */
+    signal loginRequested(string serverAddress)
+
+    /*! 该镜像所在仓库是否已有凭据（由调用方从 RegistryAuthController 传入）。 */
+    property bool credentialKnown: true
+
+    /*! 输入控件（调用方据此读当前引用与仓库地址）。 */
+    property alias referenceInput: referenceInput
 
     objectName: "pullImageDialog"
 
@@ -77,6 +85,25 @@ Kirigami.Dialog {
             operations: dialog.operations
             placeholderText: i18n("alpine:3.19")
             onAccepted: dialog.startPull()
+        }
+
+        // 该仓库还没登录：先说清楚"接下来会失败"，并给一条去登录的路
+        Kirigami.InlineMessage {
+            objectName: "pullNeedsLoginHint"
+            Layout.fillWidth: true
+            visible: dialog.referenceValid && !dialog.credentialKnown
+            type: Kirigami.MessageType.Information
+            text: i18n("No credentials are stored for this registry. A private image will fail to pull until you log in.")
+            actions: [
+                Kirigami.Action {
+                    text: i18n("Log in…")
+                    icon.name: "dialog-password"
+                    onTriggered: {
+                        dialog.close();
+                        dialog.loginRequested(dialog.referenceInput.serverAddress);
+                    }
+                }
+            ]
         }
 
         QQC2.Label {

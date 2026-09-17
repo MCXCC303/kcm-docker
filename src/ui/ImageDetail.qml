@@ -42,6 +42,8 @@ KCM.SimpleKCM {
     /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
     signal closeRequested
+    /*! 打开仓库认证页并把该镜像的仓库预填进登录框（ARCH_V5_V8 §2.7）。 */
+    signal registryAuthRequested(string serverAddress)
 
     /*!
         删除语义（ARCH_V4 §2.4）：
@@ -135,6 +137,11 @@ KCM.SimpleKCM {
             type: Kirigami.MessageType.Error
             text: controller.errorText.length > 0 ? controller.errorText : i18n("Unable to retrieve image details.")
             actions: [
+                Kirigami.Action {
+                    text: i18n("Registry logins…")
+                    icon.name: "dialog-password"
+                    onTriggered: page.registryAuthRequested(kcm.controller.registryAuth.serverAddressForImage(page.imageId))
+                },
                 Kirigami.Action {
                     text: i18n("Retry")
                     icon.name: "view-refresh"

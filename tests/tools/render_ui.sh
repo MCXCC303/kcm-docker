@@ -6,7 +6,7 @@
 #
 # 用法：
 #     tests/tools/render_ui.sh <page> <width> <height> <light|dark> <output.png>
-#     page = main | container-detail | image-detail | engine | daemon-config | daemon-config-user
+#     page = main | container-detail | image-detail | engine | daemon-config | daemon-config-user | registry-auth
 #
 # 另外两个可选环境变量（只影响截图内容，不影响产品行为）：
 #     KONTAINER_RENDER_PULLS=1       在镜像标签页造出「拉取中 + 拉取失败」两条记录

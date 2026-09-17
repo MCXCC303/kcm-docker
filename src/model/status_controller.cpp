@@ -5,6 +5,9 @@
 
 #include "model/status_controller.h"
 
+#include "backend/kwallet_credential_store.h"
+#include "model/registry_auth_controller.h"
+
 #include <KLocalizedString>
 
 #include "logging.h"
@@ -24,7 +27,10 @@ bool isFast(Section section)
 }
 } // namespace
 
-StatusController::StatusController(DockerBackendInterface *backend, HostPathService *hostPaths, QObject *parent)
+StatusController::StatusController(DockerBackendInterface *backend,
+                                   HostPathService *hostPaths,
+                                   QObject *parent,
+                                   CredentialBackend *credentialBackend)
     : QObject(parent)
     , m_backend(backend)
     , m_scheduler(new RefreshScheduler(backend, this))
@@ -40,6 +46,10 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))
+    // 凭据的唯一持久化位置是 KWallet（ARCH_V5_V8 §2.6）：后端、存储、控制器各一处实例
+    , m_credentialBackend(credentialBackend ? credentialBackend : new KWalletBackend(this))
+    , m_credentialStore(new CredentialStore(m_credentialBackend, this))
+    , m_registryAuth(new RegistryAuthController(backend, m_credentialStore, this))
 {
     Q_ASSERT(m_backend);
     // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
@@ -60,6 +70,9 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     connect(m_backend, &DockerBackendInterface::storageUpdated, this, &StatusController::onStorageUpdated);
     connect(m_backend, &DockerBackendInterface::loadingChanged, this, &StatusController::onLoadingChanged);
     connect(m_backend, &DockerBackendInterface::sectionFailed, this, &StatusController::onSectionFailed);
+    // 拉取私有仓库时用钱包里的凭据（没有就是匿名拉取）
+    m_operations->setCredentialStore(m_credentialStore);
+
     connect(m_scheduler, &RefreshScheduler::stateChanged, this, &StatusController::refreshStateChanged);
     connect(m_scheduler, &RefreshScheduler::autoRefreshEnabledChanged, this, &StatusController::autoRefreshEnabledChanged);
 

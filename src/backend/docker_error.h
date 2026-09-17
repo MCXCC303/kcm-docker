@@ -43,6 +43,14 @@ public:
     DockerError() = default;
     DockerError(Kind kind, QString detail = {}, int httpStatus = 0);
 
+    /*!
+     * 种类 → 稳定 key（`permissionDenied` / `timeout` / …）。
+     *
+     * 界面按 key 决定下一步（例如 401/403 给「去登录…」），不去匹配引擎文案——
+     * 文案会随引擎版本变，key 不会。
+     */
+    static QString kindKey(Kind kind);
+
     Kind kind() const
     {
         return m_kind;

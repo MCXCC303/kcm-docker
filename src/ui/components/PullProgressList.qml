@@ -33,6 +33,9 @@ ColumnLayout {
 
     required property var operations
 
+    /*! 凭据相关的失败（引擎回 401/403）：引导用户去登录，而不是反复重试。 */
+    signal loginRequested(string reference)
+
     objectName: "pullProgressList"
     visible: root.operations.pulls.count > 0
     spacing: Kirigami.Units.smallSpacing
@@ -71,6 +74,8 @@ ColumnLayout {
             required property int completedLayers
             required property int totalLayers
             required property bool active
+            /*! 失败种类 key（`permissionDenied` 时给「去登录…」）。 */
+            required property string errorKindKey
 
             objectName: "pullEntry"
             Layout.fillWidth: true
@@ -119,6 +124,16 @@ ColumnLayout {
                         icon.name: "process-stop"
                         flat: true
                         onClicked: root.operations.cancelPull(pullCard.reference)
+                    }
+
+                    // 凭据相关的失败（引擎回 401/403）：先去登录，而不是反复重试
+                    QQC2.Button {
+                        objectName: "pullLoginButton"
+                        visible: !pullCard.active && pullCard.statusKey === "failed" && pullCard.errorKindKey === "permissionDenied"
+                        text: i18n("Log in…")
+                        icon.name: "dialog-password"
+                        flat: true
+                        onClicked: root.loginRequested(pullCard.reference)
                     }
 
                     // 已结束：移除这条记录（失败的记录也要用户显式处理掉）

@@ -461,6 +461,24 @@ int main(int argc, char **argv)
     backend->setEndpoint(DockerEndpoint::unixSocket(socketPath));
     auto stub = std::make_unique<QmlStubKcm>(backend.get());
 
+    // KONTAINER_RENDER_STORED_CREDENTIALS=1：预置两条凭据，用于复核认证页的列表行
+    // （内存后端，不碰真实 KWallet）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_STORED_CREDENTIALS")) {
+        auto *wallet = stub->credentialBackend();
+        Kontainer::CredentialStore store(wallet);
+        store.open();
+        Kontainer::RegistryCredential first;
+        first.serverAddress = QStringLiteral("ghcr.io");
+        first.username = QStringLiteral("alice");
+        first.password = QStringLiteral("not-a-real-secret");
+        store.store(first);
+        Kontainer::RegistryCredential second;
+        second.serverAddress = QStringLiteral("registry.example.com:5000");
+        second.identityToken = QStringLiteral("ci-token");
+        store.store(second);
+        stub->controller()->registryAuth()->refresh();
+    }
+
     QQmlEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("kcm"), stub.get());
     // i18n 桩必须做 %N 替换，否则渲染出来的文案是 "%1 · created %2 ago · ID %3"，
@@ -524,6 +542,8 @@ int main(int argc, char **argv)
     } else if (page == QLatin1String("image-detail")) {
         qmlFile = QStringLiteral("ImageDetail.qml");
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+    } else if (page == QLatin1String("registry-auth")) {
+        qmlFile = QStringLiteral("RegistryAuthPage.qml");
     } else if (page == QLatin1String("daemon-config-user")) {
         qmlFile = QStringLiteral("DaemonConfigPage.qml");
         initialProperties.insert(QStringLiteral("scope"), QStringLiteral("user"));
@@ -562,6 +582,11 @@ int main(int argc, char **argv)
     window.show();
 
     // 可选：切到指定分区/标签页，便于逐页复核（例如容器详情的「网络」分区）
+    // KONTAINER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_LOGIN")) {
+        QMetaObject::invokeMethod(item, "openLoginDialog", Q_ARG(QString, QString()));
+    }
+
     if (tabIndex > 0) {
         QQuickItem *tabBar = nullptr;
         std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {

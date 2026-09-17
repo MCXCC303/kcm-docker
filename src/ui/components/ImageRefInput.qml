@@ -45,6 +45,8 @@ ColumnLayout {
 
     /*! 文本是否是合法的镜像引用。 */
     readonly property bool referenceValid: root.operations.isValidImageReference(root.text)
+    /*! 当前输入对应的仓库地址（无效引用时为空）：拉取对话框据此提示"还没登录"。 */
+    readonly property string serverAddress: root.referenceValid ? root.operations.serverAddressForImage(root.text) : ""
     /*! 归一化后的引用（缺 tag 会补 `latest`）。 */
     readonly property string normalizedReference: root.operations.normalizedImageReference(root.text)
     /*!

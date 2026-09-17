@@ -28,6 +28,13 @@ struct ImagePullEntry {
     QString statusText;
     /*! 失败原因（引擎原文）；成功与进行中为空。 */
     QString detailText;
+    /*!
+     * 失败种类 key（`permissionDenied` / `timeout` / …）；成功与进行中为空。
+     *
+     * 界面靠它区分"凭据不对（401/403）"与其他失败：前者给「去登录…」引导，
+     * 后者给重试——靠 detail 文本匹配是不可靠的（引擎文案会变）。
+     */
+    QString errorKindKey;
     /*! 0.0 ~ 1.0；未知时为 -1。 */
     double progress = -1.0;
     bool progressKnown = false;
@@ -44,7 +51,7 @@ struct ImagePullEntry {
     friend bool operator==(const ImagePullEntry &lhs, const ImagePullEntry &rhs)
     {
         return lhs.reference == rhs.reference && lhs.statusKey == rhs.statusKey && lhs.statusText == rhs.statusText
-            && lhs.detailText == rhs.detailText && qFuzzyCompare(lhs.progress, rhs.progress)
+            && lhs.detailText == rhs.detailText && lhs.errorKindKey == rhs.errorKindKey && qFuzzyCompare(lhs.progress, rhs.progress)
             && lhs.progressKnown == rhs.progressKnown && lhs.completedLayers == rhs.completedLayers
             && lhs.totalLayers == rhs.totalLayers && lhs.active == rhs.active;
     }
@@ -76,6 +83,7 @@ public:
         CompletedLayersRole,
         TotalLayersRole,
         ActiveRole,
+        ErrorKindKeyRole,
     };
     Q_ENUM(Roles)
 

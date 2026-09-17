@@ -133,6 +133,17 @@ int RegistryAuthController::lastImportFailedCount() const
     return m_importFailedCount;
 }
 
+bool RegistryAuthController::hasCredentialForImage(const QString &imageReference) const
+{
+    const QString address = RegistryAuth::serverAddressForImage(imageReference);
+    return !address.isEmpty() && m_store->hasCredential(address);
+}
+
+QString RegistryAuthController::serverAddressForImage(const QString &imageReference) const
+{
+    return RegistryAuth::serverAddressForImage(imageReference);
+}
+
 void RegistryAuthController::refresh()
 {
     m_store->open();

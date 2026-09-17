@@ -88,6 +88,11 @@ KCM.AbstractKCM {
                         "scope": scope
                     });
                 }
+                onRegistryAuthRequested: function (serverAddress) {
+                    stack.push(registryAuthComponent, {
+                        "presetServerAddress": serverAddress
+                    });
+                }
             }
         }
 
@@ -95,6 +100,14 @@ KCM.AbstractKCM {
             id: containerDetailComponent
 
             ContainerDetail {
+                onCloseRequested: stack.pop()
+            }
+        }
+
+        Component {
+            id: registryAuthComponent
+
+            RegistryAuthPage {
                 onCloseRequested: stack.pop()
             }
         }
@@ -113,6 +126,11 @@ KCM.AbstractKCM {
 
             ImageDetail {
                 onCloseRequested: stack.pop()
+                onRegistryAuthRequested: function (serverAddress) {
+                    stack.push(registryAuthComponent, {
+                        "presetServerAddress": serverAddress
+                    });
+                }
             }
         }
     }

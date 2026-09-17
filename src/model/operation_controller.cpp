@@ -6,6 +6,7 @@
 #include "model/operation_controller.h"
 
 #include "backend/credential_store.h"
+#include "backend/registry_auth.h"
 
 #include "domain/image_reference.h"
 #include "logging.h"
@@ -314,6 +315,11 @@ void OperationController::pullImage(const QString &reference)
     m_backend->pullImage(normalized, credential);
 }
 
+QString OperationController::serverAddressForImage(const QString &reference) const
+{
+    return RegistryAuth::serverAddressForImage(reference);
+}
+
 void OperationController::setCredentialStore(CredentialStore *store)
 {
     m_credentialStore = store;
@@ -457,6 +463,7 @@ void OperationController::onMutationFinished(Mutation mutation,
             case MutationOutcome::Failed:
                 entry->statusKey = QStringLiteral("failed");
                 entry->detailText = error.detail();
+                entry->errorKindKey = DockerError::kindKey(error.kind());
                 break;
             }
         }

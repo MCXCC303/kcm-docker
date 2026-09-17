@@ -12,6 +12,7 @@
 #include "support/qml_stub_kcm.h"
 
 #include <QJsonDocument>
+#include <QTemporaryDir>
 #include <cstdio>
 #include <QJsonObject>
 #include <QQmlComponent>
@@ -92,6 +93,8 @@ private Q_SLOTS:
     void configPageEditorsWriteThroughToTheController();
     void configPageWordingAndLocksPerScope();
     void topologyConnectionColorsAreStablePerContainer();
+    void registryAuthPageReflectsWalletAndStoredCredentials();
+    void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
     void delegateActivationIsWired();
     void statusChipMapsSemanticKeys_data();
@@ -519,6 +522,123 @@ void QmlLoadTest::topologyConnectionColorsAreStablePerContainer()
     QVERIFY(probe->property("emptySeed").value<QColor>().isValid());
 }
 
+/*!
+ * 仓库认证页（ARCH_V5_V8 §2.7）：空状态、钱包横幅、已保存列表、CLI 导入候选。
+ *
+ * 用注入的内存凭据后端（`QmlStubKcm::credentialBackend()`）——绝不碰真实 KWallet。
+ */
+void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
+{
+    // CLI 扫描指向一个临时配置：不读开发者机器上的真实 ~/.docker
+    QTemporaryDir cliDir;
+    QVERIFY(cliDir.isValid());
+    QJsonObject auths;
+    QJsonObject hub;
+    hub.insert(QStringLiteral("auth"), QString::fromLatin1(QByteArrayLiteral("alice:secret").toBase64()));
+    auths.insert(QStringLiteral("https://index.docker.io/v1/"), hub);
+    QJsonObject root;
+    root.insert(QStringLiteral("auths"), auths);
+    QFile config(cliDir.filePath(QStringLiteral("config.json")));
+    QVERIFY(config.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    config.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
+    config.close();
+    qputenv("DOCKER_CONFIG", cliDir.path().toUtf8());
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/RegistryAuthPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    // 空状态：钱包可用（内存后端默认可用）、没有凭据
+    QQuickItem *emptyPlaceholder = childByObjectName(page, QStringLiteral("credentialsEmptyPlaceholder"));
+    QQuickItem *walletBanner = childByObjectName(page, QStringLiteral("walletBanner"));
+    QVERIFY(emptyPlaceholder && walletBanner);
+    QTRY_VERIFY(emptyPlaceholder->property("visible").toBool());
+    QVERIFY2(!walletBanner->property("visible").toBool(), "an available wallet must not show a banner");
+
+    // 预置一条凭据（模拟"已经登录过"）：列表出现该仓库，且只有地址/用户名
+    FakeCredentialBackend *wallet = m_stubKcm->credentialBackend();
+    QVERIFY(wallet);
+    RegistryCredential stored;
+    stored.serverAddress = QStringLiteral("ghcr.io");
+    stored.username = QStringLiteral("bob");
+    stored.password = QStringLiteral("s3cret");
+    QVERIFY(m_stubKcm->controller()->registryAuth()->credentials() != nullptr);
+    CredentialStore store(wallet);
+    store.open();
+    QVERIFY(store.store(stored));
+    m_stubKcm->controller()->registryAuth()->refresh();
+
+    QTRY_VERIFY(!emptyPlaceholder->property("visible").toBool());
+    int rows = 0;
+    std::function<void(QQuickItem *)> countRows = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            if (child->objectName() == QLatin1String("credentialRow")) {
+                ++rows;
+            }
+            countRows(child);
+        }
+    };
+    countRows(page);
+    QCOMPARE(rows, 1);
+
+    // CLI 候选：钱包里还没有的仓库才列出来
+    QQuickItem *importButton = childByObjectName(page, QStringLiteral("importSelectedButton"));
+    QVERIFY(importButton);
+    QVERIFY(importButton->property("enabled").toBool());
+    qunsetenv("DOCKER_CONFIG");
+}
+
+/*!
+ * 引导：拉取失败（401/403）与"该仓库还没登录"都要能一键到登录框。
+ */
+void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
+{
+    // 失败行：只有 permissionDenied 才给「去登录…」
+    ImagePullEntry failed;
+    failed.reference = QStringLiteral("registry.example.com/team/app:1.0");
+    failed.statusKey = QStringLiteral("failed");
+    failed.detailText = QStringLiteral("unauthorized");
+    failed.errorKindKey = QStringLiteral("permissionDenied");
+    failed.active = false;
+    m_stubKcm->controller()->operations()->pulls()->setEntries({failed});
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullProgressList.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    QScopedPointer<QObject> list(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!list.isNull(), qPrintable(component.errorString()));
+    auto *listItem = qobject_cast<QQuickItem *>(list.data());
+    QVERIFY(listItem);
+    QQuickItem *loginButton = childByObjectName(listItem, QStringLiteral("pullLoginButton"));
+    QVERIFY2(loginButton, "a credential failure must offer a login action");
+    QTRY_VERIFY(loginButton->property("visible").toBool());
+
+    // 其他失败原因（例如仓库不可达）不出现这个按钮
+    ImagePullEntry unreachable = failed;
+    unreachable.errorKindKey = QStringLiteral("timeout");
+    m_stubKcm->controller()->operations()->pulls()->setEntries({unreachable});
+    QTRY_VERIFY(!loginButton->property("visible").toBool());
+
+    // 拉取对话框：该仓库没有凭据时给提示与「去登录…」
+    QQmlComponent dialogComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml")));
+    QVERIFY2(!dialogComponent.isError(), qPrintable(dialogComponent.errorString()));
+    QVariantMap dialogInitial;
+    dialogInitial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    dialogInitial.insert(QStringLiteral("credentialKnown"), false);
+    QScopedPointer<QObject> dialog(dialogComponent.createWithInitialProperties(dialogInitial, m_engine->rootContext()));
+    QVERIFY2(!dialog.isNull(), qPrintable(dialogComponent.errorString()));
+    // Kirigami.Dialog 不是 QQuickItem（它是 QObject 基类），因此这里按对象树找子项
+    QQuickItem *hint = findItemByName(dialog.data(), QStringLiteral("pullNeedsLoginHint"));
+    QVERIFY2(hint, "the pull dialog must be able to guide to the login page");
+    QVERIFY2(!hint->property("text").toString().isEmpty(), "the hint must say what will happen");
+    QVERIFY2(!hint->property("visible").toBool(), "the hint only appears once a valid reference is typed");
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -533,6 +653,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("ImageCard.qml"),
         QStringLiteral("EngineStatusView.qml"),
         QStringLiteral("DaemonConfigPage.qml"),
+        QStringLiteral("RegistryAuthPage.qml"),
         QStringLiteral("StorageView.qml"),
         QStringLiteral("ResourceView.qml"),
         QStringLiteral("components/StatTile.qml"),
@@ -554,6 +675,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/ImageRefInput.qml"),
         QStringLiteral("components/StringListEditor.qml"),
         QStringLiteral("components/KeyValueListEditor.qml"),
+        QStringLiteral("components/RegistryLoginDialog.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针

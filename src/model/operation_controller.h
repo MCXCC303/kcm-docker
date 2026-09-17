@@ -132,6 +132,8 @@ public:
     /*! 引用校验与归一化（QML 在提交前调用，非法输入不发往引擎）。 */
     Q_INVOKABLE bool isValidImageReference(const QString &reference) const;
     Q_INVOKABLE QString normalizedImageReference(const QString &reference) const;
+    /*! 镜像引用对应的仓库地址（拉取前提示"这个仓库还没登录"用）。 */
+    Q_INVOKABLE QString serverAddressForImage(const QString &reference) const;
 
     /*! 权限可能变化（例如刚被加入 socket 所属组），允许显式重算。 */
     Q_INVOKABLE void refreshWriteAccess();

@@ -31,6 +31,8 @@ Kirigami.Page {
     signal containerActivated(string containerId)
     /*! 请求打开「运行时配置」页（daemon.json）；scope = user | system。 */
     signal configureRuntimeRequested(string scope)
+    /*! 打开仓库认证页（ARCH_V5_V8 §2.7）：镜像标签页工具栏与失败引导都用它。 */
+    signal registryAuthRequested(string serverAddress)
     signal imageActivated(string imageId)
 
     /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
@@ -503,6 +505,15 @@ Kirigami.Page {
                 onModelChanged: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
             }
 
+            // 仓库登录（ARCH_V5_V8 §2.7）：私有仓库拉取前先登录
+            QQC2.Button {
+                objectName: "registryAuthEntryButton"
+                visible: tabBar.currentIndex === 1
+                text: i18n("Registry logins…")
+                icon.name: "dialog-password"
+                onClicked: root.registryAuthRequested("")
+            }
+
             // 拉取镜像（ARCH_V4 §2.4）：唯一会新增镜像的入口。
             // 权限门不允许写时按钮整体不出现，而不是禁用后静默。
             QQC2.Button {
@@ -601,6 +612,10 @@ Kirigami.Page {
                 Components.PullProgressList {
                     Layout.fillWidth: true
                     operations: root.operations
+                    // 401/403 的失败：直接把人带到对应仓库的登录框，而不是让他自己找入口
+                    onLoginRequested: function (reference) {
+                        root.registryAuthRequested(root.controller.registryAuth.serverAddressForImage(reference));
+                    }
                 }
 
                 Components.EmptyPlaceholder {
@@ -697,8 +712,15 @@ Kirigami.Page {
     Components.PullImageDialog {
         id: pullDialog
         operations: root.operations
+        // 该仓库已有凭据（或引用还没填）：不提示"需要登录"；
+        // 没有凭据时才给出「去登录…」引导
+        credentialKnown: pullDialog.referenceInput.serverAddress === ""
+            || root.controller.registryAuth.hasCredentialForImage(pullDialog.referenceInput.text)
         onPullRequested: function (reference) {
             root.operations.pullImage(reference);
+        }
+        onLoginRequested: function (serverAddress) {
+            root.registryAuthRequested(serverAddress);
         }
     }
 }

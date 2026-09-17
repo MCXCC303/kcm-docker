@@ -22,6 +22,10 @@ class RegistryCredentialModel : public QAbstractListModel
 {
     Q_OBJECT
 
+    /*! 行数 / 是否为空：界面用它决定空状态（QML 看不到普通的 C++ 方法）。 */
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+    Q_PROPERTY(bool empty READ empty NOTIFY countChanged)
+
 public:
     enum Roles {
         /*! 规范化后的仓库地址（索引键，也是界面上的主标识）。 */
