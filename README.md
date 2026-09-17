@@ -49,6 +49,29 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 
 ## 写操作与权限
 
+### 受限提权组件（五期起）
+
+修改 `/etc/docker/daemon.json` 需要 root（本机实测：daemon 是系统级 root 服务，配置文件用户不可写）。
+Kontainer 为此提供一个**能力被严格限制**的 helper，而不是让整个应用提权：
+
+| 它做什么 | 它不做什么 |
+| --- | --- |
+| 把白名单键（镜像加速器、insecure-registries、并发下载数、日志驱动）合并进 `/etc/docker/daemon.json` | 不接受任意路径、任意键、任意 JSON（调用方给不了内容，helper 自己读文件、自己合并） |
+| 经 **systemd D-Bus** 重启 `docker.service` | 不调用 `systemctl` 二进制、不执行任何外部命令、没有"运行任意命令"的接口 |
+| 写前自动备份、`QSaveFile` 原子写入、看不懂的文件拒绝覆写 | 不修改 socket 权限、不动其他系统文件 |
+
+**两步安装**（`cmake --install` 只装前缀，系统部分单独一步）：
+
+```bash
+cmake --install build                          # 装到 ~/kde/usr（不需要 root）
+sudo build/install-privileged-helper.sh        # 装 helper 与 polkit policy（需要 root）
+```
+
+没装第二步时一切照常工作：配置页会给出**可直接复制的命令**，功能不会静默失败。
+发行版打包用 `-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON` 走 KAuth 的标准安装宏。
+
+
+
 ### 权限模型
 
 **按 socket 实际权限工作，不引入提权**（决策记录见 [ARCH_V3.md](ARCH_V3.md) §1.3）：

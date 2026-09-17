@@ -201,6 +201,45 @@ target_link_libraries(kontainer_helper PRIVATE
 )
 install(TARGETS kontainer_helper ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
-# helper 的 D-Bus 服务文件与 polkit policy：两者都必须安装，缺一个授权就会失败
-kauth_install_helper_files(kontainer_helper org.kde.kontainer root)
-kauth_install_actions(org.kde.kontainer "${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.policy")
+# helper 的 D-Bus 服务文件与 polkit policy。
+#
+# 注意：KAuth 的标准宏把它们装到**系统绝对路径**（/usr/lib/kf6/kauth、
+# /usr/share/polkit-1/actions）——那是给发行版打包用的，需要 root。
+# 开发者常用的前缀安装（cmake --install 装到 ~/kde/usr）如果也走这两条规则，
+# 就会在普通用户下直接失败（真实踩过）。因此拆成两条路：
+#
+#   - 默认：只把 helper 二进制装进前缀；系统部分由一个显式脚本完成（需要 sudo）
+#   - 打包/系统安装：-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON，走 KAuth 标准宏
+option(KONTAINER_INSTALL_PRIVILEGED_HELPER
+       "Install the polkit policy and the helper D-Bus service into system paths (requires root)" OFF)
+
+if(KONTAINER_INSTALL_PRIVILEGED_HELPER)
+    kauth_install_helper_files(kontainer_helper org.kde.kontainer root)
+    kauth_install_actions(org.kde.kontainer "${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.policy")
+else()
+    message(STATUS "Kontainer: privileged helper files are not installed by cmake --install; "
+                   "run the generated install-privileged-helper.sh with sudo (see README)")
+endif()
+
+# 显式的一步提权安装脚本：路径与宏使用的系统路径一致，用 sudo 执行即可
+set(KONTAINER_PRIVILEGED_INSTALL_SCRIPT "${CMAKE_BINARY_DIR}/install-privileged-helper.sh")
+file(WRITE "${KONTAINER_PRIVILEGED_INSTALL_SCRIPT}"
+"#!/bin/sh
+# 由 CMake 生成：把受限 helper 与 polkit policy 安装到系统路径（需要 root）。
+# 只有这两个文件需要提权安装；其余部分由 cmake --install 装进前缀。
+set -e
+KAUTH_DIR=/usr/lib/kf6/kauth
+POLKIT_DIR=/usr/share/polkit-1/actions
+DBUS_DIR=/usr/share/dbus-1/system-services
+
+install -d \"\$KAUTH_DIR\" \"\$POLKIT_DIR\" \"\$DBUS_DIR\"
+install -m 0755 \"${CMAKE_BINARY_DIR}/bin/kontainer_helper\" \"\$KAUTH_DIR/kontainer_helper\"
+install -m 0644 \"${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.policy\" \"\$POLKIT_DIR/org.kde.kontainer.policy\"
+printf '%s\\n' \
+  '[D-BUS Service]' \
+  'Name=org.kde.kontainer' \
+  'Exec=/usr/lib/kf6/kauth/kontainer_helper' \\
+  'User=root' > \"\$DBUS_DIR/org.kde.kontainer.service\"
+echo \"installed: \$KAUTH_DIR/kontainer_helper, \$POLKIT_DIR/org.kde.kontainer.policy\"
+")
+message(STATUS "Kontainer: write privileged install script: ${KONTAINER_PRIVILEGED_INSTALL_SCRIPT}")
