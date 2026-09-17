@@ -116,6 +116,7 @@ private Q_SLOTS:
     void keyValueListEditorMasksValuesAndDetectsDuplicates();
     void imageDetailOffersForceDeleteOnlyForMultipleTags();
     void mountRowReflectsHostPathState();
+    void mountRowsPutTheContainerPathOnTheRight();
     void topologyDrawsDecoratedLinksForPublishedPorts();
     void unpublishedPortsAreListedWithoutLinks();
 
@@ -1812,6 +1813,106 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     };
     checkText(topology);
     QCOMPARE(nonEmptyChips, 6);
+}
+
+/*!
+ * 挂载行的排版约定（ARCH_V4 §2.1.1，2026-09-18 用户反馈）：
+ *
+ *   宿主路径占满剩余宽度、过长时**从中间省略**；容器路径**贴右边缘**、
+ *   最多占四成宽度。曾经的写法给两个标签都设了 fillWidth，于是容器路径落在
+ *   半宽处、跟着宿主路径的长度左右漂移——用户看到的是"映射点位置有点奇怪"。
+ */
+void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("demo");
+    detail.state = ContainerState::Running;
+    ContainerMount longMount;
+    longMount.type = QStringLiteral("bind");
+    longMount.source = QStringLiteral("/home/someone/.local/share/containers/storage/overlay/"
+                                      "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6/merged/opt/application/resources/very-long-name");
+    longMount.destination = QStringLiteral("/opt/application/resources/very-long-name");
+    longMount.mode = QStringLiteral("rw");
+    ContainerMount shortMount;
+    shortMount.type = QStringLiteral("bind");
+    shortMount.source = QStringLiteral("/srv/data");
+    shortMount.destination = QStringLiteral("/data");
+    shortMount.mode = QStringLiteral("ro");
+    detail.mounts = {longMount, shortMount};
+    m_backend->setContainerDetail(detail);
+    m_stubKcm->hostPaths()->setState(HostPathState::Directory);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-1")},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    // 布局断言需要真实宽度：给它一个窗口（与用户看到该分区时的状态一致）
+    QQuickWindow window;
+    window.resize(900, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(900);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 3)); // 挂载分区
+
+    QList<QQuickItem *> rows;
+    std::function<void(QQuickItem *)> collect = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            if (child->objectName() == QLatin1String("mountEntry")) {
+                rows.append(child);
+            }
+            collect(child);
+        }
+    };
+    collect(page);
+    QCOMPARE(rows.size(), 2);
+
+    for (int i = 0; i < rows.size(); ++i) {
+        QQuickItem *row = rows.at(i);
+        QQuickItem *source = childByObjectName(row, QStringLiteral("mountSourceLabel"));
+        QQuickItem *destination = childByObjectName(row, QStringLiteral("mountDestinationLabel"));
+        QVERIFY2(source && destination, qPrintable(QStringLiteral("row %1 has no path labels").arg(i)));
+        QTRY_VERIFY(source->width() > 0 && destination->width() > 0);
+        const qreal linkRowWidthHint = destination->parentItem() ? destination->parentItem()->width() : row->width();
+
+        // 容器路径的**文本框贴合文字**（不再占半行）：靠右对齐的前提
+        // ——旧写法给两个标签都设了 fillWidth，目标路径的盒子占一半宽度，
+        //   文字虽然"靠右对齐"在盒子里，看起来却落在行的中间（用户反馈的"位置奇怪"）
+        const qreal destinationContent = destination->property("contentWidth").toReal();
+        // 允许一点内边距与取整误差；关键是"贴合文字"而不是半个行宽
+        const qreal hugTolerance = qMax<qreal>(8.0, linkRowWidthHint * 0.05);
+        QVERIFY2(destination->width() <= destinationContent + hugTolerance,
+                 qPrintable(QStringLiteral("row %1: the container path box must hug its text (%2 vs %3)")
+                                .arg(i)
+                                .arg(destination->width())
+                                .arg(destinationContent)));
+        // 目标路径排在宿主路径之后（不重叠），且文字**靠右**对齐：
+        // 宿主路径左对齐、容器路径右对齐——两者必须不同，否则目标路径又会飘到中间
+        QQuickItem *linkRow = destination->parentItem();
+        QVERIFY(linkRow);
+        const qreal sourceRight = source->x() + source->width();
+        QVERIFY2(destination->x() >= sourceRight, qPrintable(QStringLiteral("row %1: labels overlap").arg(i)));
+        QVERIFY2(destination->property("horizontalAlignment").toInt() != source->property("horizontalAlignment").toInt(),
+                 qPrintable(QStringLiteral("row %1: the container path must be right-aligned").arg(i)));
+    }
+
+    // 说明：无头测试里页面的宽度链条不稳定（行的实际宽度可能超过页面），
+    // 因此"超长宿主路径真的出现省略号"这一条不在这里断言，而是靠渲染复核：
+    //   KONTAINER_RENDER_LONG_PATHS=1 tests/tools/render_ui.sh container-detail 1200 620 light /tmp/m.png 3
 }
 
 /*!

@@ -714,7 +714,8 @@ KCM.AbstractKCM {
                                 }
                             }
 
-                            /* 第二行：宿主路径 → 容器路径 */
+                            /* 第二行：宿主路径 → 容器路径
+                               （容器路径**靠右**收尾，两条路径都从中间省略：太长也不挤掉对方） */
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -726,7 +727,10 @@ KCM.AbstractKCM {
                                     text: mountRow.source
                                     font.family: "monospace"
                                     font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    // 宿主路径通常更长：占满剩余宽度，从中间省略
+                                    // （保留开头与尾段，比单纯截尾更有辨识度）
                                     elide: Text.ElideMiddle
+                                    horizontalAlignment: Text.AlignLeft
                                     Layout.fillWidth: true
                                 }
 
@@ -744,7 +748,12 @@ KCM.AbstractKCM {
                                     font.family: "monospace"
                                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                                     elide: Text.ElideMiddle
-                                    Layout.fillWidth: true
+                                    // 靠右对齐：容器路径是固定长度、需要一眼扫完的一列，
+                                    // 让它贴着右边缘（而不是跟着宿主路径的长度左右漂移）
+                                    horizontalAlignment: Text.AlignRight
+                                    Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                                    // 很长的容器路径最多占四成宽度，剩下的留给宿主路径
+                                    Layout.maximumWidth: Math.max(Kirigami.Units.gridUnit * 6, mountRow.width * 0.4)
                                 }
                             }
 

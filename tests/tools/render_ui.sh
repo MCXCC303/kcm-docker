@@ -14,6 +14,7 @@
 #     KONTAINER_RENDER_ROOTLESS=1    让 fixture 报告 rootless 部署（配置页据此走用户配置路径）
 #     KONTAINER_RENDER_LANG=zh_CN    用 po/zh_CN 的译文渲染界面（只有 QML 文案会变中文：
 #                                    C++ 组装的文本走 ki18n，渲染工具喂不进去）
+#     KONTAINER_RENDER_LONG_PATHS=1  挂载路径换成极长的那种（复核省略与靠右对齐）
 #     HOME=<临时目录>                让 daemon-config 页读到该目录下的 daemon.json
 #                                    （用于复核"用户可写"形态；默认读真实系统配置）
 #

@@ -240,6 +240,24 @@ void fillFixture(MockDockerBackend &backend)
                       QStringLiteral("/var/cache/frontend"),
                       QStringLiteral("rw"),
                       false}};
+    // KONTAINER_RENDER_LONG_PATHS=1：把挂载路径拉长，用来复核"宿主路径省略 + 容器路径靠右"
+    // 在极端长度下的表现（真实机器上 WinBoat 那类容器的宿主路径可以很长）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LONG_PATHS")) {
+        detail.mounts = {{QStringLiteral("bind"),
+                          QString(),
+                          QStringLiteral("/home/someone/.local/share/containers/storage/overlay/"
+                                         "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6/merged/opt/application/"
+                                         "resources/very-long-directory-name-for-elision-check"),
+                          QStringLiteral("/opt/application/resources/very-long-directory-name-for-elision-check"),
+                          QStringLiteral("rw"),
+                          true},
+                         {QStringLiteral("bind"),
+                          QString(),
+                          QStringLiteral("/srv/data"),
+                          QStringLiteral("/data"),
+                          QStringLiteral("ro"),
+                          true}};
+    }
     detail.environment = {QStringLiteral("NODE_ENV=production"),
                           QStringLiteral("API_BASE_URL=https://api.example.com"),
                           QStringLiteral("LOG_LEVEL=info"),
