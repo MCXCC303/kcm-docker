@@ -51,6 +51,7 @@ kontainer_add_test(tst_container_model model/tst_container_model.cpp)
 kontainer_add_test(tst_container_log_controller model/tst_container_log_controller.cpp)
 kontainer_add_test(tst_network_model model/tst_network_model.cpp)
 kontainer_add_test(tst_volume_model model/tst_volume_model.cpp)
+kontainer_add_test(tst_container_create model/tst_container_create.cpp)
 kontainer_add_test(tst_filter_models model/tst_filter_models.cpp)
 kontainer_add_test(tst_i18n_consistency model/tst_i18n_consistency.cpp)
 # 译文是 ki18n 按 <XDG_DATA_DIRS>/locale/<lang>/LC_MESSAGES/<domain>.mo 找的：
