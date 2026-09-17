@@ -128,10 +128,15 @@ void LogFrameReaderTest::ansiSequencesAreStrippedAcrossPackets()
 
 void LogFrameReaderTest::carriageReturnOverwritesTheCurrentLine()
 {
-    // 进度条：反复 \r 只保留最后一次覆盖后的内容
+    // 进度条：每次覆盖发一条**临时行**（complete == false），控制台据此替换最后一行，
+    // 因此既能实时看到进度，又不会把控制台刷爆
     LogFrameReader reader;
     const QList<LogLine> lines = reader.feed(frame(1, "10%\r50%\r100% done\nnext\n"));
-    QCOMPARE(texts(lines), QStringList({QStringLiteral("100% done"), QStringLiteral("next")}));
+    QCOMPARE(texts(lines), QStringList({QStringLiteral("10%"), QStringLiteral("50%"), QStringLiteral("100% done"), QStringLiteral("next")}));
+    QVERIFY2(!lines.at(0).complete, "an overwritten line is provisional");
+    QVERIFY2(!lines.at(1).complete, "an overwritten line is provisional");
+    QVERIFY2(lines.at(2).complete, "the line terminated by a newline is final");
+    QVERIFY(lines.at(3).complete);
 }
 
 void LogFrameReaderTest::carriageReturnFollowedByNewlineIsJustALineEnd()

@@ -103,7 +103,9 @@ void LogFrameReader::appendText(LogLine::Stream stream, const QByteArray &data, 
                 closePendingLine(stream, out); // CRLF：就是行尾
                 continue;
             }
-            // 单独的 \r：回车覆盖——丢掉当前行已有内容，后面的字节重写这一行
+            // 单独的 \r：回车覆盖——先把当前内容作为**临时行**发出去（进度条能实时看到），
+            // 再清空缓冲，后面的字节重写这一行；控制台按"临时行"语义替换最后一行
+            emitProvisionalLine(out);
             m_pendingLine.clear();
             m_hasPending = true;
             m_pendingStream = stream;
@@ -123,6 +125,18 @@ void LogFrameReader::appendText(LogLine::Stream stream, const QByteArray &data, 
         m_pendingLine.append(ch);
     }
     m_pendingStartsNewLine = false;
+}
+
+void LogFrameReader::emitProvisionalLine(QList<LogLine> *out)
+{
+    if (!m_hasPending) {
+        return;
+    }
+    LogLine line;
+    line.stream = m_pendingStream;
+    line.text = QString::fromUtf8(m_pendingLine);
+    line.complete = false; // 临时：控制台应当替换最后一行，而不是新增一行
+    out->append(line);
 }
 
 void LogFrameReader::closePendingLine(LogLine::Stream stream, QList<LogLine> *out)

@@ -115,6 +115,8 @@ add_library(kontainer_core STATIC
     model/port_mapping_model.h
     model/presentation.cpp
     model/presentation.h
+    model/container_log_controller.cpp
+    model/container_log_controller.h
     model/registry_auth_controller.cpp
     model/registry_auth_controller.h
     model/registry_credential_model.cpp

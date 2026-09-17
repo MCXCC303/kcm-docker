@@ -17,7 +17,8 @@ namespace Kontainer
  * 一条日志片段（ARCH_V5_V8 §3.1.1）。
  *
  * `text` **不含行尾换行符**：是否成行由 `complete` 说明，控制台据此决定追加还是
- * 替换最后一行（`\r` 覆盖的进度行就是这样处理的）。
+ * 替换最后一行（`\r` 覆盖的进度行就是这样处理的：每次覆盖发一条 `complete == false`
+ * 的临时行，控制台替换掉上一行，因此进度条不会把控制台刷爆，也不会只有等到换行才可见）。
  */
 struct LogLine {
     enum class Stream {
@@ -90,6 +91,8 @@ private:
     void appendText(LogLine::Stream stream, const QByteArray &data, QList<LogLine> *out);
     /*! 把当前待定行作为一条完整行发出。 */
     void closePendingLine(LogLine::Stream stream, QList<LogLine> *out);
+    /*! 把当前待定行作为**临时行**发出（`\r` 覆盖与流结束用）。 */
+    void emitProvisionalLine(QList<LogLine> *out);
 
     bool m_tty = false;
     /*! 非 TTY 模式下未凑齐一帧的字节。 */
