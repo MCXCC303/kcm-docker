@@ -28,6 +28,11 @@ void MockDockerBackend::setImages(const QList<Image> &images)
     m_images = images;
 }
 
+void MockDockerBackend::setNetworks(const QList<Network> &networks)
+{
+    m_networks = networks;
+}
+
 void MockDockerBackend::setStorageUsage(const StorageUsage &usage)
 {
     m_storageUsage = usage;
@@ -92,6 +97,11 @@ void MockDockerBackend::refreshContainers()
 void MockDockerBackend::refreshImages()
 {
     beginRefresh(Section::Images);
+}
+
+void MockDockerBackend::refreshNetworks()
+{
+    beginRefresh(Section::Networks);
 }
 
 void MockDockerBackend::refreshStorageUsage()
@@ -282,7 +292,8 @@ void MockDockerBackend::completeRefresh()
                                      Section::Storage,
                                      Section::ContainerDetail,
                                      Section::ImageDetail,
-                                     Section::Stats};
+                                     Section::Stats,
+                                     Section::Networks};
     for (Section section : sections) {
         if (!m_pending.value(int(section))) {
             continue;
@@ -320,6 +331,9 @@ void MockDockerBackend::completeRefresh()
             break;
         case Section::Stats:
             Q_EMIT containerStatsUpdated();
+            break;
+        case Section::Networks:
+            Q_EMIT networksUpdated();
             break;
         }
     }

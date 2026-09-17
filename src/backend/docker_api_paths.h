@@ -83,6 +83,17 @@ inline QString imageCreate()
     return QStringLiteral("/images/create");
 }
 /*!
+ * 网络列表（`GET /networks`，ARCH_V5_V8 §3.2）。
+ *
+ * 实测这个接口返回的**已经是完整对象**（IPAM / Options / Labels / Containers 都在），
+ * 因此详情页不需要再发一次 `/networks/{id}`。
+ */
+inline QString networks()
+{
+    return QStringLiteral("/networks");
+}
+
+/*!
  * 读取容器日志（ARCH_V5_V8 §3.1.1）。
  *
  * `stdout`/`stderr`/`follow`/`tail` 都由 query 给出；返回的是**流**

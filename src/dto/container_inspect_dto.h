@@ -19,8 +19,13 @@
 namespace Kontainer
 {
 
-/*! inspect → NetworkSettings.Networks.<name>。 */
-struct DockerNetworkDTO {
+/*!
+ * inspect → `NetworkSettings.Networks.<name>`。
+ *
+ * 注意与 `dto/network_dto.h` 的 `DockerNetworkDTO`（`GET /networks` 的**网络对象**）
+ * 区分：这个是"某个容器接在哪个网络上"的片段，字段完全不同。
+ */
+struct ContainerNetworkDTO {
     QString name;
     QString networkId;
     QString ipAddress;
@@ -82,7 +87,7 @@ struct DockerContainerInspectDTO {
     QDateTime created;
 
     QList<DockerPortDTO> ports;
-    QList<DockerNetworkDTO> networks;
+    QList<ContainerNetworkDTO> networks;
     QList<DockerMountDTO> mounts;
 
     static std::optional<DockerContainerInspectDTO> fromJson(const QJsonObject &object, QString *error = nullptr);

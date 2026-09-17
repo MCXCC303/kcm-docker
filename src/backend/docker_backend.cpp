@@ -10,6 +10,7 @@
 #include "dto/container_dto.h"
 #include "dto/container_inspect_dto.h"
 #include "dto/image_dto.h"
+#include "dto/network_dto.h"
 #include "dto/image_inspect_dto.h"
 #include "dto/image_pull_dto.h"
 #include "dto/stats_dto.h"
@@ -319,6 +320,9 @@ void DockerBackend::failSection(Section section, const DockerError &error)
     case Section::Images:
         m_imagesInFlight = false;
         break;
+    case Section::Networks:
+        m_networksInFlight = false;
+        break;
     case Section::Storage:
     case Section::ContainerDetail:
     case Section::ImageDetail:
@@ -442,6 +446,56 @@ void DockerBackend::startImagesRequest()
     });
 }
 
+
+void DockerBackend::refreshNetworks()
+{
+    if (m_networksInFlight) {
+        qCDebug(kontainerBackend) << "coalesced network refresh";
+        return;
+    }
+    m_networksInFlight = true;
+    updateLoading();
+    withApiVersion(Section::Networks, [this] {
+        startNetworksRequest();
+    });
+}
+
+void DockerBackend::startNetworksRequest()
+{
+    DockerReply *reply = m_client.get(ApiPaths::networks());
+    connect(reply, &DockerReply::finished, this, [this, reply] {
+        const bool failed = reply->state() != DockerReply::State::Succeeded;
+        const DockerError error = reply->error();
+        const QByteArray body = reply->body();
+        reply->deleteLater();
+
+        if (failed) {
+            // 保留上一次的列表：网络是低频数据，"读失败"不该让界面突然空掉
+            m_networksInFlight = false;
+            updateLoading();
+            failSection(Section::Networks, error);
+            return;
+        }
+
+        QString parseError;
+        int skipped = 0;
+        const QList<DockerNetworkDTO> dtos = DockerNetworkDTO::listFromJson(body, &parseError, &skipped);
+        if (!parseError.isEmpty()) {
+            m_networksInFlight = false;
+            updateLoading();
+            failSection(Section::Networks, DockerError(DockerError::Kind::UnexpectedPayload, parseError));
+            return;
+        }
+        if (skipped > 0) {
+            qCWarning(kontainerBackend) << "skipped" << skipped << "malformed network entries";
+        }
+
+        m_networks = networksFromDto(dtos);
+        m_networksInFlight = false;
+        updateLoading();
+        Q_EMIT networksUpdated();
+    });
+}
 
 /* ------------------------------------------------------------------------- */
 /* 二期：Storage / Container Detail / Image Detail / Stats                     */

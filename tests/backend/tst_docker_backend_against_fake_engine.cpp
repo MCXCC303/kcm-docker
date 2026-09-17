@@ -447,6 +447,7 @@ private Q_SLOTS:
     void authCheckSendsCredentialsOnlyInTheHeader();
     void authCheckClassifiesFailures();
     void pullSendsCredentialsOnlyWhenPresent();
+    void networksAreListedFromTheEngine();
     void logStreamDemultiplexesAndEnds();
     void logStreamReportsEngineFailures();
     void logStreamCancelIsNotAnError();
@@ -482,6 +483,50 @@ RegistryCredential sampleCredential()
  * 私有仓库拉取：凭据只走 `X-Registry-Auth` 头，且 `serveraddress` 必须是**镜像所在仓库**
  * （调用方给的凭据结构里可能写着别的地址）。
  */
+/*!
+ * 网络列表（ARCH_V5_V8 §3.2）：请求路径、解析与信号。
+ */
+void DockerBackendFakeEngineTest::networksAreListedFromTheEngine()
+{
+    const QByteArray payload = R"([
+        {"Name": "bridge", "Id": "5cd9ee041dffb38f712fa8b9284ef54c3fcaffd720958515aa3c155b82af90b9",
+         "Driver": "bridge", "Scope": "local",
+         "IPAM": {"Config": [{"Subnet": "172.17.0.0/16", "Gateway": "172.17.0.1"}]},
+         "Options": {"com.docker.network.bridge.name": "docker0"}, "Labels": {},
+         "Containers": {}},
+        {"Name": "app_default", "Id": "aaaaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff1234",
+         "Driver": "bridge", "Scope": "local",
+         "IPAM": {"Config": [{"Subnet": "172.18.0.0/16"}]},
+         "Labels": {"com.docker.compose.project": "app"},
+         "Containers": {"1111111111111111111111111111111111111111111111111111111111111111":
+                        {"Name": "app", "MacAddress": "02:42:ac:12:00:02", "IPv4Address": "172.18.0.2/16"}}}
+    ])";
+    m_engine->setPathStatus(QStringLiteral("/networks"), 200, payload);
+
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    QSignalSpy updatedSpy(&backend, &DockerBackend::networksUpdated);
+    QSignalSpy failureSpy(&backend, &DockerBackend::sectionFailed);
+
+    backend.refreshNetworks();
+    QTRY_COMPARE_WITH_TIMEOUT(updatedSpy.count(), 1, 10000);
+
+    QCOMPARE(failureSpy.count(), 0);
+    const QList<Network> networks = backend.networks();
+    QCOMPARE(networks.size(), 2);
+    QVERIFY(networks.at(0).isPredefined());
+    QVERIFY(!networks.at(1).isPredefined());
+    QCOMPARE(networks.at(1).memberCount(), 1);
+    QCOMPARE(networks.at(1).subnetText(), QStringLiteral("172.18.0.0/16"));
+
+    // 请求形态：版本前缀 + 简单 GET
+    const FakeEngine::RequestRecord request = m_engine->lastRequest();
+    QCOMPARE(request.method, QStringLiteral("GET"));
+    QCOMPARE(request.path, QStringLiteral("/v1.56/networks"));
+    QVERIFY(request.query.isEmpty());
+}
+
+
 /* ============================================================================
  * 容器日志（ARCH_V5_V8 §3.1）
  * ==========================================================================*/

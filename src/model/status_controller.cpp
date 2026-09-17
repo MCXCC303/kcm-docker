@@ -38,6 +38,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_storage(new StorageStatus(this))
     , m_containerModel(new ContainerModel(this))
     , m_imageModel(new ImageModel(this))
+    , m_networkModel(new NetworkModel(this))
+    , m_networkFilter(new NetworkFilterModel(this))
     , m_containerFilter(new ContainerFilterModel(this))
     , m_imageFilter(new ImageFilterModel(this))
     , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
@@ -57,6 +59,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     // 代理模型：搜索/过滤/排序状态由代理自己持有，因此后台刷新不会重置用户条件（§32）
     m_containerFilter->setSourceModel(m_containerModel);
     m_imageFilter->setSourceModel(m_imageModel);
+    m_networkFilter->setSourceModel(m_networkModel);
 
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
     // 配置页需要 /info 里的 SecurityOptions / RegistryConfig.Mirrors / LiveRestoreEnabled，
@@ -67,6 +70,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_daemonConfigSystem->setEngineInfo(m_backend->engineInfo());
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &StatusController::onContainersUpdated);
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &StatusController::onImagesUpdated);
+    connect(m_backend, &DockerBackendInterface::networksUpdated, this, &StatusController::onNetworksUpdated);
     connect(m_backend, &DockerBackendInterface::storageUpdated, this, &StatusController::onStorageUpdated);
     connect(m_backend, &DockerBackendInterface::loadingChanged, this, &StatusController::onLoadingChanged);
     connect(m_backend, &DockerBackendInterface::sectionFailed, this, &StatusController::onSectionFailed);
@@ -144,6 +148,11 @@ bool StatusController::updateFailed() const
 bool StatusController::stale() const
 {
     return m_scheduler->isStale();
+}
+
+void StatusController::refreshNetworks()
+{
+    m_backend->refreshNetworks();
 }
 
 void StatusController::refresh()
@@ -275,6 +284,11 @@ QString StatusController::storageStateKey() const
     return listStateKeyFor(m_storageState);
 }
 
+QString StatusController::networksStateKey() const
+{
+    return listStateKeyFor(m_networksState);
+}
+
 /* ------------------------------------------------------------------------- */
 /* backend 信号                                                                */
 /* ------------------------------------------------------------------------- */
@@ -320,6 +334,20 @@ void StatusController::onImagesUpdated()
     updateStates();
 }
 
+void StatusController::onNetworksUpdated()
+{
+    m_networkModel->setNetworks(m_backend->networks());
+    if (!m_networksOk) {
+        m_networksOk = true;
+        m_networksFailed = false;
+        updateStates();
+    }
+    if (!m_networksError.isEmpty()) {
+        m_networksError.clear();
+        Q_EMIT networksErrorChanged();
+    }
+}
+
 void StatusController::onStorageUpdated()
 {
     m_storage->setUsage(m_backend->storageUsage());
@@ -359,6 +387,12 @@ void StatusController::onSectionFailed(Section section, const DockerError &error
         m_storageOk = false;
         m_storageFailed = true;
         m_storage->clear(); // 失败时不让旧数据继续冒充最新（§15）
+        break;
+    case Section::Networks:
+        // 网络是低频数据：读失败时**保留**上一次的列表（后端也保留），
+        // 只把状态标成失败并在页面上提示，避免界面突然空掉
+        m_networksOk = false;
+        m_networksFailed = true;
         break;
     case Section::ContainerDetail:
     case Section::ImageDetail:
@@ -404,6 +438,13 @@ void StatusController::setSectionError(Section section, const QString &text)
         }
         m_storageError = text;
         Q_EMIT storageErrorChanged();
+        return;
+    case Section::Networks:
+        if (m_networksError == text) {
+            return;
+        }
+        m_networksError = text;
+        Q_EMIT networksErrorChanged();
         return;
     case Section::ContainerDetail:
     case Section::ImageDetail:
@@ -473,6 +514,13 @@ void StatusController::updateStates()
     if (storageState != m_storageState) {
         m_storageState = storageState;
         Q_EMIT storageStateChanged();
+    }
+
+    // 网络列表不参与整页状态（§30）：它没有数据时只是"网络页空着"
+    const ListState networksState = computeListState(m_networksOk, m_networksFailed, m_networkModel->count());
+    if (networksState != m_networksState) {
+        m_networksState = networksState;
+        Q_EMIT networksStateChanged();
     }
 
     State next = State::Idle;

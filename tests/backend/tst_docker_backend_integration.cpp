@@ -38,12 +38,15 @@ private Q_SLOTS:
     void missingSocketProducesClearError();
     void pullsAnImageWhenExplicitlyRequested();
     void readsHistoricalLogsOfAnExistingContainer();
+    void readsNetworkList();
 };
 
 void DockerBackendIntegrationTest::initTestCase()
 {
     setupTranslationDomain();
     qRegisterMetaType<Kontainer::DockerError>("Kontainer::DockerError");
+    qRegisterMetaType<Kontainer::Network>("Kontainer::Network");
+    qRegisterMetaType<QList<Kontainer::Network>>("QList<Kontainer::Network>");
     qRegisterMetaType<Kontainer::LogLine>("Kontainer::LogLine");
     qRegisterMetaType<QList<Kontainer::LogLine>>("QList<Kontainer::LogLine>");
     qRegisterMetaType<Kontainer::DockerBackendInterface::LogStreamEnd>("Kontainer::DockerBackendInterface::LogStreamEnd");
@@ -260,6 +263,45 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
     }
 
     QSKIP("no container on this machine has readable log output");
+}
+
+/*!
+ * 真实 daemon 的网络列表（ARCH_V5_V8 §3.2）。只读 `GET /networks`。
+ *
+ * 断言的是"真实载荷能被解析"以及三条预定义网络一定在（本机实测 4 个网络）。
+ */
+void DockerBackendIntegrationTest::readsNetworkList()
+{
+    DockerBackend backend;
+    QSignalSpy networksSpy(&backend, &DockerBackend::networksUpdated);
+    QSignalSpy failureSpy(&backend, &DockerBackend::sectionFailed);
+
+    backend.refreshNetworks();
+    QTRY_VERIFY_WITH_TIMEOUT(networksSpy.count() + failureSpy.count() > 0, 15000);
+    QCOMPARE(failureSpy.count(), 0);
+
+    const QList<Network> networks = backend.networks();
+    QVERIFY2(networks.size() >= 3, "a daemon always has at least bridge/host/none");
+
+    QStringList names;
+    for (const Network &network : networks) {
+        QVERIFY(!network.id.isEmpty());
+        QVERIFY(!network.name.isEmpty());
+        QVERIFY(!network.driver.isEmpty());
+        names.append(network.name);
+    }
+    for (const QString &expected : {QStringLiteral("bridge"), QStringLiteral("host"), QStringLiteral("none")}) {
+        QVERIFY2(names.contains(expected), qPrintable(QStringLiteral("missing predefined network: ") + expected));
+    }
+
+    int predefined = 0;
+    for (const Network &network : networks) {
+        if (network.isPredefined()) {
+            ++predefined;
+        }
+    }
+    QVERIFY2(predefined >= 3, "bridge/host/none must be recognised as pre-defined");
+    qInfo("read %d network(s), %d pre-defined", int(networks.size()), predefined);
 }
 
 QTEST_GUILESS_MAIN(DockerBackendIntegrationTest)

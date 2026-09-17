@@ -13,6 +13,7 @@
 #include "domain/container_stats.h"
 #include "domain/engine_info.h"
 #include "domain/image.h"
+#include "domain/network.h"
 #include "domain/image_detail.h"
 #include "domain/image_pull_progress.h"
 #include "domain/storage_usage.h"
@@ -55,6 +56,7 @@ public:
     void refreshEngine() override;
     void refreshContainers() override;
     void refreshImages() override;
+    void refreshNetworks() override;
 
     void refreshStorageUsage() override;
     void inspectContainer(const QString &id) override;
@@ -89,6 +91,10 @@ public:
     QList<Container> containers() const override
     {
         return m_containers;
+    }
+    QList<Network> networks() const override
+    {
+        return m_networks;
     }
     QList<Image> images() const override
     {
@@ -174,6 +180,7 @@ private:
     void startInfoRequest();
     void startContainersRequest();
     void startImagesRequest();
+    void startNetworksRequest();
     void startStorageRequest();
     void startContainerInspectRequest(const QString &id);
     void startImageInspectRequest(const QString &id);
@@ -206,6 +213,9 @@ private:
     bool m_engineInFlight = false;
     bool m_containersInFlight = false;
     bool m_imagesInFlight = false;
+    bool m_networksInFlight = false;
+    /*! 上一次成功读取的网络列表（刷新失败时保留，界面不会突然空掉）。 */
+    QList<Network> m_networks;
     bool m_handshakeInFlight = false;
     bool m_loading = false;
 

@@ -18,6 +18,8 @@
 #include "model/operation_controller.h"
 #include "model/registry_auth_controller.h"
 #include "model/image_model.h"
+#include "model/network_filter_model.h"
+#include "model/network_model.h"
 #include "model/refresh_scheduler.h"
 #include "model/storage_status.h"
 
@@ -55,6 +57,7 @@ class StatusController : public QObject
     Q_PROPERTY(QString containersStateKey READ containersStateKey NOTIFY containersStateChanged)
     Q_PROPERTY(QString imagesStateKey READ imagesStateKey NOTIFY imagesStateChanged)
     Q_PROPERTY(QString storageStateKey READ storageStateKey NOTIFY storageStateChanged)
+    Q_PROPERTY(QString networksStateKey READ networksStateKey NOTIFY networksStateChanged)
     /*!
      * Engine 连接状态的语义与图标（ARCH_V3 §2.1：语义判断属于 model 层，
      * QML 只把语义 key 翻译成主题颜色，不再自己 switch 状态字符串）。
@@ -67,6 +70,7 @@ class StatusController : public QObject
     Q_PROPERTY(QString containersError READ containersError NOTIFY containersErrorChanged)
     Q_PROPERTY(QString imagesError READ imagesError NOTIFY imagesErrorChanged)
     Q_PROPERTY(QString storageError READ storageError NOTIFY storageErrorChanged)
+    Q_PROPERTY(QString networksError READ networksError NOTIFY networksErrorChanged)
 
     /*! 一期 endpoint 不可在运行时改变（没有配置写入口），因此是 CONSTANT。 */
     Q_PROPERTY(QString endpoint READ endpoint CONSTANT)
@@ -81,6 +85,10 @@ class StatusController : public QObject
     Q_PROPERTY(bool autoRefreshEnabled READ autoRefreshEnabled WRITE setAutoRefreshEnabled NOTIFY autoRefreshEnabledChanged)
     Q_PROPERTY(int autoRefreshInterval READ autoRefreshInterval CONSTANT)
     Q_PROPERTY(int storageRefreshInterval READ storageRefreshInterval CONSTANT)
+
+    /*! 网络列表与过滤代理（六期 §3.2）。 */
+    Q_PROPERTY(Kontainer::NetworkModel *networkModel READ networkModel CONSTANT)
+    Q_PROPERTY(Kontainer::NetworkFilterModel *networkList READ networkList CONSTANT)
 
     /* 刷新状态（§15/§16） */
     Q_PROPERTY(QDateTime lastUpdated READ lastUpdated NOTIFY refreshStateChanged)
@@ -176,11 +184,16 @@ public:
     {
         return m_storageState;
     }
+    ListState networksState() const
+    {
+        return m_networksState;
+    }
     QString stateKey() const;
     QString engineStateKey() const;
     QString containersStateKey() const;
     QString imagesStateKey() const;
     QString storageStateKey() const;
+    QString networksStateKey() const;
     /*!
      * Engine 状态的语义 key（positive / neutral / negative / disabled）。
      *
@@ -210,6 +223,10 @@ public:
     QString storageError() const
     {
         return m_storageError;
+    }
+    QString networksError() const
+    {
+        return m_networksError;
     }
     QString endpoint() const;
     /*! 形如 "0.3.0+1e3b56e (2026-09-17 08:50 UTC)"。 */
@@ -247,6 +264,14 @@ public:
     ImageFilterModel *imageList() const
     {
         return m_imageFilter;
+    }
+    NetworkModel *networkModel() const
+    {
+        return m_networkModel;
+    }
+    NetworkFilterModel *networkList() const
+    {
+        return m_networkFilter;
     }
     ContainerDetailController *containerDetail() const
     {
@@ -309,6 +334,8 @@ public Q_SLOTS:
      * QML 不允许直接访问 backend（§4/§43），因此提供这个显式入口。
      */
     void retryStorage();
+    /*! 网络列表是低频数据：只在进入网络页面时刷新（六期 §3.2）。 */
+    void refreshNetworks();
 
 Q_SIGNALS:
     void stateChanged();
@@ -316,6 +343,8 @@ Q_SIGNALS:
     void containersStateChanged();
     void imagesStateChanged();
     void storageStateChanged();
+    void networksStateChanged();
+    void networksErrorChanged();
     void busyChanged();
     void engineErrorChanged();
     void containersErrorChanged();
@@ -332,6 +361,7 @@ private:
     void onEngineUpdated();
     void onContainersUpdated();
     void onImagesUpdated();
+    void onNetworksUpdated();
     void onStorageUpdated();
     void onLoadingChanged();
     void onSectionFailed(DockerBackendInterface::Section section, const DockerError &error);
@@ -350,6 +380,12 @@ private:
     StorageStatus *m_storage = nullptr;
     ContainerModel *m_containerModel = nullptr;
     ImageModel *m_imageModel = nullptr;
+    NetworkModel *m_networkModel = nullptr;
+    NetworkFilterModel *m_networkFilter = nullptr;
+    ListState m_networksState = ListState::Idle;
+    QString m_networksError;
+    bool m_networksOk = false;
+    bool m_networksFailed = false;
     ContainerFilterModel *m_containerFilter = nullptr;
     ImageFilterModel *m_imageFilter = nullptr;
     ContainerDetailController *m_containerDetail = nullptr;

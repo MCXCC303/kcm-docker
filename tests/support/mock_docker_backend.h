@@ -31,6 +31,7 @@ public:
     void setEngineInfo(const EngineInfo &info);
     void setContainers(const QList<Container> &containers);
     void setImages(const QList<Image> &images);
+    void setNetworks(const QList<Network> &networks);
     void setStorageUsage(const StorageUsage &usage);
     void setContainerDetail(const ContainerDetail &detail);
     void setImageDetail(const ImageDetail &detail);
@@ -87,6 +88,7 @@ public:
     void refreshEngine() override;
     void refreshContainers() override;
     void refreshImages() override;
+    void refreshNetworks() override;
     void refreshStorageUsage() override;
     void inspectContainer(const QString &id) override;
     void inspectImage(const QString &id) override;
@@ -172,6 +174,10 @@ public:
     QString endpointDisplayName() const override;
     EngineInfo engineInfo() const override;
     QList<Container> containers() const override;
+    QList<Network> networks() const override
+    {
+        return m_networks;
+    }
     QList<Image> images() const override;
     StorageUsage storageUsage() const override;
     ContainerDetail containerDetail() const override;
@@ -185,6 +191,7 @@ private:
     EngineInfo m_engine;
     QList<Container> m_containers;
     QList<Image> m_images;
+    QList<Network> m_networks;
     StorageUsage m_storageUsage;
     ContainerDetail m_containerDetail;
     ImageDetail m_imageDetail;

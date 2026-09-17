@@ -51,16 +51,16 @@ QList<DockerPortDTO> parsePorts(const QJsonObject &networkSettings)
     return ports;
 }
 
-QList<DockerNetworkDTO> parseNetworks(const QJsonObject &networkSettings)
+QList<ContainerNetworkDTO> parseNetworks(const QJsonObject &networkSettings)
 {
-    QList<DockerNetworkDTO> networks;
+    QList<ContainerNetworkDTO> networks;
     const QJsonObject map = networkSettings.value(QStringLiteral("Networks")).toObject();
     for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
         if (!it.value().isObject()) {
             continue;
         }
         const QJsonObject entry = it.value().toObject();
-        DockerNetworkDTO network;
+        ContainerNetworkDTO network;
         network.name = it.key();
         network.networkId = stringValue(entry, QStringLiteral("NetworkID"));
         network.ipAddress = stringValue(entry, QStringLiteral("IPAddress"));
@@ -233,7 +233,7 @@ ContainerDetail containerDetailFromDto(const DockerContainerInspectDTO &dto)
     }
 
     detail.networks.reserve(dto.networks.size());
-    for (const DockerNetworkDTO &networkDto : dto.networks) {
+    for (const ContainerNetworkDTO &networkDto : dto.networks) {
         ContainerNetwork network;
         network.name = networkDto.name;
         network.id = networkDto.networkId;
