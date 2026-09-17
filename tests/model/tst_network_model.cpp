@@ -70,7 +70,7 @@ QList<Network> NetworkModelTest::sampleNetworks()
         makeNetwork(QString(64, QLatin1Char('1')), QStringLiteral("bridge"), QStringLiteral("bridge"), QStringLiteral("172.17.0.0/16"), 0),
         makeNetwork(QString(64, QLatin1Char('2')), QStringLiteral("host"), QStringLiteral("host"), QString(), 0),
         makeNetwork(QString(64, QLatin1Char('3')), QStringLiteral("none"), QStringLiteral("null"), QString(), 0),
-        makeNetwork(QString(64, QLatin1Char('4')), QStringLiteral("winboat_default"), QStringLiteral("bridge"), QStringLiteral("172.18.0.0/16"), 2),
+        makeNetwork(QString(64, QLatin1Char('4')), QStringLiteral("app_default"), QStringLiteral("bridge"), QStringLiteral("172.18.0.0/16"), 2),
     };
 }
 
@@ -142,13 +142,13 @@ void NetworkModelTest::searchesAcrossNameIdDriverAndSubnet()
 
     QCOMPARE(filter.count(), 4);
 
-    // 默认按名称升序（bridge / host / none / winboat_default）
-    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("bridge"));
-    QCOMPARE(filter.index(3, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("winboat_default"));
+    // 默认按名称升序（app_default / bridge / host / none）
+    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
+    QCOMPARE(filter.index(3, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("none"));
 
-    filter.setSearchText(QStringLiteral("WINBOAT"));
+    filter.setSearchText(QStringLiteral("APP_DEFAULT")); // 大小写不敏感
     QCOMPARE(filter.count(), 1);
-    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("winboat_default"));
+    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 
     filter.setSearchText(QStringLiteral("172.17"));
     QCOMPARE(filter.count(), 1);
@@ -179,10 +179,10 @@ void NetworkModelTest::filtersPredefinedNetworks()
 
     filter.setOriginFilter(QStringLiteral("custom"));
     QCOMPARE(filter.count(), 1);
-    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("winboat_default"));
+    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 
     // 过滤与搜索可组合
-    filter.setSearchText(QStringLiteral("winboat"));
+    filter.setSearchText(QStringLiteral("app"));
     QCOMPARE(filter.count(), 1);
 
     filter.setOriginFilter(QStringLiteral("all"));
@@ -190,7 +190,7 @@ void NetworkModelTest::filtersPredefinedNetworks()
 
     // 后台刷新不会重置用户条件（§32）
     model.setNetworks(sampleNetworks());
-    QCOMPARE(filter.searchText(), QStringLiteral("winboat"));
+    QCOMPARE(filter.searchText(), QStringLiteral("app"));
     QCOMPARE(filter.count(), 1);
 }
 
@@ -202,15 +202,15 @@ void NetworkModelTest::sortsByNameAndMembers()
     filter.setSourceModel(&model);
 
     filter.setSortKey(QStringLiteral("members"));
-    // 成员数降序：winboat_default(2) 在最前
-    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("winboat_default"));
+    // 成员数降序：app_default(2) 在最前
+    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 
     filter.setSortKey(QStringLiteral("driver"));
     const int firstRow = 0;
     QVERIFY(!filter.index(firstRow, 0).data(NetworkModel::DriverRole).toString().isEmpty());
 
     filter.setSortKey(QStringLiteral("name"));
-    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("bridge"));
+    QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 }
 
 void NetworkModelTest::controllerWiresNetworksSection()

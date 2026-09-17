@@ -68,8 +68,32 @@ public:
     /*! 清空（失败时不让旧数据继续冒充最新）。 */
     void clear();
 
+    /*!
+     * 全部网络名（按当前顺序）。
+     *
+     * 界面有时需要在**没有 delegate** 的情况下知道有哪些网络（例如连接对话框要算
+     * "还能连几个"），而 QML 不能直接按 role 读模型。
+     */
+    Q_INVOKABLE QStringList names() const;
+
+    /*!
+     * 全部网络的纯数据摘要：`[{id, name, driver, predefined}]`。
+     *
+     * 给"需要在没有 delegate 的情况下拿到列表"的界面用（例如连接网络对话框）：
+     * QML 不能按 role 读模型，而对话框的内容在弹层里有自己的实例树，
+     * 递一个普通数组比递模型对象可靠得多。
+     */
+    Q_INVOKABLE QVariantList summaries() const;
+
     /*! 按 Id 找行；找不到返回 -1（详情页导航用）。 */
     Q_INVOKABLE int rowForId(const QString &id) const;
+    /*!
+     * 按名字找 Id（找不到返回空）。
+     *
+     * 容器详情里只拿得到网络名（inspect 的 `NetworkSettings.Networks` 以名字为键），
+     * 而连接/断开接口用的是网络 Id——转换只有这一处实现。
+     */
+    Q_INVOKABLE QString idForName(const QString &name) const;
 
 Q_SIGNALS:
     void countChanged();

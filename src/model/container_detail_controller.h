@@ -272,6 +272,14 @@ public Q_SLOTS:
      * 进分区才连接、离开即断开：日志是长连接，不该在用户看别的分区时挂着。
      * `tty` 取自容器详情（`Config.Tty`），判错会把 8 字节帧头当成日志正文。
      */
+    /*!
+     * 容器当前连接的网络名（界面据此把已连接的网络标出来、不给重复连接）。
+     *
+     * 名字来自 inspect 的 `NetworkSettings.Networks`（以名字为键）；
+     * 连接/断开用的网络 Id 由 `NetworkModel::idForName()` 转换。
+     */
+    Q_INVOKABLE QStringList connectedNetworkNames() const;
+
     Q_INVOKABLE void startLogs();
     Q_INVOKABLE void stopLogs();
     /*! 详情加载失败后的重试（§31）。 */

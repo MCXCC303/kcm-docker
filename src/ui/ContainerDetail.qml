@@ -83,6 +83,23 @@ KCM.AbstractKCM {
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
     signal closeRequested
 
+    /*! 正在等待"断开"确认的网络名（确认对话框要用）。 */
+    property string pendingNetworkName: ""
+
+    /*!
+     * 网络摘要（`{id, name, driver}`）：连接对话框的数据源。
+     *
+     * 每次求值都会读一次 `networkModel.count`，因此模型刷新后对话框能跟上
+     * （QML 不追踪函数调用，必须显式读一个属性建立依赖）。
+     */
+    function networkSummaries(): var {
+        const model = kcm.controller.networkModel;
+        if (!model || model.count === 0) {
+            return [];
+        }
+        return model.summaries();
+    }
+
     Component.onCompleted: {
         // 必须无条件 start()：容器 id 相同时（A → 返回 → 再进 A）也要重新 inspect、
         // 重新开始低频复核与 stats 采样（§27/§46）。
@@ -93,6 +110,35 @@ KCM.AbstractKCM {
     }
 
     // 离开页面：停止 stats 采样并释放指标历史（§27）
+    Components.ConnectNetworkDialog {
+        id: connectNetworkDialog
+
+        operations: page.operations
+        containerId: page.containerId
+        // 普通数组（不是模型对象）：弹层里的内容有自己的实例树，递数组最可靠
+        networks: page.networkSummaries()
+        connectedNames: page.controller.connectedNetworkNames()
+        onConnected: page.controller.refresh()
+    }
+
+    Components.ConfirmDialog {
+        id: disconnectNetworkDialog
+
+        objectName: "disconnectNetworkDialog"
+        headingText: i18n("Disconnect from network")
+        questionText: i18n("Disconnect this container from “%1”?", page.pendingNetworkName)
+        // 断开正在使用的网络会中断通信：这句话是必须写清的后果
+        consequenceText: i18n("The container loses this network's addresses and aliases; connections through it may be interrupted.")
+        acceptText: i18n("Disconnect")
+        destructive: true
+        onConfirmed: {
+            // 网络名 → Id 的转换只有一处实现（NetworkModel::idForName）
+            const networkId = kcm.controller.networkModel.idForName(page.pendingNetworkName);
+            page.operations.disconnectContainerFromNetwork(networkId.length > 0 ? networkId : page.pendingNetworkName,
+                                                           page.containerId);
+        }
+    }
+
     Component.onDestruction: controller.stop()
 
     /*!
@@ -256,6 +302,11 @@ KCM.AbstractKCM {
                     page.controller.startLogs();
                 } else {
                     page.controller.stopLogs();
+                }
+                // 网络分区要用到网络列表（连接对话框、名字 → Id）：进分区时按需刷新一次，
+                // 否则从没打开过"网络"标签页的用户会看到"没有可连的网络"（实测踩过）
+                if (currentIndex === 2) {
+                    kcm.controller.refreshNetworks();
                 }
             }
 
@@ -504,6 +555,27 @@ KCM.AbstractKCM {
                         message: page.controller.networks.empty ? i18n("No network information.") : ""
                     }
 
+                    // 连接/断开网络（ARCH_V5_V8 §3.4）：只读模式不出现入口
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.Button {
+                            objectName: "connectNetworkEntryButton"
+                            visible: page.operations.writeAllowed
+                            text: i18n("Connect to a network…")
+                            icon.name: "network-connect"
+                            onClicked: {
+                                connectNetworkDialog.reset();
+                                connectNetworkDialog.open();
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                    }
+
                     /*  网络条目**不用 FormLayout**：每个条目一个 GridLayout 落在
                         Repeater 里，正是 core dump 中「外层布局 → 条目 box → 内层
                         GridLayout sizeHint → 查 FormData 附加属性」的形状。
@@ -539,6 +611,18 @@ KCM.AbstractKCM {
                                     font.family: "monospace"
                                     Layout.fillWidth: true
                                     elide: Text.ElideMiddle
+                                }
+                                // 断开这个网络：可能中断通信，因此走确认对话框
+                                QQC2.Button {
+                                    objectName: "disconnectNetworkButton"
+                                    visible: page.operations.writeAllowed
+                                    flat: true
+                                    text: i18n("Disconnect")
+                                    icon.name: "network-disconnect"
+                                    onClicked: {
+                                        page.pendingNetworkName = label;
+                                        disconnectNetworkDialog.open();
+                                    }
                                 }
                             }
                             RowLayout {

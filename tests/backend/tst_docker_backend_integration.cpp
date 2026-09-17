@@ -223,8 +223,19 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
 
     // 从有输出的容器里挑一个：纯"读了但一行都没有"无法验证解复用真的工作。
     // 只读（follow=0），不改动任何容器；全部容器都没有输出时跳过。
+    //
+    // **只碰 alpine / ubuntu 这类测试镜像**：用户的 Docker 里可能有正在使用的
+    // 业务容器（例如某个 Windows 兼容层），即使只是读日志也不该去动它们。
+    const auto isTestContainer = [](const Container &container) {
+        const QString haystack = (container.name + QLatin1Char(' ') + container.image).toLower();
+        return haystack.contains(QLatin1String("alpine")) || haystack.contains(QLatin1String("ubuntu"));
+    };
+
     int inspected = 0;
     for (const Container &container : containers) {
+        if (!isTestContainer(container)) {
+            continue;
+        }
         if (++inspected > 8) {
             break; // 别把整个列表都扫一遍
         }
@@ -262,7 +273,7 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
         }
     }
 
-    QSKIP("no container on this machine has readable log output");
+    QSKIP("no alpine/ubuntu test container with readable log output on this machine");
 }
 
 /*!

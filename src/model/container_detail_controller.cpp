@@ -148,6 +148,16 @@ void ContainerDetailController::stop()
     m_logs->disconnect();
 }
 
+QStringList ContainerDetailController::connectedNetworkNames() const
+{
+    QStringList names;
+    names.reserve(m_detail.networks.size());
+    for (const ContainerNetwork &network : m_detail.networks) {
+        names.append(network.name);
+    }
+    return names;
+}
+
 void ContainerDetailController::startLogs()
 {
     if (m_containerId.isEmpty()) {

@@ -292,16 +292,19 @@ Item {
 
                 Local.FieldChip {
                     objectName: "portContainerChip"
-                    anchors.left: parent.left
+                    // 靠**右**（靠近中间的节点列）：两侧芯片都朝节点收拢，图才紧凑
+                    anchors.right: parent.right
+                    anchors.rightMargin: Math.max(0, parent.width - topology.chipColumnWidth)
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.rightMargin: Kirigami.Units.smallSpacing
                     // 端口文本是数据，等宽字体更易比对（§1.5）
                     font.family: "monospace"
                     text: group.containerChipText
                 }
 
                 Column {
-                    anchors.right: parent.right
+                    // 靠**左**（紧接节点之后）：与容器侧一起把两列拉向中间
+                    anchors.left: parent.left
+                    anchors.leftMargin: Math.min(topology.width, topology.width - topology.chipColumnWidth + Kirigami.Units.smallSpacing)
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
 

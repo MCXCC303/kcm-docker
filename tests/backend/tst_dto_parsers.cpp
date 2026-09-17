@@ -413,7 +413,7 @@ void DtoParsersTest::statsBlockIoToleratesSyncAsyncOnly()
 /*!
  * 网络列表解析（ARCH_V5_V8 §3.2）。
  *
- * 样例取自本机真实 daemon 的 `GET /networks`（bridge / none / winboat_default / host），
+ * 样例取自本机真实 daemon 的 `GET /networks`（bridge / none / 一个 compose 建的网络 / host），
  * 字段缺失、类型不符、成员地址带子网前缀这些真实形态都要处理。
  */
 void DtoParsersTest::parsesNetworks()
@@ -438,17 +438,17 @@ void DtoParsersTest::parsesNetworks()
             "Containers": {}
         },
         {
-            "Name": "winboat_default",
+            "Name": "app_default",
             "Id": "aaaaaaaaaaaabbbbbbbbbbccccccccccddddddddddeeeeeeeeeeffffffffff1234",
             "Created": "2026-09-16T19:14:22.391557578+08:00",
             "Scope": "local",
             "Driver": "bridge",
             "IPAM": {"Config": [{"Subnet": "172.18.0.0/16", "Gateway": "172.18.0.1"}]},
             "Options": {},
-            "Labels": {"com.docker.compose.project": "winboat"},
+            "Labels": {"com.docker.compose.project": "app"},
             "Containers": {
                 "1111111111111111111111111111111111111111111111111111111111111111": {
-                    "Name": "winboat", "EndpointID": "ep1",
+                    "Name": "app", "EndpointID": "ep1",
                     "MacAddress": "02:42:ac:12:00:02",
                     "IPv4Address": "172.18.0.2/16", "IPv6Address": ""
                 }
@@ -483,7 +483,7 @@ void DtoParsersTest::parsesNetworks()
     QCOMPARE(compose.labels.size(), 1);
     QCOMPARE(compose.memberCount(), 1);
     // 成员地址去掉子网前缀（daemon 给的是 172.18.0.2/16）
-    QCOMPARE(compose.members.first().name, QStringLiteral("winboat"));
+    QCOMPARE(compose.members.first().name, QStringLiteral("app"));
     QCOMPARE(compose.members.first().ipv4Address, QStringLiteral("172.18.0.2"));
     QCOMPARE(compose.members.first().macAddress, QStringLiteral("02:42:ac:12:00:02"));
 }

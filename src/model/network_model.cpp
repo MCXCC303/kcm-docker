@@ -5,6 +5,8 @@
 
 #include "model/network_model.h"
 
+#include <QVariantMap>
+
 namespace Kontainer
 {
 
@@ -123,6 +125,41 @@ void NetworkModel::clear()
     m_networks.clear();
     endResetModel();
     Q_EMIT countChanged();
+}
+
+QVariantList NetworkModel::summaries() const
+{
+    QVariantList result;
+    result.reserve(m_networks.size());
+    for (const Network &network : m_networks) {
+        result.append(QVariantMap {
+            {QStringLiteral("id"), network.id},
+            {QStringLiteral("name"), network.name},
+            {QStringLiteral("driver"), network.driver.isEmpty() ? QStringLiteral("bridge") : network.driver},
+            {QStringLiteral("predefined"), network.isPredefined()},
+        });
+    }
+    return result;
+}
+
+QStringList NetworkModel::names() const
+{
+    QStringList result;
+    result.reserve(m_networks.size());
+    for (const Network &network : m_networks) {
+        result.append(network.name);
+    }
+    return result;
+}
+
+QString NetworkModel::idForName(const QString &name) const
+{
+    for (const Network &network : m_networks) {
+        if (network.name == name) {
+            return network.id;
+        }
+    }
+    return {};
 }
 
 int NetworkModel::rowForId(const QString &id) const

@@ -555,7 +555,7 @@ int main(int argc, char **argv)
             for (int i = 0; i < members; ++i) {
                 Kontainer::NetworkMember member;
                 member.containerId = QString(64, QLatin1Char('1'));
-                member.name = i == 0 ? QStringLiteral("winboat") : QStringLiteral("app-%1").arg(i);
+                member.name = i == 0 ? QStringLiteral("alpine") : QStringLiteral("app-%1").arg(i);
                 member.ipv4Address = QStringLiteral("172.18.0.%1").arg(i + 2);
                 member.macAddress = QStringLiteral("02:42:ac:12:00:0%1").arg(i + 2);
                 network.members.append(member);
@@ -565,7 +565,7 @@ int main(int argc, char **argv)
         networks.append(makeNetwork(QStringLiteral("bridge"), QStringLiteral("bridge"), QStringLiteral("172.17.0.0/16"), 0));
         networks.append(makeNetwork(QStringLiteral("host"), QStringLiteral("host"), QString(), 0));
         networks.append(makeNetwork(QStringLiteral("none"), QStringLiteral("null"), QString(), 0));
-        networks.append(makeNetwork(QStringLiteral("winboat_default"), QStringLiteral("bridge"), QStringLiteral("172.18.0.0/16"), 2));
+        networks.append(makeNetwork(QStringLiteral("app_default"), QStringLiteral("bridge"), QStringLiteral("172.18.0.0/16"), 2));
         backend->setNetworks(networks);
     }
 
@@ -584,8 +584,8 @@ int main(int argc, char **argv)
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
     } else if (page == QLatin1String("network-detail")) {
         qmlFile = QStringLiteral("NetworkDetail.qml");
-        // fixture 里 winboat_default 的 id 是 64 个 'w'
-        initialProperties.insert(QStringLiteral("networkId"), QString(64, QLatin1Char('w')));
+        // fixture 里 app_default 的 id 是 64 个 'a'
+        initialProperties.insert(QStringLiteral("networkId"), QString(64, QLatin1Char('a')));
     } else if (page == QLatin1String("registry-auth")) {
         qmlFile = QStringLiteral("RegistryAuthPage.qml");
     } else if (page == QLatin1String("daemon-config-user")) {
@@ -661,6 +661,14 @@ int main(int argc, char **argv)
         QObject *removeDialog = item->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
         if (removeDialog) {
             QMetaObject::invokeMethod(removeDialog, "open");
+        }
+    }
+
+    // KONTAINER_RENDER_CONNECT_NETWORK=1：打开"连接到网络"对话框（复核选项与别名输入）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CONNECT_NETWORK")) {
+        QObject *connectDialog = item->findChild<QObject *>(QStringLiteral("connectNetworkDialog"));
+        if (connectDialog) {
+            QMetaObject::invokeMethod(connectDialog, "open");
         }
     }
 

@@ -135,6 +135,7 @@ private Q_SLOTS:
     void networksTabListsAndOpensDetails();
     void createNetworkDialogValidatesBeforeSubmitting();
     void networkRemovalIsHiddenForBuiltInNetworks();
+    void containerNetworkSectionConnectsAndDisconnects();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -981,6 +982,106 @@ void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
     QVERIFY2(!createButton->property("visible").toBool(), "read-only mode must hide the create entry");
 }
 
+/*!
+ * 容器详情的网络分区（ARCH_V5_V8 §3.4）：连接对话框只列未连接的网络，
+ * 断开走确认对话框（后果说明必填），只读模式下两个入口都不出现。
+ */
+void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
+{
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    // 两个网络：容器已连 bridge，未连 app_default
+    QList<Network> networks;
+    Network bridge;
+    bridge.id = QString(64, QLatin1Char('b'));
+    bridge.name = QStringLiteral("bridge");
+    bridge.driver = QStringLiteral("bridge");
+    networks.append(bridge);
+    Network app;
+    app.id = QString(64, QLatin1Char('a'));
+    app.name = QStringLiteral("app_default");
+    app.driver = QStringLiteral("bridge");
+    networks.append(app);
+    m_backend->setNetworks(networks);
+    m_stubKcm->controller()->refreshNetworks();
+
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("demo");
+    detail.state = ContainerState::Running;
+    detail.networks = {{QStringLiteral("bridge"), QStringLiteral("net1"), QStringLiteral("172.17.0.4"),
+                        QStringLiteral("fd00::4"), QStringLiteral("02:42:ac:11:00:04"), QStringLiteral("172.17.0.1")}};
+    m_backend->setContainerDetail(detail);
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("containerId"), QStringLiteral("cid-1")}},
+                                                                        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 2)); // 网络分区
+
+    // 已连接的网络在控制器里如实报告（对话框据此禁用该选项）
+    const QStringList connected = m_stubKcm->controller()->containerDetail()->connectedNetworkNames();
+    QCOMPARE(connected, QStringList {QStringLiteral("bridge")});
+
+    // 每行有「断开」，确认对话框带上后果说明；确认后发出断开请求
+    // Kirigami.Dialog / Kirigami.Action 都不是 QQuickItem：按对象名在对象树里找
+    QObject *disconnectDialog = page->findChild<QObject *>(QStringLiteral("disconnectNetworkDialog"));
+    QVERIFY2(disconnectDialog, "the disconnect confirmation must exist");
+    QVERIFY2(!disconnectDialog->property("consequenceText").toString().isEmpty(),
+             "the disconnect dialog must always carry a consequence");
+
+    QObject *connectDialog = page->findChild<QObject *>(QStringLiteral("connectNetworkDialog"));
+    QVERIFY2(connectDialog, "the connect dialog must exist");
+    // 名称 → Id 的转换（断开接口的路径参数用 Id）
+    QCOMPARE(m_stubKcm->controller()->networkModel()->idForName(QStringLiteral("app_default")), app.id);
+    QCOMPARE(m_stubKcm->controller()->networkModel()->idForName(QStringLiteral("nope")), QString());
+
+    // 连接对话框：可用网络 = 未连接的（这里只有 app_default）
+    QVariantMap initial;
+    initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    initial.insert(QStringLiteral("containerId"), QStringLiteral("cid-1"));
+    // 对话框收的是普通数组（模型对象的 summaries）
+    initial.insert(QStringLiteral("networks"), m_stubKcm->controller()->networkModel()->summaries());
+    initial.insert(QStringLiteral("connectedNames"), connected);
+    QQmlComponent dialogComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ConnectNetworkDialog.qml")));
+    QVERIFY2(!dialogComponent.isError(), qPrintable(dialogComponent.errorString()));
+    QScopedPointer<QObject> dialog(dialogComponent.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!dialog.isNull(), qPrintable(dialogComponent.errorString()));
+    // 对话框的内容（含 Repeater 的 delegate）在打开时才真正建立
+    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "open"));
+    QTRY_COMPARE(dialog->property("availableCount").toInt(), 1);
+
+    QSignalSpy connectedSpy(dialog.data(), SIGNAL(connected(QString)));
+    // 已连接的网络不能再选、未连接的可以（delegate 的 enabled 用的就是这个函数）
+    bool connectable = true;
+    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "isConnectable", Q_RETURN_ARG(bool, connectable),
+                                      Q_ARG(QString, QStringLiteral("bridge"))));
+    QVERIFY2(!connectable, "an already connected network must not be selectable");
+    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "isConnectable", Q_RETURN_ARG(bool, connectable),
+                                      Q_ARG(QString, QStringLiteral("app_default"))));
+    QVERIFY(connectable);
+
+    // 选中未连接的网络并提交：请求带上网络 Id、容器 Id 与别名
+    dialog->setProperty("selectedNetworkId", app.id);
+    QQuickItem *aliases = findItemByName(dialog.data(), QStringLiteral("connectNetworkAliasesField"));
+    QVERIFY(aliases);
+    aliases->setProperty("text", QStringLiteral("demo, api"));
+    QVERIFY(QMetaObject::invokeMethod(dialog.data(), "submit"));
+    QTRY_COMPARE(connectedSpy.count(), 1);
+    QCOMPARE(m_backend->lastNetworkConnect().second, QStringLiteral("cid-1"));
+    QCOMPARE(m_backend->lastNetworkConnect().first, app.id);
+    QCOMPARE(m_backend->lastNetworkConnectAliases(), QStringList({QStringLiteral("demo"), QStringLiteral("api")}));
+}
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -1022,6 +1123,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/RegistryLoginDialog.qml"),
         QStringLiteral("components/LogConsole.qml"),
         QStringLiteral("components/CreateNetworkDialog.qml"),
+        QStringLiteral("components/ConnectNetworkDialog.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
