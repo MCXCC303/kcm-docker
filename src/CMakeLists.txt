@@ -1,5 +1,5 @@
 # 提权与凭据：core 直接用到 KAuth 客户端 API 与 KWallet（helper 只在授权后以 root 执行）
-find_package(KF6 6.5 REQUIRED COMPONENTS Auth Wallet Config)
+find_package(KF6 6.5 REQUIRED COMPONENTS Auth Wallet Config Archive)
 
 # --- 核心库 -------------------------------------------------------------------
 # backend + model：与 KCM 插件、单元测试共同链接，保证分层可测试（ARCH_V1 §28/§30/§35）
@@ -7,6 +7,8 @@ add_library(kontainer_core STATIC
     i18n.cpp
     logging.cpp
 
+    backend/build_context.cpp
+    backend/build_context.h
     backend/docker_api_version.cpp
     backend/docker_api_version.h
     backend/daemon_config.cpp
@@ -183,6 +185,8 @@ target_link_libraries(kontainer_core
         KF6::Wallet
         # 挂载预设持久化（~/.config/kontainerrc，§4.1）
         KF6::ConfigCore
+        # 构建上下文打包（八期 §5.2）
+        KF6::Archive
         KF6::CoreAddons
         KF6::I18n
 )

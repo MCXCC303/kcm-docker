@@ -29,6 +29,7 @@ kontainer_add_test(tst_http_response_parser backend/tst_http_response_parser.cpp
 kontainer_add_test(tst_json_line_reader backend/tst_json_line_reader.cpp)
 kontainer_add_test(tst_log_frame_reader backend/tst_log_frame_reader.cpp)
 kontainer_add_test(tst_http_request_body backend/tst_http_request_body.cpp)
+kontainer_add_test(tst_build_context backend/tst_build_context.cpp)
 kontainer_add_test(tst_daemon_config backend/tst_daemon_config.cpp)
 kontainer_add_test(tst_daemon_deployment backend/tst_daemon_deployment.cpp)
 kontainer_add_test(tst_kontainer_helper backend/tst_kontainer_helper.cpp)
