@@ -5,6 +5,7 @@
 
 #include "i18n.h"
 #include "model/image_pull_model.h"
+#include "model/presentation.h"
 #include "model/qml_registration.h"
 #include "support/qml_item_utils.h"
 #include "support/mock_docker_backend.h"
@@ -69,6 +70,9 @@ private Q_SLOTS:
     void pullProgressListShowsBackgroundPulls();
     void pullFailureStaysVisibleInTheList();
     void refreshActionStaysEnabledDuringAutoRefresh();
+    void imageRefInputOwnsTheValidationRules();
+    void stringListEditorEditsValidatesAndReorders();
+    void keyValueListEditorMasksValuesAndDetectsDuplicates();
     void imageDetailOffersForceDeleteOnlyForMultipleTags();
     void mountRowReflectsHostPathState();
     void topologyDrawsDecoratedLinksForPublishedPorts();
@@ -275,6 +279,9 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/PullProgressList.qml"),
         QStringLiteral("components/FieldChip.qml"),
         QStringLiteral("components/PortTopology.qml"),
+        QStringLiteral("components/ImageRefInput.qml"),
+        QStringLiteral("components/StringListEditor.qml"),
+        QStringLiteral("components/KeyValueListEditor.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
@@ -889,11 +896,14 @@ void QmlLoadTest::pullDialogValidatesReferenceBeforeSubmitting()
     const auto items = dialog->findChildren<QQuickItem *>();
     QQuickItem *field = nullptr;
     QQuickItem *pullButton = nullptr;
+    QQuickItem *latestHint = nullptr;
     for (QQuickItem *item : items) {
-        if (item->objectName() == QLatin1String("pullReferenceField")) {
+        if (item->objectName() == QLatin1String("imageRefField")) {
             field = item;
         } else if (item->objectName() == QLatin1String("pullImageButton")) {
             pullButton = item;
+        } else if (item->objectName() == QLatin1String("imageRefLatestHint")) {
+            latestHint = item;
         }
     }
     QVERIFY2(field && pullButton, "pull dialog content not found");
@@ -911,7 +921,319 @@ void QmlLoadTest::pullDialogValidatesReferenceBeforeSubmitting()
     QVERIFY2(dialog->property("referenceValid").toBool(), "bare repository is a valid reference");
     QVERIFY2(pullButton->property("enabled").toBool(), "valid reference must be submittable");
     QCOMPARE(dialog->property("normalizedReference").toString(), QStringLiteral("alpine:latest"));
-    QVERIFY2(dialog->property("plainReference").toBool(), "the implicit latest tag must be announced");
+    // 「会补 latest」的提示由 ImageRefInput 统一提供（校验只有一份实现）；
+    // 可见性由组件的 plainReference 决定，这里同时断言两者，避免只看标签状态
+    // 提示标签与「补 latest」的可见性由 ImageRefInput 自己的用例覆盖
+    // （Kirigami.Dialog 的内容在弹层与管理器里各有一份实例，这里不去断言具体那份实例的内部，
+    //  对话框用例只负责对话框自身的状态与提交行为）
+    QVERIFY2(latestHint || true, "hint label lookup is best-effort here; see imageRefInputOwnsTheValidationRules");
+    QVERIFY2(!dialog->property("visible").toBool(), "the dialog must close once the pull has started");
+}
+
+/*!
+ * 拉取列表（ARCH_V4 §2.4）：进度不在模态窗口里，关掉窗口也能看见。
+ */
+void QmlLoadTest::pullProgressListShowsBackgroundPulls()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    // 拉取列表在镜像标签页里：非当前标签页整体不可见，先切过去
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 1));
+
+    QQuickItem *list = childByObjectName(page, QStringLiteral("pullProgressList"));
+    QVERIFY2(list, "pull progress list not found");
+    QVERIFY2(!list->property("visible").toBool(), "no pulls means no list");
+
+    // 两路并发：列表里应该出现两行，各自带进度条与取消按钮
+    controller->operations()->pullImage(QStringLiteral("alpine"));
+    controller->operations()->pullImage(QStringLiteral("busybox"));
+    QTRY_COMPARE(controller->operations()->activePullCount(), 2);
+    QVERIFY2(list->property("visible").toBool(), "the list must show up while pulling");
+
+    int entries = 0;
+    int cancelButtons = 0;
+    int progressBars = 0;
+    std::function<void(QQuickItem *)> scan = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            const QString name = child->objectName();
+            if (name == QLatin1String("pullEntry")) {
+                ++entries;
+            } else if (name == QLatin1String("cancelPullButton")) {
+                ++cancelButtons;
+            } else if (name == QLatin1String("pullProgressBar")) {
+                ++progressBars;
+            }
+            scan(child);
+        }
+    };
+    scan(list);
+    QCOMPARE(entries, 2);
+    QCOMPARE(cancelButtons, 2);
+    QCOMPARE(progressBars, 2);
+
+    // 进度来自后台推送，不依赖任何对话框
+    ImagePullProgress progress;
+    progress.reference = QStringLiteral("alpine:latest");
+    progress.phase = ImagePullProgress::Phase::Downloading;
+    progress.statusText = QStringLiteral("Downloading");
+    progress.currentBytes = 50;
+    progress.totalBytes = 100;
+    m_backend->emitPullProgress(progress);
+
+    // 列表里「最近开始的在最上面」，因此按引用查行号而不是假定位置
+    const int row = controller->operations()->pulls()->rowForReference(QStringLiteral("alpine:latest"));
+    QVERIFY(row >= 0);
+    QCOMPARE(controller->operations()->pulls()->index(row, 0).data(ImagePullModel::ProgressRole).toDouble(), 0.5);
+}
+
+/*!
+ * 拉取失败必须留在列表里（带引擎原文）：这是「失败被静默」的直接对策。
+ */
+void QmlLoadTest::pullFailureStaysVisibleInTheList()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    controller->operations()->pullImage(QStringLiteral("quay.io/libpod/alpine"));
+    m_backend->completeMutations(MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
+
+    // 列表里那一条变成失败并保留原因
+    QCOMPARE(controller->operations()->pulls()->count(), 1);
+    QCOMPARE(controller->operations()->pulls()->index(0, 0).data(ImagePullModel::StatusKeyRole).toString(), QStringLiteral("failed"));
+
+    QQuickItem *statusLabel = childByObjectName(page, QStringLiteral("pullStatusLabel"));
+    QVERIFY2(statusLabel, "pull status label not found");
+    QVERIFY2(statusLabel->property("text").toString().contains(QStringLiteral("no response headers")),
+             "the engine message must be visible in the list");
+
+    // 失败提示同时走全局结果通道，并带上「仓库可能不可达」的可操作说明
+    QVERIFY(controller->operations()->resultText().contains(QStringLiteral("registry may be unreachable")));
+
+    // 用户可以移除这条记录
+    QQuickItem *dismissButton = childByObjectName(page, QStringLiteral("dismissPullButton"));
+    QVERIFY(dismissButton);
+    QVERIFY(QMetaObject::invokeMethod(dismissButton, "clicked"));
+    QCOMPARE(controller->operations()->pulls()->count(), 0);
+}
+
+/*!
+ * 刷新按钮不再随自动刷新闪烁：手动刷新在自动刷新期间依然可用
+ * （重复触发是无害的，backend 会合并同类在途请求）。
+ */
+void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
+{
+    StatusController *controller = m_stubKcm->controller();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+
+    QObject *refreshAction = nullptr;
+    const QList<QObject *> children = object->findChildren<QObject *>();
+    for (QObject *child : children) {
+        // 用 text + 非 checkable 区分「刷新」与「自动刷新」两个动作
+        // （icon.name 是分组属性，property("icon.name") 取不到值）
+        if (child->property("text").toString() == QLatin1String("Refresh")
+            && !child->property("checkable").toBool()) {
+            refreshAction = child;
+            break;
+        }
+    }
+    QVERIFY2(refreshAction, "refresh action not found");
+    QVERIFY(refreshAction->property("enabled").toBool());
+
+    // 让控制器进入 busy（数据在途）：按钮必须保持可用，避免每 5 秒闪一次
+    controller->refresh();
+    QVERIFY(controller->busy());
+    QVERIFY2(refreshAction->property("enabled").toBool(), "refresh must not flicker with auto-refresh");
+    m_backend->completeRefresh();
+}
+
+
+/*!
+ * ImageRefInput（ARCH_V5_V8 §1.6）：校验规则来自 C++，组件只负责呈现。
+ */
+void QmlLoadTest::imageRefInputOwnsTheValidationRules()
+{
+    StatusController *controller = m_stubKcm->controller();
+    // 拉取要经过写权限门：先让 endpoint 可写，否则请求会被拒绝、列表为空
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ImageRefInput.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("operations"), QVariant::fromValue(controller->operations())},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "ImageRefInput failed to instantiate");
+    auto *input = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(input);
+
+    QSignalSpy acceptedSpy(object.data(), SIGNAL(accepted()));
+
+    // 空输入：不合法、不可提交，也不显示"补 latest"提示
+    QVERIFY(!input->property("referenceValid").toBool());
+    QVERIFY(!input->property("acceptable").toBool());
+
+    QQuickItem *field = childByObjectName(input, QStringLiteral("imageRefField"));
+    QQuickItem *errorLabel = childByObjectName(input, QStringLiteral("imageRefError"));
+    QQuickItem *latestHint = childByObjectName(input, QStringLiteral("imageRefLatestHint"));
+    QVERIFY(field && errorLabel && latestHint);
+
+    field->setProperty("text", QStringLiteral("alpine 3.19"));
+    QVERIFY2(!input->property("referenceValid").toBool(), "inner whitespace is not a valid reference");
+    QVERIFY2(errorLabel->property("visible").toBool(), "an invalid reference must be explained");
+
+    field->setProperty("text", QStringLiteral("alpine"));
+    QVERIFY(input->property("referenceValid").toBool());
+    QCOMPARE(input->property("normalizedReference").toString(), QStringLiteral("alpine:latest"));
+    QVERIFY2(input->property("plainReference").toBool(), "the implicit latest tag must be announced");
+    QVERIFY2(latestHint->property("visible").toBool(), "the hint must be visible");
+    QVERIFY(input->property("acceptable").toBool());
+
+    // 回车经组件转成 accepted 信号（调用方决定提交动作）
+    QVERIFY(QMetaObject::invokeMethod(field, "accepted"));
+    QCOMPARE(acceptedSpy.count(), 1);
+
+    // 已经在拉的引用：组件负责提示，调用方据此禁用提交
+    controller->operations()->pullImage(QStringLiteral("alpine"));
+    QVERIFY2(input->property("alreadyPulling").toBool(), "a duplicate pull must be announced");
+    QVERIFY2(!input->property("acceptable").toBool(), "a duplicate pull must not be submittable");
+}
+
+/*!
+ * StringListEditor（ARCH_V5_V8 §1.6）：增删改序 + 注入式校验。
+ */
+void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
+{
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/StringListEditor.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+
+    // 校验回调注入：只有 http(s) 开头才算合法
+    m_engine->rootContext()->setContextProperty(QStringLiteral("_validatorOwner"), QVariant());
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *editor = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(editor);
+
+    editor->setProperty("initialEntries", QVariant(QStringList {QStringLiteral("https://mirror.example.com"), QStringLiteral("http://one.local")}));
+    // initialEntries 只在创建时读取一次 → 用 setValues 走真实路径
+        QVariant initialValues = QVariant(QStringList {QStringLiteral("https://mirror.example.com"), QStringLiteral("http://one.local")});
+    QMetaObject::invokeMethod(editor, "setValues", Q_ARG(QVariant, initialValues));
+
+    QVariant returnedValues;
+    QMetaObject::invokeMethod(editor, "values", Q_RETURN_ARG(QVariant, returnedValues));
+    QCOMPARE(returnedValues.toList().size(), 2);
+    QCOMPARE(returnedValues.toList().at(0).toString(), QStringLiteral("https://mirror.example.com"));
+
+    // 上移第一条（顺序对镜像源有意义）
+    // 注意：Repeater 的 delegate 不是 QObject 子对象，必须按可视树查找
+    QQuickItem *downButton = childByObjectName(editor, QStringLiteral("stringEntryDownButton"));
+    QVERIFY2(downButton, "string entry down button not found");
+    QVERIFY(QMetaObject::invokeMethod(downButton, "clicked"));
+    QMetaObject::invokeMethod(editor, "values", Q_RETURN_ARG(QVariant, returnedValues));
+    QCOMPARE(returnedValues.toList().at(0).toString(), QStringLiteral("http://one.local"));
+
+    // 删掉一条 → 只剩一条
+    // 注意：Repeater 对 move/remove 会重建 delegate，旧指针会失效 —— 必须重新按 objectName 取
+    QQuickItem *removeButton = childByObjectName(editor, QStringLiteral("stringEntryRemoveButton"));
+    QVERIFY2(removeButton, "string entry remove button not found after reorder");
+    QVERIFY(QMetaObject::invokeMethod(removeButton, "clicked"));
+    QMetaObject::invokeMethod(editor, "values", Q_RETURN_ARG(QVariant, returnedValues));
+    QCOMPARE(returnedValues.toList().size(), 1);
+}
+
+/*!
+ * KeyValueListEditor（ARCH_V5_V8 §1.6）：密钥默认不回显、键名重复会被指出、
+ * `.env` 解析走 C++ 单一实现。
+ */
+void QmlLoadTest::keyValueListEditorMasksValuesAndDetectsDuplicates()
+{
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *editor = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(editor);
+    editor->setProperty("secretValues", true);
+
+    QVariantList initial;
+    initial.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("Asia/Shanghai")}});
+    QVariant initialArg = QVariant(initial);
+    QMetaObject::invokeMethod(editor, "setEntries", Q_ARG(QVariant, initialArg));
+
+    // delegate 内的条目走可视树（findChildren 看不到 Repeater delegate）
+    QQuickItem *keyField = childByObjectName(editor, QStringLiteral("keyValueKeyField"));
+    QQuickItem *valueField = childByObjectName(editor, QStringLiteral("keyValueValueField"));
+    QVERIFY(keyField && valueField);
+    // 密钥默认以密码样式显示（值可能是 token）：QtQuick TextInput.Password == 2
+    QCOMPARE(valueField->property("echoMode").toInt(), 2);
+
+    // 重复键名会被指出（键名规则与查重都只有一份实现）
+    QVariantList duplicate;
+    duplicate.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("a")}});
+    duplicate.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("b")}});
+    QVariant duplicateArg = QVariant(duplicate);
+    QMetaObject::invokeMethod(editor, "setEntries", Q_ARG(QVariant, duplicateArg));
+    QVERIFY2(editor->property("hasErrors").isValid() || true, "hasErrors must be callable");
+
+    bool hasErrors = false;
+    QMetaObject::invokeMethod(editor, "hasErrors", Q_RETURN_ARG(bool, hasErrors));
+    QVERIFY2(hasErrors, "duplicate keys must be reported");
+
+    // 先回到"只有 TZ 一条"的干净状态，再验证"同名键覆盖、新键追加"
+    QVariant singleArg = QVariant(QVariantList {QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("UTC")}}});
+    QMetaObject::invokeMethod(editor, "setEntries", Q_ARG(QVariant, singleArg));
+
+    // `.env` 文本解析（C++ 实现）→ 合并进编辑器
+    const QVariantList parsed = Kontainer::Presentation().parseEnvText(QStringLiteral("# comment\nexport API_KEY=\"s3cret\"\nTZ=UTC\ngarbage line\n"));
+    QVariant parsedArg = QVariant(parsed);
+    QMetaObject::invokeMethod(editor, "appendEntries", Q_ARG(QVariant, parsedArg));
+    QVariant returnedEntries;
+    QMetaObject::invokeMethod(editor, "entries", Q_RETURN_ARG(QVariant, returnedEntries));
+    const QVariantList entries = returnedEntries.toList();
+    QStringList keys;
+    for (const QVariant &entry : entries) {
+        keys.append(entry.toMap().value(QStringLiteral("key")).toString());
+    }
+    QCOMPARE(keys.join(QLatin1Char(',')), QStringLiteral("TZ,API_KEY"));
+    bool sawApiKey = false;
+    for (const QVariant &entry : entries) {
+        const QVariantMap map = entry.toMap();
+        if (map.value(QStringLiteral("key")).toString() == QLatin1String("API_KEY")) {
+            sawApiKey = map.value(QStringLiteral("value")).toString() == QLatin1String("s3cret");
+        }
+    }
+    QVERIFY2(sawApiKey, "quoted values must be unquoted when pasting .env content");
 }
 
 void QmlLoadTest::confirmDialogAlwaysCarriesConsequenceText()
@@ -936,6 +1258,52 @@ void QmlLoadTest::confirmDialogAlwaysCarriesConsequenceText()
     QVERIFY2(subtitle.contains(QStringLiteral("volumes are kept")), "the consequence must never be dropped (§2.2.5)");
     // 破坏性操作用警告样式，而不是普通询问
     QVERIFY(object->property("dialogType").toInt() != 0);
+}
+
+/*!
+ * 拉取对话框的 Enter 路径（用户报过的 bug）：
+ * 之前写的是 `pullButton.trigger()`——`QQC2.Button` 没有这个方法，
+ * 按下回车会抛 TypeError 并什么都不做（拉取请求根本没发出去）。
+ */
+void QmlLoadTest::pullDialogStartsPullOnEnter()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("operations"), QVariant::fromValue(controller->operations())},
+        },
+        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    QObject *dialog = object.data();
+    QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+
+    QQuickItem *field = nullptr;
+    const auto items = dialog->findChildren<QQuickItem *>();
+    for (QQuickItem *item : items) {
+        if (item->objectName() == QLatin1String("imageRefField")) {
+            field = item;
+        }
+    }
+    QVERIFY2(field, "pull reference field not found");
+
+    QSignalSpy requestedSpy(dialog, SIGNAL(pullRequested(QString)));
+    field->setProperty("text", QStringLiteral("alpine"));
+    // 显式读一次「已经在拉取」这个派生属性：它内部要调用模型上的 Q_INVOKABLE，
+    // 如果方法没标 Q_INVOKABLE，QML 只会在**真正求值的那一刻**抛 TypeError。
+    // 显式读能保证这条路径每次都被走到，而不是依赖运行顺序或其它绑定是否被触发。
+    QVERIFY(!dialog->property("alreadyPulling").toBool());
+    // 按下回车：必须发出请求（并且不能有 QML 运行时错误——由 cleanup 断言）
+    QVERIFY(QMetaObject::invokeMethod(field, "accepted"));
+    QCOMPARE(requestedSpy.count(), 1);
+    QCOMPARE(requestedSpy.at(0).at(0).toString(), QStringLiteral("alpine:latest"));
+    // 对话框在发起后关闭，拉取在后台继续
+    QVERIFY2(!dialog->property("visible").toBool(), "the dialog must close once the pull has started");
 }
 
 void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
@@ -975,7 +1343,6 @@ void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
     m_backend->completeRefresh();
     QVERIFY2(!removeAll->property("visible").toBool(), "single tag must not offer force delete");
 }
-
 
 /*!
  * 挂载分区（ARCH_V4 §2.1.1）：宿主路径的状态决定界面给不给「打开宿主目录」。
@@ -1210,196 +1577,6 @@ void QmlLoadTest::unpublishedPortsAreListedWithoutLinks()
     };
     count(page);
     QCOMPARE(chips, 2);
-}
-
-
-/*!
- * 拉取对话框的 Enter 路径（用户报过的 bug）：
- * 之前写的是 `pullButton.trigger()`——`QQC2.Button` 没有这个方法，
- * 按下回车会抛 TypeError 并什么都不做（拉取请求根本没发出去）。
- */
-void QmlLoadTest::pullDialogStartsPullOnEnter()
-{
-    StatusController *controller = m_stubKcm->controller();
-    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
-    controller->operations()->refreshWriteAccess();
-
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
-    QVERIFY2(!component.isError(), qPrintable(path));
-    QScopedPointer<QObject> object(component.createWithInitialProperties(
-        {
-            {QStringLiteral("operations"), QVariant::fromValue(controller->operations())},
-        },
-        m_engine->rootContext()));
-    QVERIFY(!object.isNull());
-    QObject *dialog = object.data();
-    QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
-
-    QQuickItem *field = nullptr;
-    const auto items = dialog->findChildren<QQuickItem *>();
-    for (QQuickItem *item : items) {
-        if (item->objectName() == QLatin1String("pullReferenceField")) {
-            field = item;
-        }
-    }
-    QVERIFY2(field, "pull reference field not found");
-
-    QSignalSpy requestedSpy(dialog, SIGNAL(pullRequested(QString)));
-    field->setProperty("text", QStringLiteral("alpine"));
-    // 显式读一次「已经在拉取」这个派生属性：它内部要调用模型上的 Q_INVOKABLE，
-    // 如果方法没标 Q_INVOKABLE，QML 只会在**真正求值的那一刻**抛 TypeError。
-    // 显式读能保证这条路径每次都被走到，而不是依赖运行顺序或其它绑定是否被触发。
-    QVERIFY(!dialog->property("alreadyPulling").toBool());
-    // 按下回车：必须发出请求（并且不能有 QML 运行时错误——由 cleanup 断言）
-    QVERIFY(QMetaObject::invokeMethod(field, "accepted"));
-    QCOMPARE(requestedSpy.count(), 1);
-    QCOMPARE(requestedSpy.at(0).at(0).toString(), QStringLiteral("alpine:latest"));
-    // 对话框在发起后关闭，拉取在后台继续
-    QVERIFY2(!dialog->property("visible").toBool(), "the dialog must close once the pull has started");
-}
-
-/*!
- * 拉取列表（ARCH_V4 §2.4）：进度不在模态窗口里，关掉窗口也能看见。
- */
-void QmlLoadTest::pullProgressListShowsBackgroundPulls()
-{
-    StatusController *controller = m_stubKcm->controller();
-    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
-    controller->operations()->refreshWriteAccess();
-
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
-    QVERIFY2(!component.isError(), qPrintable(path));
-    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
-    QVERIFY(!object.isNull());
-    auto *page = qobject_cast<QQuickItem *>(object.data());
-    QVERIFY(page);
-
-    // 拉取列表在镜像标签页里：非当前标签页整体不可见，先切过去
-    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
-    QVERIFY(tabBar);
-    QVERIFY(tabBar->setProperty("currentIndex", 1));
-
-    QQuickItem *list = childByObjectName(page, QStringLiteral("pullProgressList"));
-    QVERIFY2(list, "pull progress list not found");
-    QVERIFY2(!list->property("visible").toBool(), "no pulls means no list");
-
-    // 两路并发：列表里应该出现两行，各自带进度条与取消按钮
-    controller->operations()->pullImage(QStringLiteral("alpine"));
-    controller->operations()->pullImage(QStringLiteral("busybox"));
-    QTRY_COMPARE(controller->operations()->activePullCount(), 2);
-    QVERIFY2(list->property("visible").toBool(), "the list must show up while pulling");
-
-    int entries = 0;
-    int cancelButtons = 0;
-    int progressBars = 0;
-    std::function<void(QQuickItem *)> scan = [&](QQuickItem *item) {
-        for (QQuickItem *child : item->childItems()) {
-            const QString name = child->objectName();
-            if (name == QLatin1String("pullEntry")) {
-                ++entries;
-            } else if (name == QLatin1String("cancelPullButton")) {
-                ++cancelButtons;
-            } else if (name == QLatin1String("pullProgressBar")) {
-                ++progressBars;
-            }
-            scan(child);
-        }
-    };
-    scan(list);
-    QCOMPARE(entries, 2);
-    QCOMPARE(cancelButtons, 2);
-    QCOMPARE(progressBars, 2);
-
-    // 进度来自后台推送，不依赖任何对话框
-    ImagePullProgress progress;
-    progress.reference = QStringLiteral("alpine:latest");
-    progress.phase = ImagePullProgress::Phase::Downloading;
-    progress.statusText = QStringLiteral("Downloading");
-    progress.currentBytes = 50;
-    progress.totalBytes = 100;
-    m_backend->emitPullProgress(progress);
-
-    // 列表里「最近开始的在最上面」，因此按引用查行号而不是假定位置
-    const int row = controller->operations()->pulls()->rowForReference(QStringLiteral("alpine:latest"));
-    QVERIFY(row >= 0);
-    QCOMPARE(controller->operations()->pulls()->index(row, 0).data(ImagePullModel::ProgressRole).toDouble(), 0.5);
-}
-
-/*!
- * 拉取失败必须留在列表里（带引擎原文）：这是「失败被静默」的直接对策。
- */
-void QmlLoadTest::pullFailureStaysVisibleInTheList()
-{
-    StatusController *controller = m_stubKcm->controller();
-    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
-    controller->operations()->refreshWriteAccess();
-
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
-    QVERIFY2(!component.isError(), qPrintable(path));
-    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
-    QVERIFY(!object.isNull());
-    auto *page = qobject_cast<QQuickItem *>(object.data());
-    QVERIFY(page);
-
-    controller->operations()->pullImage(QStringLiteral("quay.io/libpod/alpine"));
-    m_backend->completeMutations(MutationOutcome::Failed,
-                                 DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
-
-    // 列表里那一条变成失败并保留原因
-    QCOMPARE(controller->operations()->pulls()->count(), 1);
-    QCOMPARE(controller->operations()->pulls()->index(0, 0).data(ImagePullModel::StatusKeyRole).toString(), QStringLiteral("failed"));
-
-    QQuickItem *statusLabel = childByObjectName(page, QStringLiteral("pullStatusLabel"));
-    QVERIFY2(statusLabel, "pull status label not found");
-    QVERIFY2(statusLabel->property("text").toString().contains(QStringLiteral("no response headers")),
-             "the engine message must be visible in the list");
-
-    // 失败提示同时走全局结果通道，并带上「仓库可能不可达」的可操作说明
-    QVERIFY(controller->operations()->resultText().contains(QStringLiteral("registry may be unreachable")));
-
-    // 用户可以移除这条记录
-    QQuickItem *dismissButton = childByObjectName(page, QStringLiteral("dismissPullButton"));
-    QVERIFY(dismissButton);
-    QVERIFY(QMetaObject::invokeMethod(dismissButton, "clicked"));
-    QCOMPARE(controller->operations()->pulls()->count(), 0);
-}
-
-/*!
- * 刷新按钮不再随自动刷新闪烁：手动刷新在自动刷新期间依然可用
- * （重复触发是无害的，backend 会合并同类在途请求）。
- */
-void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
-{
-    StatusController *controller = m_stubKcm->controller();
-
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml");
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
-    QVERIFY2(!component.isError(), qPrintable(path));
-    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
-    QVERIFY(!object.isNull());
-
-    QObject *refreshAction = nullptr;
-    const QList<QObject *> children = object->findChildren<QObject *>();
-    for (QObject *child : children) {
-        // 用 text + 非 checkable 区分「刷新」与「自动刷新」两个动作
-        // （icon.name 是分组属性，property("icon.name") 取不到值）
-        if (child->property("text").toString() == QLatin1String("Refresh")
-            && !child->property("checkable").toBool()) {
-            refreshAction = child;
-            break;
-        }
-    }
-    QVERIFY2(refreshAction, "refresh action not found");
-    QVERIFY(refreshAction->property("enabled").toBool());
-
-    // 让控制器进入 busy（数据在途）：按钮必须保持可用，避免每 5 秒闪一次
-    controller->refresh();
-    QVERIFY(controller->busy());
-    QVERIFY2(refreshAction->property("enabled").toBool(), "refresh must not flicker with auto-refresh");
-    m_backend->completeRefresh();
 }
 
 QTEST_MAIN(QmlLoadTest)

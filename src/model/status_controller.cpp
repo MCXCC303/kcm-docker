@@ -5,6 +5,8 @@
 
 #include "model/status_controller.h"
 
+#include <KLocalizedString>
+
 #include "logging.h"
 #include "model/docker_error_text.h"
 
@@ -35,6 +37,7 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
     , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
+    , m_hostPaths(hostPaths)
 {
     Q_ASSERT(m_backend);
     // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
@@ -54,6 +57,25 @@ StatusController::StatusController(DockerBackendInterface *backend, HostPathServ
 
     // 写后即读（ARCH_V4 §2.2.4）：操作成功后让打开着的详情页静默重读，
     // 否则状态徽标与资源分区要等到下一次 30 秒复核才会跟上
+    if (m_hostPaths) {
+        connect(m_hostPaths, &HostPathService::openFinished, this, [this](HostPathError error, const QString &detail) {
+            switch (error) {
+            case HostPathError::None:
+                setHostPathError(QString());
+                break;
+            case HostPathError::Missing:
+                setHostPathError(i18n("The host path does not exist."));
+                break;
+            case HostPathError::NotADirectory:
+                setHostPathError(i18n("The host path is not a directory."));
+                break;
+            case HostPathError::LaunchFailed:
+                setHostPathError(i18n("Could not open the file manager: %1", detail));
+                break;
+            }
+        });
+    }
+
     connect(m_operations, &OperationController::containerStateChanged, this, [this](const QString &id) {
         if (m_containerDetail->containerId() == id) {
             m_containerDetail->reload();
@@ -444,6 +466,62 @@ void StatusController::updateStates()
         m_state = next;
         Q_EMIT stateChanged();
     }
+}
+
+QString StatusController::hostPathStateKey(const QString &path) const
+{
+    if (path.isEmpty() || !m_hostPaths) {
+        return QStringLiteral("notApplicable");
+    }
+    switch (m_hostPaths->probe(path)) {
+    case HostPathState::Directory:
+        return QStringLiteral("directory");
+    case HostPathState::NotADirectory:
+        return QStringLiteral("notADirectory");
+    case HostPathState::Missing:
+        return QStringLiteral("missing");
+    case HostPathState::NotApplicable:
+        break;
+    }
+    return QStringLiteral("notApplicable");
+}
+
+bool StatusController::openHostPath(const QString &path)
+{
+    if (!m_hostPaths) {
+        setHostPathError(i18n("Opening host paths is not available in this environment."));
+        return false;
+    }
+    setHostPathError(QString());
+    // 路径本身不进日志（ARCH_V2 §40）；结果经 openFinished 回来
+    return m_hostPaths->openDirectory(path);
+}
+
+QStringList StatusController::portBindingsInUse() const
+{
+    QStringList bindings;
+    if (!m_backend) {
+        return bindings;
+    }
+    for (const Container &container : m_backend->containers()) {
+        for (const Port &port : container.ports) {
+            if (!port.isPublished()) {
+                continue;
+            }
+            const QString ip = port.ip.isEmpty() ? QStringLiteral("0.0.0.0") : port.ip;
+            bindings.append(ip + QLatin1Char(':') + QString::number(port.publicPort));
+        }
+    }
+    return bindings;
+}
+
+void StatusController::setHostPathError(const QString &text)
+{
+    if (m_hostPathError == text) {
+        return;
+    }
+    m_hostPathError = text;
+    Q_EMIT hostPathErrorChanged();
 }
 
 } // namespace Kontainer

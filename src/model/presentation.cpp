@@ -7,6 +7,8 @@
 
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QRegularExpression>
+#include <QVariantMap>
 
 namespace Kontainer
 {
@@ -87,6 +89,89 @@ void Presentation::copyToClipboard(const QString &text) const
     if (QClipboard *clipboard = QGuiApplication::clipboard()) {
         clipboard->setText(text);
     }
+}
+
+bool Presentation::isValidEnvKey(const QString &key) const
+{
+    static const QRegularExpression pattern(QStringLiteral("^[A-Za-z_][A-Za-z0-9_]*$"));
+    return pattern.match(key).hasMatch();
+}
+
+QVariantList Presentation::parseEnvText(const QString &text) const
+{
+    QVariantList entries;
+    const QStringList lines = text.split(QLatin1Char('\n'));
+    for (QString line : lines) {
+        line = line.trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#'))) {
+            continue;
+        }
+        if (line.startsWith(QLatin1String("export "))) {
+            line = line.mid(int(qstrlen("export "))).trimmed();
+        }
+        const int equals = line.indexOf(QLatin1Char('='));
+        if (equals <= 0) {
+            continue; // 不是 KEY=VALUE 的行直接跳过（粘贴内容常常是人手整理的）
+        }
+        const QString key = line.left(equals).trimmed();
+        QString value = line.mid(equals + 1).trimmed();
+        if (!isValidEnvKey(key)) {
+            continue;
+        }
+        // 引号包裹：整段取值，不做转义展开（够用且行为可预期）
+        if (value.size() >= 2) {
+            const QChar first = value.front();
+            if ((first == QLatin1Char('"') || first == QLatin1Char('\'')) && value.back() == first) {
+                value = value.mid(1, value.size() - 2);
+            } else {
+                // 未加引号：去掉行内注释（` #` 之后的内容）
+                const int comment = value.indexOf(QLatin1String(" #"));
+                if (comment >= 0) {
+                    value = value.left(comment).trimmed();
+                }
+            }
+        }
+
+        QVariantMap entry;
+        entry.insert(QStringLiteral("key"), key);
+        entry.insert(QStringLiteral("value"), value);
+        entries.append(entry);
+    }
+    return entries;
+}
+
+bool Presentation::isValidPort(int port) const
+{
+    return port >= 1 && port <= 65535;
+}
+
+bool Presentation::isWildcardHostIp(const QString &hostIp) const
+{
+    return hostIp.isEmpty() || hostIp == QLatin1String("0.0.0.0") || hostIp == QLatin1String("::") || hostIp == QLatin1String("[::]");
+}
+
+bool Presentation::hostPortConflicts(const QString &hostIp, int hostPort, const QStringList &usedBindings) const
+{
+    if (!isValidPort(hostPort)) {
+        return false; // 非法端口由范围校验负责，不算冲突
+    }
+    const bool wildcard = isWildcardHostIp(hostIp);
+    for (const QString &binding : usedBindings) {
+        const int colon = binding.lastIndexOf(QLatin1Char(':'));
+        if (colon <= 0) {
+            continue;
+        }
+        bool ok = false;
+        const int usedPort = binding.mid(colon + 1).toInt(&ok);
+        if (!ok || usedPort != hostPort) {
+            continue;
+        }
+        const QString usedIp = binding.left(colon);
+        if (wildcard || isWildcardHostIp(usedIp) || usedIp == hostIp) {
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace Kontainer

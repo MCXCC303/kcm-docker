@@ -95,6 +95,8 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::ImageDetailController *imageDetail READ imageDetail CONSTANT)
     /*! 写操作编排与结果通道（ARCH_V4 §2.2.4）。 */
     Q_PROPERTY(Kontainer::OperationController *operations READ operations CONSTANT)
+    /*! 最近一次「打开宿主路径」的失败说明；为空表示没有失败。 */
+    Q_PROPERTY(QString hostPathError READ hostPathError NOTIFY hostPathErrorChanged)
 
 public:
     /*! 整页状态：Idle / Loading / Ready / Error（§14）。 */
@@ -240,6 +242,10 @@ public:
     {
         return m_operations;
     }
+    QString hostPathError() const
+    {
+        return m_hostPathError;
+    }
     RefreshScheduler *scheduler() const
     {
         return m_scheduler;
@@ -249,6 +255,19 @@ public:
     {
         return m_backend;
     }
+
+    /* --- 表单与预设共用的查询（ARCH_V5_V8 §1.6：不在 QML 里重复实现规则） --- */
+
+    /*! 宿主路径状态 key：directory / missing / notADirectory / notApplicable。 */
+    Q_INVOKABLE QString hostPathStateKey(const QString &path) const;
+    /*! 用系统文件管理器打开宿主目录；返回是否已受理（失败原因走 hostPathError）。 */
+    Q_INVOKABLE bool openHostPath(const QString &path);
+
+    /*!
+     * 当前所有已发布的宿主端口绑定，形如 `0.0.0.0:8080`。
+     * 创建表单用它做端口冲突的前置检测（判定逻辑在 Presentation.hostPortConflicts）。
+     */
+    Q_INVOKABLE QStringList portBindingsInUse() const;
 
 public Q_SLOTS:
     /*! 手动刷新（§16 必须项）；请求去重由 backend 负责（§29）。 */
@@ -271,9 +290,13 @@ Q_SIGNALS:
     void imagesErrorChanged();
     void storageErrorChanged();
     void autoRefreshEnabledChanged();
+    /*! 「打开宿主路径」失败提示变化。 */
+    void hostPathErrorChanged();
     void refreshStateChanged();
 
 private:
+    /*! 宿主路径动作的失败提示（表单与挂载分区共用）。 */
+    void setHostPathError(const QString &text);
     void onEngineUpdated();
     void onContainersUpdated();
     void onImagesUpdated();
@@ -300,6 +323,8 @@ private:
     ContainerDetailController *m_containerDetail = nullptr;
     ImageDetailController *m_imageDetail = nullptr;
     OperationController *m_operations = nullptr;
+    HostPathService *m_hostPaths = nullptr;
+    QString m_hostPathError;
 
     State m_state = State::Idle;
     EngineState m_engineState = EngineState::Loading;
