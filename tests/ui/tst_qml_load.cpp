@@ -1104,6 +1104,32 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     QCOMPARE(containerChips, 3);
     QCOMPARE(hostChips, 3);
 
+    {
+        /*!
+         * 拓扑的前提：连线按 index 推导行位置，芯片按锚点居中——两者必须落在同一个中心。
+         * 一旦这条不变量破了（例如给行加了 margin、改了 rowHeight 的用法），
+         * 屏幕上就会出现「线从芯片旁边穿过去」这种只有肉眼能发现的错位。
+         */
+        QQuickItem *row0 = nullptr;
+        std::function<void(QQuickItem *)> findRow = [&](QQuickItem *item) {
+            for (QQuickItem *child : item->childItems()) {
+                if (child->objectName() == QLatin1String("portMappingRow") && (!row0 || child->y() < row0->y())) {
+                    row0 = child;
+                }
+                findRow(child);
+            }
+        };
+        findRow(topology);
+        QQuickItem *chip = row0 ? row0->childItems().value(0) : nullptr;
+        QVERIFY(row0 && chip);
+        const qreal headerHeight = topology->property("headerHeight").toReal();
+        const qreal rowHeight = topology->property("rowHeight").toReal();
+        QCOMPARE(row0->y(), headerHeight);
+        QCOMPARE(row0->height(), rowHeight);
+        // 允许 1px 的取整误差：连线画在 rowHeight / 2 上
+        QVERIFY(qAbs(chip->y() + chip->height() / 2 - rowHeight / 2) <= 1.0);
+    }
+
     // 连线层只是装饰（QML 里标了 Accessible.ignored）：这里断言「信息不在图形里」——
     // 每行的两侧芯片都必须是真实文本，屏幕阅读器与键盘用户完全不依赖连线
     QQuickItem *links = childByObjectName(page, QStringLiteral("portTopologyLinks"));

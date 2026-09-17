@@ -189,6 +189,20 @@ void fillFixture(MockDockerBackend &backend)
     detail.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
                     {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
                     {QStringLiteral("::"), 9090, 0, QStringLiteral("tcp")}};
+    // KONTAINER_RENDER_MANY_PORTS=1：造一堆映射，用来复核拓扑在 20+ 行时的观感
+    // （连线按 index 推导行高，行数多了不应该错位或溢出）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_MANY_PORTS")) {
+        detail.ports.clear();
+        for (int i = 0; i < 12; ++i) {
+            const quint16 hostPort = quint16(20000 + i * 7);
+            const quint16 containerPort = quint16(3000 + i);
+            detail.ports.append({QStringLiteral("0.0.0.0"), containerPort, hostPort, QStringLiteral("tcp")});
+            detail.ports.append({QStringLiteral("127.0.0.1"), containerPort, quint16(hostPort + 1), QStringLiteral("tcp")});
+        }
+        for (int i = 0; i < 4; ++i) {
+            detail.ports.append({QString(), quint16(9000 + i), 0, QStringLiteral("tcp")});
+        }
+    }
     detail.networks = {{QStringLiteral("bridge"),
                         QStringLiteral("a1b2c3d4e5f6"),
                         QStringLiteral("172.17.0.4"),
