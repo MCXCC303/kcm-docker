@@ -14,6 +14,34 @@ namespace Kontainer
 {
 
 /*!
+ * helper 的 D-Bus 名 / KAuth helper id（**单一来源**）。
+ *
+ * 同一个字符串必须同时出现在四个地方，任何一处不一致都只会在真机上表现为
+ * "授权失败"，而看不出是哪一处写错：
+ *
+ *   - `KAUTH_HELPER_MAIN()` 的第一个参数（helper 侧，决定它 own 哪个总线名）
+ *   - `KAuth::Action::setHelperId()`（会话侧，不设它 polkit 后端会直接拒绝执行）
+ *   - `<helper>.actions` 里动作名的前缀（策略侧）
+ *   - `/usr/share/dbus-1/system.d/<helper>.conf` 的 `allow own`（总线侧）
+ *
+ * `tst_kauth_wiring` 把这四处钉在一起。
+ */
+inline constexpr auto kHelperId = "org.kde.kontainer";
+
+/*!
+ * 动作 id（必须与 `kauth/org.kde.kontainer.actions` 的段名一致）。
+ *
+ * 命名只能用**小写字母与数字**（分层用 `.`）：这是官方教程的要求，
+ * 而且 KAuth 自带的 kauth-policy-gen 会直接拒绝大写与下划线
+ * （`Wrong action syntax`），所以这里不能用 `write_daemon_config` 这类名字。
+ *
+ * 动作名 → helper 槽名：去掉 helper id 前缀后把 `.` 换成 `_`
+ * （`org.kde.kontainer.daemon.save` → `daemon_save`）。
+ */
+inline constexpr auto kSaveActionName = "org.kde.kontainer.daemon.save";
+inline constexpr auto kRestartActionName = "org.kde.kontainer.daemon.restart";
+
+/*!
  * 提权请求的受限语义（ARCH_V5_V8 §2.4）。
  *
  * **这是提权组件的安全边界**：helper 只接受"对白名单键的编辑意图"，

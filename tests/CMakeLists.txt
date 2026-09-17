@@ -28,6 +28,14 @@ kontainer_add_test(tst_json_line_reader backend/tst_json_line_reader.cpp)
 kontainer_add_test(tst_daemon_config backend/tst_daemon_config.cpp)
 kontainer_add_test(tst_daemon_deployment backend/tst_daemon_deployment.cpp)
 kontainer_add_test(tst_kontainer_helper backend/tst_kontainer_helper.cpp)
+kontainer_add_test(tst_kauth_wiring backend/tst_kauth_wiring.cpp)
+# 接线测试要能读到生成物（策略与安装脚本），因此需要构建目录路径，并依赖生成目标
+target_compile_definitions(tst_kauth_wiring PRIVATE
+    KONTAINER_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    KONTAINER_BUILD_DIR="${CMAKE_BINARY_DIR}")
+if(TARGET kontainer_policy)
+    add_dependencies(tst_kauth_wiring kontainer_policy)
+endif()
 kontainer_add_test(tst_docker_capabilities backend/tst_docker_capabilities.cpp)
 kontainer_add_test(tst_image_reference backend/tst_image_reference.cpp)
 kontainer_add_test(tst_dto_parsers backend/tst_dto_parsers.cpp)

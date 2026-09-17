@@ -64,13 +64,67 @@ Kontainer 为此提供一个**能力被严格限制**的 helper，而不是让�
 
 ```bash
 cmake --install build                          # 装到 ~/kde/usr（不需要 root）
-sudo build/install-privileged-helper.sh        # 装 helper 与 polkit policy（需要 root）
+sudo build/install-privileged-helper.sh        # 装 helper 与系统集成文件（需要 root）
 ```
 
+第二步装的是**四个**文件，缺任何一个授权都走不通（各自的作用见下表）：
+
+| 文件 | 作用 |
+| --- | --- |
+| `/usr/lib/kf6/kauth/kontainer_helper` | helper 本体（唯一以 root 运行的进程） |
+| `/usr/share/polkit-1/actions/org.kde.kontainer.policy` | 动作注册（**由 `src/kauth/org.kde.kontainer.actions` 生成**，不要直接改 XML） |
+| `/usr/share/dbus-1/system-services/org.kde.kontainer.service` | D-Bus 激活（第一次调用时以 root 启动 helper） |
+| `/usr/share/dbus-1/system.d/org.kde.kontainer.conf` | D-Bus 系统策略：系统总线默认 `<deny own="*"/>`，不放行则 helper 连总线名都 own 不了 |
+
 没装第二步时一切照常工作：配置页会给出**可直接复制的命令**，功能不会静默失败。
-发行版打包用 `-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON` 走 KAuth 的标准安装宏。
+发行版打包用 `-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON` 走 KAuth 的标准安装宏
+（同一个 `.actions` 源，宏负责生成并安装上面四个文件）。
+
+> 动作文案（polkit 授权框里那句话）写在 `org.kde.kontainer.actions` 的
+> `Name[zh_CN]` / `Description[zh_CN]`：它是全项目**唯一**不走 po 体系的用户可见文本，
+> 由 `tst_kauth_wiring` 守住。
 
 
+
+### 实机验证提权（polkit）
+
+单测全部注入假的 KAuth 结果，**不能替代真机验证**。装完第二步后按下面顺序过一遍，
+每一步都对应链路上不同的环节，哪一步失败就能定位到哪个文件没装好：
+
+```bash
+# 1) 动作是否注册（policy 装对了才有输出）
+pkaction --verbose --action-id org.kde.kontainer.daemon.save
+pkaction --verbose --action-id org.kde.kontainer.daemon.restart
+#    期望：implicit active = auth_admin_keep、implicit inactive = no、implicit any = no，
+#    description/message 是 .actions 里的文案（中文会话取 xml:lang="zh_CN" 那份）
+
+# 2) helper 能否被总线拉起来（D-Bus .service + .conf 装对了才通过）
+busctl --system call org.freedesktop.DBus /org/freedesktop/DBus \
+       org.freedesktop.DBus StartServiceByName su org.kde.kontainer 0
+#    这就是 KAuth 内部做的事（DBusHelperProxy::executeAction → startService）。
+#    期望返回 u 1（START_REPLY_SUCCESS）；报 AccessDenied 说明 .conf 没装，
+#    ServiceUnknown / 找不到文件说明 .service 没装
+
+# 3) 单动作授权（不经过界面，直接问 polkit；应弹出授权框）
+pkcheck --action-id org.kde.kontainer.daemon.save --process $$
+#    期望：弹框 → 认证后退出码 0；取消则退出码 1 并把原因打到 stderr
+
+# 4) 端到端（界面）
+#    打开「系统级配置」→「解锁以编辑」：弹一次授权，成功后横幅显示解锁剩余秒数（约 300s）
+#    改一个镜像加速器 → 保存（同一授权窗口内不再弹框）→ /etc/docker/daemon.json 与备份都更新
+#    「重启 Docker…」是另一个动作，会再问一次授权 —— 这是 auth_admin_keep 按动作记的预期行为
+
+# 5) 出问题时看哪里
+journalctl -b -u polkit --no-pager | tail -30        # 授权判定
+journalctl -b -t dbus-daemon --no-pager | tail -30    # own / send_destination 被拒
+busctl --system monitor org.kde.kontainer             # helper 侧是否真的被调用
+```
+
+验证完可以卸载：`sudo rm` 那四个文件，再 `sudo systemctl restart polkit dbus`；
+卸载后配置页会自动退回"手动执行命令"的降级形态。
+
+> 前提：polkit 的认证代理（`polkit-kde-agent-1` 等）必须在当前会话里运行，
+> 否则授权请求会以 `NoResponder` 直接失败，而不是弹框。
 
 ### 权限模型
 
@@ -287,6 +341,7 @@ ctest --test-dir build --output-on-failure
 | `tst_daemon_deployment` | 部署形态矩阵（系统级 / rootless / 未知）、配置路径选择、**形态未知时不猜系统路径**、可写性判定（已存在文件只看自身权限位；不存在则看最近的可创建父目录）、数据目录在家目录的提示 |
 | `tst_daemon_config` | `daemon.json` 读写：未知键原样保留、无法解析时只读且绝不覆盖、原子写 + 备份、空内容拒绝、**作用域与解锁状态机**（未解锁不得保存、授权超时自动上锁、换作用域即失效）、提权只取决于"这个文件能不能写"、降级命令按形态给出（rootless 用 `systemctl --user`） |
 | `tst_kontainer_helper` | 提权 helper 的安全边界：只接受白名单键、值校验在 helper 内再做一遍、超长内容拒绝、`dryRun` 不落盘、注入尝试（换行 / 任意路径 / 任意 systemd unit）一律拒绝 |
+| `tst_kauth_wiring` | 提权链路的接线：helper id 单一来源（会话侧必须 `setHelperId`、helper 侧不许硬编码）、四个系统文件齐备、`.actions` 恰好是这两个动作且带中文对话框文案、helper 槽名与动作名对齐（KAuth 的"去前缀 + 点换下划线"规则）、**生成出来的策略不是空策略**且默认值是收紧的（`auth_admin_keep` + `allow_inactive=no`、不写 `allow_any`） |
 | `tst_i18n_consistency` | 翻译域一致性、译文完整性、**模板与源码同步**（现场跑一次 `xgettext` 比对 `po/kcm_docker.pot`，漏提取或多提取都失败）、**运行时真的加载 `.mo`** 并断言几条译文（域 / 语言 / 安装目录任一环错都会静默退回英文）、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
 | `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
 | `tst_refresh_churn` / `tst_kcm_widget_churn` | 刷新抖动压力测试：数据、窗口尺寸、分区、页面进出反复变化；后者用 **QQuickWidget**（与 kcmshell6 相同的宿主形态）承载 `main.qml`，并断言「同一结构下的数值刷新不得重建统计块与存储图例的条目」——针对真实会话里出现过的布局 polish 段错误 |

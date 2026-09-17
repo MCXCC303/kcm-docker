@@ -1,0 +1,50 @@
+# SPDX-FileCopyrightText: 2026 kontainer developers
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# 提权动作定义（ARCH_V5_V8 §2.4）——这是**源头**，polkit 的 .policy XML 是构建产物：
+# `kauth_install_actions()`（打包路径）或本仓库的 `kontainer_policy` 目标（前缀安装路径）
+# 会调用 KAuth 自带的 kauth-policy-gen 生成 XML。
+#
+# 为什么必须是这个 INI 格式而不是直接写 XML：kauth-policy-gen 只认这个格式，
+# 把 XML 喂给它不会报错，而是**生成一个没有任何动作的空策略**
+# （详见 ARCH_V5_V8 附录 C 的排查记录）。
+#
+# 命名规则：只用小写字母与数字，分层用 `.`（官方教程的要求，且 kauth-policy-gen
+# 会直接拒绝大写与下划线：`Wrong action syntax`）。
+#
+# 动作名 → helper 槽名：去掉 helper id 前缀后把 `.` 换成 `_`
+# （规则见 src/backends/dbus/DBusHelperProxy.cpp，helper 侧对应
+#   kontainer_helper.cpp 的 daemon_save / daemon_restart）
+#   org.kde.kontainer.daemon.save    → daemon_save
+#   org.kde.kontainer.daemon.restart → daemon_restart
+#
+# Policy/Persistence 的语义（官方教程 + 生成结果实测）：
+#   Policy=auth_admin             → 需要以管理员身份认证
+#   Persistence=session           → 生成 <allow_active>auth_admin_keep</allow_active>，
+#                                   polkit 下等价于"授权保持几分钟"（session/always 同义），
+#                                   因此界面上的解锁窗口按 5 分钟计
+#   不带 Persistence              → 生成 auth_admin，每次都问
+#   生成器不会写 <allow_any>（默认即 no），<allow_inactive> 默认 no：
+#   只有**活动会话**能触发授权，远端/切换走的会话不弹管理员口令框。
+
+[Domain]
+Name=Kontainer
+Name[zh_CN]=Kontainer
+Icon=utilities-terminal
+URL=https://invent.kde.org/
+
+[org.kde.kontainer.daemon.save]
+Name=Write the Docker daemon configuration
+Name[zh_CN]=写入 Docker 守护进程配置
+Description=Kontainer wants to change the Docker daemon configuration (/etc/docker/daemon.json)
+Description[zh_CN]=Kontainer 需要修改 Docker 守护进程配置（/etc/docker/daemon.json）
+Policy=auth_admin
+Persistence=session
+
+[org.kde.kontainer.daemon.restart]
+Name=Restart the Docker daemon
+Name[zh_CN]=重启 Docker 守护进程
+Description=Kontainer wants to restart the Docker service. Running containers will be stopped.
+Description[zh_CN]=Kontainer 需要重启 Docker 服务；正在运行的容器会被停止。
+Policy=auth_admin
+Persistence=session

@@ -201,45 +201,87 @@ target_link_libraries(kontainer_helper PRIVATE
 )
 install(TARGETS kontainer_helper ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
-# helper 的 D-Bus 服务文件与 polkit policy。
+# 提权组件的系统集成：polkit 策略、helper 的 D-Bus 服务文件、D-Bus 系统策略。
 #
-# 注意：KAuth 的标准宏把它们装到**系统绝对路径**（/usr/lib/kf6/kauth、
-# /usr/share/polkit-1/actions）——那是给发行版打包用的，需要 root。
-# 开发者常用的前缀安装（cmake --install 装到 ~/kde/usr）如果也走这两条规则，
+# 关于 polkit 策略的来源（ARCH_V5_V8 附录 C）：**源头是 .actions（INI）**，
+# .policy（XML）是构建产物，由 KAuth 自带的 kauth-policy-gen 生成。
+# 把 XML 直接交给 kauth_install_actions() 不会报错，而是生成一个"有文件、没有动作"
+# 的空策略——打包出来的系统上授权永远失败（真实踩过，别改回去）。
+set(KONTAINER_ACTIONS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.actions")
+set(KONTAINER_POLICY_FILE "${CMAKE_CURRENT_BINARY_DIR}/org.kde.kontainer.policy")
+
+# 注意：KAuth 的标准宏把文件装到**系统绝对路径**（/usr/lib/kf6/kauth、
+# /usr/share/polkit-1/actions、/usr/share/dbus-1/...）——那是给发行版打包用的，需要 root。
+# 开发者常用的前缀安装（cmake --install 装到 ~/kde/usr）如果也走这些规则，
 # 就会在普通用户下直接失败（真实踩过）。因此拆成两条路：
 #
-#   - 默认：只把 helper 二进制装进前缀；系统部分由一个显式脚本完成（需要 sudo）
-#   - 打包/系统安装：-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON，走 KAuth 标准宏
+#   - 默认：只把 helper 二进制装进前缀，另外**生成**策略；系统部分由一个显式脚本完成（需要 sudo）
+#   - 打包/系统安装：-DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON，走 KAuth 标准宏（含 D-Bus 策略）
 option(KONTAINER_INSTALL_PRIVILEGED_HELPER
        "Install the polkit policy and the helper D-Bus service into system paths (requires root)" OFF)
 
 if(KONTAINER_INSTALL_PRIVILEGED_HELPER)
+    # 官方宏：生成并安装 <helper_id>.conf（D-Bus 系统策略：放行 root own 该名字）、
+    # <helper_id>.service（D-Bus 激活）、以及由 .actions 生成的 polkit .policy
     kauth_install_helper_files(kontainer_helper org.kde.kontainer root)
-    kauth_install_actions(org.kde.kontainer "${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.policy")
+    kauth_install_actions(org.kde.kontainer "${KONTAINER_ACTIONS_FILE}")
 else()
+    # 同一套官方工具与输入格式，只是不往系统路径装（由 install-privileged-helper.sh 提权安装）。
+    # 少了这一步，下面的脚本就没有策略文件可装——所以生成目标是 ALL。
+    add_custom_command(OUTPUT "${KONTAINER_POLICY_FILE}"
+                       COMMAND KF6::kauth-policy-gen "${KONTAINER_ACTIONS_FILE}" "${KONTAINER_POLICY_FILE}"
+                       MAIN_DEPENDENCY "${KONTAINER_ACTIONS_FILE}"
+                       COMMENT "Generating org.kde.kontainer.policy from org.kde.kontainer.actions")
+    add_custom_target(kontainer_policy ALL DEPENDS "${KONTAINER_POLICY_FILE}")
     message(STATUS "Kontainer: privileged helper files are not installed by cmake --install; "
                    "run the generated install-privileged-helper.sh with sudo (see README)")
 endif()
 
-# 显式的一步提权安装脚本：路径与宏使用的系统路径一致，用 sudo 执行即可
+# 显式的一步提权安装脚本：路径与官方宏使用的系统路径一致，用 sudo 执行即可。
+# 四个文件缺一不可（ARCH_V5_V8 附录 C）：
+#   helper 二进制、polkit 策略、D-Bus 服务文件（激活）、D-Bus 系统策略（own 总线名）
 set(KONTAINER_PRIVILEGED_INSTALL_SCRIPT "${CMAKE_BINARY_DIR}/install-privileged-helper.sh")
+# 用 here-doc 生成两个系统集成文件：脚本里不再有转义地狱，内容与官方 stub 一致
 file(WRITE "${KONTAINER_PRIVILEGED_INSTALL_SCRIPT}"
-"#!/bin/sh
-# 由 CMake 生成：把受限 helper 与 polkit policy 安装到系统路径（需要 root）。
-# 只有这两个文件需要提权安装；其余部分由 cmake --install 装进前缀。
-set -e
-KAUTH_DIR=/usr/lib/kf6/kauth
-POLKIT_DIR=/usr/share/polkit-1/actions
-DBUS_DIR=/usr/share/dbus-1/system-services
-
-install -d \"\$KAUTH_DIR\" \"\$POLKIT_DIR\" \"\$DBUS_DIR\"
-install -m 0755 \"${CMAKE_BINARY_DIR}/bin/kontainer_helper\" \"\$KAUTH_DIR/kontainer_helper\"
-install -m 0644 \"${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kontainer.policy\" \"\$POLKIT_DIR/org.kde.kontainer.policy\"
-printf '%s\\n' \
-  '[D-BUS Service]' \
-  'Name=org.kde.kontainer' \
-  'Exec=/usr/lib/kf6/kauth/kontainer_helper' \\
-  'User=root' > \"\$DBUS_DIR/org.kde.kontainer.service\"
-echo \"installed: \$KAUTH_DIR/kontainer_helper, \$POLKIT_DIR/org.kde.kontainer.policy\"
-")
+"#!/bin/sh\n"
+"# 由 CMake 生成：把受限 helper 及其系统集成文件安装到系统路径（需要 root）。\n"
+"# 其余部分由 cmake --install 装进前缀。\n"
+"set -e\n"
+"KAUTH_DIR=/usr/lib/kf6/kauth\n"
+"POLKIT_DIR=/usr/share/polkit-1/actions\n"
+"DBUS_SERVICE_DIR=/usr/share/dbus-1/system-services\n"
+"DBUS_POLICY_DIR=/usr/share/dbus-1/system.d\n"
+"\n"
+"install -d \"\$KAUTH_DIR\" \"\$POLKIT_DIR\" \"\$DBUS_SERVICE_DIR\" \"\$DBUS_POLICY_DIR\"\n"
+"install -m 0755 \"${CMAKE_BINARY_DIR}/bin/kontainer_helper\" \"\$KAUTH_DIR/kontainer_helper\"\n"
+"install -m 0644 \"${KONTAINER_POLICY_FILE}\" \"\$POLKIT_DIR/org.kde.kontainer.policy\"\n"
+"\n"
+"# D-Bus 激活：总线在第一次调用时按这个文件以 root 启动 helper\n"
+"cat > \"\$DBUS_SERVICE_DIR/org.kde.kontainer.service\" <<'EOF'\n"
+"[D-BUS Service]\n"
+"Name=org.kde.kontainer\n"
+"Exec=/usr/lib/kf6/kauth/kontainer_helper\n"
+"User=root\n"
+"EOF\n"
+"\n"
+"# D-Bus 系统策略：系统总线默认 <deny own=\"*\"/> + <deny send_type=\"method_call\"/>，\n"
+"# 每个服务必须在自己 .conf 里打洞，否则 helper 连总线名都 own 不了（KAuth 的\n"
+"# dbus_policy.stub 就是这个洞；这里额外放行调用方 send_destination）\n"
+"cat > \"\$DBUS_POLICY_DIR/org.kde.kontainer.conf\" <<'EOF'\n"
+"<!DOCTYPE busconfig PUBLIC \"-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN\" \"http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd\">\n"
+"<busconfig>\n"
+"  <policy user=\"root\">\n"
+"    <allow own=\"org.kde.kontainer\"/>\n"
+"  </policy>\n"
+"  <policy context=\"default\">\n"
+"    <allow send_destination=\"org.kde.kontainer\"/>\n"
+"  </policy>\n"
+"</busconfig>\n"
+"EOF\n"
+"\n"
+"echo \"installed: \$KAUTH_DIR/kontainer_helper\"\n"
+"echo \"installed: \$POLKIT_DIR/org.kde.kontainer.policy\"\n"
+"echo \"installed: \$DBUS_SERVICE_DIR/org.kde.kontainer.service\"\n"
+"echo \"installed: \$DBUS_POLICY_DIR/org.kde.kontainer.conf\"\n"
+)
 message(STATUS "Kontainer: write privileged install script: ${KONTAINER_PRIVILEGED_INSTALL_SCRIPT}")

@@ -5,6 +5,7 @@
 
 #include "backend/privileged_config_client.h"
 
+#include "kauth/privileged_config_request.h"
 #include "logging.h"
 
 #include <QDBusConnection>
@@ -21,8 +22,6 @@ namespace Kontainer
 
 namespace
 {
-constexpr auto kWriteAction = "org.kde.kontainer.write_daemon_config";
-constexpr auto kRestartAction = "org.kde.kontainer.restart_docker";
 constexpr auto kDockerUnit = "docker.service";
 
 /*!
@@ -78,7 +77,8 @@ bool PrivilegedConfigClient::writeAvailable() const
 {
     // KAuth 的 action 只有在 policy 与 helper 都安装时才"可用"；
     // 这里只做一次便宜的判断，真正的结论以执行结果为准（失败会给 helperUnavailable）
-    const KAuth::Action action(QString::fromLatin1(kWriteAction));
+    KAuth::Action action(QString::fromLatin1(kSaveActionName));
+    action.setHelperId(QString::fromLatin1(kHelperId));
     return action.isValid();
 }
 
@@ -90,7 +90,7 @@ void PrivilegedConfigClient::requestAuthorization()
     }
     QVariantMap arguments;
     arguments.insert(QStringLiteral("dryRun"), true);
-    runHelperAction(QString::fromLatin1(kWriteAction), arguments, Operation::Authorize);
+    runHelperAction(QString::fromLatin1(kSaveActionName), arguments, Operation::Authorize);
 }
 
 void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
@@ -113,7 +113,7 @@ void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
     if (!edits.logDriver.isEmpty()) {
         arguments.insert(QStringLiteral("log-driver"), edits.logDriver);
     }
-    runHelperAction(QString::fromLatin1(kWriteAction), arguments, Operation::WriteConfig);
+    runHelperAction(QString::fromLatin1(kSaveActionName), arguments, Operation::WriteConfig);
 }
 
 void PrivilegedConfigClient::restartDocker(bool systemService)
@@ -129,12 +129,16 @@ void PrivilegedConfigClient::restartDocker(bool systemService)
     }
     QVariantMap arguments;
     arguments.insert(QStringLiteral("confirm"), true);
-    runHelperAction(QString::fromLatin1(kRestartAction), arguments, Operation::Restart);
+    runHelperAction(QString::fromLatin1(kRestartActionName), arguments, Operation::Restart);
 }
 
 void PrivilegedConfigClient::runHelperAction(const QString &actionName, const QVariantMap &arguments, Operation operation)
 {
     KAuth::Action action(actionName);
+    // 必须显式声明 helper：polkit 后端的执行路径要求动作带 helper
+    // （KAuth 的 Polkit1Backend 声明的是 AuthorizeFromHelperCapability，
+    //  ExecuteJob 在"没有 helper"时直接返回 InvalidActionReply，不会去执行任何东西）
+    action.setHelperId(QString::fromLatin1(kHelperId));
     action.setArguments(arguments);
     if (!action.isValid()) {
         // policy / helper 未安装：直接走降级路径，而不是弹一个必然失败的授权框
