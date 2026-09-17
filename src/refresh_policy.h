@@ -53,6 +53,11 @@ inline constexpr int kStopTimeoutSeconds{10};
  */
 inline constexpr std::chrono::seconds kPullIdleTimeout{60};
 
+/*! 上传构建上下文阶段的静默超时（八期 §5.1）：上传几十 MB 时"多久没进展"才算异常。 */
+inline constexpr std::chrono::seconds kBuildUploadTimeout{120};
+/*! 构建响应阶段的静默超时：构建可能长时间没有输出（例如编译一个内核模块）。 */
+inline constexpr std::chrono::seconds kBuildIdleTimeout{300};
+
 /*! 资源采样连续失败多少次后停止轮询（容器可能已经停止）。 */
 inline constexpr int kMaxConsecutiveStatsFailures{3};
 

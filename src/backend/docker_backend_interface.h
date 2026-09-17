@@ -15,6 +15,7 @@
 #include "domain/container_stats.h"
 #include "domain/engine_info.h"
 #include "domain/image.h"
+#include "domain/image_build.h"
 #include "domain/network.h"
 #include "domain/volume.h"
 #include "domain/image_detail.h"
@@ -106,6 +107,8 @@ public:
         DisconnectNetwork,
         /*! 七期：创建容器（§4.6）。 */
         CreateContainer,
+        /*! 八期：从 Dockerfile 构建镜像（§5.3）。 */
+        BuildImage,
         /*! 六期：数据卷的创建 / 删除 / 清理（§3.5）。 */
         CreateVolume,
         RemoveVolume,
@@ -202,6 +205,8 @@ public:
     virtual void cancelImagePull(const QString &reference) = 0;
     /*! 取消全部在途拉取（关闭 KCM / 退出时的兜底）。 */
     virtual void cancelAllImagePulls() = 0;
+    /*! 取消一路构建（八期 §5.3）：中断上传/响应，临时上下文由后端清理。 */
+    virtual void cancelImageBuild(const QString &buildId) = 0;
     /*! `force=true` 用于多标签镜像的强制删除（引擎在 409 时要求）。 */
     virtual void removeImage(const QString &id, bool force) = 0;
 
@@ -212,6 +217,14 @@ public:
      * 其它驱动"只识别不创建"（有意偏离，见 §3.3）。
      */
     virtual void createNetwork(const Kontainer::NetworkCreateRequest &request) = 0;
+    /*!
+     * 构建镜像（`POST /build`，§5.3）。
+     *
+     * 上下文由调用方用 `packBuildContext()` 打好（`request.contextArchive`），
+     * 后端负责上传、解析逐行 JSON 进度、结束后删除临时 tar。
+     */
+    virtual void buildImage(const Kontainer::ImageBuildRequest &request) = 0;
+
     /*!
      * 创建容器（`POST /containers/create?name=…`，§4.6）。
      *
@@ -327,6 +340,13 @@ Q_SIGNALS:
     void imagesUpdated();
     void networksUpdated();
     void volumesUpdated();
+    /*! 构建进度：`update` 是这一行的增量（step、状态原文、进度）。 */
+    void imageBuildProgress(const QString &buildId, const Kontainer::ImageBuildUpdate &update);
+    /*! 构建结束：成功时带镜像 id，失败时 `error` 里是**含失败步骤**的原因。 */
+    void imageBuildFinished(const QString &buildId,
+                            Kontainer::DockerBackendInterface::MutationOutcome outcome,
+                            const Kontainer::DockerError &error,
+                            const QString &imageId);
     /*! 容器创建成功：新容器 id 与引擎的提醒（`Warnings` 可能非空，例如名称被截断）。 */
     void containerCreated(const QString &id, const QString &warning);
     /*! 数据卷清理完成：删掉的卷名与回收的字节数（可能为空 = 没有可清理的）。 */

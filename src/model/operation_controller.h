@@ -8,6 +8,7 @@
 #include "backend/docker_backend_interface.h"
 #include "backend/docker_capabilities.h"
 #include "domain/image_pull_progress.h"
+#include "model/image_build_model.h"
 #include "model/image_pull_model.h"
 
 #include <QObject>
@@ -59,6 +60,8 @@ class OperationController : public QObject
 
     /* --- 拉取列表（可并发、可在后台继续，ARCH_V4 §2.4） --- */
     Q_PROPERTY(Kontainer::ImagePullModel *pulls READ pulls CONSTANT)
+    /*! 构建列表（八期 §5.3）：与拉取同一个模式（后台继续、可并发、可取消、失败保留原文）。 */
+    Q_PROPERTY(Kontainer::ImageBuildModel *builds READ builds CONSTANT)
     Q_PROPERTY(bool pulling READ pulling NOTIFY pullListChanged)
     Q_PROPERTY(int activePullCount READ activePullCount NOTIFY pullListChanged)
 
@@ -83,6 +86,10 @@ public:
     ImagePullModel *pulls() const
     {
         return m_pulls;
+    }
+    ImageBuildModel *builds() const
+    {
+        return m_builds;
     }
     /*! 是否至少有一路拉取在进行中（用于工具栏指示与对话框文案）。 */
     bool pulling() const;
@@ -118,6 +125,27 @@ public:
     void setCredentialStore(CredentialStore *store);
     /*! 取消某一项拉取（列表里的「取消」按钮）。 */
     Q_INVOKABLE void cancelPull(const QString &reference);
+
+    /*!
+     * 从 Dockerfile 构建镜像（八期 §5.3）。
+     *
+     * 上下文目录在这里打包（`packBuildContext`），失败时给稳定 key；
+     * 成功后交给后端上传并进入构建列表（进度、取消、失败原因都在列表里）。
+     * `inlineDockerfile` 非空时用它替代目录里的 Dockerfile（界面可以直接贴内容）。
+     */
+    Q_INVOKABLE bool buildImage(const QString &contextDirectory,
+                                const QStringList &tags,
+                                const QString &dockerfile = QStringLiteral("Dockerfile"),
+                                const QStringList &buildArgs = {},
+                                const QVariantList &labels = {},
+                                const QString &target = {},
+                                bool noCache = false,
+                                bool pull = false,
+                                const QString &inlineDockerfile = {});
+    /*! 取消一路构建（临时上下文由后端在结束时删除）。 */
+    Q_INVOKABLE void cancelBuild(const QString &buildId);
+    /*! 清掉已结束的构建记录（进行中的不动）。 */
+    Q_INVOKABLE void clearFinishedBuilds();
     /*! 取消全部在途拉取。 */
     Q_INVOKABLE void cancelAllPulls();
     /*! 从列表里移除一条已结束的记录（失败的记录会一直留着，直到用户处理）。 */
@@ -249,6 +277,8 @@ private:
     ImagePullEntry *findPull(const QString &reference);
     /*! 重排并写入模型：进行中的在前，已结束的按结束顺序倒序（最近的在最上面）。 */
     void publishPulls();
+    /*! 写入/更新构建列表里的一条（进行中的在前）。 */
+    void publishBuild(const Kontainer::ImageBuildEntry &entry);
     void onBackendMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error);
 
     void setResult(Result result, const QString &text, const QString &detail = QString(), const DockerError &error = DockerError());
@@ -284,6 +314,9 @@ private:
     QString m_resultActionKey;
 
     ImagePullModel *m_pulls = nullptr;
+    ImageBuildModel *m_builds = nullptr;
+    /*! 构建 id 的自增计数（界面不关心具体值，只要稳定唯一）。 */
+    int m_buildCounter = 0;
     /*! 界面顺序（进行中 + 已结束），模型每次按它重建。 */
     QList<ImagePullEntry> m_pullEntries;
 

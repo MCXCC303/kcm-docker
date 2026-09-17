@@ -115,6 +115,30 @@ void MockDockerBackend::refreshVolumes(bool includeUsage)
     beginRefresh(Section::Volumes);
 }
 
+void MockDockerBackend::buildImage(const ImageBuildRequest &request)
+{
+    m_lastBuildRequest = request;
+    m_mutationCalls.append({Mutation::BuildImage, QStringLiteral("build:") + request.id, false});
+}
+
+void MockDockerBackend::cancelImageBuild(const QString &buildId)
+{
+    m_cancelledBuilds.append(buildId);
+}
+
+void MockDockerBackend::emitBuildProgress(const QString &buildId, const ImageBuildUpdate &update)
+{
+    Q_EMIT imageBuildProgress(buildId, update);
+}
+
+void MockDockerBackend::emitBuildFinished(const QString &buildId,
+                                          DockerBackendInterface::MutationOutcome outcome,
+                                          const DockerError &error,
+                                          const QString &imageId)
+{
+    Q_EMIT imageBuildFinished(buildId, outcome, error, imageId);
+}
+
 void MockDockerBackend::createContainer(const ContainerCreateRequest &request)
 {
     m_lastContainerCreate = request;

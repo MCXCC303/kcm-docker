@@ -58,6 +58,8 @@ add_library(kontainer_core STATIC
     dto/volume_dto.h
     dto/network_dto.cpp
     dto/network_dto.h
+    dto/image_build_dto.cpp
+    dto/image_build_dto.h
     dto/image_dto.cpp
     dto/image_dto.h
     dto/image_inspect_dto.cpp
@@ -77,6 +79,7 @@ add_library(kontainer_core STATIC
     domain/container_stats.h
     domain/engine_info.h
     domain/container_create_request.cpp
+    domain/image_build.h
     domain/container_create_request.h
     domain/volume.cpp
     domain/volume.h
@@ -131,6 +134,8 @@ add_library(kontainer_core STATIC
     model/network_model.h
     model/image_model.cpp
     model/image_model.h
+    model/image_build_model.cpp
+    model/image_build_model.h
     model/image_pull_model.cpp
     model/image_pull_model.h
     model/metrics_model.cpp

@@ -59,6 +59,8 @@ public:
     void refreshImages() override;
     void refreshNetworks() override;
     void refreshVolumes(bool includeUsage = true) override;
+    void buildImage(const Kontainer::ImageBuildRequest &request) override;
+    void cancelImageBuild(const QString &buildId) override;
     void createContainer(const Kontainer::ContainerCreateRequest &request) override;
     void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) override;
     void removeVolume(const QString &name) override;
@@ -172,6 +174,16 @@ private:
         bool failed = false;
     };
 
+    /*! 一路构建的状态：自己的流解析器 + 当前进度聚合。 */
+    struct ImageBuildState {
+        QString id;
+        QString contextArchive;
+        DockerReply *reply = nullptr;
+        JsonLineReader reader;
+        ImageBuildUpdate update;
+        bool failed = false;
+    };
+
     /*! 需要 API 版本前缀的请求：若尚未协商，则先完成握手再执行。 */
     void withApiVersion(Section section, ReadyCallback callback);
 
@@ -182,6 +194,11 @@ private:
     void runMutation(Mutation mutation, const QString &targetKey, ReadyCallback run);
     /*! start / stop / restart / remove 共用的实现。 */
     void runContainerMutation(Mutation mutation, const QString &id, const QString &apiPath, const QUrlQuery &query);
+    /*! 处理构建流的一行（聚合进度、记录失败原因）。 */
+    void handleBuildLine(ImageBuildState &state, const QJsonObject &object);
+    /*! 结束一路构建：删临时 tar、清理状态、发信号。 */
+    void finishBuild(const QString &buildId, MutationOutcome outcome, const DockerError &error);
+
     void startPullRequest(const QString &reference, const QString &targetKey, const Kontainer::RegistryCredential &credential);
     void handlePullLine(ImagePullState &state, const QJsonObject &object);
     void updatePullTotals(ImagePullState &state);
@@ -246,6 +263,7 @@ private:
 
     /*! 在途拉取，key = targetKey（`image:<归一化引用>`）。 */
     QHash<QString, ImagePullState> m_pulls;
+    QHash<QString, ImageBuildState> m_builds;
 
     /*! 等待版本握手的写操作（握手完成或失败后统一清算）。 */
     struct PendingMutation {

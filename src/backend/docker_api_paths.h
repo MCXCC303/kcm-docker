@@ -94,6 +94,16 @@ inline QString networks()
 }
 
 /*!
+ * 构建镜像（`POST /build`，ARCH_V5_V8 §5.3）。
+ *
+ * 上下文以 tar 上传（`Content-Type: application/x-tar`），响应是逐行 JSON 进度。
+ */
+inline QString buildImage()
+{
+    return QStringLiteral("/build");
+}
+
+/*!
  * 创建容器（`POST /containers/create`，ARCH_V5_V8 §4.6）。
  *
  * 注意：容器名是 **query 参数**（`?name=`），不在请求体里。

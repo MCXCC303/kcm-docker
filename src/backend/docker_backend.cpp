@@ -16,12 +16,17 @@
 #include "dto/image_dto.h"
 #include "dto/network_dto.h"
 #include "dto/image_inspect_dto.h"
+#include "dto/image_build_dto.h"
 #include "dto/image_pull_dto.h"
+
+#include <QFileInfo>
 #include "dto/stats_dto.h"
 #include "dto/storage_dto.h"
 #include "dto/volume_dto.h"
 #include "domain/image_reference.h"
 #include "logging.h"
+
+#include <KLocalizedString>
 #include "refresh_policy.h"
 
 #include <QUrlQuery>
@@ -762,6 +767,18 @@ int pullIdleTimeoutMs()
     return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kPullIdleTimeout).count());
 }
 
+/*! 上传构建上下文阶段的静默超时：上传几十 MB 时"多久没进展"才是异常。 */
+int buildUploadTimeoutMs()
+{
+    return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kBuildUploadTimeout).count());
+}
+
+/*! 构建响应阶段的静默超时：构建本身可能很久没有输出。 */
+int buildIdleTimeoutMs()
+{
+    return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kBuildIdleTimeout).count());
+}
+
 const char *mutationName(DockerBackendInterface::Mutation mutation)
 {
     switch (mutation) {
@@ -787,6 +804,8 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "disconnect-network";
     case DockerBackendInterface::Mutation::CreateContainer:
         return "create-container";
+    case DockerBackendInterface::Mutation::BuildImage:
+        return "build-image";
     case DockerBackendInterface::Mutation::CreateVolume:
         return "create-volume";
     case DockerBackendInterface::Mutation::RemoveVolume:
@@ -1148,6 +1167,222 @@ void DockerBackend::stopContainerLogs(const QString &id)
         // cancel() 之后 finished 仍会来一次，届时按 Cancelled 收尾
         it->reply->cancel();
     }
+}
+
+void DockerBackend::buildImage(const ImageBuildRequest &request)
+{
+    // 目标键用构建 id：同一路重复提交会被拒绝，而不是并发跑两次构建
+    const QString targetKey = QStringLiteral("build:") + request.id;
+
+    runMutation(Mutation::BuildImage, targetKey, [this, request, targetKey] {
+        if (!QFileInfo::exists(request.contextArchive)) {
+            emitMutationFinished(Mutation::BuildImage,
+                                 targetKey,
+                                 MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::PreconditionFailed,
+                                             QStringLiteral("build context archive is missing")));
+            return;
+        }
+
+        QUrlQuery query;
+        for (const QString &tag : request.tags) {
+            query.addQueryItem(QStringLiteral("t"), tag);
+        }
+        if (!request.dockerfile.isEmpty() && request.dockerfile != QLatin1String("Dockerfile")) {
+            query.addQueryItem(QStringLiteral("dockerfile"), request.dockerfile);
+        }
+        if (!request.target.isEmpty()) {
+            query.addQueryItem(QStringLiteral("target"), request.target);
+        }
+        if (!request.platform.isEmpty()) {
+            query.addQueryItem(QStringLiteral("platform"), request.platform);
+        }
+        if (request.noCache) {
+            query.addQueryItem(QStringLiteral("nocache"), QStringLiteral("1"));
+        }
+        if (request.pull) {
+            query.addQueryItem(QStringLiteral("pull"), QStringLiteral("1"));
+        }
+        if (request.removeIntermediate) {
+            query.addQueryItem(QStringLiteral("rm"), QStringLiteral("1"));
+        }
+        if (!request.buildArgs.isEmpty()) {
+            // buildargs 是一个 JSON 对象（值为字符串）
+            QJsonObject args;
+            for (const QString &entry : request.buildArgs) {
+                const int separator = entry.indexOf(QLatin1Char('='));
+                if (separator > 0) {
+                    args.insert(entry.left(separator), entry.mid(separator + 1));
+                }
+            }
+            query.addQueryItem(QStringLiteral("buildargs"), QString::fromUtf8(QJsonDocument(args).toJson(QJsonDocument::Compact)));
+        }
+        if (!request.labels.isEmpty()) {
+            QJsonObject labels;
+            for (const auto &label : request.labels) {
+                labels.insert(label.first, label.second);
+            }
+            query.addQueryItem(QStringLiteral("labels"), QString::fromUtf8(QJsonDocument(labels).toJson(QJsonDocument::Compact)));
+        }
+
+        QMap<QByteArray, QByteArray> headers;
+        if (!request.registryAuthHeader.isEmpty()) {
+            headers.insert(QByteArrayLiteral("X-Registry-Auth"), request.registryAuthHeader);
+        }
+
+        ImageBuildState state;
+        state.id = request.id;
+        state.contextArchive = request.contextArchive;
+        state.update.statusText = i18n("Uploading the build context…");
+        m_builds.insert(request.id, state);
+
+        // 上传 tar：写入阶段用较宽的静默超时，响应阶段沿用流式空闲超时（§5.1）
+        DockerReply *reply = m_client.postFile(ApiPaths::buildImage(),
+                                               query,
+                                               request.contextArchive,
+                                               QByteArrayLiteral("application/x-tar"),
+                                               buildUploadTimeoutMs(),
+                                               buildIdleTimeoutMs(),
+                                               headers);
+        m_builds[request.id].reply = reply;
+
+        connect(reply, &DockerReply::streamStarted, this, [this, reply, id = request.id] {
+            if (reply->httpStatus() >= 400) {
+                return;
+            }
+            if (const auto it = m_builds.constFind(id); it != m_builds.constEnd()) {
+                Q_EMIT imageBuildProgress(id, it->update);
+            }
+        });
+
+        connect(reply, &DockerReply::bodyChunk, this, [this, reply, id = request.id] {
+            if (reply->httpStatus() >= 400) {
+                return;
+            }
+            const auto it = m_builds.find(id);
+            if (it == m_builds.end()) {
+                return;
+            }
+            const QList<QJsonObject> lines = it->reader.feed(reply->takeBody());
+            for (const QJsonObject &line : lines) {
+                if (reply->isFinished() || !m_builds.contains(id)) {
+                    return;
+                }
+                handleBuildLine(*it, line);
+            }
+        });
+
+        connect(reply, &DockerReply::finished, this, [this, reply, id = request.id, targetKey] {
+            const DockerReply::State state = reply->state();
+            const DockerError error = reply->error();
+            reply->deleteLater();
+
+            auto it = m_builds.find(id);
+            if (it == m_builds.end()) {
+                return; // 已经被取消并清算过
+            }
+            it->reply = nullptr;
+
+            if (state != DockerReply::State::Cancelled) {
+                const QList<QJsonObject> tail = it->reader.finish();
+                for (const QJsonObject &line : tail) {
+                    handleBuildLine(*it, line);
+                }
+            }
+
+            if (state == DockerReply::State::Cancelled) {
+                finishBuild(id, MutationOutcome::Cancelled, DockerError());
+                return;
+            }
+            if (state != DockerReply::State::Succeeded) {
+                finishBuild(id, MutationOutcome::Failed, error);
+                return;
+            }
+            if (it->failed) {
+                // 流内的 error 行才是真正的失败原因（此时 HTTP 是 200）
+                finishBuild(id, MutationOutcome::Failed, DockerError(DockerError::Kind::EngineError, it->update.errorText));
+                return;
+            }
+            finishBuild(id, MutationOutcome::Succeeded, DockerError());
+        });
+    });
+}
+
+void DockerBackend::cancelImageBuild(const QString &buildId)
+{
+    const auto it = m_builds.constFind(buildId);
+    if (it == m_builds.constEnd() || !it->reply) {
+        return;
+    }
+    // 取消走 reply：finished 会带着 Cancelled 回来，临时 tar 在那条路径上删掉
+    it->reply->cancel();
+}
+
+void DockerBackend::handleBuildLine(ImageBuildState &state, const QJsonObject &object)
+{
+    const DockerImageBuildLineDTO line = DockerImageBuildLineDTO::fromJson(object);
+
+    if (!line.error.isEmpty() || !line.errorDetail.isEmpty()) {
+        state.failed = true;
+        // 失败原因要**带上失败的步骤**：只给"构建失败"没法排查（§5.3）
+        const QString reason = line.errorDetail.isEmpty() ? line.error : line.errorDetail;
+        state.update.errorText = state.update.stepIndex > 0 && !state.update.stepCommand.isEmpty()
+            ? i18n("Step %1/%2 (%3) failed: %4",
+                   state.update.stepIndex,
+                   state.update.totalSteps,
+                   state.update.stepCommand,
+                   reason)
+            : reason;
+        Q_EMIT imageBuildProgress(state.id, state.update);
+        return;
+    }
+
+    if (!line.auxImageId.isEmpty()) {
+        state.update.auxImageId = line.auxImageId;
+    }
+
+    if (line.stepIndex > 0) {
+        state.update.stepIndex = line.stepIndex;
+        state.update.totalSteps = line.totalSteps;
+        state.update.stepCommand = line.stepCommand;
+        state.update.cached = false;
+        state.update.statusText = line.stream.trimmed();
+        if (line.totalSteps > 0) {
+            state.update.progress = double(line.stepIndex) / double(line.totalSteps);
+            state.update.progressKnown = true;
+        }
+        Q_EMIT imageBuildProgress(state.id, state.update);
+        return;
+    }
+
+    if (line.cached) {
+        state.update.cached = true;
+    }
+    const QString text = !line.stream.isEmpty() ? line.stream : line.status;
+    if (!text.trimmed().isEmpty()) {
+        state.update.statusText = text.trimmed();
+        Q_EMIT imageBuildProgress(state.id, state.update);
+    }
+}
+
+void DockerBackend::finishBuild(const QString &buildId, MutationOutcome outcome, const DockerError &error)
+{
+    auto it = m_builds.find(buildId);
+    if (it == m_builds.end()) {
+        return;
+    }
+    const QString archive = it->contextArchive;
+    QString imageId;
+    if (outcome == MutationOutcome::Succeeded) {
+        imageId = it->update.auxImageId;
+    }
+    m_builds.erase(it);
+    // 临时 tar 用完就删（无论成功、失败还是取消）
+    if (!archive.isEmpty()) {
+        QFile::remove(archive);
+    }
+    Q_EMIT imageBuildFinished(buildId, outcome, error, imageId);
+    emitMutationFinished(Mutation::BuildImage, QStringLiteral("build:") + buildId, outcome, error);
 }
 
 void DockerBackend::createContainer(const ContainerCreateRequest &request)

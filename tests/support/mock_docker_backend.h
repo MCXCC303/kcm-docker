@@ -106,7 +106,25 @@ public:
     void refreshImages() override;
     void refreshNetworks() override;
     void refreshVolumes(bool includeUsage = true) override;
+    void buildImage(const Kontainer::ImageBuildRequest &request) override;
+    void cancelImageBuild(const QString &buildId) override;
     void createContainer(const Kontainer::ContainerCreateRequest &request) override;
+
+    /*! 最近一次构建请求（断言查询参数与凭据头真的传下去了）。 */
+    ImageBuildRequest lastBuildRequest() const
+    {
+        return m_lastBuildRequest;
+    }
+    /*! 让一路构建推进/结束（真实后端从流里读，这里由用例直接喂）。 */
+    void emitBuildProgress(const QString &buildId, const Kontainer::ImageBuildUpdate &update);
+    void emitBuildFinished(const QString &buildId,
+                           DockerBackendInterface::MutationOutcome outcome,
+                           const Kontainer::DockerError &error = {},
+                           const QString &imageId = {});
+    QStringList cancelledBuilds() const
+    {
+        return m_cancelledBuilds;
+    }
     void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) override;
 
     /*! 最近一次创建容器的请求（断言表单字段真的传下去了）。 */
@@ -271,6 +289,8 @@ private:
     NetworkCreateRequest m_lastNetworkCreate;
     QString m_lastRemovedNetwork;
     ContainerCreateRequest m_lastContainerCreate;
+    ImageBuildRequest m_lastBuildRequest;
+    QStringList m_cancelledBuilds;
     QPair<QString, QString> m_lastNetworkConnect;
     QStringList m_lastNetworkConnectAliases;
     QPair<QString, QString> m_lastNetworkDisconnect;

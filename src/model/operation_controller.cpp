@@ -9,6 +9,7 @@
 
 #include <QRegularExpression>
 
+#include "backend/build_context.h"
 #include "backend/credential_store.h"
 #include "backend/registry_auth.h"
 
@@ -45,6 +46,7 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
     : QObject(parent)
     , m_backend(backend)
     , m_pulls(new ImagePullModel(this))
+    , m_builds(new ImageBuildModel(this))
 {
     Q_ASSERT(m_backend);
 
@@ -52,6 +54,63 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
     connect(m_backend, &DockerBackendInterface::imagePullProgress, this, &OperationController::onPullProgress);
     // 清理数据卷的"成功明细"（删了哪些、回收多少）：mutationFinished 只带错误，放不下这份内容
     // 创建成功才能拿到 id；"创建并启动"在这里串行发起第二步（两步结果分别呈现）
+    // 构建进度：逐行更新列表里的那一条（失败原因由后端拼好失败步骤）
+    connect(m_backend, &DockerBackendInterface::imageBuildProgress, this, [this](const QString &buildId, const ImageBuildUpdate &update) {
+        const int row = m_builds->rowForBuildId(buildId);
+        if (row < 0) {
+            return;
+        }
+        ImageBuildEntry entry = m_builds->entries().at(row);
+        if (!update.statusText.isEmpty()) {
+            entry.statusText = update.statusText;
+        }
+        entry.stepIndex = update.stepIndex;
+        entry.totalSteps = update.totalSteps;
+        entry.stepCommand = update.stepCommand;
+        if (update.progressKnown) {
+            entry.progress = update.progress;
+            entry.progressKnown = true;
+        }
+        if (!update.errorText.isEmpty()) {
+            entry.detailText = update.errorText;
+        }
+        publishBuild(entry);
+    });
+
+    connect(m_backend,
+            &DockerBackendInterface::imageBuildFinished,
+            this,
+            [this](const QString &buildId, MutationOutcome outcome, const DockerError &error, const QString &imageId) {
+                const int row = m_builds->rowForBuildId(buildId);
+                if (row < 0) {
+                    return;
+                }
+                ImageBuildEntry entry = m_builds->entries().at(row);
+                entry.active = false;
+                switch (outcome) {
+                case MutationOutcome::Succeeded:
+                case MutationOutcome::Unchanged:
+                    entry.statusKey = QStringLiteral("succeeded");
+                    entry.progress = 1.0;
+                    entry.progressKnown = true;
+                    entry.imageId = imageId;
+                    setResult(Result::Success,
+                              entry.tags.isEmpty() ? i18n("Image built.") : i18n("Image built: %1", entry.tags.first()));
+                    break;
+                case MutationOutcome::Cancelled:
+                    entry.statusKey = QStringLiteral("cancelled");
+                    break;
+                case MutationOutcome::Failed:
+                    entry.statusKey = QStringLiteral("failed");
+                    // 失败原因里已经带上了失败的步骤（后端拼的），没拼上时退回引擎原文
+                    entry.detailText = entry.detailText.isEmpty() ? error.detail() : entry.detailText;
+                    entry.errorKindKey = DockerError::kindKey(error.kind());
+                    setResult(Result::Error, failureText(Mutation::BuildImage, error), entry.detailText, error);
+                    break;
+                }
+                publishBuild(entry);
+            });
+
     connect(m_backend, &DockerBackendInterface::containerCreated, this, [this](const QString &id, const QString &warning) {
         m_createdContainerId = id;
         const bool startNow = m_pendingStartAfterCreate;
@@ -879,6 +938,114 @@ bool OperationController::disconnectContainerFromNetwork(const QString &networkI
     return true;
 }
 
+bool OperationController::buildImage(const QString &contextDirectory,
+                                     const QStringList &tags,
+                                     const QString &dockerfile,
+                                     const QStringList &buildArgs,
+                                     const QVariantList &labels,
+                                     const QString &target,
+                                     bool noCache,
+                                     bool pull,
+                                     const QString &inlineDockerfile)
+{
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("building the image")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+    if (tags.isEmpty() || tags.first().trimmed().isEmpty()) {
+        setResult(Result::Error, i18n("The image was not built because no tag was given."), QStringLiteral("tagRequired"));
+        return false;
+    }
+
+    // 上下文先打包：本地能发现的错误（目录不存在、没有 Dockerfile、太大）不必等引擎
+    BuildContextOptions options;
+    options.directory = contextDirectory;
+    options.dockerfile = dockerfile.isEmpty() ? QStringLiteral("Dockerfile") : dockerfile;
+    options.inlineDockerfile = inlineDockerfile;
+    const BuildContextResult context = packBuildContext(options);
+    if (!context.ok) {
+        setResult(Result::Error, i18n("The build context could not be packaged."), context.errorKey);
+        return false;
+    }
+
+    ImageBuildRequest request;
+    request.id = QStringLiteral("build-%1").arg(++m_buildCounter);
+    request.contextArchive = context.archivePath;
+    request.contextDirectory = contextDirectory;
+    request.dockerfile = options.dockerfile;
+    request.tags = tags;
+    request.buildArgs = buildArgs;
+    request.target = target;
+    request.noCache = noCache;
+    request.pull = pull;
+    for (const QVariant &entry : labels) {
+        const QVariantMap label = entry.toMap();
+        const QString key = label.value(QStringLiteral("key")).toString().trimmed();
+        if (!key.isEmpty()) {
+            request.labels.append({key, label.value(QStringLiteral("value")).toString()});
+        }
+    }
+    // 私有基础镜像：凭据查询与拉取走同一条路径（八期 §5.3）
+    const RegistryCredential credential = m_credentialStore
+        ? m_credentialStore->credentialForImage(tags.first().trimmed())
+        : RegistryCredential();
+    if (!credential.isEmpty() && !credential.username.isEmpty()) {
+        RegistryCredential outgoing = credential;
+        const QString registry = RegistryAuth::serverAddressForImage(tags.first().trimmed());
+        if (!registry.isEmpty()) {
+            outgoing.serverAddress = registry;
+        }
+        request.registryAuthHeader = RegistryAuth::encode(outgoing);
+    }
+
+    ImageBuildEntry entry;
+    entry.id = request.id;
+    entry.contextDirectory = contextDirectory;
+    entry.tags = tags;
+    entry.statusKey = QStringLiteral("building");
+    entry.statusText = i18n("Uploading the build context…");
+    entry.active = true;
+    publishBuild(entry);
+
+    m_backend->buildImage(request);
+    return true;
+}
+
+void OperationController::cancelBuild(const QString &buildId)
+{
+    m_backend->cancelImageBuild(buildId);
+}
+
+void OperationController::clearFinishedBuilds()
+{
+    QList<ImageBuildEntry> kept;
+    for (const ImageBuildEntry &entry : m_builds->entries()) {
+        if (entry.active) {
+            kept.append(entry);
+        }
+    }
+    m_builds->setEntries(kept);
+}
+
+void OperationController::publishBuild(const ImageBuildEntry &entry)
+{
+    QList<ImageBuildEntry> entries = m_builds->entries();
+    const int row = m_builds->rowForBuildId(entry.id);
+    if (row >= 0) {
+        entries[row] = entry;
+    } else {
+        entries.append(entry);
+    }
+    // 进行中的在前，已结束的排在后面（与拉取列表一致）
+    std::stable_sort(entries.begin(), entries.end(), [](const ImageBuildEntry &lhs, const ImageBuildEntry &rhs) {
+        return lhs.active && !rhs.active;
+    });
+    m_builds->setEntries(entries);
+}
+
 void OperationController::cancelPull(const QString &reference)
 {
     const QString normalized = ImageReference::normalized(reference);
@@ -1117,6 +1284,11 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         m_backend->refreshContainers();
         m_backend->refreshStorageUsage();
         break;
+    case Mutation::BuildImage:
+        // 构建成功会多出镜像与构建缓存；失败也无所谓，刷新一次不贵
+        m_backend->refreshImages();
+        m_backend->refreshStorageUsage();
+        break;
     case Mutation::CreateVolume:
     case Mutation::RemoveVolume:
     case Mutation::PruneVolumes:
@@ -1169,6 +1341,10 @@ QString OperationController::successText(Mutation mutation, const QString &targe
         const QString name = targetKey.section(QLatin1Char(':'), 1);
         return i18n("Container created: %1", name);
     }
+    case Mutation::BuildImage: {
+        // 构建的进度与结果主要在构建列表里；这里只给一句总的结果
+        return i18n("Image built.");
+    }
     case Mutation::CreateVolume: {
         const QString name = targetKey.section(QLatin1Char(':'), 1);
         return i18n("Volume created: %1", name);
@@ -1189,6 +1365,10 @@ QString OperationController::failureText(Mutation mutation, const DockerError &e
     if (mutation == Mutation::PullImage && error.kind() == DockerError::Kind::Timeout) {
         return i18n("%1 The registry may be unreachable from the Docker daemon (network, proxy, or IPv6 routing).",
                     base);
+    }
+    if (mutation == Mutation::BuildImage) {
+        // 具体的失败步骤在 detail 里（后端拼好的"Step N/M (命令) failed: …"）
+        return i18n("The image could not be built: %1", base);
     }
     return base;
 }
