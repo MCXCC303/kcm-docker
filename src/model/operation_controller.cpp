@@ -39,6 +39,11 @@ int OperationController::activeCount() const
     return int(m_busyTargets.size());
 }
 
+int OperationController::stateRevision() const
+{
+    return m_stateRevision;
+}
+
 QString OperationController::resultKey() const
 {
     switch (m_result) {
@@ -186,6 +191,16 @@ bool OperationController::isTargetBusy(const QString &targetKey) const
     return m_busyTargets.contains(targetKey);
 }
 
+bool OperationController::isContainerBusy(const QString &id) const
+{
+    return isTargetBusy(OperationTarget::container(id));
+}
+
+bool OperationController::isImageBusy(const QString &reference) const
+{
+    return isTargetBusy(OperationTarget::image(reference));
+}
+
 bool OperationController::admit(const QString &targetKey, const QString &what)
 {
     if (!writeAllowed()) {
@@ -206,6 +221,7 @@ bool OperationController::admit(const QString &targetKey, const QString &what)
 void OperationController::beginOperation(Mutation mutation, const QString &targetKey)
 {
     m_busyTargets.insert(targetKey);
+    ++m_stateRevision;
     // 新操作开始：清掉上一次的结果，避免旧提示被误读成这次的结果
     setResult(Result::None, QString());
     Q_EMIT stateChanged();
@@ -353,6 +369,7 @@ void OperationController::onMutationFinished(Mutation mutation,
 {
     const bool wasBusy = m_busyTargets.remove(targetKey);
     if (wasBusy) {
+        ++m_stateRevision;
         Q_EMIT stateChanged();
     }
 

@@ -31,6 +31,8 @@ KCM.SimpleKCM {
     property string imageId: ""
 
     readonly property var controller: kcm.controller.imageDetail
+    /*! 写操作控制器（ARCH_V4 §2.4）。 */
+    readonly property var operations: kcm.controller.operations
     readonly property bool ready: controller.loadStateKey === "ready"
 
     /*! 折叠时显示的层数（§2.3）。 */
@@ -40,6 +42,22 @@ KCM.SimpleKCM {
     /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
         注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
     signal closeRequested
+
+    /*!
+        删除语义（ARCH_V4 §2.4）：
+        - 有标签 → 按「仓库:标签」删除，只移除该标签，其他标签保留
+        - 有多个标签 → 额外提供「删除全部标签」，走 force=true
+        - 无标签（dangling）→ 按 ID 删除
+        被容器引用时引擎返回 409，文案会说明原因，不自动 force。
+    */
+    readonly property bool targetBusy: {
+        // 同上：函数调用本身不建立依赖，必须先读 stateRevision
+        page.operations.stateRevision;
+        return page.operations.isImageBusy(page.imageId);
+    }
+    readonly property bool canRemove: page.ready && !page.targetBusy && page.operations.writeAllowed
+    readonly property bool hasTags: controller.primaryTag.length > 0
+    readonly property bool multipleTags: controller.tags.count > 1
 
     /*! 正文最大宽度：约 42 gridUnit，避免宽窗口下一行过长（§1.2）。 */
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
@@ -64,6 +82,12 @@ KCM.SimpleKCM {
 
     ColumnLayout {
         spacing: Kirigami.Units.largeSpacing
+
+        /* 本页触发的操作结果（拉取 / 删除）在这里呈现 */
+        Components.OperationMessage {
+            Layout.fillWidth: true
+            operations: page.operations
+        }
 
         /* ------------------------------------------------------------------ */
         /* 页头：返回 + 镜像名（与容器详情保持一致，用户始终知道自己在看哪个镜像）  */
@@ -399,6 +423,94 @@ KCM.SimpleKCM {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /*!
+        删除入口（ARCH_V4 §2.4）：破坏性操作只在详情页，且必须二次确认。
+        权限门不允许写时整条 footer 不出现。
+    */
+    footer: QQC2.ToolBar {
+        id: actionBar
+
+        objectName: "imageActionBar"
+        visible: page.operations.writeAllowed
+        position: QQC2.ToolBar.Footer
+
+        contentItem: RowLayout {
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.BusyIndicator {
+                objectName: "imageBusyIndicator"
+                visible: page.targetBusy
+                running: page.targetBusy
+                implicitWidth: Kirigami.Units.iconSizes.smallMedium
+                implicitHeight: Kirigami.Units.iconSizes.smallMedium
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            QQC2.Button {
+                objectName: "imageRemoveAllTagsButton"
+                visible: page.canRemove && page.multipleTags
+                text: i18n("Delete all tags…")
+                icon.name: "edit-delete"
+                onClicked: removeAllTagsDialog.open()
+            }
+
+            QQC2.Button {
+                objectName: "imageRemoveButton"
+                visible: page.canRemove
+                text: i18n("Delete")
+                icon.name: "edit-delete"
+                onClicked: removeDialog.open()
+            }
+        }
+    }
+
+    /* 删除单个标签（默认动作） */
+    Components.ConfirmDialog {
+        id: removeDialog
+
+        objectName: "removeImageDialog"
+        headingText: i18n("Delete image tag")
+        questionText: page.hasTags
+            ? i18n("Delete the tag “%1”?", controller.primaryTag)
+            : i18n("Delete the image “%1”?", controller.shortId)
+        consequenceText: i18n("Only this tag is removed. Layers shared with other images are kept.")
+        acceptText: i18n("Delete")
+        destructive: true
+        onConfirmed: {
+            if (page.hasTags) {
+                page.operations.removeImage(controller.primaryTag, false);
+            } else {
+                page.operations.removeImage(page.imageId, false);
+            }
+        }
+    }
+
+    /* 删除全部标签：force，且不提供「顺便清理」之类的额外选项 */
+    Components.ConfirmDialog {
+        id: removeAllTagsDialog
+
+        objectName: "removeAllImageTagsDialog"
+        headingText: i18n("Delete all tags")
+        questionText: i18n("Delete every tag of this image (%1 tags)?", controller.tags.count)
+        consequenceText: i18n("All tags of this image are removed. Containers that reference it can no longer be started.")
+        acceptText: i18n("Delete all tags")
+        destructive: true
+        onConfirmed: page.operations.removeImage(page.imageId, true)
+    }
+
+    /* 删除成功后本页目标已不存在：返回列表 */
+    Connections {
+        target: page.operations
+        function onImageRemoved(id) {
+            if (id === page.imageId || id === controller.primaryTag) {
+                page.closeRequested();
             }
         }
     }

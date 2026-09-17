@@ -35,6 +35,14 @@ class OperationController : public QObject
     /* --- 操作状态 --- */
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
     Q_PROPERTY(int activeCount READ activeCount NOTIFY stateChanged)
+    /*!
+     * 忙碌集合的修订号（每次集合变化 +1）。
+     *
+     * 存在的唯一理由：QML 不会追踪 `Q_INVOKABLE` 调用，像
+     * `operations.isContainerBusy(id)` 这样的绑定不会因为忙碌状态变化而重新求值。
+     * 界面需要在同一个绑定里读一次这个可通知属性来建立依赖（见 ContainerCard.qml）。
+     */
+    Q_PROPERTY(int stateRevision READ stateRevision NOTIFY stateChanged)
 
     /* --- 结果通道（唯一的操作结果呈现来源） --- */
     Q_PROPERTY(QString resultKey READ resultKey NOTIFY resultChanged)
@@ -66,6 +74,7 @@ public:
 
     bool busy() const;
     int activeCount() const;
+    int stateRevision() const;
 
     QString resultKey() const;
     QString resultText() const;
@@ -87,6 +96,14 @@ public:
 
     /*! 某个目标（`container:<id>` / `image:<ref>`）是否有操作在途。 */
     Q_INVOKABLE bool isTargetBusy(const QString &targetKey) const;
+    /*!
+     * 某个目标是否有操作在途。
+     *
+     * 界面调这两个便捷方法而不是自己拼 `container:` / `image:` 前缀：
+     * target key 的拼法只有一处定义（OperationTarget），拼错会让忙碌态静默失效。
+     */
+    Q_INVOKABLE bool isContainerBusy(const QString &id) const;
+    Q_INVOKABLE bool isImageBusy(const QString &reference) const;
 
     Q_INVOKABLE void startContainer(const QString &id);
     Q_INVOKABLE void stopContainer(const QString &id);
@@ -152,6 +169,7 @@ private:
     DockerBackendInterface *m_backend = nullptr;
 
     QSet<QString> m_busyTargets;
+    int m_stateRevision = 0;
     Result m_result = Result::None;
     QString m_resultText;
     QString m_resultDetailText;

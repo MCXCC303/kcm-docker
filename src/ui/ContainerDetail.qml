@@ -36,12 +36,34 @@ KCM.AbstractKCM {
     property string containerId: ""
 
     readonly property var controller: kcm.controller.containerDetail
+    /*! 写操作控制器（ARCH_V4 §2.3）。 */
+    readonly property var operations: kcm.controller.operations
     readonly property bool ready: controller.loadStateKey === "ready"
     /*! 健康问题优先于状态（Unhealthy 的 Running 必须看起来有问题，§11.3） */
     readonly property string stateSemanticKey: Kontainer.Presentation.stateSemanticKey(controller.stateKey, controller.healthKey)
     readonly property bool healthVisible: controller.healthKey !== "unknown" && controller.healthKey !== "none"
     /*! 正文最大宽度：约 42 gridUnit，宽窗口下避免一行过长（§1.2）。 */
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
+
+    /*!
+        写操作可见性（ARCH_V4 §2.3）：
+        - 权限门不允许写时，整条 footer 不出现（不是禁用后静默）
+        - 可逆操作（启动 / 停止 / 重启）直接执行；删除必须二次确认
+        - 运行中的容器不给删除按钮，并说明原因：让引擎返回 409 再解释是下策
+    */
+    readonly property bool targetBusy: {
+        // 同上：函数调用本身不建立依赖，必须先读 stateRevision
+        page.operations.stateRevision;
+        return page.operations.isContainerBusy(page.containerId);
+    }
+    readonly property bool canStart: page.ready && !page.targetBusy && page.operations.writeAllowed
+        && (controller.stateKey === "exited" || controller.stateKey === "created" || controller.stateKey === "dead")
+    readonly property bool canStop: page.ready && !page.targetBusy && page.operations.writeAllowed
+        && (controller.stateKey === "running" || controller.stateKey === "paused" || controller.stateKey === "restarting")
+    readonly property bool canRestart: page.ready && !page.targetBusy && page.operations.writeAllowed
+        && (controller.stateKey === "running" || controller.stateKey === "paused")
+    readonly property bool canRemove: page.ready && !page.targetBusy && page.operations.writeAllowed
+        && controller.stateKey !== "running" && controller.stateKey !== "paused" && controller.stateKey !== "restarting"
 
     /*! 网络条目里地址行的字段名：IPv4 / IPv6 / 网关。 */
     function networkValueLabel(entryKey: string): string {
@@ -71,13 +93,86 @@ KCM.AbstractKCM {
     Component.onDestruction: controller.stop()
 
     /*!
-        四期扩展点：破坏性/状态操作按钮统一放在 KCM.AbstractKCM 的 footer 里
-        （ARCH_V3 §2.2 约束 5）。三期仍然只读，因此 footer 保持为空——
-        不放没有功能的按钮占位。
+        写操作 footer（ARCH_V3 §2.2 约束 5 预留的位置，ARCH_V4 §2.3 填充）。
+
+        可逆操作与破坏性操作在同一行，但删除按钮在最右侧并单独确认；
+        忙碌时按钮禁用并显示进度指示，避免重复点击产生第二个请求。
     */
+    footer: QQC2.ToolBar {
+        id: actionBar
+
+        objectName: "containerActionBar"
+        visible: page.operations.writeAllowed
+        position: QQC2.ToolBar.Footer
+
+        contentItem: RowLayout {
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Button {
+                objectName: "detailStartButton"
+                visible: page.canStart
+                text: i18n("Start")
+                icon.name: "media-playback-start"
+                onClicked: page.operations.startContainer(page.containerId)
+            }
+
+            QQC2.Button {
+                objectName: "detailStopButton"
+                visible: page.canStop
+                text: i18n("Stop")
+                icon.name: "media-playback-stop"
+                onClicked: page.operations.stopContainer(page.containerId)
+            }
+
+            QQC2.Button {
+                objectName: "detailRestartButton"
+                visible: page.canRestart
+                text: i18n("Restart")
+                icon.name: "view-refresh"
+                onClicked: page.operations.restartContainer(page.containerId)
+            }
+
+            QQC2.BusyIndicator {
+                objectName: "detailBusyIndicator"
+                visible: page.targetBusy
+                running: page.targetBusy
+                implicitWidth: Kirigami.Units.iconSizes.smallMedium
+                implicitHeight: Kirigami.Units.iconSizes.smallMedium
+            }
+
+            // 运行中不给删除：说明原因比让引擎报 409 更直接
+            QQC2.Label {
+                objectName: "removeBlockedHint"
+                visible: page.ready && !page.canRemove && !page.targetBusy && page.operations.writeAllowed
+                    && (controller.stateKey === "running" || controller.stateKey === "paused" || controller.stateKey === "restarting")
+                text: i18n("Stop the container to delete it.")
+                font: Kirigami.Theme.smallFont
+                opacity: 0.7
+            }
+
+            Item {
+                Layout.fillWidth: true
+            }
+
+            QQC2.Button {
+                objectName: "detailRemoveButton"
+                visible: page.canRemove
+                text: i18n("Delete")
+                icon.name: "edit-delete"
+                onClicked: removeDialog.open()
+            }
+        }
+    }
+
 
     contentItem: ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
+
+        /* 本页触发的操作结果（启动 / 停止 / 重启 / 删除）在这里呈现 */
+        Components.OperationMessage {
+            Layout.fillWidth: true
+            operations: page.operations
+        }
 
         /* ------------------------------------------------------------------ */
         /* 页头：返回 + 名称 + 复制名称                                          */
@@ -586,6 +681,29 @@ KCM.AbstractKCM {
                 Item {
                     Layout.fillHeight: true
                 }
+            }
+        }
+    }
+
+    /* 删除确认：句式与后果说明固定（ARCH_V4 §2.2.5） */
+    Components.ConfirmDialog {
+        id: removeDialog
+
+        objectName: "removeContainerDialog"
+        headingText: i18n("Delete container")
+        questionText: i18n("Delete the container “%1”?", controller.name)
+        consequenceText: i18n("The container is removed. Its anonymous and named volumes are kept.")
+        acceptText: i18n("Delete")
+        destructive: true
+        onConfirmed: page.operations.removeContainer(page.containerId)
+    }
+
+    /* 删除成功后本页的目标已经不存在：返回列表（列表已由控制器刷新） */
+    Connections {
+        target: page.operations
+        function onContainerRemoved(id) {
+            if (id === page.containerId) {
+                page.closeRequested();
             }
         }
     }

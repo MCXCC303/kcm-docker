@@ -12,7 +12,9 @@
 #include <QQmlComponent>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QFile>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <QAccessible>
 #include <QClipboard>
 #include <QGuiApplication>
@@ -23,6 +25,7 @@
 #include <memory>
 
 using namespace Kontainer;
+using MutationOutcome = DockerBackendInterface::MutationOutcome;
 
 /*!
  * QML 加载测试（ARCH_V2 §46）。
@@ -56,6 +59,12 @@ private Q_SLOTS:
     void imageLayersCollapseByDefault();
     void keyboardNavigationAndAccessibilityAreWired();
     void autoRefreshActionControlsTheScheduler();
+    void writeActionsFollowThePermissionGate();
+    void containerActionsFollowStateAndBusy();
+    void operationMessageReflectsResultState();
+    void pullDialogValidatesReferenceBeforeSubmitting();
+    void confirmDialogAlwaysCarriesConsequenceText();
+    void imageDetailOffersForceDeleteOnlyForMultipleTags();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
@@ -246,6 +255,10 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/EmptyPlaceholder.qml"),
         QStringLiteral("components/CollapsibleSection.qml"),
         QStringLiteral("components/KeyValueList.qml"),
+        // 四期新增（ARCH_V4 §2.2.5 / §2.4）
+        QStringLiteral("components/ConfirmDialog.qml"),
+        QStringLiteral("components/OperationMessage.qml"),
+        QStringLiteral("components/PullImageDialog.qml"),
     };
     for (const QString &file : files) {
         // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
@@ -664,6 +677,287 @@ void QmlLoadTest::autoRefreshActionControlsTheScheduler()
 
     QVERIFY(QMetaObject::invokeMethod(autoRefresh, "trigger"));
     QVERIFY2(controller->autoRefreshEnabled(), "triggering again must turn auto-refresh back on");
+}
+
+/* ============================================================================
+ * 写操作界面（ARCH_V4 §5.1）
+ *
+ * 这些用例锁住四期最容易悄悄退化的三件事：
+ *  1. 权限门失效（只读环境下仍然出现写按钮）
+ *  2. 前置条件失效（运行中的容器出现删除按钮）
+ *  3. 确认对话框丢掉「后果说明」
+ * ==========================================================================*/
+
+namespace
+{
+
+/*! 造一个当前进程可写的 socket 文件：权限门据此判定允许写。 */
+QString writableSocketPath()
+{
+    static QTemporaryDir dir;
+    const QString path = dir.path() + QStringLiteral("/docker.sock");
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly)) {
+        file.write("x");
+        file.close();
+    }
+    QFile::setPermissions(path, QFile::ReadOwner | QFile::WriteOwner);
+    return path;
+}
+
+} // namespace
+
+void QmlLoadTest::writeActionsFollowThePermissionGate()
+{
+    StatusController *controller = m_stubKcm->controller();
+
+    // 默认 mock endpoint 无效 → 不可写：写入口整体不出现，并说明原因
+    QVERIFY(!controller->operations()->writeAllowed());
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickItem *pullButton = childByObjectName(page, QStringLiteral("pullImageEntryButton"));
+    QVERIFY2(pullButton, "pull entry button not found");
+    QVERIFY2(!pullButton->property("visible").toBool(), "read-only mode must not offer writes");
+
+    QQuickItem *banner = childByObjectName(page, QStringLiteral("writeAccessBanner"));
+    QVERIFY2(banner, "write access banner not found");
+    QVERIFY2(banner->property("visible").toBool(), "read-only mode must explain itself");
+    QVERIFY2(!banner->property("text").toString().isEmpty(), "banner text must not be empty");
+
+    // socket 变可写之后（例如用户刚被加入 docker 组）写入口回来
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+    QVERIFY(controller->operations()->writeAllowed());
+    QVERIFY2(!banner->property("visible").toBool(), "banner must disappear once writing is allowed");
+    // 拉取入口在镜像标签页才出现，这里只断言权限门放行后它不再是「被权限挡掉」的状态
+    QVERIFY(pullButton->property("visible").toBool() || pullButton->property("enabled").toBool());
+}
+
+void QmlLoadTest::containerActionsFollowStateAndBusy()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+    QVERIFY(controller->operations()->writeAllowed());
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+
+    // 运行中的容器：可以停止 / 重启，但不给删除（先停止再删除，别让用户撞引擎的 409）
+    ContainerDetail running;
+    running.id = QStringLiteral("cid-1");
+    running.name = QStringLiteral("demo");
+    running.state = ContainerState::Running;
+    m_backend->setContainerDetail(running);
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-1")},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "ContainerDetail failed to instantiate");
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    QQuickItem *actionBar = childByObjectName(page, QStringLiteral("containerActionBar"));
+    QVERIFY2(actionBar, "container action bar not found");
+    QVERIFY2(actionBar->property("visible").toBool(), "writable socket must show the action bar");
+
+    QQuickItem *startButton = childByObjectName(page, QStringLiteral("detailStartButton"));
+    QQuickItem *stopButton = childByObjectName(page, QStringLiteral("detailStopButton"));
+    QQuickItem *restartButton = childByObjectName(page, QStringLiteral("detailRestartButton"));
+    QQuickItem *removeButton = childByObjectName(page, QStringLiteral("detailRemoveButton"));
+    QQuickItem *blockedHint = childByObjectName(page, QStringLiteral("removeBlockedHint"));
+    QVERIFY(startButton && stopButton && restartButton && removeButton && blockedHint);
+
+    QVERIFY2(!startButton->property("visible").toBool(), "running container cannot be started");
+    QVERIFY2(stopButton->property("visible").toBool(), "running container must offer stop");
+    QVERIFY2(restartButton->property("visible").toBool(), "running container must offer restart");
+    QVERIFY2(!removeButton->property("visible").toBool(), "running container must not offer delete");
+    QVERIFY2(blockedHint->property("visible").toBool(), "the missing delete button needs a reason");
+
+    // 已停止的容器：反过来（写操作后的「写后即读」正是走 reload 这条路）
+    ContainerDetail exited;
+    exited.id = QStringLiteral("cid-1");
+    exited.name = QStringLiteral("demo");
+    exited.state = ContainerState::Exited;
+    m_backend->setContainerDetail(exited);
+    controller->containerDetail()->reload();
+    m_backend->completeRefresh();
+
+    QVERIFY2(startButton->property("visible").toBool(), "exited container must offer start");
+    QVERIFY2(!stopButton->property("visible").toBool(), "exited container cannot be stopped");
+    QVERIFY2(removeButton->property("visible").toBool(), "exited container may be deleted");
+    QVERIFY2(!blockedHint->property("visible").toBool(), "no reason needed once delete is available");
+
+    // 操作在途：按钮禁用 + 忙碌指示，避免重复点击
+    controller->operations()->startContainer(QStringLiteral("cid-1"));
+    QVERIFY(controller->operations()->isContainerBusy(QStringLiteral("cid-1")));
+    QQuickItem *busy = childByObjectName(page, QStringLiteral("detailBusyIndicator"));
+    QVERIFY2(busy, "busy indicator not found");
+    QVERIFY2(busy->property("visible").toBool(), "busy indicator must show while a mutation is in flight");
+    QVERIFY2(!startButton->property("visible").toBool(), "buttons must be gone while the target is busy");
+
+    m_backend->completeMutations();
+    QVERIFY(!controller->operations()->busy());
+}
+
+void QmlLoadTest::operationMessageReflectsResultState()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickItem *message = childByObjectName(page, QStringLiteral("operationMessage"));
+    QVERIFY2(message, "operation message not found");
+    QVERIFY2(!message->property("visible").toBool(), "no result yet means no banner");
+
+    // 成功：正向提示
+    controller->operations()->startContainer(QStringLiteral("cid-1"));
+    m_backend->completeMutations();
+    QVERIFY2(message->property("visible").toBool(), "success must be visible");
+    const int successType = message->property("type").toInt();
+    QVERIFY(!message->property("text").toString().isEmpty());
+
+    // 失败：文案必须带上引擎原文（用户报问题时唯一的「为什么」）
+    controller->operations()->removeContainer(QStringLiteral("cid-2"));
+    m_backend->completeMutations(MutationOutcome::Failed,
+                                 DockerError(DockerError::Kind::Conflict, QStringLiteral("You cannot remove a running container cid-2"), 409));
+    QVERIFY2(message->property("visible").toBool(), "failure must be visible");
+    QVERIFY(message->property("type").toInt() != successType);
+    QVERIFY2(message->property("text").toString().contains(QStringLiteral("running container")),
+             "the engine message must reach the user");
+
+    // 用户已读：关掉之后不再显示
+    controller->operations()->dismissResult();
+    QVERIFY2(!message->property("visible").toBool(), "dismissed result must disappear");
+}
+
+void QmlLoadTest::pullDialogValidatesReferenceBeforeSubmitting()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("operations"), QVariant::fromValue(controller->operations())},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "PullImageDialog failed to instantiate");
+
+    // Kirigami.Dialog 是 Popup：根对象不是 Item，内容项也要等它打开后才创建
+    QObject *dialog = object.data();
+    QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+
+    const auto items = dialog->findChildren<QQuickItem *>();
+    QQuickItem *field = nullptr;
+    QQuickItem *pullButton = nullptr;
+    for (QQuickItem *item : items) {
+        if (item->objectName() == QLatin1String("pullReferenceField")) {
+            field = item;
+        } else if (item->objectName() == QLatin1String("pullImageButton")) {
+            pullButton = item;
+        }
+    }
+    QVERIFY2(field && pullButton, "pull dialog content not found");
+
+    // 空输入：不能提交
+    QVERIFY2(!pullButton->property("enabled").toBool(), "empty reference must not be submittable");
+
+    // 非法输入（内部空格）：仍然不能提交
+    field->setProperty("text", QStringLiteral("alpine 3.19"));
+    QVERIFY2(!dialog->property("referenceValid").toBool(), "invalid reference must be detected");
+    QVERIFY2(!pullButton->property("enabled").toBool(), "invalid reference must not be submittable");
+
+    // 合法但没写标签：可提交，且归一化补上 latest
+    field->setProperty("text", QStringLiteral("alpine"));
+    QVERIFY2(dialog->property("referenceValid").toBool(), "bare repository is a valid reference");
+    QVERIFY2(pullButton->property("enabled").toBool(), "valid reference must be submittable");
+    QCOMPARE(dialog->property("normalizedReference").toString(), QStringLiteral("alpine:latest"));
+    QVERIFY2(dialog->property("plainReference").toBool(), "the implicit latest tag must be announced");
+}
+
+void QmlLoadTest::confirmDialogAlwaysCarriesConsequenceText()
+{
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ConfirmDialog.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("headingText"), QStringLiteral("Delete container")},
+            {QStringLiteral("questionText"), QStringLiteral("Delete the container “demo”?")},
+            {QStringLiteral("consequenceText"), QStringLiteral("Its volumes are kept.")},
+            {QStringLiteral("destructive"), true},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "ConfirmDialog failed to instantiate");
+
+    const QString title = object->property("title").toString();
+    const QString subtitle = object->property("subtitle").toString();
+    QCOMPARE(title, QStringLiteral("Delete container"));
+    QVERIFY2(subtitle.contains(QStringLiteral("Delete the container")), "the question must be shown");
+    QVERIFY2(subtitle.contains(QStringLiteral("volumes are kept")), "the consequence must never be dropped (§2.2.5)");
+    // 破坏性操作用警告样式，而不是普通询问
+    QVERIFY(object->property("dialogType").toInt() != 0);
+}
+
+void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
+{
+    StatusController *controller = m_stubKcm->controller();
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    controller->operations()->refreshWriteAccess();
+
+    ImageDetail detail;
+    detail.id = QStringLiteral("sha256:aaaa");
+    detail.repoTags = {QStringLiteral("alpine:3.19"), QStringLiteral("alpine:latest")};
+    m_backend->setImageDetail(detail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(path));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("imageId"), QStringLiteral("sha256:aaaa")},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), "ImageDetail failed to instantiate");
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    QQuickItem *removeAll = childByObjectName(page, QStringLiteral("imageRemoveAllTagsButton"));
+    QQuickItem *remove = childByObjectName(page, QStringLiteral("imageRemoveButton"));
+    QVERIFY(removeAll && remove);
+    QVERIFY2(remove->property("visible").toBool(), "a tag may always be deleted");
+    QVERIFY2(removeAll->property("visible").toBool(), "multiple tags must offer the force path");
+
+    // 单标签：强制删除入口消失（没有歧义就不给危险选项）
+    detail.repoTags = {QStringLiteral("alpine:3.19")};
+    m_backend->setImageDetail(detail);
+    controller->imageDetail()->refresh();
+    m_backend->completeRefresh();
+    QVERIFY2(!removeAll->property("visible").toBool(), "single tag must not offer force delete");
 }
 
 QTEST_MAIN(QmlLoadTest)

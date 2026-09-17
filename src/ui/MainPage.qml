@@ -67,6 +67,9 @@ Kirigami.Page {
 
     readonly property bool countsReady: controller.engine.countsAvailable
 
+    /*! 写操作控制器（ARCH_V4 §2.2.4）：卡片按钮与结果提示都从这里读。 */
+    readonly property var operations: root.controller.operations
+
     function engineStateText(stateKey: string): string {
         switch (stateKey) {
         case "loading":
@@ -119,7 +122,8 @@ Kirigami.Page {
         if (root.controller.images.count === 0) {
             return {
                 message: i18n("No images found."),
-                actionText: ""
+                // 权限允许时给出真正能解决问题的动作（ARCH_V3_pre §1.3：空状态可以带一个操作按钮）
+                actionText: root.operations.writeAllowed ? i18n("Pull an image") : ""
             };
         }
         if (root.imageList.searchText.length > 0) {
@@ -140,6 +144,18 @@ Kirigami.Page {
         注意：用户一旦在输入框里打过字，TextField.text 的声明式绑定就会被内部赋值打断
         （这是 QQC2 的行为，不是本页的 bug），因此这里必须同时显式清空输入框与下拉框。
     */
+    /*!
+        空状态里的引导动作：镜像列表为空时是「拉取一个镜像」，其余情况是清空条件。
+    */
+    function handleEmptyAction() {
+        if (tabBar.currentIndex === 1 && root.controller.images.count === 0 && root.operations.writeAllowed) {
+            pullDialog.reset();
+            pullDialog.open();
+            return;
+        }
+        root.clearCurrentTabFilters();
+    }
+
     function clearCurrentTabFilters() {
         if (tabBar.currentIndex === 0) {
             root.containerList.searchText = "";
@@ -222,6 +238,23 @@ Kirigami.Page {
         /* ------------------------------------------------------------------ */
         /* 整页错误（只有高频数据集全部失败才会到这里，§30）                     */
         /* ------------------------------------------------------------------ */
+        /* ------------------------------------------------------------------ */
+        /* 写权限门（ARCH_V4 §2.2.3）：不可写时写入口整体消失，这里说明原因     */
+        /* ------------------------------------------------------------------ */
+        Kirigami.InlineMessage {
+            objectName: "writeAccessBanner"
+            Layout.fillWidth: true
+            visible: !root.operations.writeAllowed && root.operations.writeAccessText.length > 0
+            type: Kirigami.MessageType.Information
+            text: root.operations.writeAccessText
+        }
+
+        /* 操作结果（成功 / 失败 / 取消）的唯一呈现位置之一 */
+        Components.OperationMessage {
+            Layout.fillWidth: true
+            operations: root.operations
+        }
+
         Kirigami.InlineMessage {
             Layout.fillWidth: true
             visible: root.controller.stateKey === "error"
@@ -467,6 +500,19 @@ Kirigami.Page {
                 Component.onCompleted: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
                 onModelChanged: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
             }
+
+            // 拉取镜像（ARCH_V4 §2.4）：唯一会新增镜像的入口。
+            // 权限门不允许写时按钮整体不出现，而不是禁用后静默。
+            QQC2.Button {
+                objectName: "pullImageEntryButton"
+                visible: tabBar.currentIndex === 1 && root.operations.writeAllowed
+                text: i18n("Pull image")
+                icon.name: "download"
+                onClicked: {
+                    pullDialog.reset();
+                    pullDialog.open();
+                }
+            }
         }
 
         /* ------------------------------------------------------------------ */
@@ -496,7 +542,7 @@ Kirigami.Page {
                     message: root.containersEmptyState.message
                     actionText: root.containersEmptyState.actionText
                     actionIconName: "edit-clear"
-                    onActionTriggered: root.clearCurrentTabFilters()
+                    onActionTriggered: root.handleEmptyAction()
                 }
 
                 ListView {
@@ -530,6 +576,7 @@ Kirigami.Page {
                     }
 
                     delegate: ContainerCard {
+                        operations: root.operations
                         onActivated: root.containerActivated(containerId)
                     }
                 }
@@ -553,7 +600,7 @@ Kirigami.Page {
                     message: root.imagesEmptyState.message
                     actionText: root.imagesEmptyState.actionText
                     actionIconName: "edit-clear"
-                    onActionTriggered: root.clearCurrentTabFilters()
+                    onActionTriggered: root.handleEmptyAction()
                 }
 
                 ListView {
@@ -600,6 +647,15 @@ Kirigami.Page {
                     buildStamp: root.controller.buildStamp
                 }
             }
+        }
+    }
+
+    /* 拉取镜像对话框（进度与取消也在这里） */
+    Components.PullImageDialog {
+        id: pullDialog
+        operations: root.operations
+        onPullRequested: function (reference) {
+            root.operations.pullImage(reference);
         }
     }
 }
