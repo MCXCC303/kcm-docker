@@ -34,6 +34,20 @@ constexpr auto kLocked = "locked";
  * 这件事重新变成用户的显式动作（而不是等到保存时才失败）。
  */
 constexpr int kUnlockKeepSeconds = 300;
+
+/*!
+ * 两份部署信息是否等价（用于"只在真的变了才通知界面"）。
+ *
+ * 刻意逐字段比较而不是给 DaemonDeployment 加 operator==：那个结构体是给界面用的，
+ * 加比较运算符会让"哪些字段影响界面"这件事变得不明显。
+ */
+bool sameDeployment(const DaemonDeployment &a, const DaemonDeployment &b)
+{
+    return a.form == b.form && a.systemConfigPath == b.systemConfigPath && a.userConfigPath == b.userConfigPath
+        && a.configPath == b.configPath && a.configExists == b.configExists && a.configWritable == b.configWritable
+        && a.configSize == b.configSize && a.configModified == b.configModified
+        && a.dataRootInHomeDir == b.dataRootInHomeDir;
+}
 } // namespace
 
 DaemonConfigController::DaemonConfigController(QObject *parent)
@@ -174,8 +188,17 @@ void DaemonConfigController::restartDocker()
 void DaemonConfigController::setEngineInfo(const EngineInfo &info)
 {
     m_engine = info;
+
+    // 这里**不能**重新读盘：`setEngineInfo()` 会被状态刷新（自动刷新、容器列表更新）
+    // 反复调用，重新读盘会把 `m_edits` 与 dirty 一并清零——用户正在编辑镜像列表或
+    // 并发下载数时，界面会突然恢复成磁盘上的旧值（真实反馈的 bug）。
+    // 需要重新读盘时走显式的 reload()／保存后／切换作用域。
+    const bool mirrorsChanged = m_activeMirrors != info.registryMirrors;
     m_activeMirrors = info.registryMirrors;
-    refreshFromDisk();
+
+    if (refreshDeployment() || mirrorsChanged) {
+        Q_EMIT changed();
+    }
 }
 
 QString DaemonConfigController::formKey() const
@@ -308,8 +331,11 @@ void DaemonConfigController::reload()
     refreshFromDisk();
 }
 
-void DaemonConfigController::refreshFromDisk()
+bool DaemonConfigController::refreshDeployment()
 {
+    const DaemonDeployment previous = m_deployment;
+    const bool previousActiveScope = m_activeScope;
+
     m_deployment = DaemonDeploymentDetector::detect(m_engine);
 
     // 作用域决定看哪个文件：用户级 ~/.config/docker/daemon.json、系统级 /etc/docker/daemon.json。
@@ -324,6 +350,15 @@ void DaemonConfigController::refreshFromDisk()
 
     const bool rootlessDaemon = m_deployment.form == DaemonForm::Rootless;
     m_activeScope = (m_scope == QLatin1String("user")) == rootlessDaemon;
+
+    // 周期刷新（引擎/容器列表每次更新）都会走到这里，因此只在**真的变了**的时候通知界面：
+    // 一是避免无谓的绑定重算与列表重建（刷新抖动），二是别把用户正在编辑的内容搅乱
+    return previousActiveScope != m_activeScope || !sameDeployment(previous, m_deployment);
+}
+
+void DaemonConfigController::refreshFromDisk()
+{
+    refreshDeployment();
 
     m_document = DaemonConfigDocument::fromFile(m_deployment.configPath);
     m_backups = DaemonConfigWriter::listBackups(m_deployment.configPath);

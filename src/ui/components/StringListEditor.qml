@@ -57,12 +57,42 @@ ColumnLayout {
     ListModel {
         id: entries
 
-        Component.onCompleted: {
-            for (const value of root.initialEntries) {
-                entries.append({
-                    value: String(value)
-                });
+        Component.onCompleted: root.syncFromInitialEntries()
+    }
+
+    /*!
+     * 把控制器给出的列表同步进模型。
+     *
+     * 为什么要判断"内容是否相同"：自动刷新会让 `initialEntries` 重新求值。
+     * 无条件重建会把用户正在输入的那一行（以及光标位置）一起丢掉；
+     * 而内容相同时重建没有任何意义——用户在控件里的改动本来就会立刻写回控制器，
+     * 因此两边一致恰恰是"不需要动"的信号。真正的外部变化（重新读盘、恢复备份）
+     * 才会走到重建这一步。
+     */
+    onInitialEntriesChanged: root.syncFromInitialEntries()
+
+    function syncFromInitialEntries(): void {
+        const incoming = [];
+        for (const value of root.initialEntries) {
+            incoming.push(String(value));
+        }
+        if (incoming.length === entries.count) {
+            let identical = true;
+            for (let i = 0; i < incoming.length; ++i) {
+                if (entries.get(i).value !== incoming[i]) {
+                    identical = false;
+                    break;
+                }
             }
+            if (identical) {
+                return;
+            }
+        }
+        entries.clear();
+        for (const value of incoming) {
+            entries.append({
+                value: value
+            });
         }
     }
 

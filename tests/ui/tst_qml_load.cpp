@@ -323,6 +323,14 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
     QJsonObject merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
     QCOMPARE(merged.value(QStringLiteral("max-concurrent-downloads")).toInt(), 9);
 
+    // 自动刷新（状态控制器拿到引擎信息就会调 setEngineInfo）不得把正在编辑的内容刷回去：
+    // refresh() 只标记待刷新，completeRefresh() 才真的把 engineUpdated 发出来
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+    QTRY_VERIFY(controller->dirty());
+    QCOMPARE(controller->maxConcurrentDownloads(), 9);
+    QCOMPARE(spin->property("value").toInt(), 9);
+
     // 选一个具体驱动 → Set
     QVERIFY(combo->setProperty("currentIndex", 1));
     QVERIFY(QMetaObject::invokeMethod(combo, "activated", Q_ARG(int, 1)));
@@ -340,6 +348,13 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
     merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
     QVERIFY2(!merged.contains(QStringLiteral("log-driver")), "the key must be removed, not emptied");
     QVERIFY2(!merged.contains(QStringLiteral("max-concurrent-downloads")), "the key must be removed, not zeroed");
+
+    // 「默认」也是待保存的编辑：自动刷新后仍然是待保存状态
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+    QTRY_VERIFY(controller->dirty());
+    QCOMPARE(spin->property("value").toInt(), 0);
+    QCOMPARE(combo->property("currentIndex").toInt(), 0);
 }
 
 void QmlLoadTest::loadsAllQmlFiles_data()

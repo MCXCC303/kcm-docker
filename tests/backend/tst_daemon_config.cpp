@@ -28,6 +28,23 @@ void writeFile(const QString &path, const QByteArray &content)
     file.close();
 }
 
+/*! 系统级 daemon（本机形态）：SecurityOptions 有内容但不含 rootless。 */
+EngineInfo systemEngine()
+{
+    EngineInfo info;
+    info.available = true;
+    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
+    return info;
+}
+
+EngineInfo rootlessEngine()
+{
+    EngineInfo info;
+    info.available = true;
+    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=rootless")};
+    return info;
+}
+
 } // namespace
 
 /*!
@@ -48,6 +65,7 @@ private Q_SLOTS:
     void mergeCanRemoveASetting();
     void mergeOnlyTouchesRequestedKeys();
     void mergeCanRemoveScalarKeys();
+    void periodicRefreshKeepsPendingEdits();
     void removeIntentIsNotAnEmptyEdit();
     void atomicWriteCreatesBackupAndKeepsContent();
     void refusingEmptyContent();
@@ -204,6 +222,36 @@ void DaemonConfigTest::mergeCanRemoveScalarKeys()
     QCOMPARE(root.value(QStringLiteral("data-root")).toString(), QStringLiteral("/srv"));
 }
 
+void DaemonConfigTest::periodicRefreshKeepsPendingEdits()
+{
+    // 真实反馈的 bug：状态刷新（引擎信息每次更新都会调 setEngineInfo）把
+    // 正在编辑的内容恢复成磁盘上的旧值。自动刷新只允许更新"引擎的事实"。
+    DaemonConfigController controller;
+    controller.setEngineInfo(systemEngine());
+    controller.setScope(QStringLiteral("user")); // 用户作用域：不依赖机器上的 /etc 内容
+
+    controller.setRegistryMirrors({QStringLiteral("https://mirror.example.com")});
+    controller.setMaxConcurrentDownloads(9);
+    controller.setLogDriver(QStringLiteral("local"));
+    QVERIFY(controller.dirty());
+
+    for (int tick = 0; tick < 3; ++tick) {
+        controller.setEngineInfo(systemEngine()); // 自动刷新走的就是这条路
+        QVERIFY2(controller.dirty(), "periodic refresh must not clear the pending edits");
+        QCOMPARE(controller.registryMirrors(), QStringList {QStringLiteral("https://mirror.example.com")});
+        QCOMPARE(controller.maxConcurrentDownloads(), 9);
+        QCOMPARE(controller.logDriver(), QStringLiteral("local"));
+        QVERIFY(controller.pendingContentPreview().contains(QStringLiteral("mirror.example.com")));
+    }
+
+    // 显式重新读盘才是"以磁盘为准、丢弃编辑"的入口
+    controller.reload();
+    QVERIFY(!controller.dirty());
+    QVERIFY2(!controller.pendingContentPreview().contains(QStringLiteral("mirror.example.com")),
+             "an explicit reload must drop the edits");
+    QVERIFY(controller.registryMirrors().isEmpty());
+}
+
 void DaemonConfigTest::removeIntentIsNotAnEmptyEdit()
 {
     // 纯删除也是编辑：不能因为"没有值"就被当成"什么都没改"而拒绝保存
@@ -284,24 +332,6 @@ void DaemonConfigTest::readBackupRejectsBrokenContent()
 
 /* --- 作用域与解锁状态机 --- */
 
-namespace
-{
-EngineInfo systemEngine()
-{
-    EngineInfo info;
-    info.available = true;
-    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
-    return info;
-}
-
-EngineInfo rootlessEngine()
-{
-    EngineInfo info;
-    info.available = true;
-    info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=rootless")};
-    return info;
-}
-} // namespace
 
 void DaemonConfigTest::scopesPointAtDifferentFiles()
 {

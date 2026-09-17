@@ -149,6 +149,12 @@ KCM.AbstractKCM {
             text: i18n("Reload from disk")
             icon.name: "view-refresh"
             onTriggered: {
+                // 有未保存的修改时先确认：这是唯一还会丢掉编辑的入口
+                // （自动刷新已经不再重新读盘了，见 DaemonConfigController::setEngineInfo）
+                if (page.controller.dirty) {
+                    discardChangesDialog.open();
+                    return;
+                }
                 page.controller.reload();
                 saveMessage.visible = false;
             }
@@ -574,6 +580,22 @@ KCM.AbstractKCM {
             saveMessage.text = success
                 ? i18n("Docker restarted. The page refreshes once the engine is reachable again.")
                 : i18n("Restarting Docker failed (%1).", errorKey);
+        }
+    }
+
+    /*! 重新读盘会丢掉未保存的修改：问一次再丢。 */
+    Components.ConfirmDialog {
+        id: discardChangesDialog
+
+        objectName: "discardChangesDialog"
+        headingText: i18n("Discard the unsaved changes?")
+        questionText: i18n("Reloading reads the file from disk again and drops what you have changed here.")
+        consequenceText: i18n("The file on disk is not touched.")
+        acceptText: i18n("Discard and reload")
+        destructive: true
+        onConfirmed: {
+            page.controller.reload();
+            saveMessage.visible = false;
         }
     }
 

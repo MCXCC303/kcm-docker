@@ -191,7 +191,15 @@ Q_SIGNALS:
     void restarted(bool success, const QString &errorKey);
 
 private:
+    /*! 重新读盘（显式动作）：磁盘值成为新基准，待保存的编辑会被丢弃。 */
     void refreshFromDisk();
+    /*!
+     * 只重算"探测出来的事实"（路径、可写性、生效作用域、数据目录提示），
+     * **不碰**文档与待保存编辑；返回是否有变化。
+     *
+     * 自动刷新会反复调用它，所以它必须便宜且无副作用。
+     */
+    bool refreshDeployment();
     DaemonConfigEdits buildEdits() const;
     void setLastError(const QString &error);
     void setDirty(bool dirty);
