@@ -95,8 +95,14 @@ public:
     {
         return m_entries;
     }
-    /*! 按引用查找行号；不存在返回 -1。 */
-    int rowForReference(const QString &reference) const;
+    /*!
+     * 按引用查找行号；不存在返回 -1。
+     *
+     * 必须是 Q_INVOKABLE：QML 只能调用 Q_INVOKABLE / 槽 / 属性，
+     * 普通 C++ 成员函数在 QML 里是 undefined，调用时会抛
+     * `TypeError: Property 'rowForReference' ... is not a function`。
+     */
+    Q_INVOKABLE int rowForReference(const QString &reference) const;
 
 Q_SIGNALS:
     void countChanged();

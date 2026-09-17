@@ -90,6 +90,7 @@ namespace
 {
 QStringList g_messages;
 QtMessageHandler g_previousHandler = nullptr;
+QStringList g_debugDump;
 } // namespace
 
 void QmlLoadTest::captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message)
@@ -116,11 +117,15 @@ void QmlLoadTest::initTestCase()
 {
     setupTranslationDomain();
     registerKontainerQmlTypes();
-    g_previousHandler = qInstallMessageHandler(&QmlLoadTest::captureMessages);
 }
 
 void QmlLoadTest::init()
 {
+    // 每个用例都重新安装：cleanup() 会把它还原，只在 initTestCase 装一次的话，
+    // 第一个用例之后所有 QML 运行时错误都会被静默（真实踩过的坑）
+    g_messages.clear();
+    g_previousHandler = qInstallMessageHandler(&QmlLoadTest::captureMessages);
+
     m_backend = std::make_unique<MockDockerBackend>();
     m_stubKcm = std::make_unique<QmlStubKcm>(m_backend.get());
     m_engine = std::make_unique<QQmlEngine>();
@@ -1242,6 +1247,10 @@ void QmlLoadTest::pullDialogStartsPullOnEnter()
 
     QSignalSpy requestedSpy(dialog, SIGNAL(pullRequested(QString)));
     field->setProperty("text", QStringLiteral("alpine"));
+    // 显式读一次「已经在拉取」这个派生属性：它内部要调用模型上的 Q_INVOKABLE，
+    // 如果方法没标 Q_INVOKABLE，QML 只会在**真正求值的那一刻**抛 TypeError。
+    // 显式读能保证这条路径每次都被走到，而不是依赖运行顺序或其它绑定是否被触发。
+    QVERIFY(!dialog->property("alreadyPulling").toBool());
     // 按下回车：必须发出请求（并且不能有 QML 运行时错误——由 cleanup 断言）
     QVERIFY(QMetaObject::invokeMethod(field, "accepted"));
     QCOMPARE(requestedSpy.count(), 1);
