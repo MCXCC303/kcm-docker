@@ -715,6 +715,13 @@ int main(int argc, char **argv)
                                                {QStringLiteral("destination"), QStringLiteral("/var/lib/postgresql/data")},
                                                {QStringLiteral("readOnly"), false}}});
         controller->setNetwork(QStringLiteral("app_default"));
+        // 挂载步骤：加两条预设并展开管理面板，用来复核预设列表与管理控件
+        if (step == QLatin1String("mounts") || step == QLatin1String("all")) {
+            stub->controller()->mountPresets()->add(QStringLiteral("/srv/data"), QStringLiteral("/data"),
+                                                    QStringLiteral("bind"), true, QStringLiteral("数据目录"));
+            stub->controller()->mountPresets()->add(QStringLiteral("pgdata"), QStringLiteral("/var/lib/postgresql/data"),
+                                                    QStringLiteral("volume"), false, QString());
+        }
         const QString target = (step == QLatin1String("summary") || step == QLatin1String("all")) ? QStringLiteral("summary") : step;
         const bool moved = controller->goToStep(target);
         std::fprintf(stderr, "DBG wizard target=%s moved=%d now=%s error=%s\n", qPrintable(target), int(moved),
@@ -722,6 +729,28 @@ int main(int argc, char **argv)
         // 逐步前进，找出卡在哪一步
         for (const QString &key : Kontainer::CreateContainerController::stepKeys()) {
             std::fprintf(stderr, "DBG   step %s error=%s\n", qPrintable(key), qPrintable(controller->stepErrorKeyForStep(key)));
+        }
+    }
+
+    // KONTAINER_RENDER_OPEN_PRESETS=1：展开向导里的预设管理面板
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_PRESETS")) {
+        QQuickItem *manage = nullptr;
+        std::function<void(QQuickItem *)> walkPresets = [&](QQuickItem *node) {
+            if (!node || manage) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("wizardManagePresetsButton")) {
+                manage = node;
+                return;
+            }
+            const QList<QQuickItem *> children = node->childItems();
+            for (QQuickItem *child : children) {
+                walkPresets(child);
+            }
+        };
+        walkPresets(item);
+        if (manage) {
+            QMetaObject::invokeMethod(manage, "clicked");
         }
     }
 

@@ -30,7 +30,8 @@ bool isFast(Section section)
 StatusController::StatusController(DockerBackendInterface *backend,
                                    HostPathService *hostPaths,
                                    QObject *parent,
-                                   CredentialBackend *credentialBackend)
+                                   CredentialBackend *credentialBackend,
+                                   MountPresetStore *mountPresetStore)
     : QObject(parent)
     , m_backend(backend)
     , m_scheduler(new RefreshScheduler(backend, this))
@@ -50,8 +51,9 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
     // 挂载预设是"这个工具的数据"（~/.config/kontainerrc），不是系统设置（§1.5.3）
-    , m_mountPresets(new MountPresetStore({}, this))
-    , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, this))
+    // 挂载预设：注入时用注入的（测试/渲染用临时文件，绝不写用户真实配置）
+    , m_mountPresets(mountPresetStore ? mountPresetStore : new MountPresetStore({}, this))
+    , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, this))
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))

@@ -5,6 +5,7 @@
 
 #include "i18n.h"
 #include "model/image_pull_model.h"
+#include "model/mount_preset_store.h"
 #include "model/presentation.h"
 #include "model/qml_registration.h"
 #include "support/qml_item_utils.h"
@@ -138,6 +139,7 @@ private Q_SLOTS:
     void containerNetworkSectionConnectsAndDisconnects();
     void volumesTabListsCreatesAndPreviewsCleanup();
     void createContainerWizardGatesStepsAndHidesSecrets();
+    void presetPanelManagesPresets();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -1306,6 +1308,72 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QCOMPARE(m_backend->lastContainerCreate().network, QStringLiteral("app_default"));
     QCOMPARE(m_backend->lastContainerCreate().environment, QStringList {QStringLiteral("API_TOKEN=s3cret-value")});
 }
+
+/*!
+ * 挂载预设的管理（ARCH_V5_V8 §4.2）：向导挂载步骤里的内联面板可以增、收藏、排序、删，
+ * 容器详情的挂载行可以一键保存为预设。
+ */
+void QmlLoadTest::presetPanelManagesPresets()
+{
+    // 预设存储指向临时文件：绝不碰用户的 ~/.config/kontainerrc
+    QTemporaryDir configDir;
+    QVERIFY(configDir.isValid());
+    auto *store = m_stubKcm->controller()->mountPresets();
+    QVERIFY(store);
+    const QString firstId = store->add(QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("bind"), true,
+                                       QStringLiteral("数据目录"));
+    QVERIFY(!firstId.isEmpty());
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1100, 800);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1100);
+    page->setHeight(800);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    // 管理面板默认收起，点按钮展开
+    QQuickItem *manageButton = childByObjectName(page, QStringLiteral("wizardManagePresetsButton"));
+    QVERIFY(manageButton);
+    QVERIFY2(!page->property("presetPanelOpen").toBool(), "the preset panel starts collapsed");
+    QVERIFY(QMetaObject::invokeMethod(manageButton, "clicked"));
+    QVERIFY(page->property("presetPanelOpen").toBool());
+    QQuickItem *panel = childByObjectName(page, QStringLiteral("wizardPresetPanel"));
+    QVERIFY(panel);
+
+    // 新增一条：填宿主路径与容器路径后点「添加」
+    auto *sourceField = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardNewPresetSource")));
+    auto *destinationField = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardNewPresetDestination")));
+    auto *addButton = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardNewPresetAdd")));
+    QVERIFY(sourceField && destinationField && addButton);
+    QVERIFY2(!addButton->property("enabled").toBool(), "an empty preset must not be addable");
+    sourceField->setProperty("text", QStringLiteral("/srv/cache"));
+    destinationField->setProperty("text", QStringLiteral("/cache"));
+    QTRY_VERIFY(addButton->property("enabled").toBool());
+    QCOMPARE(store->count(), 1);
+    QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
+    QTRY_COMPARE(store->count(), 2);
+
+    // 非法输入不会被接受（宿主路径必须绝对），界面上的提示由 store 的校验 key 决定
+    QCOMPARE(MountPresetStore::validateSource(QStringLiteral("relative"), QStringLiteral("bind")),
+             QStringLiteral("sourceNotAbsolute"));
+
+    // 收藏 / 排序 / 删除
+    QVERIFY(store->setFavorite(firstId, true));
+    QCOMPARE(store->presets().first().id, firstId);
+    QVERIFY(store->moveDown(firstId));
+    QVERIFY(store->remove(firstId));
+    QCOMPARE(store->count(), 1);
+}
+
 
 void QmlLoadTest::loadsAllQmlFiles_data()
 {

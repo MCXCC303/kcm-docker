@@ -38,6 +38,9 @@ Kirigami.Page {
 
     objectName: "createContainerPage"
 
+    /*! 预设管理面板是否展开（挂载步骤里）。 */
+    property bool presetPanelOpen: false
+
     /*! 步骤 key → 标题（顺序由控制器给出，界面不另抄一份）。 */
     function stepTitle(key: string): string {
         switch (key) {
@@ -496,11 +499,23 @@ Kirigami.Page {
                         text: i18n("Mounts")
                     }
 
-                    QQC2.Label {
+                    RowLayout {
                         Layout.fillWidth: true
-                        visible: presetRepeater.count > 0
-                        text: i18n("Quick add from your presets:")
-                        font.bold: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            visible: presetRepeater.count > 0
+                            text: i18n("Quick add from your presets:")
+                            font.bold: true
+                        }
+
+                        QQC2.Button {
+                            objectName: "wizardManagePresetsButton"
+                            text: page.controller.presets.length > 0 ? i18n("Manage presets…") : i18n("Add a preset…")
+                            icon.name: "configure"
+                            onClicked: page.presetPanelOpen = !page.presetPanelOpen
+                        }
                     }
 
                     Flow {
@@ -521,6 +536,126 @@ Kirigami.Page {
                                 text: (presetButton.modelData.favorite ? "★ " : "") + presetButton.modelData.source
                                     + " → " + presetButton.modelData.destination
                                 onClicked: page.controller.addMountFromPreset(presetButton.modelData.id)
+                            }
+                        }
+                    }
+
+                    Kirigami.Separator {
+                        Layout.fillWidth: true
+                        visible: page.presetPanelOpen
+                    }
+
+                    ColumnLayout {
+                        objectName: "wizardPresetPanel"
+                        Layout.fillWidth: true
+                        visible: page.presetPanelOpen
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.Label {
+                            Layout.fillWidth: true
+                            text: i18n("Presets are stored in your own configuration (~/.config/kontainerrc).")
+                            font: Kirigami.Theme.smallFont
+                            opacity: 0.75
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            id: presetManageRepeater
+
+                            model: page.controller.presets
+
+                            delegate: RowLayout {
+                                id: presetRow
+
+                                required property var modelData
+
+                                objectName: "wizardPresetManageRow"
+                                Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+
+                                QQC2.TextField {
+                                    objectName: "wizardPresetSourceField"
+                                    Layout.fillWidth: true
+                                    text: presetRow.modelData.source
+                                    onEditingFinished: kcm.controller.mountPresets.update(presetRow.modelData.id, text,
+                                                                                         presetRow.modelData.destination,
+                                                                                         presetRow.modelData.readOnly,
+                                                                                         presetRow.modelData.note)
+                                }
+                                QQC2.TextField {
+                                    objectName: "wizardPresetDestinationField"
+                                    Layout.fillWidth: true
+                                    text: presetRow.modelData.destination
+                                    onEditingFinished: kcm.controller.mountPresets.update(presetRow.modelData.id,
+                                                                                         presetRow.modelData.source,
+                                                                                         text,
+                                                                                         presetRow.modelData.readOnly,
+                                                                                         presetRow.modelData.note)
+                                }
+                                QQC2.CheckBox {
+                                    objectName: "wizardPresetFavoriteCheck"
+                                    text: i18n("Favourite")
+                                    checked: presetRow.modelData.favorite
+                                    onToggled: kcm.controller.mountPresets.setFavorite(presetRow.modelData.id, checked)
+                                }
+                                QQC2.Button {
+                                    objectName: "wizardPresetMoveUp"
+                                    icon.name: "go-up"
+                                    flat: true
+                                    Accessible.name: i18n("Move up")
+                                    onClicked: kcm.controller.mountPresets.moveUp(presetRow.modelData.id)
+                                }
+                                QQC2.Button {
+                                    objectName: "wizardPresetMoveDown"
+                                    icon.name: "go-down"
+                                    flat: true
+                                    Accessible.name: i18n("Move down")
+                                    onClicked: kcm.controller.mountPresets.moveDown(presetRow.modelData.id)
+                                }
+                                QQC2.Button {
+                                    objectName: "wizardPresetDelete"
+                                    icon.name: "edit-delete"
+                                    flat: true
+                                    Accessible.name: i18n("Remove this preset")
+                                    onClicked: kcm.controller.mountPresets.remove(presetRow.modelData.id)
+                                }
+                            }
+                        }
+
+                        // 新增：宿主路径 + 容器路径（类型默认 bind；命名卷用类型下拉在挂载行里选）
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            QQC2.TextField {
+                                id: newPresetSource
+
+                                objectName: "wizardNewPresetSource"
+                                Layout.fillWidth: true
+                                placeholderText: i18n("Host path or volume name")
+                                Accessible.name: i18n("Preset source")
+                            }
+                            QQC2.TextField {
+                                id: newPresetDestination
+
+                                objectName: "wizardNewPresetDestination"
+                                Layout.fillWidth: true
+                                placeholderText: i18n("Container path")
+                                Accessible.name: i18n("Preset destination")
+                            }
+                            QQC2.Button {
+                                objectName: "wizardNewPresetAdd"
+                                text: i18n("Add")
+                                icon.name: "list-add"
+                                enabled: newPresetSource.text.length > 0 && newPresetDestination.text.length > 0
+                                onClicked: {
+                                    const id = kcm.controller.mountPresets.add(newPresetSource.text, newPresetDestination.text,
+                                                                               "bind", false, "");
+                                    if (id.length > 0) {
+                                        newPresetSource.text = "";
+                                        newPresetDestination.text = "";
+                                    }
+                                }
                             }
                         }
                     }

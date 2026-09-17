@@ -6,6 +6,7 @@
 #include "model/create_container_controller.h"
 
 #include "domain/container.h"
+#include "model/container_detail_controller.h"
 #include "model/operation_controller.h"
 
 #include <KLocalizedString>
@@ -39,11 +40,13 @@ QStringList CreateContainerController::stepKeys()
 CreateContainerController::CreateContainerController(OperationController *operations,
                                                      MountPresetStore *presets,
                                                      DockerBackendInterface *backend,
+                                                     ContainerDetailController *containerDetail,
                                                      QObject *parent)
     : QObject(parent)
     , m_operations(operations)
     , m_presets(presets)
     , m_backend(backend)
+    , m_containerDetail(containerDetail)
 {
     Q_ASSERT(m_operations);
     Q_ASSERT(m_presets);
@@ -469,13 +472,44 @@ bool CreateContainerController::prefillFromContainer(const QString &containerId)
     }
     const Container &container = *it;
 
-    // 列表项只有基本信息；重启策略/挂载/命令这些只在 inspect 里——因此克隆以**当前详情**为准
-    // （调用方从容器详情页进入时，详情控制器里已经有一份完整数据）
-    reset(container.image);
+    // 列表项只有基本信息；命令/入口点/环境/标签/重启策略这些只在 inspect 里，
+    // 因此当调用方从容器详情页进来（详情控制器里就是同一个容器）时，把**完整配置**一并克隆过来。
+    // 只复制配置，不复制运行时状态（§4.5）
+    const bool hasDetail = m_containerDetail && m_containerDetail->hasDetail()
+        && m_containerDetail->containerId() == container.id;
+    reset(hasDetail ? m_containerDetail->image() : container.image);
     m_name = container.name + QStringLiteral("-copy");
     const QString suggestion = suggestedName();
     if (!suggestion.isEmpty()) {
         m_name = suggestion;
+    }
+
+    if (hasDetail) {
+        m_commandText = m_containerDetail->command().join(QLatin1Char('\n'));
+        m_entrypointText = m_containerDetail->entrypoint().join(QLatin1Char('\n'));
+        m_environmentRows.clear();
+        for (const QString &entry : m_containerDetail->environment()) {
+            const int separator = entry.indexOf(QLatin1Char('='));
+            QVariantMap row;
+            row.insert(QStringLiteral("key"), separator > 0 ? entry.left(separator) : entry);
+            row.insert(QStringLiteral("value"), separator > 0 ? entry.mid(separator + 1) : QString());
+            m_environmentRows.append(row);
+        }
+        m_labelRows.clear();
+        if (DetailListModel *labels = m_containerDetail->labels()) {
+            // DetailListModel 只按 role 暴露：这里按 LabelRole/ValueRole 读回键值对
+            for (int row = 0; row < labels->count(); ++row) {
+                const QModelIndex index = labels->index(row, 0);
+                m_labelRows.append(QVariantMap {
+                    {QStringLiteral("key"), index.data(DetailListModel::LabelRole).toString()},
+                    {QStringLiteral("value"), index.data(DetailListModel::ValueRole).toString()},
+                });
+            }
+        }
+        m_workingDirectory = m_containerDetail->workingDirectory();
+        m_user = m_containerDetail->user();
+        m_restartPolicy = m_containerDetail->restartPolicy().isEmpty() ? QStringLiteral("no")
+                                                                      : m_containerDetail->restartPolicy();
     }
 
     QVariantList ports;

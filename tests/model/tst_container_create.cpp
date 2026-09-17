@@ -5,6 +5,7 @@
 
 #include "domain/container.h"
 #include "domain/container_create_request.h"
+#include "model/container_detail_controller.h"
 #include "model/create_container_controller.h"
 #include "model/mount_preset_store.h"
 #include "model/operation_controller.h"
@@ -41,6 +42,7 @@ private Q_SLOTS:
     void presetStorePersistsAndOrders();
     void wizardGatesSteps();
     void wizardBuildsTheRequestAndSubmits();
+    void cloneCopiesTheFullConfiguration();
     void presetStoreDeduplicatesAndTrimsRecents();
 };
 
@@ -447,6 +449,68 @@ void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
     // 提交：写权限门在控制器里（这里是只读 endpoint），因此先换一个可写的
     QVERIFY(!wizard.submit());
     QVERIFY(!operations.resultText().isEmpty());
+}
+
+/*!
+ * 克隆（ARCH_V5_V8 §4.5）：复制**配置**而不是运行时状态；命令/入口点/环境/标签/重启策略
+ * 只有 inspect 里才有，因此从容器详情进入时要一并带过来。
+ */
+void ContainerCreateTest::cloneCopiesTheFullConfiguration()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MockDockerBackend backend;
+
+    Container listed;
+    listed.id = QStringLiteral("cid-1");
+    listed.name = QStringLiteral("web");
+    listed.image = QStringLiteral("registry.example.com/team/app:1.0");
+    listed.state = ContainerState::Running;
+    listed.ports = {{QStringLiteral("0.0.0.0"), 8080, 18080, QStringLiteral("tcp")}};
+    backend.setContainers({listed});
+
+    // 详情（inspect）里才有的字段
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-1");
+    detail.name = QStringLiteral("web");
+    detail.image = QStringLiteral("registry.example.com/team/app:1.0");
+    detail.command = {QStringLiteral("node"), QStringLiteral("server.js")};
+    detail.entrypoint = {QStringLiteral("/entry.sh")};
+    detail.environment = {QStringLiteral("LANG=C"), QStringLiteral("TZ=UTC")};
+    detail.labels = {{QStringLiteral("com.example.owner"), QStringLiteral("team-a")}};
+    detail.workingDirectory = QStringLiteral("/app");
+    detail.user = QStringLiteral("1000:1000");
+    detail.restartPolicy = QStringLiteral("unless-stopped");
+    backend.setContainerDetail(detail);
+
+    OperationController operations(&backend);
+    ContainerDetailController detailController(&backend);
+    detailController.setContainerId(QStringLiteral("cid-1"));
+    detailController.start();
+    backend.completeRefresh(); // inspect 是异步的：必须先真的把详情读进来
+
+    CreateContainerController wizard(&operations, &presets, &backend, &detailController);
+    QVERIFY(wizard.prefillFromContainer(QStringLiteral("cid-1")));
+
+    QCOMPARE(wizard.image(), QStringLiteral("registry.example.com/team/app:1.0"));
+    QVERIFY2(wizard.name().startsWith(QStringLiteral("web-copy")), qPrintable(wizard.name()));
+    QCOMPARE(wizard.commandText(), QStringLiteral("node\nserver.js"));
+    QCOMPARE(wizard.entrypointText(), QStringLiteral("/entry.sh"));
+    QCOMPARE(wizard.environmentRows().size(), 2);
+    QCOMPARE(wizard.environmentRows().first().toMap().value(QStringLiteral("key")).toString(), QStringLiteral("LANG"));
+    QCOMPARE(wizard.environmentRows().first().toMap().value(QStringLiteral("value")).toString(), QStringLiteral("C"));
+    QCOMPARE(wizard.labelRows().size(), 1);
+    QCOMPARE(wizard.workingDirectory(), QStringLiteral("/app"));
+    QCOMPARE(wizard.user(), QStringLiteral("1000:1000"));
+    QCOMPARE(wizard.restartPolicy(), QStringLiteral("unless-stopped"));
+    QCOMPARE(wizard.portRows().size(), 1);
+    QCOMPARE(wizard.portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), 18080);
+
+    // 受控容器不存在时：返回 false，不改动现有表单
+    const QString previousName = wizard.name();
+    QVERIFY(!wizard.prefillFromContainer(QStringLiteral("does-not-exist")));
+    QCOMPARE(wizard.name(), previousName);
 }
 
 QTEST_MAIN(ContainerCreateTest)

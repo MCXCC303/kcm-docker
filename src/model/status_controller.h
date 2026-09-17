@@ -182,7 +182,8 @@ public:
     explicit StatusController(DockerBackendInterface *backend,
                               HostPathService *hostPaths = nullptr,
                               QObject *parent = nullptr,
-                              CredentialBackend *credentialBackend = nullptr);
+                              CredentialBackend *credentialBackend = nullptr,
+                              MountPresetStore *mountPresetStore = nullptr);
     ~StatusController() override;
 
     State state() const

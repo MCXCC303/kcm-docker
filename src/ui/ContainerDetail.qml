@@ -85,6 +85,10 @@ KCM.AbstractKCM {
     /*! 克隆这个容器的配置（七期 §4.5）：只复制配置，不复制运行时状态。 */
     signal cloneRequested(string containerId)
 
+    /*! 「保存为预设」的结果提示（挂载行里的小反馈）。 */
+    property string mountPresetMessage: ""
+    property bool mountPresetMessageVisible: false
+
     /*! 正在等待"断开"确认的网络名（确认对话框要用）。 */
     property string pendingNetworkName: ""
     /*! 连接网络的内联面板是否展开（以及当前选中的网络 Id / 别名）。 */
@@ -845,6 +849,21 @@ KCM.AbstractKCM {
                         message: page.controller.mounts.empty ? i18n("No mounts.") : ""
                     }
 
+                    // 「保存为预设」的结果：就地给一行反馈，不用跑去别处看
+                    Kirigami.InlineMessage {
+                        objectName: "mountPresetMessage"
+                        Layout.fillWidth: true
+                        visible: page.mountPresetMessageVisible
+                        type: Kirigami.MessageType.Positive
+                        text: page.mountPresetMessage
+                        showCloseButton: true
+                        onVisibleChanged: {
+                            if (!visible) {
+                                page.mountPresetMessageVisible = false;
+                            }
+                        }
+                    }
+
                     /* 打开宿主目录失败时的提示（路径不存在 / 没有文件管理器） */
                     Kirigami.InlineMessage {
                         objectName: "mountActionMessage"
@@ -980,6 +999,23 @@ KCM.AbstractKCM {
                                 Components.CopyButton {
                                     value: mountRow.destination
                                     fieldLabel: i18n("container path")
+                                }
+
+                                // 把这条挂载存成预设（七期 §4.2）：下次创建容器时可以一键添加
+                                QQC2.Button {
+                                    objectName: "mountSavePresetButton"
+                                    visible: mountRow.source.length > 0
+                                    text: i18n("Save as preset")
+                                    icon.name: "bookmark-new"
+                                    onClicked: {
+                                        const id = kcm.controller.mountPresets.add(mountRow.source, mountRow.destination,
+                                                                                   mountRow.typeKey === "volume" ? "volume" : "bind",
+                                                                                   mountRow.mode === "ro", "");
+                                        page.mountPresetMessage = id.length > 0
+                                            ? i18n("Saved as a preset.")
+                                            : i18n("This mount is already saved as a preset.");
+                                        page.mountPresetMessageVisible = true;
+                                    }
                                 }
                             }
                         }

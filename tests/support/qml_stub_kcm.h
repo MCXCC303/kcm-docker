@@ -8,9 +8,11 @@
 #include "backend/docker_backend_interface.h"
 #include "support/fake_credential_backend.h"
 #include "support/fake_host_path_service.h"
+#include "model/mount_preset_store.h"
 #include "model/status_controller.h"
 
 #include <QObject>
+#include <QTemporaryDir>
 #include <QString>
 
 namespace Kontainer
@@ -43,6 +45,15 @@ public:
     {
         return m_credentialBackend;
     }
+    /*!
+     * 挂载预设存储（指向临时目录）。
+     *
+     * 绝不用用户真实的 `~/.config/kontainerrc`：测试会往里加/删预设。
+     */
+    MountPresetStore *mountPresets() const
+    {
+        return m_mountPresets;
+    }
 
     /*! 测试可以注入探测结果与打开失败（挂载分区的两种状态）。 */
     FakeHostPathService *hostPaths() const
@@ -67,6 +78,8 @@ public:
 private:
     FakeHostPathService *m_hostPaths = nullptr;
     FakeCredentialBackend *m_credentialBackend = nullptr;
+    QTemporaryDir *m_configDir = nullptr;
+    MountPresetStore *m_mountPresets = nullptr;
     StatusController *m_controller = nullptr;
 };
 

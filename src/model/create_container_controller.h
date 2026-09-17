@@ -16,6 +16,7 @@
 namespace Kontainer
 {
 
+class ContainerDetailController;
 class OperationController;
 
 /*!
@@ -87,6 +88,7 @@ public:
     CreateContainerController(OperationController *operations,
                               MountPresetStore *presets,
                               DockerBackendInterface *backend,
+                              ContainerDetailController *containerDetail = nullptr,
                               QObject *parent = nullptr);
 
     /*! 步骤 key 顺序（界面与测试共用；不要在 QML 里另抄一份）。 */
@@ -198,6 +200,8 @@ private:
     OperationController *m_operations = nullptr;
     MountPresetStore *m_presets = nullptr;
     DockerBackendInterface *m_backend = nullptr;
+    /*! 容器详情控制器（可能为空）：克隆时用它拿命令/入口点/环境/标签等完整配置。 */
+    ContainerDetailController *m_containerDetail = nullptr;
 
     int m_stepIndex = 0;
 
