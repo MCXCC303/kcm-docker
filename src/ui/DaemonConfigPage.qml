@@ -117,8 +117,10 @@ KCM.AbstractKCM {
         const key = Kontainer.Presentation.registryMirrorErrorKey(value);
         if (key === "emptyHost") {
             // 示例地址走参数而不是写进 msgid：gettext 不建议把 URL 放进待译字符串
-            //（URL 不需要翻译，混在里面只会让译者去改动它）
-            return i18n("Enter a registry mirror address, for example %1", QStringLiteral("https://mirror.example.com"));
+            //（URL 不需要翻译，混在里面只会让译者去改动它）。
+            // 注意这里只能是 QML 的普通字符串字面量：QStringLiteral 是 C++ 宏，
+            // 在 QML 里会抛 ReferenceError（真实踩过，添加空行时立刻报错）
+            return i18n("Enter a registry mirror address, for example %1", "https://mirror.example.com");
         }
         if (key === "invalid") {
             return i18n("Use an address of the form http(s)://host[:port].");

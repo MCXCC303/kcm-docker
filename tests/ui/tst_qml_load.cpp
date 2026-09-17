@@ -14,6 +14,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QQmlComponent>
+#include <QQmlContext>
+#include <QQmlExpression>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QFile>
@@ -414,6 +416,24 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
         QVERIFY2(item, name);
         QVERIFY2(!item->property("visible").toBool(),
                  qPrintable(QStringLiteral("%1 must not appear on the user scope page").arg(QString::fromLatin1(name))));
+    }
+
+    // 校验路径必须真的产出文案：用户点「添加加速器」会新增一个空行，
+    // 空行立刻走校验分支。这条路径里只能用 QML 的字符串字面量——写成 C++ 的
+    // QStringLiteral 会抛 ReferenceError，而且编译、页面加载、tst_qml_load 都看不出来
+    // （真实反馈：添加加速器时报 ReferenceError 且错误提示不出现）。
+    // 校验路径必须真的产出文案：用户点「添加加速器」后会新增一个空行，
+    // 空行立刻走校验分支（StringListEditor 的错误标签直接调用 validator("")）。
+    // 这条路径里只能用 QML 的字符串字面量——写成 C++ 的 QStringLiteral 会抛
+    // ReferenceError，而且编译、页面加载、控制台之外都看不出来
+    // （真实反馈：添加加速器时报 ReferenceError，且错误提示不出现）。
+    QQmlExpression emptyHostCall(qmlContext(userPage.data()), userPage.data(), QStringLiteral("mirrorError('')"));
+    const QString emptyHostMessage = emptyHostCall.evaluate().toString();
+    QVERIFY2(emptyHostMessage.contains(QStringLiteral("example")), qPrintable(emptyHostMessage));
+    QQmlExpression invalidCall(qmlContext(userPage.data()), userPage.data(), QStringLiteral("mirrorError('not a host')"));
+    QVERIFY2(!invalidCall.evaluate().toString().isEmpty(), "the invalid-address branch must produce a message");
+    for (const QString &captured : g_messages) {
+        QVERIFY2(!captured.contains(QStringLiteral("ReferenceError")), qPrintable(captured));
     }
 
     // 数据目录提示：用户级说的是"生效需要权限"

@@ -85,6 +85,7 @@ private Q_SLOTS:
     void qmlNeverTalksHttp();
     void kioStaysInHostPathService();
     void externalProcessesStayForbidden();
+    void qmlUsesOnlyQmlIdentifiers();
 };
 
 /*!
@@ -275,6 +276,34 @@ void SourceConventionsTest::externalProcessesStayForbidden()
     QVERIFY2(offenders.isEmpty(),
              qPrintable(QStringLiteral("Kontainer never shells out; privilege escalation is limited to the reviewed helper files:\n%1")
                             .arg(offenders.join(QLatin1Char('\n')))));
+}
+
+/*!
+ * QML 里不许出现 C++ 侧的名字（`QStringLiteral` / `QString` / …）。
+ *
+ * 真实踩过：把 `i18n("… %1", QStringLiteral("https://…"))` 写进 QML —— C++ 里
+ * 完全正常，QML 里则抛 `ReferenceError: QStringLiteral is not defined`，
+ * 而且只在**那条分支真的被执行**时才报（添加空行触发校验），编译与页面加载都看不出来。
+ * 这类错误的代价是"看起来只是校验没生效"。
+ */
+void SourceConventionsTest::qmlUsesOnlyQmlIdentifiers()
+{
+    const QMap<QString, QString> qmlFiles = collectFiles(sourceDir() + QStringLiteral("/src/ui"), {QStringLiteral("*.qml")});
+    QVERIFY2(!qmlFiles.isEmpty(), "no QML sources found");
+
+    const QRegularExpression cppOnly(QStringLiteral("\\b(QStringLiteral|QStringList|QLatin1String|QVariantMap|QStringView|qPrintable|QString::)\\b"));
+    const QRegularExpression plainQString(QStringLiteral("\\bQString\\s*\\("));
+    QStringList offenders;
+    for (auto it = qmlFiles.constBegin(); it != qmlFiles.constEnd(); ++it) {
+        for (const QString &hit : linesMatching(it.value(), cppOnly)) {
+            offenders.append(QStringLiteral("%1 → %2").arg(it.key(), hit));
+        }
+        for (const QString &hit : linesMatching(it.value(), plainQString)) {
+            offenders.append(QStringLiteral("%1 → %2").arg(it.key(), hit));
+        }
+    }
+    QVERIFY2(offenders.isEmpty(),
+             qPrintable(QStringLiteral("C++ identifiers are not available in QML:\n%1").arg(offenders.join(QLatin1Char('\n')))));
 }
 
 QTEST_GUILESS_MAIN(SourceConventionsTest)
