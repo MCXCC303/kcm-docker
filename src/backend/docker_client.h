@@ -10,6 +10,7 @@
 #include "backend/docker_error.h"
 #include "refresh_policy.h"
 
+#include <QFile>
 #include <QMap>
 #include <QObject>
 #include <QUrlQuery>
@@ -66,6 +67,8 @@ public:
         QString path;
         QUrlQuery query;
         int timeoutMs = 0;
+        /*! 上传请求体阶段的静默超时（0 = 沿用 timeoutMs）。 */
+        int uploadTimeoutMs = 0;
         /*!
          * 请求体（JSON）。
          *
@@ -73,6 +76,16 @@ public:
          * 带 JSON 体，因此在这里按需加上（并统一声明 `Content-Type: application/json`）。
          */
         QByteArray body;
+        /*!
+         * 从**文件**流式上传的请求体（八期构建镜像的 tar 上下文）。
+         *
+         * 与 `body` 二选一：设置它时按文件大小写 `Content-Length`，然后分块写入
+         * （避免几十上百 MB 的上下文一次性进内存）。文件的所有权在调用方，
+         * 上传期间必须一直存在。
+         */
+        QString bodyFile;
+        /*! 上传的内容类型（默认 application/json；构建上下文是 application/x-tar）。 */
+        QByteArray bodyContentType = QByteArrayLiteral("application/json");
         /*!
          * 流式请求的「首个响应」超时：在收到响应头之前用这个值。
          *
@@ -135,6 +148,24 @@ public:
      */
     void cancel();
 
+    /*! 上传阶段（写请求体）的静默超时：写完之前用它，避免用流式空闲超时误杀上传。 */
+    void setUploadTimeoutMs(int timeoutMs)
+    {
+        m_request.uploadTimeoutMs = timeoutMs;
+    }
+
+    /*! 请求体来自文件（`postFile`）：start() 之后由上传流程打开并分块写。 */
+    void setBodyFile(const QString &filePath)
+    {
+        m_request.bodyFile = filePath;
+    }
+
+    /*! 请求体的内容类型。 */
+    void setBodyContentType(const QByteArray &contentType)
+    {
+        m_request.bodyContentType = contentType;
+    }
+
     /*! 流式请求：收到响应头之前使用的超时（由 DockerClient 设置）。 */
     void setHeadersTimeoutMs(int timeoutMs)
     {
@@ -155,6 +186,12 @@ private:
 
     void start();
     void onConnected();
+    /*! 继续写请求体（分块上传）：由 bytesWritten 驱动，写完切回响应超时。 */
+    void writeNextBodyChunk();
+    /*! 写出去一块：接着写下一块（背压）。 */
+    void onBytesWritten(qint64 bytes);
+    /*! 打开待上传的文件；失败时返回错误（调用方负责发出）。 */
+    bool openBodyFile(DockerError *error);
     void onReadyRead();
     void onDisconnected();
     void onSocketError(int socketError, const QString &socketErrorString);
@@ -179,6 +216,12 @@ private:
 
     QLocalSocket *m_socket = nullptr;
     QTimer *m_timer = nullptr;
+    /*! 正在上传的请求体文件（`bodyFile` 模式）。 */
+    QFile *m_bodyFile = nullptr;
+    /*! 还剩多少字节没写。 */
+    qint64 m_bodyRemaining = 0;
+    /*! 单次写入的块大小：够大以减少系统调用，又不至于让一次 write 卡住事件循环。 */
+    static constexpr qint64 kBodyChunkBytes = 256 * 1024;
     std::unique_ptr<HttpResponseParser> m_parser;
 
     State m_state = State::Pending;
@@ -253,6 +296,19 @@ public:
                       int timeoutMs = 0,
                       const QMap<QByteArray, QByteArray> &headers = {},
                       const QByteArray &body = {});
+    /*!
+     * 从文件上传请求体（`POST /build` 的 tar 上下文）。
+     *
+     * `uploadTimeoutMs` 是**写入阶段**的静默超时：上传期间用较宽的值，
+     * 写完之后切回流式空闲超时（`idleTimeoutMs`）。
+     */
+    DockerReply *postFile(const QString &apiPath,
+                          const QUrlQuery &query,
+                          const QString &filePath,
+                          const QByteArray &contentType,
+                          int uploadTimeoutMs,
+                          int idleTimeoutMs,
+                          const QMap<QByteArray, QByteArray> &headers = {});
     DockerReply *del(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0);
     /*!
      * 流式读请求（日志跟随是 GET）。
@@ -268,13 +324,22 @@ public:
     DockerReply *postStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
 
     /*! 通用入口：路径拼接（版本前缀）、超时与流式标记都在这里统一处理。 */
+    /*!
+     * 构造并**立刻启动**一个请求。
+     *
+     * `bodyFile` / `bodyContentType` / `uploadTimeoutMs` 必须在这里传入：
+     * `start()` 会马上把请求写进 socket，之后再设置就晚了（§5.1 的同一个坑）。
+     */
     DockerReply *request(DockerReply::Method method,
                          const QString &apiPath,
                          const QUrlQuery &query,
                          int timeoutMs,
                          bool streaming,
                          const QMap<QByteArray, QByteArray> &headers = {},
-                         const QByteArray &body = {});
+                         const QByteArray &body = {},
+                         const QString &bodyFile = {},
+                         const QByteArray &bodyContentType = QByteArrayLiteral("application/json"),
+                         int uploadTimeoutMs = 0);
 
 private:
     DockerEndpoint m_endpoint = DockerEndpoint::fromEnvironment();

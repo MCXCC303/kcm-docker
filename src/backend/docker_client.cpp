@@ -53,6 +53,8 @@ DockerReply::DockerReply(DockerEndpoint endpoint, Request request, QObject *pare
     connect(m_socket, &QLocalSocket::connected, this, &DockerReply::onConnected);
     connect(m_socket, &QLocalSocket::readyRead, this, &DockerReply::onReadyRead);
     connect(m_socket, &QLocalSocket::disconnected, this, &DockerReply::onDisconnected);
+    // 分块上传请求体：写出去一块就接着写下一块（靠这个信号做背压，不自己转圈写）
+    connect(m_socket, &QLocalSocket::bytesWritten, this, &DockerReply::onBytesWritten);
     connect(m_socket, &QLocalSocket::errorOccurred, this, [this](auto socketError) {
         onSocketError(int(socketError), m_socket->errorString());
     });
@@ -83,7 +85,12 @@ bool DockerReply::isHeaderSafe(const QByteArray &name, const QByteArray &value)
     return true;
 }
 
-DockerReply::~DockerReply() = default;
+DockerReply::~DockerReply()
+{
+    if (m_bodyFile && m_bodyFile->isOpen()) {
+        m_bodyFile->close();
+    }
+}
 
 void DockerReply::start()
 {
@@ -117,6 +124,16 @@ void DockerReply::onConnected()
         return;
     }
 
+    if (!m_request.bodyFile.isEmpty()) {
+        DockerError error;
+        if (!openBodyFile(&error)) {
+            // 必须**延后**发失败：调用方是在拿到 reply 之后才 connect(finished) 的，
+            // 同步发信号会让它永远收不到（构建上下文读不到时会表现为"卡住"）
+            failLater(error);
+            return;
+        }
+    }
+
     QByteArray request;
     request += methodName(m_request.method);
     request += ' ';
@@ -127,7 +144,7 @@ void DockerReply::onConnected()
     request += " HTTP/1.1\r\n";
     for (auto it = m_request.headers.constBegin(); it != m_request.headers.constEnd(); ++it) {
         if (!isHeaderSafe(it.key(), it.value())) {
-            fail(DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("unsafe request header")));
+            failLater(DockerError(DockerError::Kind::PreconditionFailed, QStringLiteral("unsafe request header")));
             return;
         }
         request += it.key() + ": " + it.value() + "\r\n";
@@ -135,18 +152,81 @@ void DockerReply::onConnected()
     request += "Host: docker\r\n";
     request += "Accept: application/json\r\n";
     request += "User-Agent: kontainer/" KONTAINER_VERSION "\r\n";
+    const bool uploadsFile = !m_request.bodyFile.isEmpty();
     if (methodSendsBody(m_request.method)) {
-        if (!m_request.body.isEmpty()) {
-            request += "Content-Type: application/json\r\n";
+        if (uploadsFile || !m_request.body.isEmpty()) {
+            request += "Content-Type: " + m_request.bodyContentType + "\r\n";
         }
         // 没有请求体时也显式声明长度（比留空更稳妥）
-        request += "Content-Length: " + QByteArray::number(m_request.body.size()) + "\r\n";
+        const qint64 length = uploadsFile ? QFileInfo(m_request.bodyFile).size() : m_request.body.size();
+        request += "Content-Length: " + QByteArray::number(length) + "\r\n";
     }
     request += "Connection: close\r\n\r\n";
-    request += m_request.body;
 
     m_socket->write(request);
+    if (uploadsFile) {
+        // 上传阶段用较宽的静默超时：写大上下文时"多久没有进展"才是异常
+        if (m_request.uploadTimeoutMs > 0) {
+            m_timer->start(m_request.uploadTimeoutMs);
+        }
+        writeNextBodyChunk();
+        return;
+    }
+    m_socket->write(m_request.body);
     m_socket->flush();
+}
+
+void DockerReply::writeNextBodyChunk()
+{
+    if (isFinished()) {
+        return;
+    }
+    if (!m_bodyFile) {
+        return; // 没打开成功（错误已经发出）
+    }
+    const qint64 chunk = qMin(kBodyChunkBytes, m_bodyRemaining);
+    const QByteArray data = m_bodyFile->read(chunk);
+    if (data.isEmpty() && m_bodyRemaining > 0) {
+        fail(DockerError(DockerError::Kind::ConnectionFailed,
+                         QStringLiteral("build context file shrank while uploading")));
+        return;
+    }
+    m_bodyRemaining -= data.size();
+    m_socket->write(data);
+    m_socket->flush();
+    if (m_bodyRemaining <= 0) {
+        // 上传完成：切回响应阶段（流式空闲超时或首个响应超时）
+        m_bodyFile->close();
+        const int responseTimeout = m_request.timeoutMs > 0 ? m_request.timeoutMs : m_request.headersTimeoutMs;
+        if (responseTimeout > 0) {
+            m_timer->start(responseTimeout);
+        } else {
+            m_timer->stop();
+        }
+    }
+}
+
+bool DockerReply::openBodyFile(DockerError *error)
+{
+    m_bodyFile = new QFile(m_request.bodyFile, this);
+    if (!m_bodyFile->open(QIODevice::ReadOnly)) {
+        *error = DockerError(DockerError::Kind::PreconditionFailed,
+                             QStringLiteral("cannot read the request body file: %1").arg(m_bodyFile->errorString()));
+        return false;
+    }
+    m_bodyRemaining = m_bodyFile->size();
+    return true;
+}
+
+void DockerReply::onBytesWritten(qint64 bytes)
+{
+    Q_UNUSED(bytes);
+    if (isFinished() || !m_bodyFile) {
+        return;
+    }
+    if (m_bodyRemaining > 0) {
+        writeNextBodyChunk();
+    }
 }
 
 void DockerReply::onReadyRead()
@@ -346,6 +426,26 @@ DockerReply *DockerClient::post(const QString &apiPath,
     return request(DockerReply::Method::Post, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false, headers, body);
 }
 
+DockerReply *DockerClient::postFile(const QString &apiPath,
+                                   const QUrlQuery &query,
+                                   const QString &filePath,
+                                   const QByteArray &contentType,
+                                   int uploadTimeoutMs,
+                                   int idleTimeoutMs,
+                                   const QMap<QByteArray, QByteArray> &headers)
+{
+    return request(DockerReply::Method::Post,
+                   apiPath,
+                   query,
+                   idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs,
+                   /*streaming=*/true,
+                   headers,
+                   /*body=*/{},
+                   filePath,
+                   contentType,
+                   uploadTimeoutMs);
+}
+
 DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, int timeoutMs)
 {
     return request(DockerReply::Method::Delete, apiPath, query, timeoutMs > 0 ? timeoutMs : m_timeoutMs, false);
@@ -373,7 +473,10 @@ DockerReply *DockerClient::request(DockerReply::Method method,
                                   int timeoutMs,
                                   bool streaming,
                                   const QMap<QByteArray, QByteArray> &headers,
-                                  const QByteArray &body)
+                                  const QByteArray &body,
+                                  const QString &bodyFile,
+                                  const QByteArray &bodyContentType,
+                                  int uploadTimeoutMs)
 {
     QString path = apiPath;
     if (m_apiVersion.isValid()) {
@@ -394,6 +497,9 @@ DockerReply *DockerClient::request(DockerReply::Method method,
     request.headers = headers;
     // 请求体必须在 start() 之前放进 Request：start() 会立刻把请求写进 socket
     request.body = body;
+    request.bodyFile = bodyFile;
+    request.bodyContentType = bodyContentType;
+    request.uploadTimeoutMs = uploadTimeoutMs;
 
     auto *reply = new DockerReply(m_endpoint, request, this);
     reply->start();
