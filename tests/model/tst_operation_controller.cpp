@@ -62,6 +62,8 @@ private Q_SLOTS:
     void createNetworkRefreshesAndReports();
     void removeNetworkIsGatedAndTracked();
     void connectAndDisconnectContainerToNetwork();
+    void createContainerValidatesAgainstExistingState();
+    void createContainerCanStartAfterwards();
     void createVolumeValidatesAndRefreshes();
     void removeAndPruneVolumes();
     void invalidReferenceIsRejectedBeforeBackend();
@@ -584,6 +586,142 @@ void OperationControllerTest::removeAndPruneVolumes()
     m_backend->completeMutation(OperationTarget::volumePrune(), DockerBackendInterface::MutationOutcome::Succeeded);
     QVERIFY2(m_operations->resultText().contains(QStringLiteral("Nothing")), qPrintable(m_operations->resultText()));
     QVERIFY(m_operations->resultDetailText().isEmpty());
+}
+
+/*!
+ * 创建容器的校验（ARCH_V5_V8 §4.3/§4.6）：依赖后端数据的检查也在 C++ 侧，失败给稳定 key。
+ */
+void OperationControllerTest::createContainerValidatesAgainstExistingState()
+{
+    Container existing;
+    existing.id = QStringLiteral("existing-id");
+    existing.name = QStringLiteral("web");
+    existing.image = QStringLiteral("alpine:3.19");
+    existing.state = ContainerState::Running;
+    // Port 字段顺序是 {ip, 容器端口, 宿主端口, 协议}
+    existing.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
+    m_backend->setContainers({existing});
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:3.19")};
+    m_backend->setImages({image});
+
+    const auto baseRequest = [] {
+        QVariantMap request;
+        request.insert(QStringLiteral("name"), QStringLiteral("worker"));
+        request.insert(QStringLiteral("image"), QStringLiteral("alpine:3.19"));
+        return request;
+    };
+
+    // 名称规则
+    QVariantMap request = baseRequest();
+    request.insert(QStringLiteral("name"), QStringLiteral("has space"));
+    QVERIFY(!m_operations->createContainer(request));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameInvalid"));
+
+    // 与现有容器重名（大小写不敏感）
+    request = baseRequest();
+    request.insert(QStringLiteral("name"), QStringLiteral("WEB"));
+    QVERIFY(!m_operations->createContainer(request));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("nameInUse"));
+
+    // 镜像不在本地：默认拒绝，`allowMissingImage` 时放行
+    request = baseRequest();
+    request.insert(QStringLiteral("image"), QStringLiteral("busybox:latest"));
+    QVERIFY(!m_operations->createContainer(request));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("imageNotLocal"));
+    QVERIFY2(m_operations->createContainer(request, /*allowMissingImage=*/true),
+             "the UI can offer 'pull first' and still submit");
+    // 收尾那次提交：否则同名目标会一直处于"操作在途"，后面的同名提交会被拒绝
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("worker")),
+                                DockerBackendInterface::MutationOutcome::Succeeded);
+    // 基线：此刻没有在途的写操作（completeMutation 会把已完成的调用从列表里清掉）
+    const int callsAfterFirstSubmit = m_backend->mutationCalls().size();
+
+    // 宿主端口冲突（0.0.0.0 与具体地址也算冲突）
+    request = baseRequest();
+    request.insert(QStringLiteral("ports"),
+                   QVariantList {QVariantMap {{QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")},
+                                              {QStringLiteral("hostPort"), 8080},
+                                              {QStringLiteral("containerPort"), 80},
+                                              {QStringLiteral("protocol"), QStringLiteral("tcp")}}});
+    QVERIFY(!m_operations->createContainer(request, true));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("portInUse"));
+
+    // 挂载目标必须是绝对路径
+    request = baseRequest();
+    request.insert(QStringLiteral("mounts"),
+                   QVariantList {QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
+                                              {QStringLiteral("source"), QStringLiteral("/srv/x")},
+                                              {QStringLiteral("destination"), QStringLiteral("relative")}}});
+    QVERIFY(!m_operations->createContainer(request, true));
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("pathNotAbsolute"));
+
+    // 这几次校验失败同样一个请求都没发
+    QCOMPARE(m_backend->mutationCalls().size(), callsAfterFirstSubmit);
+
+    // 合法请求：字段如实传下去
+    request = baseRequest();
+    request.insert(QStringLiteral("network"), QStringLiteral("app_default"));
+    request.insert(QStringLiteral("environment"), QStringList {QStringLiteral("LANG=C")});
+    request.insert(QStringLiteral("memoryLimitBytes"), 64LL * 1024 * 1024);
+    request.insert(QStringLiteral("cpus"), 0.5);
+    QVERIFY(m_operations->createContainer(request));
+    const ContainerCreateRequest sent = m_backend->lastContainerCreate();
+    QCOMPARE(sent.name, QStringLiteral("worker"));
+    QCOMPARE(sent.image, QStringLiteral("alpine:3.19"));
+    QCOMPARE(sent.network, QStringLiteral("app_default"));
+    QCOMPARE(sent.environment, QStringList {QStringLiteral("LANG=C")});
+    QCOMPARE(sent.memoryLimitBytes, 64LL * 1024 * 1024);
+    QCOMPARE(sent.cpus, 0.5);
+}
+
+/*!
+ * 「创建并启动」：两步串行，成功与失败都要说清是哪一步（§4.6）。
+ */
+void OperationControllerTest::createContainerCanStartAfterwards()
+{
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:3.19")};
+    m_backend->setImages({image});
+
+    QSignalSpy createdSpy(m_operations, &OperationController::containerCreatedSignal);
+
+    QVariantMap request;
+    request.insert(QStringLiteral("name"), QStringLiteral("web"));
+    request.insert(QStringLiteral("image"), QStringLiteral("alpine:3.19"));
+    request.insert(QStringLiteral("startAfterCreate"), true);
+    QVERIFY(m_operations->createContainer(request));
+
+    // 第一步：引擎给了 id
+    m_backend->completeContainerCreate(QStringLiteral("new-id"));
+    QCOMPARE(createdSpy.count(), 1);
+    QCOMPARE(createdSpy.at(0).at(0).toString(), QStringLiteral("new-id"));
+    QCOMPARE(createdSpy.at(0).at(1).toBool(), false); // 尚未启动
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("web")),
+                                DockerBackendInterface::MutationOutcome::Succeeded);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("created")), qPrintable(m_operations->resultText()));
+
+    // 第二步：启动成功 → 另给一条"已创建并启动"，并把 started=true 报给界面
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("new-id")),
+                                DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(createdSpy.count(), 2);
+    QCOMPARE(createdSpy.at(1).at(1).toBool(), true);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("started")), qPrintable(m_operations->resultText()));
+
+    // 启动失败：文案必须说明"容器已创建，但启动失败"
+    QVERIFY(m_operations->createContainer(request));
+    m_backend->completeContainerCreate(QStringLiteral("second-id"));
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("web")),
+                                DockerBackendInterface::MutationOutcome::Succeeded);
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("second-id")),
+                                DockerBackendInterface::MutationOutcome::Failed,
+                                DockerError(DockerError::Kind::EngineError, QStringLiteral("port is already allocated")));
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("created")), qPrintable(m_operations->resultText()));
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("started")), qPrintable(m_operations->resultText()));
+    QVERIFY2(m_operations->resultDetailText().contains(QStringLiteral("port is already allocated")),
+             qPrintable(m_operations->resultDetailText()));
 }
 
 void OperationControllerTest::cancelTargetsOnePull()

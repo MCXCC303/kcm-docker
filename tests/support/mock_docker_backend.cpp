@@ -115,6 +115,17 @@ void MockDockerBackend::refreshVolumes(bool includeUsage)
     beginRefresh(Section::Volumes);
 }
 
+void MockDockerBackend::createContainer(const ContainerCreateRequest &request)
+{
+    m_lastContainerCreate = request;
+    m_mutationCalls.append({Mutation::CreateContainer, OperationTarget::container(request.name), false});
+}
+
+void MockDockerBackend::completeContainerCreate(const QString &id, const QString &warning)
+{
+    Q_EMIT containerCreated(id, warning);
+}
+
 void MockDockerBackend::createVolume(const QString &name, const QString &driver, const QList<QPair<QString, QString>> &labels)
 {
     Q_UNUSED(labels);

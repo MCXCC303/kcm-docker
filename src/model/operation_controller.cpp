@@ -21,6 +21,23 @@
 namespace Kontainer
 {
 
+namespace
+{
+/*! QVariant（QStringList 或 QVariantList）→ QStringList：界面可能用任一种表达。 */
+QStringList stringListFromVariant(const QVariant &value)
+{
+    QStringList result;
+    const QVariantList list = value.toList();
+    for (const QVariant &item : list) {
+        const QString text = item.toString();
+        if (!text.isEmpty()) {
+            result.append(text);
+        }
+    }
+    return result;
+}
+} // namespace
+
 using Mutation = DockerBackendInterface::Mutation;
 using MutationOutcome = DockerBackendInterface::MutationOutcome;
 
@@ -34,6 +51,21 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
     connect(m_backend, &DockerBackendInterface::mutationFinished, this, &OperationController::onBackendMutationFinished);
     connect(m_backend, &DockerBackendInterface::imagePullProgress, this, &OperationController::onPullProgress);
     // 清理数据卷的"成功明细"（删了哪些、回收多少）：mutationFinished 只带错误，放不下这份内容
+    // 创建成功才能拿到 id；"创建并启动"在这里串行发起第二步（两步结果分别呈现）
+    connect(m_backend, &DockerBackendInterface::containerCreated, this, [this](const QString &id, const QString &warning) {
+        m_createdContainerId = id;
+        const bool startNow = m_pendingStartAfterCreate;
+        Q_EMIT containerCreatedSignal(id, false); // 先报"已创建"；启动成功后再报一次 started=true
+        if (startNow) {
+            // 第二步：启动。完成时（成功或失败）文案都要说明"这是创建之后的启动"
+            m_startAfterCreateInFlight = true;
+            m_backend->startContainer(id);
+        }
+        if (!warning.isEmpty()) {
+            qCWarning(kontainerModel) << "container create warning:" << warning;
+        }
+    });
+
     connect(m_backend, &DockerBackendInterface::volumesPruned, this, [this](const QStringList &names, qint64 reclaimedBytes) {
         // 只**记下**明细：紧接着 mutationFinished 会走统一的结果通道，
         // 由 successText() 把这份内容当作这次清理的结果文案（直接 setResult 会被它覆盖）
@@ -469,6 +501,191 @@ void OperationController::removeNetwork(const QString &id, const QString &name)
     m_backend->removeNetwork(id);
 }
 
+bool OperationController::imageExistsLocally(const QString &reference) const
+{
+    if (reference.isEmpty()) {
+        return false;
+    }
+    // 按引用与 id 都能匹配：界面可能选的是列表里的镜像（带 tag），也可能直接填了 id
+    const QList<Image> images = m_backend->images();
+    for (const Image &image : images) {
+        if (image.id == reference) {
+            return true;
+        }
+        for (const QString &tag : image.repoTags) {
+            if (tag == reference) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool OperationController::containerNameTaken(const QString &name) const
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty()) {
+        return false;
+    }
+    // 引擎允许更长的名字，界面按完整名字比对；容器名前缀 `/` 是 docker CLI 的写法，这里不涉及
+    const QList<Container> containers = m_backend->containers();
+    for (const Container &container : containers) {
+        if (container.name.compare(trimmed, Qt::CaseInsensitive) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool OperationController::hostPortInUse(const QString &hostIp, int hostPort) const
+{
+    if (hostPort <= 0) {
+        return false; // 0 = 随机分配，不冲突
+    }
+    const QString wanted = hostIp.isEmpty() ? QStringLiteral("0.0.0.0") : hostIp;
+    const QList<Container> containers = m_backend->containers();
+    for (const Container &container : containers) {
+        for (const Port &port : container.ports) {
+            if (!port.isPublished() || port.publicPort != hostPort) {
+                continue;
+            }
+            const QString used = port.ip.isEmpty() ? QStringLiteral("0.0.0.0") : port.ip;
+            // 同一个宿主端口：只要两边的绑定地址有交集就算冲突
+            // （0.0.0.0 与任何地址都冲突；具体地址之间必须相同）
+            if (used == wanted || used == QLatin1String("0.0.0.0") || wanted == QLatin1String("0.0.0.0")) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool OperationController::createContainer(const QVariantMap &request, bool allowMissingImage)
+{
+    const QString name = request.value(QStringLiteral("name")).toString().trimmed();
+    const QString image = request.value(QStringLiteral("image")).toString().trimmed();
+
+    // 1) 名称与镜像：名称规则 / 重名 / 镜像必须存在
+    const QString nameError = validateContainerName(name);
+    if (!nameError.isEmpty()) {
+        setResult(Result::Error, i18n("The container was not created because the name is not valid."), nameError);
+        return false;
+    }
+    if (containerNameTaken(name)) {
+        setResult(Result::Error,
+                  i18n("The container was not created because the name is already in use."),
+                  QStringLiteral("nameInUse"));
+        return false;
+    }
+    if (image.isEmpty()) {
+        setResult(Result::Error,
+                  i18n("The container was not created because no image was chosen."),
+                  QStringLiteral("imageRequired"));
+        return false;
+    }
+    if (!allowMissingImage && !imageExistsLocally(image)) {
+        setResult(Result::Error,
+                  i18n("The container was not created because the image is not available locally."),
+                  QStringLiteral("imageNotLocal"));
+        return false;
+    }
+
+    // 2) 端口冲突：对照现有容器（引擎也会拒绝，但在这里挡住能给出更清楚的提示）
+    const QVariantList ports = request.value(QStringLiteral("ports")).toList();
+    for (const QVariant &entry : ports) {
+        const QVariantMap port = entry.toMap();
+        const int hostPort = port.value(QStringLiteral("hostPort")).toInt();
+        const QString hostIp = port.value(QStringLiteral("hostIp")).toString();
+        if (hostPortInUse(hostIp, hostPort)) {
+            setResult(Result::Error,
+                      i18n("The container was not created because host port %1 is already in use.", hostPort),
+                      QStringLiteral("portInUse"));
+            return false;
+        }
+    }
+
+    // 3) 挂载与环境变量的字段级校验
+    const QVariantList mounts = request.value(QStringLiteral("mounts")).toList();
+    for (const QVariant &entry : mounts) {
+        const QVariantMap mount = entry.toMap();
+        const QString destination = mount.value(QStringLiteral("destination")).toString();
+        const QString pathError = validateContainerPath(destination);
+        if (!pathError.isEmpty()) {
+            setResult(Result::Error,
+                      i18n("The container was not created because a mount destination is not valid."),
+                      pathError);
+            return false;
+        }
+    }
+
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("creating the container")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+
+    const QString targetKey = OperationTarget::container(name);
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+
+    // 4) QVariantMap → 请求结构（界面只传表单字段，映射细节在这里收口）
+    ContainerCreateRequest create;
+    create.name = name;
+    create.image = image;
+    create.command = stringListFromVariant(request.value(QStringLiteral("command")));
+    create.entrypoint = stringListFromVariant(request.value(QStringLiteral("entrypoint")));
+    create.environment = stringListFromVariant(request.value(QStringLiteral("environment")));
+    create.workingDirectory = request.value(QStringLiteral("workingDirectory")).toString();
+    create.user = request.value(QStringLiteral("user")).toString();
+    create.hostname = request.value(QStringLiteral("hostname")).toString();
+    create.network = request.value(QStringLiteral("network")).toString();
+    create.networkAliases = stringListFromVariant(request.value(QStringLiteral("networkAliases")));
+    create.restartPolicy = request.value(QStringLiteral("restartPolicy"), QStringLiteral("no")).toString();
+    create.restartMaxRetries = request.value(QStringLiteral("restartMaxRetries")).toInt();
+    create.memoryLimitBytes = request.value(QStringLiteral("memoryLimitBytes")).toLongLong();
+    create.cpus = request.value(QStringLiteral("cpus")).toDouble();
+    create.privileged = request.value(QStringLiteral("privileged")).toBool();
+    create.startAfterCreate = request.value(QStringLiteral("startAfterCreate")).toBool();
+    for (const QVariant &entry : request.value(QStringLiteral("labels")).toList()) {
+        const QVariantMap label = entry.toMap();
+        const QString key = label.value(QStringLiteral("key")).toString().trimmed();
+        if (!key.isEmpty()) {
+            create.labels.append({key, label.value(QStringLiteral("value")).toString()});
+        }
+    }
+    for (const QVariant &entry : ports) {
+        const QVariantMap port = entry.toMap();
+        ContainerPortRequest portRequest;
+        portRequest.hostIp = port.value(QStringLiteral("hostIp")).toString();
+        portRequest.hostPort = quint16(port.value(QStringLiteral("hostPort")).toUInt());
+        portRequest.containerPort = quint16(port.value(QStringLiteral("containerPort")).toUInt());
+        portRequest.protocol = port.value(QStringLiteral("protocol"), QStringLiteral("tcp")).toString();
+        create.ports.append(portRequest);
+    }
+    for (const QVariant &entry : mounts) {
+        const QVariantMap mount = entry.toMap();
+        ContainerMountRequest mountRequest;
+        mountRequest.type = mount.value(QStringLiteral("type"), QStringLiteral("bind")).toString();
+        mountRequest.source = mount.value(QStringLiteral("source")).toString();
+        mountRequest.destination = mount.value(QStringLiteral("destination")).toString();
+        mountRequest.readOnly = mount.value(QStringLiteral("readOnly")).toBool();
+        create.mounts.append(mountRequest);
+    }
+
+    m_pendingStartAfterCreate = create.startAfterCreate;
+    m_createdContainerId.clear();
+    beginOperation(Mutation::CreateContainer, targetKey);
+    m_backend->createContainer(create);
+    return true;
+}
+
 QString OperationController::volumeNameError(const QString &name) const
 {
     const QString trimmed = name.trimmed();
@@ -809,6 +1026,13 @@ void OperationController::onMutationFinished(Mutation mutation,
 
     switch (outcome) {
     case MutationOutcome::Succeeded:
+        if (m_startAfterCreateInFlight && mutation == Mutation::StartContainer) {
+            m_startAfterCreateInFlight = false;
+            Q_EMIT containerCreatedSignal(m_createdContainerId, true);
+            setResult(Result::Success, i18n("Container created and started: %1", targetKey.section(QLatin1Char(':'), 1)));
+            refreshAfter(mutation, targetKey);
+            break;
+        }
         if (mutation == Mutation::PruneVolumes) {
             // 清理的明细（卷名列表）放在"技术细节"行里，用户可以核对删了什么
             setResult(Result::Success, successText(mutation, targetKey), m_pruneDetailList);
@@ -826,6 +1050,16 @@ void OperationController::onMutationFinished(Mutation mutation,
                   mutation == Mutation::PullImage ? i18n("Image pull cancelled.") : i18n("Operation cancelled."));
         break;
     case MutationOutcome::Failed: {
+        if (m_startAfterCreateInFlight && mutation == Mutation::StartContainer) {
+            // 创建成功、启动失败：必须说清是哪一步失败（§4.6）
+            m_startAfterCreateInFlight = false;
+            setResult(Result::Error,
+                      i18n("The container was created but could not be started: %1", dockerErrorText(error)),
+                      error.detail(),
+                      error);
+            refreshAfter(Mutation::CreateContainer, targetKey);
+            break;
+        }
         // 权限被拒 → 本次会话降级为只读（不可逆）
         if (error.kind() == DockerError::Kind::PermissionDenied) {
             degradeToReadOnly(error);
@@ -877,6 +1111,12 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         m_backend->refreshContainers();
         Q_EMIT networksChanged();
         break;
+    case Mutation::CreateContainer:
+        // 创建成功后容器列表与存储占用都会变；"创建并启动"由 containerCreated 的
+        // 回调串行发起启动（见构造函数里的连接）
+        m_backend->refreshContainers();
+        m_backend->refreshStorageUsage();
+        break;
     case Mutation::CreateVolume:
     case Mutation::RemoveVolume:
     case Mutation::PruneVolumes:
@@ -924,6 +1164,11 @@ QString OperationController::successText(Mutation mutation, const QString &targe
         return i18n("Container connected to the network.");
     case Mutation::DisconnectNetwork:
         return i18n("Container disconnected from the network.");
+    case Mutation::CreateContainer: {
+        // 只声明"已创建"：启动是第二步，成功或失败都会另给一条结果（§4.6）
+        const QString name = targetKey.section(QLatin1Char(':'), 1);
+        return i18n("Container created: %1", name);
+    }
     case Mutation::CreateVolume: {
         const QString name = targetKey.section(QLatin1Char(':'), 1);
         return i18n("Volume created: %1", name);

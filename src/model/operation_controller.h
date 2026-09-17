@@ -152,6 +152,23 @@ public:
     Q_INVOKABLE bool disconnectContainerFromNetwork(const QString &networkId, const QString &containerId);
 
     /*!
+     * 创建容器（ARCH_V5_V8 §4.6）。
+     *
+     * 表单由界面收集成一个 `ContainerCreateRequest`；这里做**依赖后端数据**的校验
+     * （与现有容器重名、宿主端口冲突、镜像不在本地），并把两步串起来：
+     * 创建成功 → 可选启动。两步的结果分别呈现，失败时说明是**哪一步**失败。
+     *
+     * `allowMissingImage` 对应界面上的「先拉取」：镜像不在本地时也允许提交。
+     */
+    Q_INVOKABLE bool createContainer(const QVariantMap &request, bool allowMissingImage = false);
+    /*! 主机端口是否已被现有容器占用（界面在提交前也能用）。 */
+    Q_INVOKABLE bool hostPortInUse(const QString &hostIp, int hostPort) const;
+    /*! 名字是否已被现有容器占用。 */
+    Q_INVOKABLE bool containerNameTaken(const QString &name) const;
+    /*! 镜像是否在本地（界面据此提示"需要先拉取"）。 */
+    Q_INVOKABLE bool imageExistsLocally(const QString &reference) const;
+
+    /*!
      * 创建数据卷（ARCH_V5_V8 §3.5）：名称规则与重名检查在这里做，失败给稳定 key。
      */
     Q_INVOKABLE bool createVolume(const QString &name,
@@ -205,6 +222,8 @@ Q_SIGNALS:
     void networksChanged();
     /*! 数据卷集合或占用变化（创建 / 删除 / 清理成功）。 */
     void volumesChanged();
+    /*! 容器创建成功（含"创建并启动"里"已创建但启动失败"的情况，此时 `started` 为 false）。 */
+    void containerCreatedSignal(const QString &id, bool started);
 
 private:
     enum class Result {
@@ -250,6 +269,11 @@ private:
     QSet<QString> m_busyTargets;
     int m_stateRevision = 0;
     Result m_result = Result::None;
+    /*! "创建并启动"：创建成功后要不要接着启动、新容器的 id、第二步是否在途。 */
+    bool m_pendingStartAfterCreate = false;
+    bool m_startAfterCreateInFlight = false;
+    QString m_createdContainerId;
+
     /*! 最近一次数据卷清理的明细文案（`volumesPruned` 记下，成功路径用它当结果）。 */
     QString m_pruneDetailText;
     QString m_pruneDetailList;

@@ -10,6 +10,7 @@
 #include "backend/log_frame_reader.h"
 #include "backend/registry_auth.h"
 #include "domain/container.h"
+#include "domain/container_create_request.h"
 #include "domain/container_detail.h"
 #include "domain/container_stats.h"
 #include "domain/engine_info.h"
@@ -103,6 +104,8 @@ public:
         RemoveNetwork,
         ConnectNetwork,
         DisconnectNetwork,
+        /*! 七期：创建容器（§4.6）。 */
+        CreateContainer,
         /*! 六期：数据卷的创建 / 删除 / 清理（§3.5）。 */
         CreateVolume,
         RemoveVolume,
@@ -210,6 +213,14 @@ public:
      */
     virtual void createNetwork(const Kontainer::NetworkCreateRequest &request) = 0;
     /*!
+     * 创建容器（`POST /containers/create?name=…`，§4.6）。
+     *
+     * 表单到请求体的映射全在 `ContainerCreateRequest::toJson()` 里（单一实现 + 快照测试）。
+     * 新容器的 id 经 `containerCreated()` 回来——`mutationFinished` 只带错误，放不下它。
+     */
+    virtual void createContainer(const Kontainer::ContainerCreateRequest &request) = 0;
+
+    /*!
      * 创建数据卷（`POST /volumes/create`，§3.5）。
      *
      * 名称校验与重名检查在控制器侧做；这里只负责发请求（`Driver` 默认 local）。
@@ -316,6 +327,8 @@ Q_SIGNALS:
     void imagesUpdated();
     void networksUpdated();
     void volumesUpdated();
+    /*! 容器创建成功：新容器 id 与引擎的提醒（`Warnings` 可能非空，例如名称被截断）。 */
+    void containerCreated(const QString &id, const QString &warning);
     /*! 数据卷清理完成：删掉的卷名与回收的字节数（可能为空 = 没有可清理的）。 */
     void volumesPruned(const QStringList &names, qint64 reclaimedBytes);
     void storageUpdated();

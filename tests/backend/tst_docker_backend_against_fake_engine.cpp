@@ -456,6 +456,7 @@ private Q_SLOTS:
     void networksAreListedFromTheEngine();
     void networkCreateSendsJsonBodyAndRemoveUsesDelete();
     void volumesAreListedFromTheEngine();
+    void createsAContainerWithNameInTheQuery();
     void networkConnectAndDisconnectSendTheContainer();
     void logStreamDemultiplexesAndEnds();
     void logStreamReportsEngineFailures();
@@ -1481,6 +1482,48 @@ void DockerBackendFakeEngineTest::volumesAreListedFromTheEngine()
     QTRY_COMPARE_WITH_TIMEOUT(updatedSpy.count(), 2, 10000);
     request = m_engine->lastRequest();
     QVERIFY(request.query.contains(QStringLiteral("no-usage=1")));
+}
+
+
+/*!
+ * 创建容器（ARCH_V5_V8 §4.6）：名字走 query、体是映射函数生成的 JSON、id 经信号回来。
+ */
+void DockerBackendFakeEngineTest::createsAContainerWithNameInTheQuery()
+{
+    m_engine->setPathStatus(QStringLiteral("/containers/create"), 201,
+                            QByteArrayLiteral("{\"Id\":\"new-container-id\",\"Warnings\":[]}"));
+
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    QSignalSpy createdSpy(&backend, &DockerBackend::containerCreated);
+    QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
+
+    ContainerCreateRequest request;
+    request.name = QStringLiteral("web");
+    request.image = QStringLiteral("alpine:3.19");
+    request.mounts = {{QStringLiteral("bind"), QStringLiteral("/srv/data"), QStringLiteral("/data"), true}};
+    backend.createContainer(request);
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+
+    QCOMPARE(createdSpy.count(), 1);
+    QCOMPARE(createdSpy.at(0).at(0).toString(), QStringLiteral("new-container-id"));
+    QCOMPARE(finishedSpy.at(0).at(2).value<DockerBackendInterface::MutationOutcome>(),
+             DockerBackendInterface::MutationOutcome::Succeeded);
+
+    const FakeEngine::RequestRecord record = m_engine->lastRequest();
+    QCOMPARE(record.method, QStringLiteral("POST"));
+    QCOMPARE(record.path, QStringLiteral("/v1.56/containers/create"));
+    QCOMPARE(record.query, QStringLiteral("name=web")); // 名字在 query 里
+    const QJsonObject body = QJsonDocument::fromJson(record.body).object();
+    QCOMPARE(body.value(QStringLiteral("Image")).toString(), QStringLiteral("alpine:3.19"));
+    QVERIFY2(!body.contains(QStringLiteral("Name")), "the name must not be in the body");
+
+    // 201 但没有 Id：必须当成失败，不能让界面以为创建成功了
+    m_engine->setPathStatus(QStringLiteral("/containers/create"), 201, QByteArrayLiteral("{}"));
+    backend.createContainer(request);
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);
+    QCOMPARE(finishedSpy.at(1).at(2).value<DockerBackendInterface::MutationOutcome>(),
+             DockerBackendInterface::MutationOutcome::Failed);
 }
 
 QTEST_GUILESS_MAIN(DockerBackendFakeEngineTest)

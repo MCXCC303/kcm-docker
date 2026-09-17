@@ -785,6 +785,8 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "connect-network";
     case DockerBackendInterface::Mutation::DisconnectNetwork:
         return "disconnect-network";
+    case DockerBackendInterface::Mutation::CreateContainer:
+        return "create-container";
     case DockerBackendInterface::Mutation::CreateVolume:
         return "create-volume";
     case DockerBackendInterface::Mutation::RemoveVolume:
@@ -1146,6 +1148,52 @@ void DockerBackend::stopContainerLogs(const QString &id)
         // cancel() 之后 finished 仍会来一次，届时按 Cancelled 收尾
         it->reply->cancel();
     }
+}
+
+void DockerBackend::createContainer(const ContainerCreateRequest &request)
+{
+    // 目标键用容器名：同名重复提交会被拒绝，而不是并发建出两个（与引擎的 name 冲突语义一致）
+    const QString targetKey = OperationTarget::container(request.name);
+
+    runMutation(Mutation::CreateContainer, targetKey, [this, request, targetKey] {
+        // 名字是 query 参数；体由 ContainerCreateRequest::toJson() 生成
+        QUrlQuery query;
+        query.addQueryItem(QStringLiteral("name"), request.name);
+
+        DockerReply *reply = m_client.post(ApiPaths::containerCreate(),
+                                           query,
+                                           mutationTimeoutMs(),
+                                           {},
+                                           request.toJson());
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerReply::State state = reply->state();
+            const DockerError error = reply->error();
+            const QByteArray body = reply->body();
+            reply->deleteLater();
+
+            if (state != DockerReply::State::Succeeded) {
+                emitMutationFinished(Mutation::CreateContainer, targetKey, outcomeFor(reply), error);
+                return;
+            }
+
+            const QJsonObject object = QJsonDocument::fromJson(body).object();
+            const QString id = object.value(QStringLiteral("Id")).toString();
+            const QString warning = object.value(QStringLiteral("Warnings")).toString();
+            if (!warning.isEmpty()) {
+                qCWarning(kontainerBackend) << "container create warning:" << warning;
+            }
+            if (id.isEmpty()) {
+                // 201 却没有 id：当成不可读响应，别让界面以为创建成功了
+                emitMutationFinished(Mutation::CreateContainer,
+                                     targetKey,
+                                     MutationOutcome::Failed,
+                                     DockerError(DockerError::Kind::InvalidResponse, QStringLiteral("create response has no Id")));
+                return;
+            }
+            Q_EMIT containerCreated(id, warning);
+            emitMutationFinished(Mutation::CreateContainer, targetKey, MutationOutcome::Succeeded, DockerError());
+        });
+    });
 }
 
 void DockerBackend::createVolume(const QString &name, const QString &driver, const QList<QPair<QString, QString>> &labels)

@@ -106,7 +106,16 @@ public:
     void refreshImages() override;
     void refreshNetworks() override;
     void refreshVolumes(bool includeUsage = true) override;
+    void createContainer(const Kontainer::ContainerCreateRequest &request) override;
     void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) override;
+
+    /*! 最近一次创建容器的请求（断言表单字段真的传下去了）。 */
+    ContainerCreateRequest lastContainerCreate() const
+    {
+        return m_lastContainerCreate;
+    }
+    /*! 让"创建成功"的 id 回来（真实后端在响应里拿到它，再经 containerCreated 发出）。 */
+    void completeContainerCreate(const QString &id, const QString &warning = {});
     void removeVolume(const QString &name) override;
     void pruneVolumes() override;
 
@@ -261,6 +270,7 @@ private:
     int m_pruneCalls = 0;
     NetworkCreateRequest m_lastNetworkCreate;
     QString m_lastRemovedNetwork;
+    ContainerCreateRequest m_lastContainerCreate;
     QPair<QString, QString> m_lastNetworkConnect;
     QStringList m_lastNetworkConnectAliases;
     QPair<QString, QString> m_lastNetworkDisconnect;

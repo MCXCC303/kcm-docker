@@ -94,6 +94,16 @@ inline QString networks()
 }
 
 /*!
+ * 创建容器（`POST /containers/create`，ARCH_V5_V8 §4.6）。
+ *
+ * 注意：容器名是 **query 参数**（`?name=`），不在请求体里。
+ */
+inline QString containerCreate()
+{
+    return QStringLiteral("/containers/create");
+}
+
+/*!
  * 数据卷列表（`GET /volumes`，ARCH_V5_V8 §3.5）。
  *
  * 载荷是**对象**（`{Volumes, Warnings}`），与 `/networks` 的数组不同（实测）。
