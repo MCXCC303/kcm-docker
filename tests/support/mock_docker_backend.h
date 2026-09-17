@@ -113,6 +113,22 @@ public:
     void pullImage(const QString &reference, const Kontainer::RegistryCredential &credential = {}) override;
     void createNetwork(const Kontainer::NetworkCreateRequest &request) override;
     void removeNetwork(const QString &id) override;
+    void connectNetwork(const QString &networkId, const QString &containerId, const QStringList &aliases = {}) override;
+    void disconnectNetwork(const QString &networkId, const QString &containerId, bool force = false) override;
+
+    /*! 最近一次连接/断开请求（断言参数传递）。 */
+    QPair<QString, QString> lastNetworkConnect() const
+    {
+        return m_lastNetworkConnect;
+    }
+    QStringList lastNetworkConnectAliases() const
+    {
+        return m_lastNetworkConnectAliases;
+    }
+    QPair<QString, QString> lastNetworkDisconnect() const
+    {
+        return m_lastNetworkDisconnect;
+    }
     void cancelImagePull(const QString &reference) override;
     void cancelAllImagePulls() override;
     void removeImage(const QString &id, bool force) override;
@@ -206,6 +222,9 @@ private:
     QList<Network> m_networks;
     NetworkCreateRequest m_lastNetworkCreate;
     QString m_lastRemovedNetwork;
+    QPair<QString, QString> m_lastNetworkConnect;
+    QStringList m_lastNetworkConnectAliases;
+    QPair<QString, QString> m_lastNetworkDisconnect;
     StorageUsage m_storageUsage;
     ContainerDetail m_containerDetail;
     ImageDetail m_imageDetail;

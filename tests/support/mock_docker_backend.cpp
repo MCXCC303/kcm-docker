@@ -232,6 +232,21 @@ void MockDockerBackend::removeNetwork(const QString &id)
     m_mutationCalls.append({Mutation::RemoveNetwork, OperationTarget::network(id), false});
 }
 
+void MockDockerBackend::connectNetwork(const QString &networkId, const QString &containerId, const QStringList &aliases)
+{
+    m_lastNetworkConnect = {networkId, containerId};
+    m_lastNetworkConnectAliases = aliases;
+    // 目标键与真实后端一致（网络 + 容器）：控制器据此找到要重读的容器
+    m_mutationCalls.append({Mutation::ConnectNetwork, OperationTarget::network(networkId) + QLatin1Char('/') + containerId, false});
+}
+
+void MockDockerBackend::disconnectNetwork(const QString &networkId, const QString &containerId, bool force)
+{
+    Q_UNUSED(force);
+    m_lastNetworkDisconnect = {networkId, containerId};
+    m_mutationCalls.append({Mutation::DisconnectNetwork, OperationTarget::network(networkId) + QLatin1Char('/') + containerId, false});
+}
+
 void MockDockerBackend::cancelImagePull(const QString &reference)
 {
     m_cancelledPulls.append(reference);

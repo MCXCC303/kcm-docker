@@ -61,6 +61,7 @@ private Q_SLOTS:
     void createNetworkValidatesInput();
     void createNetworkRefreshesAndReports();
     void removeNetworkIsGatedAndTracked();
+    void connectAndDisconnectContainerToNetwork();
     void invalidReferenceIsRejectedBeforeBackend();
 
 private:
@@ -468,6 +469,43 @@ void OperationControllerTest::removeNetworkIsGatedAndTracked()
     m_operations->removeNetwork(id, QStringLiteral("app_net"));
     QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
     QVERIFY(!m_operations->resultText().isEmpty());
+}
+
+/*!
+ * 容器连接/断开网络（ARCH_V5_V8 §3.4）：参数传递、别名解析与写后即读。
+ */
+void OperationControllerTest::connectAndDisconnectContainerToNetwork()
+{
+    const QString networkId = QString(64, QLatin1Char('n'));
+    const QString containerId = QString(64, QLatin1Char('c'));
+    QSignalSpy networksSpy(m_operations, &OperationController::networksChanged);
+    QSignalSpy containerSpy(m_operations, &OperationController::containerStateChanged);
+
+    // 别名是逗号分隔的输入框内容：空白要去掉、空项要丢掉
+    QVERIFY(m_operations->connectContainerToNetwork(networkId, containerId, QStringLiteral(" app , api ,, ")));
+    QCOMPARE(m_backend->lastNetworkConnect().first, networkId);
+    QCOMPARE(m_backend->lastNetworkConnect().second, containerId);
+    QCOMPARE(m_backend->lastNetworkConnectAliases(), QStringList({QStringLiteral("app"), QStringLiteral("api")}));
+
+    m_backend->completeMutations(DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(networksSpy.count(), 1);
+    QCOMPARE(containerSpy.count(), 1);
+    QCOMPARE(containerSpy.at(0).at(0).toString(), containerId);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("connected")), qPrintable(m_operations->resultText()));
+
+    // 断开：force 关闭（界面不给"强制"选项）
+    QVERIFY(m_operations->disconnectContainerFromNetwork(networkId, containerId));
+    QCOMPARE(m_backend->lastNetworkDisconnect().first, networkId);
+    QCOMPARE(m_backend->lastNetworkDisconnect().second, containerId);
+    m_backend->completeMutations(DockerBackendInterface::MutationOutcome::Succeeded);
+    QCOMPARE(networksSpy.count(), 2);
+
+    // 缺参数：不发请求，给出明确结果
+    const int callsBefore = m_backend->mutationCalls().size();
+    QVERIFY(!m_operations->connectContainerToNetwork(QString(), containerId));
+    QVERIFY(!m_operations->disconnectContainerFromNetwork(networkId, QString()));
+    QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
+    QCOMPARE(m_operations->resultDetailText(), QStringLiteral("missingTarget"));
 }
 
 void OperationControllerTest::cancelTargetsOnePull()

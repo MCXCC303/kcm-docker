@@ -141,6 +141,16 @@ public:
     /*! 删除网络（内置网络会被 daemon 拒绝，界面不提供入口）。 */
     Q_INVOKABLE void removeNetwork(const QString &id, const QString &name = {});
 
+    /*!
+     * 把容器连接到网络（ARCH_V5_V8 §3.4）。
+     *
+     * `aliases` 是逗号分隔的别名（界面上的单个输入框）：别名让同网络内的其它容器
+     * 用名字互访，比 IP 稳定。为空则不传 `EndpointConfig`。
+     */
+    Q_INVOKABLE bool connectContainerToNetwork(const QString &networkId, const QString &containerId, const QString &aliases = {});
+    /*! 把容器从网络断开（`force` 默认关闭：不强断正在使用的网络）。 */
+    Q_INVOKABLE bool disconnectContainerFromNetwork(const QString &networkId, const QString &containerId);
+
     /*! 关掉结果提示（用户已读）。 */
     Q_INVOKABLE void dismissResult();
 

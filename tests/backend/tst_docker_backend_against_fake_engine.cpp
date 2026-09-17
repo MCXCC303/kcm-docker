@@ -455,6 +455,7 @@ private Q_SLOTS:
     void pullSendsCredentialsOnlyWhenPresent();
     void networksAreListedFromTheEngine();
     void networkCreateSendsJsonBodyAndRemoveUsesDelete();
+    void networkConnectAndDisconnectSendTheContainer();
     void logStreamDemultiplexesAndEnds();
     void logStreamReportsEngineFailures();
     void logStreamCancelIsNotAnError();
@@ -1388,6 +1389,44 @@ void DockerBackendFakeEngineTest::networkCreateSendsJsonBodyAndRemoveUsesDelete(
     const FakeEngine::RequestRecord removed = m_engine->lastRequest();
     QCOMPARE(removed.method, QStringLiteral("DELETE"));
     QCOMPARE(removed.path, QStringLiteral("/v1.56/networks/abc123"));
+}
+
+/*!
+ * 容器与网络的连接/断开（ARCH_V5_V8 §3.4）：都是带 JSON 体的 POST。
+ */
+void DockerBackendFakeEngineTest::networkConnectAndDisconnectSendTheContainer()
+{
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    m_engine->setPathStatus(QStringLiteral("/networks/net1/connect"), 200, QByteArrayLiteral("{}"));
+    m_engine->setPathStatus(QStringLiteral("/networks/net1/disconnect"), 200, QByteArrayLiteral("{}"));
+
+    QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
+
+    backend.connectNetwork(QStringLiteral("net1"), QStringLiteral("cid-1"), {QStringLiteral("app"), QStringLiteral(" api ")});
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
+    QCOMPARE(finishedSpy.at(0).at(0).value<DockerBackendInterface::Mutation>(),
+             DockerBackendInterface::Mutation::ConnectNetwork);
+
+    const FakeEngine::RequestRecord connected = m_engine->lastRequest();
+    QCOMPARE(connected.method, QStringLiteral("POST"));
+    QCOMPARE(connected.path, QStringLiteral("/v1.56/networks/net1/connect"));
+    const QJsonObject connectBody = QJsonDocument::fromJson(connected.body).object();
+    QCOMPARE(connectBody.value(QStringLiteral("Container")).toString(), QStringLiteral("cid-1"));
+    const QJsonArray aliases = connectBody.value(QStringLiteral("EndpointConfig")).toObject().value(QStringLiteral("Aliases")).toArray();
+    QCOMPARE(aliases.size(), 2);
+    QCOMPARE(aliases.at(0).toString(), QStringLiteral("app"));
+    QCOMPARE(aliases.at(1).toString(), QStringLiteral("api")); // trim 过
+
+    backend.disconnectNetwork(QStringLiteral("net1"), QStringLiteral("cid-1"));
+    QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);
+    const FakeEngine::RequestRecord disconnected = m_engine->lastRequest();
+    QCOMPARE(disconnected.method, QStringLiteral("POST"));
+    QCOMPARE(disconnected.path, QStringLiteral("/v1.56/networks/net1/disconnect"));
+    const QJsonObject disconnectBody = QJsonDocument::fromJson(disconnected.body).object();
+    QCOMPARE(disconnectBody.value(QStringLiteral("Container")).toString(), QStringLiteral("cid-1"));
+    // force 默认关闭：不强断正在使用的网络
+    QVERIFY(!disconnectBody.value(QStringLiteral("Force")).toBool());
 }
 
 QTEST_GUILESS_MAIN(DockerBackendFakeEngineTest)

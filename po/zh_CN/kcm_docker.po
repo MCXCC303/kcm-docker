@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.5.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 03:46+0800\n"
+"POT-Creation-Date: 2026-09-18 04:05+0800\n"
 "PO-Revision-Date: 2026-09-18 02:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -184,12 +184,16 @@ msgstr "仅本机 Docker socket 支持管理容器与镜像。"
 #: src/model/operation_controller.cpp:290
 #: src/model/operation_controller.cpp:394
 #: src/model/operation_controller.cpp:436
+#: src/model/operation_controller.cpp:464
+#: src/model/operation_controller.cpp:503
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr "Kontainer 处于只读模式，因此未执行%1。"
 
 #: src/model/operation_controller.cpp:192
 #: src/model/operation_controller.cpp:418
 #: src/model/operation_controller.cpp:444
+#: src/model/operation_controller.cpp:482
+#: src/model/operation_controller.cpp:512
 msgid "Another operation on this object is still running."
 msgstr "该对象上仍有操作在进行中。"
 
@@ -245,70 +249,97 @@ msgstr "创建网络"
 msgid "removing the network"
 msgstr "删除网络"
 
-#: src/model/operation_controller.cpp:529
+#: src/model/operation_controller.cpp:458
+msgid ""
+"The container was not connected because a network or container was missing."
+msgstr "容器未连接：缺少网络或容器。"
+
+#: src/model/operation_controller.cpp:464
+msgid "connecting the container to the network"
+msgstr "把容器连接到网络"
+
+#: src/model/operation_controller.cpp:497
+msgid ""
+"The container was not disconnected because a network or container was "
+"missing."
+msgstr "容器未断开：缺少网络或容器。"
+
+#: src/model/operation_controller.cpp:503
+msgid "disconnecting the container from the network"
+msgstr "把容器从网络断开"
+
+#: src/model/operation_controller.cpp:598
 msgid "removing the image"
 msgstr "删除镜像"
 
-#: src/model/operation_controller.cpp:610
+#: src/model/operation_controller.cpp:679
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr "已取消镜像拉取。"
 
-#: src/model/operation_controller.cpp:610
+#: src/model/operation_controller.cpp:679
 msgid "Operation cancelled."
 msgstr "已取消操作。"
 
-#: src/model/operation_controller.cpp:671
+#: src/model/operation_controller.cpp:750
 msgid "Container started."
 msgstr "容器已启动。"
 
-#: src/model/operation_controller.cpp:673
+#: src/model/operation_controller.cpp:752
 msgid "Container stopped."
 msgstr "容器已停止。"
 
-#: src/model/operation_controller.cpp:675
+#: src/model/operation_controller.cpp:754
 msgid "Container restarted."
 msgstr "容器已重启。"
 
-#: src/model/operation_controller.cpp:677
+#: src/model/operation_controller.cpp:756
 msgid "Container removed."
 msgstr "容器已删除。"
 
-#: src/model/operation_controller.cpp:680
+#: src/model/operation_controller.cpp:759
 msgid "Image pulled: %1"
 msgstr "已拉取镜像：%1"
 
-#: src/model/operation_controller.cpp:683
+#: src/model/operation_controller.cpp:762
 msgid "Image removed."
 msgstr "镜像已删除。"
 
-#: src/model/operation_controller.cpp:686
+#: src/model/operation_controller.cpp:765
 msgid "Network created: %1"
 msgstr "网络已创建：%1"
 
-#: src/model/operation_controller.cpp:689
+#: src/model/operation_controller.cpp:768
 msgid "Network removed."
 msgstr "网络已删除。"
 
-#: src/model/operation_controller.cpp:691
+#: src/model/operation_controller.cpp:770
+msgid "Container connected to the network."
+msgstr "容器已连接到网络。"
+
+#: src/model/operation_controller.cpp:772
+msgid "Container disconnected from the network."
+msgstr "容器已从网络断开。"
+
+#: src/model/operation_controller.cpp:774
 msgid "Done."
 msgstr "完成。"
 
-#: src/model/operation_controller.cpp:699
+#: src/model/operation_controller.cpp:782
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr "%1 Docker 守护进程可能无法访问镜像仓库（网络、代理或 IPv6 路由问题）。"
 
-#: src/model/operation_controller.cpp:709
+#: src/model/operation_controller.cpp:792
 msgid "The container is already running."
 msgstr "容器已经在运行。"
 
-#: src/model/operation_controller.cpp:711
+#: src/model/operation_controller.cpp:794
 msgid "The container is already stopped."
 msgstr "容器已经停止。"
 
-#: src/model/operation_controller.cpp:713
+#: src/model/operation_controller.cpp:796
 msgid "Nothing to do: the object is already in the requested state."
 msgstr "无需操作：对象已处于目标状态。"
 
@@ -723,7 +754,8 @@ msgstr "请填写一个属于该子网的有效网关地址。"
 msgid ""
 "Only bridge networks can be created here. Use the docker CLI for overlay, "
 "macvlan or ipvlan."
-msgstr "这里只能创建 bridge 网络。overlay、macvlan 或 ipvlan 请用 docker 命令行创建。"
+msgstr ""
+"这里只能创建 bridge 网络。overlay、macvlan 或 ipvlan 请用 docker 命令行创建。"
 
 #: src/ui/components/CreateNetworkDialog.qml:136
 #: src/ui/components/CreateNetworkDialog.qml:137

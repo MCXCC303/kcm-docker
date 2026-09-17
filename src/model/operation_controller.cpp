@@ -451,6 +451,75 @@ void OperationController::removeNetwork(const QString &id, const QString &name)
     m_backend->removeNetwork(id);
 }
 
+bool OperationController::connectContainerToNetwork(const QString &networkId, const QString &containerId, const QString &aliases)
+{
+    if (networkId.isEmpty() || containerId.isEmpty()) {
+        setResult(Result::Error,
+                  i18n("The container was not connected because a network or container was missing."),
+                  QStringLiteral("missingTarget"));
+        return false;
+    }
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("connecting the container to the network")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+
+    QStringList aliasList;
+    const QStringList parts = aliases.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    for (const QString &part : parts) {
+        const QString trimmed = part.trimmed();
+        if (!trimmed.isEmpty()) {
+            aliasList.append(trimmed);
+        }
+    }
+
+    const QString targetKey = OperationTarget::network(networkId) + QLatin1Char('/') + containerId;
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+
+    beginOperation(Mutation::ConnectNetwork, targetKey);
+    m_backend->connectNetwork(networkId, containerId, aliasList);
+    return true;
+}
+
+bool OperationController::disconnectContainerFromNetwork(const QString &networkId, const QString &containerId)
+{
+    if (networkId.isEmpty() || containerId.isEmpty()) {
+        setResult(Result::Error,
+                  i18n("The container was not disconnected because a network or container was missing."),
+                  QStringLiteral("missingTarget"));
+        return false;
+    }
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("disconnecting the container from the network")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return false;
+    }
+
+    const QString targetKey = OperationTarget::network(networkId) + QLatin1Char('/') + containerId;
+    if (isTargetBusy(targetKey)) {
+        setResult(Result::Error,
+                  i18n("Another operation on this object is still running."),
+                  QString(),
+                  DockerError(DockerError::Kind::PreconditionFailed));
+        return false;
+    }
+
+    beginOperation(Mutation::DisconnectNetwork, targetKey);
+    m_backend->disconnectNetwork(networkId, containerId);
+    return true;
+}
+
 void OperationController::cancelPull(const QString &reference)
 {
     const QString normalized = ImageReference::normalized(reference);
@@ -661,6 +730,16 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         m_backend->refreshContainers();
         Q_EMIT networksChanged();
         break;
+    case Mutation::ConnectNetwork:
+    case Mutation::DisconnectNetwork: {
+        // 网络成员列表与容器详情的网络分区都会变：两边都重读
+        const QString containerId = targetKey.section(QLatin1Char('/'), 1);
+        m_backend->refreshNetworks();
+        m_backend->refreshContainers();
+        Q_EMIT networksChanged();
+        Q_EMIT containerStateChanged(containerId);
+        break;
+    }
     }
 }
 
@@ -687,6 +766,10 @@ QString OperationController::successText(Mutation mutation, const QString &targe
     }
     case Mutation::RemoveNetwork:
         return i18n("Network removed.");
+    case Mutation::ConnectNetwork:
+        return i18n("Container connected to the network.");
+    case Mutation::DisconnectNetwork:
+        return i18n("Container disconnected from the network.");
     }
     return i18n("Done.");
 }

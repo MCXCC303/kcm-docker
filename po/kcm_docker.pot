@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 03:46+0800\n"
+"POT-Creation-Date: 2026-09-18 04:05+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -186,12 +186,16 @@ msgstr ""
 #: src/model/operation_controller.cpp:290
 #: src/model/operation_controller.cpp:394
 #: src/model/operation_controller.cpp:436
+#: src/model/operation_controller.cpp:464
+#: src/model/operation_controller.cpp:503
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr ""
 
 #: src/model/operation_controller.cpp:192
 #: src/model/operation_controller.cpp:418
 #: src/model/operation_controller.cpp:444
+#: src/model/operation_controller.cpp:482
+#: src/model/operation_controller.cpp:512
 msgid "Another operation on this object is still running."
 msgstr ""
 
@@ -247,70 +251,97 @@ msgstr ""
 msgid "removing the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:529
+#: src/model/operation_controller.cpp:458
+msgid ""
+"The container was not connected because a network or container was missing."
+msgstr ""
+
+#: src/model/operation_controller.cpp:464
+msgid "connecting the container to the network"
+msgstr ""
+
+#: src/model/operation_controller.cpp:497
+msgid ""
+"The container was not disconnected because a network or container was "
+"missing."
+msgstr ""
+
+#: src/model/operation_controller.cpp:503
+msgid "disconnecting the container from the network"
+msgstr ""
+
+#: src/model/operation_controller.cpp:598
 msgid "removing the image"
 msgstr ""
 
-#: src/model/operation_controller.cpp:610
+#: src/model/operation_controller.cpp:679
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:610
+#: src/model/operation_controller.cpp:679
 msgid "Operation cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:671
+#: src/model/operation_controller.cpp:750
 msgid "Container started."
 msgstr ""
 
-#: src/model/operation_controller.cpp:673
+#: src/model/operation_controller.cpp:752
 msgid "Container stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:675
+#: src/model/operation_controller.cpp:754
 msgid "Container restarted."
 msgstr ""
 
-#: src/model/operation_controller.cpp:677
+#: src/model/operation_controller.cpp:756
 msgid "Container removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:680
+#: src/model/operation_controller.cpp:759
 msgid "Image pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:683
+#: src/model/operation_controller.cpp:762
 msgid "Image removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:686
+#: src/model/operation_controller.cpp:765
 msgid "Network created: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:689
+#: src/model/operation_controller.cpp:768
 msgid "Network removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:691
+#: src/model/operation_controller.cpp:770
+msgid "Container connected to the network."
+msgstr ""
+
+#: src/model/operation_controller.cpp:772
+msgid "Container disconnected from the network."
+msgstr ""
+
+#: src/model/operation_controller.cpp:774
 msgid "Done."
 msgstr ""
 
-#: src/model/operation_controller.cpp:699
+#: src/model/operation_controller.cpp:782
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr ""
 
-#: src/model/operation_controller.cpp:709
+#: src/model/operation_controller.cpp:792
 msgid "The container is already running."
 msgstr ""
 
-#: src/model/operation_controller.cpp:711
+#: src/model/operation_controller.cpp:794
 msgid "The container is already stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:713
+#: src/model/operation_controller.cpp:796
 msgid "Nothing to do: the object is already in the requested state."
 msgstr ""
 

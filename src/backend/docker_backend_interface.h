@@ -85,9 +85,11 @@ public:
         RemoveContainer,
         PullImage,
         RemoveImage,
-        /*! 六期：创建 / 删除网络（§3.3）。语义化命名，界面文案不拼动词。 */
+        /*! 六期：创建 / 删除网络（§3.3）与连接 / 断开容器（§3.4）。 */
         CreateNetwork,
         RemoveNetwork,
+        ConnectNetwork,
+        DisconnectNetwork,
     };
     Q_ENUM(Mutation)
 
@@ -186,6 +188,21 @@ public:
     virtual void createNetwork(const Kontainer::NetworkCreateRequest &request) = 0;
     /*! 删除网络（`DELETE /networks/{id}`）。内置网络由 daemon 拒绝（403）。 */
     virtual void removeNetwork(const QString &id) = 0;
+
+    /*!
+     * 把容器连接到网络（`POST /networks/{id}/connect`，§3.4）。
+     *
+     * `aliases` 是这个容器在该网络里的别名（Docker 的 `EndpointConfig.Aliases`）：
+     * 同一网络里的其它容器可以用别名互相访问，比 IP 稳定。
+     */
+    virtual void connectNetwork(const QString &networkId, const QString &containerId, const QStringList &aliases = {}) = 0;
+    /*!
+     * 把容器从网络断开（`POST /networks/{id}/disconnect`，§3.4）。
+     *
+     * `force` 默认关闭：daemon 只在容器正在运行时才需要它，而"悄悄强制断开"
+     * 不是我们想要的默认行为。
+     */
+    virtual void disconnectNetwork(const QString &networkId, const QString &containerId, bool force = false) = 0;
 
     /*!
      * 日志流为什么结束（ARCH_V5_V8 §3.1.4）。

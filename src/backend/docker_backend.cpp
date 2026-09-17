@@ -7,6 +7,7 @@
 
 #include "backend/docker_api_paths.h"
 
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 
@@ -715,6 +716,10 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "create-network";
     case DockerBackendInterface::Mutation::RemoveNetwork:
         return "remove-network";
+    case DockerBackendInterface::Mutation::ConnectNetwork:
+        return "connect-network";
+    case DockerBackendInterface::Mutation::DisconnectNetwork:
+        return "disconnect-network";
     }
     return "mutation";
 }
@@ -1098,6 +1103,64 @@ void DockerBackend::removeNetwork(const QString &id)
             const DockerError error = reply->error();
             reply->deleteLater();
             emitMutationFinished(Mutation::RemoveNetwork, targetKey, outcomeFor(reply), error);
+        });
+    });
+}
+
+void DockerBackend::connectNetwork(const QString &networkId, const QString &containerId, const QStringList &aliases)
+{
+    // 目标键是"网络 + 容器"：同一个网络上的不同容器可以并发连接
+    const QString targetKey = OperationTarget::network(networkId) + QLatin1Char('/') + containerId;
+
+    runMutation(Mutation::ConnectNetwork, targetKey, [this, networkId, containerId, aliases, targetKey] {
+        QJsonObject endpoint;
+        if (!aliases.isEmpty()) {
+            QJsonArray aliasArray;
+            for (const QString &alias : aliases) {
+                const QString trimmed = alias.trimmed();
+                if (!trimmed.isEmpty()) {
+                    aliasArray.append(trimmed);
+                }
+            }
+            endpoint.insert(QStringLiteral("Aliases"), aliasArray);
+        }
+        QJsonObject payload;
+        payload.insert(QStringLiteral("Container"), containerId);
+        if (!endpoint.isEmpty()) {
+            payload.insert(QStringLiteral("EndpointConfig"), endpoint);
+        }
+
+        DockerReply *reply = m_client.post(ApiPaths::networkConnect(networkId),
+                                           QUrlQuery(),
+                                           mutationTimeoutMs(),
+                                           {},
+                                           QJsonDocument(payload).toJson(QJsonDocument::Compact));
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerError error = reply->error();
+            reply->deleteLater();
+            emitMutationFinished(Mutation::ConnectNetwork, targetKey, outcomeFor(reply), error);
+        });
+    });
+}
+
+void DockerBackend::disconnectNetwork(const QString &networkId, const QString &containerId, bool force)
+{
+    const QString targetKey = OperationTarget::network(networkId) + QLatin1Char('/') + containerId;
+
+    runMutation(Mutation::DisconnectNetwork, targetKey, [this, networkId, containerId, force, targetKey] {
+        QJsonObject payload;
+        payload.insert(QStringLiteral("Container"), containerId);
+        payload.insert(QStringLiteral("Force"), force);
+
+        DockerReply *reply = m_client.post(ApiPaths::networkDisconnect(networkId),
+                                           QUrlQuery(),
+                                           mutationTimeoutMs(),
+                                           {},
+                                           QJsonDocument(payload).toJson(QJsonDocument::Compact));
+        connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
+            const DockerError error = reply->error();
+            reply->deleteLater();
+            emitMutationFinished(Mutation::DisconnectNetwork, targetKey, outcomeFor(reply), error);
         });
     });
 }
