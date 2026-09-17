@@ -1104,10 +1104,26 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     QCOMPARE(containerChips, 3);
     QCOMPARE(hostChips, 3);
 
-    // 连线层是装饰：必须对可访问性隐藏（键盘与屏幕阅读器不依赖它）
+    // 连线层只是装饰（QML 里标了 Accessible.ignored）：这里断言「信息不在图形里」——
+    // 每行的两侧芯片都必须是真实文本，屏幕阅读器与键盘用户完全不依赖连线
     QQuickItem *links = childByObjectName(page, QStringLiteral("portTopologyLinks"));
     QVERIFY2(links, "link layer not found");
-    QVERIFY2(links->property("Accessible\.ignored").toBool() || links->property("visible").toBool(), "link layer must exist and stay decorative");
+    QCOMPARE(links->width(), topology->width());
+    QCOMPARE(links->height(), topology->height());
+
+    int nonEmptyChips = 0;
+    std::function<void(QQuickItem *)> checkText = [&](QQuickItem *item) {
+        for (QQuickItem *child : item->childItems()) {
+            const QString name = child->objectName();
+            if ((name == QLatin1String("portContainerChip") || name == QLatin1String("portHostChip"))
+                && !child->property("text").toString().isEmpty()) {
+                ++nonEmptyChips;
+            }
+            checkText(child);
+        }
+    };
+    checkText(topology);
+    QCOMPARE(nonEmptyChips, 6);
 }
 
 /*!

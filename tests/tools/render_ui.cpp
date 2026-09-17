@@ -37,6 +37,8 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWindow>
+#include <QFile>
+#include <QTemporaryDir>
 #include <QTimer>
 #include <QtGlobal>
 
@@ -61,7 +63,7 @@ void fillFixture(MockDockerBackend &backend)
     engine.osType = QStringLiteral("linux");
     engine.architecture = QStringLiteral("x86_64");
     engine.kernelVersion = QStringLiteral("6.17.4-arch1-1");
-    engine.engineName = QStringLiteral("unix:///run/docker.sock");
+    engine.engineName = QStringLiteral("workstation");
     engine.operatingSystem = QStringLiteral("Arch Linux");
     engine.cgroupVersion = QStringLiteral("2");
     engine.storageDriver = QStringLiteral("overlayfs");
@@ -316,6 +318,19 @@ int main(int argc, char **argv)
 
     auto backend = std::make_unique<MockDockerBackend>();
     fillFixture(*backend);
+    // 截图要能看到四期的写入口：把 endpoint 指向一个当前进程可写的临时 socket 文件，
+    // 权限门（DockerCapabilities）才会放行。不连接它，只是让判定为「可写」。
+    QTemporaryDir socketDir;
+    const QString socketPath = socketDir.path() + QStringLiteral("/docker.sock");
+    {
+        QFile socketFile(socketPath);
+        if (socketFile.open(QIODevice::WriteOnly)) {
+            socketFile.write("x");
+            socketFile.close();
+        }
+        QFile::setPermissions(socketPath, QFile::ReadOwner | QFile::WriteOwner);
+    }
+    backend->setEndpoint(DockerEndpoint::unixSocket(socketPath));
     auto stub = std::make_unique<QmlStubKcm>(backend.get());
 
     QQmlEngine engine;

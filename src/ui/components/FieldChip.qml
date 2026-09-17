@@ -25,8 +25,12 @@ import org.kde.kirigami as Kirigami
 Kirigami.Badge {
     id: chip
 
-    /*! 芯片文本（通常是数据，例如容器端口或挂载类型）。 */
-    required property string text
+    /*!
+        芯片文本由基类（`Kirigami.Badge` → `Label`）的 `text` 承载。
+        不要在这里重新声明 `property string text`：那会遮蔽基类属性，
+        内部渲染用的仍是基类那个（空）属性，结果是一枚没有文字的圆形徽标——
+        属性读出来是对的，屏幕上却是错的。
+    */
 
     /*! 弱化显示：用于「未发布」这类补充信息，避免抢走注意。 */
     property bool muted: false

@@ -4,20 +4,29 @@
 """最小假 Docker Engine —— 仅用于 UI 开发/验证，不属于产品代码。
 
 用途：在没有 Docker（或不想触碰真实 daemon）的情况下验证 KCM 的
-Loading / Empty / Error 状态。只实现一期用到的只读 GET 端点：
+Loading / Empty / Error 状态，以及四期的写操作界面（启动 / 停止 / 重启 / 删除、
+镜像拉取与删除）。实现的端点：
 
-    GET /_ping
-    GET /version
-    GET /info            (以及 /v1.xx/info)
-    GET /containers/json (以及 /v1.xx/containers/json)
-    GET /images/json     (以及 /v1.xx/images/json)
+    GET    /_ping
+    GET    /version
+    GET    /info                  (以及 /v1.xx/info)
+    GET    /containers/json
+    GET    /images/json
+    GET    /system/df
+    GET    /containers/{id}/json
+    GET    /containers/{id}/stats
+    POST   /containers/{id}/start | stop | restart
+    DELETE /containers/{id}
+    POST   /images/create         (chunked 进度流)
+    DELETE /images/{name}
 
 用法：
     tests/tools/fake_docker_server.py /tmp/fake-docker.sock [--empty] [--api-version 1.56]
 
     DOCKER_HOST=unix:///tmp/fake-docker.sock kcmshell6 kcm_docker
 
-本脚本只读，绝不修改任何 Docker 状态。
+状态只存在于**本进程内存**里（启动 / 删除会真的改变列表，便于观察界面刷新），
+绝不触碰任何真实 Docker 资源。socket 权限是 0600，因此写权限门会放行。
 """
 
 from __future__ import annotations
@@ -72,7 +81,22 @@ IMAGES = [
 ]
 
 
+PULL_LINES = [
+    {"status": "Pulling from library/hello-world"},
+    {"status": "Downloading", "progressDetail": {"current": 1000, "total": 4000}, "id": "aaa"},
+    {"status": "Downloading", "progressDetail": {"current": 4000, "total": 4000}, "id": "aaa"},
+    {"status": "Pull complete", "id": "aaa"},
+    {"status": "Downloading", "progressDetail": {"current": 500, "total": 2000}, "id": "bbb"},
+    {"status": "Pull complete", "id": "bbb"},
+    {"status": "Status: Downloaded newer image for hello-world:latest"},
+]
+
+
 def make_handler(empty: bool, api_version: str):
+    # 每个进程一份内存状态：写操作真的改动它，界面因此能看到刷新
+    containers = [] if empty else [dict(entry) for entry in CONTAINERS]
+    images = [] if empty else [dict(entry) for entry in IMAGES]
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -109,8 +133,9 @@ def make_handler(empty: bool, api_version: str):
                     }
                 )
             elif path == "/info":
-                containers = [] if empty else CONTAINERS
-                images = [] if empty else IMAGES
+                # 注意：这里不要重新绑定 containers / images，
+                # 否则 do_GET 内部会把它们当成局部变量（UnboundLocalError）；
+                # 计数直接取内存态，写操作之后界面上的数字才会跟着变
                 self._json(
                     {
                         "Name": "fake-engine",
@@ -130,11 +155,105 @@ def make_handler(empty: bool, api_version: str):
                     }
                 )
             elif path == "/containers/json":
-                self._json([] if empty else CONTAINERS)
+                self._json(containers)
             elif path == "/images/json":
-                self._json([] if empty else IMAGES)
+                self._json(images)
             else:
                 self._json({"message": f"fake engine has no endpoint {path}"}, status=404)
+
+        def do_POST(self) -> None:  # noqa: N802 (http.server API)
+            path, _, query = self.path.partition("?")
+            parts = path.split("/")
+            if len(parts) > 1 and parts[1].startswith("v1."):
+                path = "/" + "/".join(parts[2:])
+
+            if path == "/images/create":
+                self._pull_stream(query)
+                return
+
+            if path.startswith("/containers/"):
+                container = self._find_container(path.split("/")[2])
+                if container is None:
+                    self._json({"message": "No such container"}, status=404)
+                    return
+                if path.endswith("/start"):
+                    container["State"] = "running"
+                    container["Status"] = "Up 1 second"
+                    self._send(b"", status=204)
+                    return
+                if path.endswith("/stop"):
+                    container["State"] = "exited"
+                    container["Status"] = "Exited (0) 1 second ago"
+                    self._send(b"", status=204)
+                    return
+                if path.endswith("/restart"):
+                    container["State"] = "running"
+                    container["Status"] = "Up 1 second"
+                    self._send(b"", status=204)
+                    return
+
+            self._json({"message": f"fake engine has no endpoint {path}"}, status=404)
+
+        def do_DELETE(self) -> None:  # noqa: N802 (http.server API)
+            path, _, query = self.path.partition("?")
+            parts = path.split("/")
+            if len(parts) > 1 and parts[1].startswith("v1."):
+                path = "/" + "/".join(parts[2:])
+
+            if path.startswith("/containers/"):
+                container = self._find_container(path.split("/")[2])
+                if container is None:
+                    self._json({"message": "No such container"}, status=404)
+                    return
+                if container["State"] == "running" and "force=true" not in query:
+                    self._json({"message": "You cannot remove a running container"}, status=409)
+                    return
+                containers.remove(container)
+                self._send(b"", status=204)
+                return
+
+            if path.startswith("/images/"):
+                name = "/".join(path.split("/")[2:])
+                for image in list(images):
+                    tags = image.get("RepoTags") or []
+                    if image["Id"] in name or image["Id"].replace("sha256:", "").startswith(name) or name in tags:
+                        images.remove(image)
+                        self._json([{"Deleted": image["Id"]}])
+                        return
+                self._json({"message": "No such image"}, status=404)
+                return
+
+            self._json({"message": f"fake engine has no endpoint {path}"}, status=404)
+
+        @staticmethod
+        def _find_container(identifier: str):
+            for container in containers:
+                if container["Id"] == identifier or container["Id"].startswith(identifier):
+                    return container
+            return None
+
+        def _pull_stream(self, query: str) -> None:
+            """chunked 逐行推送拉取进度（与真实 daemon 的形态一致）。"""
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Transfer-Encoding", "chunked")
+            self.end_headers()
+            for line in PULL_LINES:
+                payload = (json.dumps(line) + "\n").encode()
+                self.wfile.write(b"%x\r\n" % len(payload) + payload + b"\r\n")
+                self.wfile.flush()
+            self.wfile.write(b"0\r\n\r\n")
+            # 拉取成功后镜像列表里真的多一个（界面刷新就能看到）
+            images.append(
+                {
+                    "Id": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                    "RepoTags": ["hello-world:latest"],
+                    "RepoDigests": ["hello-world@sha256:eeee"],
+                    "Size": 20000,
+                    "Created": 1789500000,
+                    "Containers": 0,
+                }
+            )
 
         def log_message(self, *args: object) -> None:  # 静默
             return

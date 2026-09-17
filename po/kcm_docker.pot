@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-17 16:52+0800\n"
+"POT-Creation-Date: 2026-09-17 18:18+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,13 +18,306 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: src/ui/components/StorageBar.qml:46 src/ui/MainPage.qml:61
-#: src/ui/ImageDetail.qml:76
+#: src/model/format.cpp:35
+msgctxt "@info elapsed time just now"
+msgid "less than a minute"
+msgstr ""
+
+#: src/model/format.cpp:38
+msgctxt "@info elapsed time less than one minute"
+msgid "less than a minute"
+msgstr ""
+
+#: src/model/image_detail_controller.cpp:86
+msgid "No image selected."
+msgstr ""
+
+#: src/model/state_text.cpp:17
+msgid "Created"
+msgstr ""
+
+#: src/model/state_text.cpp:19 src/ui/MainPage.qml:422
+msgid "Restarting"
+msgstr ""
+
+#: src/model/state_text.cpp:21 src/ui/MainPage.qml:43 src/ui/MainPage.qml:410
+msgid "Running"
+msgstr ""
+
+#: src/model/state_text.cpp:23
+msgid "Removing"
+msgstr ""
+
+#: src/model/state_text.cpp:25 src/ui/MainPage.qml:49 src/ui/MainPage.qml:414
+msgid "Paused"
+msgstr ""
+
+#: src/model/state_text.cpp:27
+msgid "Exited"
+msgstr ""
+
+#: src/model/state_text.cpp:29 src/ui/MainPage.qml:426
+msgid "Dead"
+msgstr ""
+
+#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:319
+#: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
+#: src/ui/EngineStatusView.qml:42
+msgid "Unknown"
+msgstr ""
+
+#: src/model/state_text.cpp:40
+msgid "No health check"
+msgstr ""
+
+#: src/model/state_text.cpp:42
+msgid "Starting"
+msgstr ""
+
+#: src/model/state_text.cpp:44
+msgid "Healthy"
+msgstr ""
+
+#: src/model/state_text.cpp:46
+msgid "Unhealthy"
+msgstr ""
+
+#: src/model/docker_error_text.cpp:27
+msgid "The container is running. Stop it before deleting it."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:32
+msgid "The image is in use by a container and cannot be deleted."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:35
+msgid ""
+"The image has more than one tag. Force deletion removes all of its tags."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:39
+msgid "The name is already in use."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:41
+msgid "The Docker daemon rejected the request because of the current state."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:52
+msgid "Docker Engine is not reachable."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:54
+msgid "Could not connect to the Docker daemon."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:56
+msgid "Permission denied while accessing the Docker socket."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:58
+msgid "The Docker daemon did not respond in time."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:60
+msgid "This Docker Engine version is not supported by Kontainer."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:62
+msgid ""
+"The object no longer exists. It may have been removed outside Kontainer."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:66
+msgid "The action was not started because a precondition was not met."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:68
+msgid "The Docker daemon rejected the request."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:70
+msgid "The Docker daemon reported an internal error."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:72
+msgid "The Docker daemon returned an unreadable response."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:74
+msgid "The Docker daemon returned unexpected data."
+msgstr ""
+
+#: src/model/docker_error_text.cpp:76
+msgid "Unknown Docker error."
+msgstr ""
+
+#: src/model/operation_controller.cpp:143
+msgid ""
+"The Docker daemon refused the last write operation because of missing "
+"permissions. Kontainer switched to read-only for this session."
+msgstr ""
+
+#: src/model/operation_controller.cpp:145
+msgid ""
+"Kontainer can only read from this Docker socket: the current user is not "
+"allowed to write it. Add the user to the group that owns the socket, or use "
+"a rootless Docker setup."
+msgstr ""
+
+#: src/model/operation_controller.cpp:148
+msgid ""
+"The Docker socket does not exist, so containers and images cannot be managed."
+msgstr ""
+
+#: src/model/operation_controller.cpp:150
+msgid ""
+"Managing containers and images is only available for the local Docker socket."
+msgstr ""
+
+#: src/model/operation_controller.cpp:208
+msgid "Kontainer is in read-only mode, so %1 was not performed."
+msgstr ""
+
+#: src/model/operation_controller.cpp:213
+msgid "Another operation on this object is still running."
+msgstr ""
+
+#: src/model/operation_controller.cpp:262
+msgid "starting the container"
+msgstr ""
+
+#: src/model/operation_controller.cpp:272
+msgid "stopping the container"
+msgstr ""
+
+#: src/model/operation_controller.cpp:282
+msgid "restarting the container"
+msgstr ""
+
+#: src/model/operation_controller.cpp:292
+msgid "removing the container"
+msgstr ""
+
+#: src/model/operation_controller.cpp:303
+msgid "“%1” is not a valid image reference."
+msgstr ""
+
+#: src/model/operation_controller.cpp:310
+msgid "pulling the image"
+msgstr ""
+
+#: src/model/operation_controller.cpp:315
+msgid "An image pull is already running."
+msgstr ""
+
+#: src/model/operation_controller.cpp:340
+msgid "removing the image"
+msgstr ""
+
+#: src/model/operation_controller.cpp:393
+msgid "Image pull cancelled."
+msgstr ""
+
+#: src/model/operation_controller.cpp:393
+msgid "Operation cancelled."
+msgstr ""
+
+#: src/model/operation_controller.cpp:444
+msgid "Container started."
+msgstr ""
+
+#: src/model/operation_controller.cpp:446
+msgid "Container stopped."
+msgstr ""
+
+#: src/model/operation_controller.cpp:448
+msgid "Container restarted."
+msgstr ""
+
+#: src/model/operation_controller.cpp:450
+msgid "Container removed."
+msgstr ""
+
+#: src/model/operation_controller.cpp:453
+msgid "Image pulled: %1"
+msgstr ""
+
+#: src/model/operation_controller.cpp:456
+msgid "Image removed."
+msgstr ""
+
+#: src/model/operation_controller.cpp:458
+msgid "Done."
+msgstr ""
+
+#: src/model/operation_controller.cpp:465
+msgid "The container is already running."
+msgstr ""
+
+#: src/model/operation_controller.cpp:467
+msgid "The container is already stopped."
+msgstr ""
+
+#: src/model/operation_controller.cpp:469
+msgid "Nothing to do: the object is already in the requested state."
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:46
+msgid "The host directory of this mount does not exist."
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:49
+#: src/model/container_detail_controller.cpp:327
+msgid "This mount has no host directory to open."
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:52
+msgid "Could not open the file manager: %1"
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:127
+msgid "No container selected."
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:218
+msgid "IPv6"
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:221
+msgid "Gateway"
+msgstr ""
+
+#: src/model/container_detail_controller.cpp:331
+msgid "Opening host directories is not available in this environment."
+msgstr ""
+
+#: src/ui/components/CollapsibleSection.qml:71
+msgid "hidden by default"
+msgstr ""
+
+#: src/ui/components/CopyButton.qml:37
+msgctxt "@info copy a named field"
+msgid "Copy %1"
+msgstr ""
+
+#: src/ui/components/CopyButton.qml:37
+msgid "Copy"
+msgstr ""
+
+#: src/ui/components/CopyableText.qml:50 src/ui/components/StorageBar.qml:85
+#: src/ui/StorageView.qml:33 src/ui/MainPage.qml:328 src/ui/ResourceView.qml:34
+#: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
+msgid "—"
+msgstr ""
+
+#: src/ui/components/StorageBar.qml:46 src/ui/ImageDetail.qml:100
+#: src/ui/MainPage.qml:61
 msgid "Images"
 msgstr ""
 
-#: src/ui/components/StorageBar.qml:52 src/ui/ContainerDetail.qml:80
-#: src/ui/MainPage.qml:37 src/ui/ImageDetail.qml:328
+#: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:352
+#: src/ui/ContainerDetail.qml:189 src/ui/MainPage.qml:37
 msgid "Containers"
 msgstr ""
 
@@ -34,12 +327,6 @@ msgstr ""
 
 #: src/ui/components/StorageBar.qml:66
 msgid "Build cache"
-msgstr ""
-
-#: src/ui/components/StorageBar.qml:85 src/ui/components/CopyableText.qml:50
-#: src/ui/StorageView.qml:33 src/ui/MainPage.qml:295 src/ui/ResourceView.qml:34
-#: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:96
-msgid "—"
 msgstr ""
 
 #: src/ui/components/StorageBar.qml:92
@@ -56,27 +343,514 @@ msgstr ""
 msgid "Storage usage is not available."
 msgstr ""
 
-#: src/ui/components/CopyButton.qml:37
-msgctxt "@info copy a named field"
-msgid "Copy %1"
+#: src/ui/components/ConfirmDialog.qml:46
+msgid "Continue"
 msgstr ""
 
-#: src/ui/components/CopyButton.qml:37
-msgid "Copy"
+#: src/ui/components/ConfirmDialog.qml:69
+msgid "Cancel"
 msgstr ""
 
-#: src/ui/components/CollapsibleSection.qml:71
-msgid "hidden by default"
+#: src/ui/components/OperationMessage.qml:55 src/ui/main.qml:24
+msgid "Refresh"
+msgstr ""
+
+#: src/ui/components/OperationMessage.qml:64
+msgid "Dismiss"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:46 src/ui/MainPage.qml:509
+msgid "Pull image"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:66
+msgid ""
+"Image reference (for example “alpine:3.19” or “registry.example.com/team/"
+"app”)."
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:77
+msgid "alpine:3.19"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:86
+msgid "This is not a valid image reference."
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:96
+msgid "No tag given, “latest” will be pulled: %1"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:137
+msgid "%1 of %2 layers"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:152
+msgid "Pull"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:161
+msgid "Cancel pull"
+msgstr ""
+
+#: src/ui/components/PullImageDialog.qml:161
+msgid "Close"
+msgstr ""
+
+#: src/ui/ImageCard.qml:45
+msgid "Dangling image %1"
+msgstr ""
+
+#: src/ui/ImageCard.qml:45
+msgid "Image %1"
+msgstr ""
+
+#: src/ui/ImageCard.qml:69
+msgid "<none>:<none> (dangling)"
+msgstr ""
+
+#: src/ui/ImageCard.qml:75
+msgctxt "@info image is used by containers"
+msgid "in use (%1)"
+msgid_plural "in use (%1)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/ImageCard.qml:83
+msgctxt "@info image size, creation time and id"
+msgid "%1 · created %2 ago · ID %3"
+msgstr ""
+
+#: src/ui/ImageCard.qml:92
+msgctxt "@info additional image tags"
+msgid "Tags: %1"
+msgstr ""
+
+#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:112
+#: src/ui/ImageDetail.qml:183
+msgid "image reference"
+msgstr ""
+
+#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:190
+msgid "image ID"
+msgstr ""
+
+#: src/ui/StorageView.qml:40
+msgid "Storage"
+msgstr ""
+
+#: src/ui/StorageView.qml:58
+msgid "Unable to read Docker disk usage: %1"
+msgstr ""
+
+#: src/ui/StorageView.qml:61 src/ui/ImageDetail.qml:139
+#: src/ui/ContainerDetail.qml:231 src/ui/MainPage.qml:265
+msgid "Retry"
+msgstr ""
+
+#: src/ui/StorageView.qml:85
+msgid "Total"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:108
+msgid "Image"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:127
+msgid "Loading image details…"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:136
+msgid "Unable to retrieve image details."
+msgstr ""
+
+#: src/ui/ImageDetail.qml:144 src/ui/ContainerDetail.qml:236 src/ui/main.qml:31
+msgid "Back"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:166
+msgid "Repository:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:168
+msgid "<none> (dangling)"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:169
+msgid "repository"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:173
+msgid "Tag:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:175 src/ui/ImageDetail.qml:182
+msgid "<none>"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:176
+msgid "tag"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:180
+msgid "Full reference:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:187
+msgid "Image ID:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:194 src/ui/ContainerDetail.qml:337
+msgid "Created:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:196 src/ui/ContainerDetail.qml:345
+msgctxt "@info absolute time and relative"
+msgid "%1 (%2 ago)"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:199
+msgid "Size:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:203
+msgid "Architecture:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:208
+msgid "OS:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:213
+msgid "Author:"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:223
+msgid "Tags"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:253
+msgid "Digests"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:297
+msgctxt "@info image layer count"
+msgid "Layers (%1)"
+msgid_plural "Layers (%1)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/ImageDetail.qml:305
+msgid "The Docker API reports layer digests, not per-layer sizes."
+msgstr ""
+
+#: src/ui/ImageDetail.qml:344
+msgid "Show fewer layers"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:344
+msgctxt "@info show all image layers"
+msgid "Show all %1 layers"
+msgid_plural "Show all %1 layers"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/ImageDetail.qml:360
+msgid "No containers use this image."
+msgstr ""
+
+#: src/ui/ImageDetail.qml:404 src/ui/ContainerDetail.qml:448
+msgctxt "@info environment variable count"
+msgid "Environment (%1 variable)"
+msgid_plural "Environment (%1 variables)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/ImageDetail.qml:459
+msgid "Delete all tags…"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:467 src/ui/ImageDetail.qml:484
+#: src/ui/ContainerDetail.qml:163 src/ui/ContainerDetail.qml:809
+msgid "Delete"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:479
+msgid "Delete image tag"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:481
+msgid "Delete the tag “%1”?"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:482
+msgid "Delete the image “%1”?"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:483
+msgid "Only this tag is removed. Layers shared with other images are kept."
+msgstr ""
+
+#: src/ui/ImageDetail.qml:500 src/ui/ImageDetail.qml:503
+msgid "Delete all tags"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:501
+msgid "Delete every tag of this image (%1 tags)?"
+msgstr ""
+
+#: src/ui/ImageDetail.qml:502
+msgid ""
+"All tags of this image are removed. Containers that reference it can no "
+"longer be started."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:55
+msgid "Host"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:74
+msgid "IPv6:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:77
+msgid "Gateway:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:79
+msgid "IPv4:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:117 src/ui/ContainerCard.qml:161
+#: src/ui/ContainerCard.qml:165
+msgid "Start"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:125 src/ui/ContainerCard.qml:174
+#: src/ui/ContainerCard.qml:178
+msgid "Stop"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:133
+msgid "Restart"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:151
+msgid "Stop the container to delete it."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:197 src/ui/ContainerDetail.qml:592
+msgid "Container"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:201
+msgid "container name"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:219
+msgid "Loading container details…"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:228
+msgid "Unable to retrieve container details."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:254
+msgctxt "@title:tab container overview"
+msgid "Overview"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:257
+msgctxt "@title:tab container resources"
+msgid "Resources"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:260
+msgctxt "@title:tab container network"
+msgid "Network"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:263
+msgctxt "@title:tab container mounts"
+msgid "Mounts"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:266
+msgctxt "@title:tab container logs"
+msgid "Logs"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:302
+msgid "State:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:318
+msgid "Status:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:323
+msgid "Image:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:330
+msgid "Container ID:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:333 src/ui/ContainerCard.qml:187
+msgid "container ID"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:343
+msgid "Started:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:349
+msgid "Finished:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:358
+msgid "Runtime"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:368
+msgid "Restart count:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:372
+msgid "Exit code:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:376
+msgid "OOM killed:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:378
+msgid "Yes"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:382
+msgid "Process ID:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:387
+msgid "Restart policy:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:392
+msgid "Platform:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:401
+msgid "Configuration"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:411
+msgid "Entrypoint:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:419
+msgid "Command:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:427
+msgid "Working directory:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:433
+msgid "User:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:438
+msgid "Hostname:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:458
+msgctxt "@info label count"
+msgid "Labels (%1)"
+msgid_plural "Labels (%1)"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/ContainerDetail.qml:495
+msgid "No network information."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:523 src/ui/ResourceView.qml:128
+msgid "Network:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:559
+msgid "MAC:"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:575
+msgid "Port mapping"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:584
+msgid "No published ports."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:601
+msgid "Exposed but not published"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:620
+msgid "%1, exposed but not published to the host"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:642
+msgid "No mounts."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:686
+msgid "mount"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:711
+msgid "Not a directory"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:711
+msgid "Host path missing"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:757
+msgid "Open host folder"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:765
+msgid "host path"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:770
+msgid "container path"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:790
+msgid "Container logs are not available yet."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:791
+msgid ""
+"Streaming logs will be added in a later version. Until then, use the docker "
+"CLI or your container's own log destination."
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:806
+msgid "Delete container"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:807
+msgid "Delete the container “%1”?"
+msgstr ""
+
+#: src/ui/ContainerDetail.qml:808
+msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr ""
 
 #: src/ui/EngineStatusView.qml:28
 msgid "Endpoint:"
-msgstr ""
-
-#: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
-#: src/ui/EngineStatusView.qml:42 src/ui/ContainerDetail.qml:210
-#: src/model/state_text.cpp:33
-msgid "Unknown"
 msgstr ""
 
 #: src/ui/EngineStatusView.qml:34
@@ -119,443 +893,172 @@ msgctxt "@info build identification"
 msgid "Build: %1"
 msgstr ""
 
-#: src/ui/main.qml:24
-msgid "Refresh"
-msgstr ""
-
-#: src/ui/main.qml:31 src/ui/ContainerDetail.qml:127 src/ui/ImageDetail.qml:120
-msgid "Back"
-msgstr ""
-
-#: src/ui/main.qml:44
-msgid "Auto-refresh"
-msgstr ""
-
-#: src/ui/StorageView.qml:40
-msgid "Storage"
-msgstr ""
-
-#: src/ui/StorageView.qml:58
-msgid "Unable to read Docker disk usage: %1"
-msgstr ""
-
-#: src/ui/StorageView.qml:61 src/ui/ContainerDetail.qml:122
-#: src/ui/MainPage.qml:232 src/ui/ImageDetail.qml:115
-msgid "Retry"
-msgstr ""
-
-#: src/ui/StorageView.qml:85
-msgid "Total"
-msgstr ""
-
-#: src/ui/ContainerCard.qml:48
-msgid "Container %1, %2"
-msgstr ""
-
-#: src/ui/ContainerCard.qml:116
-msgctxt "@info container status line"
-msgid "%1 · created %2 ago · ID %3"
-msgstr ""
-
-#: src/ui/ContainerCard.qml:125
-msgctxt "@info published container ports"
-msgid "Ports: %1"
-msgstr ""
-
-#: src/ui/ContainerCard.qml:136 src/ui/ContainerDetail.qml:224
-msgid "container ID"
-msgstr ""
-
-#: src/ui/ImageCard.qml:45
-msgid "Dangling image %1"
-msgstr ""
-
-#: src/ui/ImageCard.qml:45
-msgid "Image %1"
-msgstr ""
-
-#: src/ui/ImageCard.qml:69
-msgid "<none>:<none> (dangling)"
-msgstr ""
-
-#: src/ui/ImageCard.qml:75
-msgctxt "@info image is used by containers"
-msgid "in use (%1)"
-msgid_plural "in use (%1)"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/ImageCard.qml:83
-msgctxt "@info image size, creation time and id"
-msgid "%1 · created %2 ago · ID %3"
-msgstr ""
-
-#: src/ui/ImageCard.qml:92
-msgctxt "@info additional image tags"
-msgid "Tags: %1"
-msgstr ""
-
-#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:88
-#: src/ui/ImageDetail.qml:159
-msgid "image reference"
-msgstr ""
-
-#: src/ui/ImageCard.qml:102 src/ui/ImageDetail.qml:166
-msgid "image ID"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:88
-msgid "Container"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:92
-msgid "container name"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:110
-msgid "Loading container details…"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:119
-msgid "Unable to retrieve container details."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:145
-msgctxt "@title:tab container overview"
-msgid "Overview"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:148
-msgctxt "@title:tab container resources"
-msgid "Resources"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:151
-msgctxt "@title:tab container network"
-msgid "Network"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:154
-msgctxt "@title:tab container mounts"
-msgid "Mounts"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:157
-msgctxt "@title:tab container logs"
-msgid "Logs"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:193
-msgid "State:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:209
-msgid "Status:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:214
-msgid "Image:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:221
-msgid "Container ID:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:228 src/ui/ImageDetail.qml:170
-msgid "Created:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:234
-msgid "Started:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:236 src/ui/ImageDetail.qml:172
-msgctxt "@info absolute time and relative"
-msgid "%1 (%2 ago)"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:240
-msgid "Finished:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:249
-msgid "Runtime"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:259
-msgid "Restart count:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:263
-msgid "Exit code:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:267
-msgid "OOM killed:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:269
-msgid "Yes"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:273
-msgid "Process ID:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:278
-msgid "Restart policy:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:283
-msgid "Platform:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:292
-msgid "Configuration"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:302
-msgid "Entrypoint:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:310
-msgid "Command:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:318
-msgid "Working directory:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:324
-msgid "User:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:329
-msgid "Hostname:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:339 src/ui/ImageDetail.qml:380
-msgctxt "@info environment variable count"
-msgid "Environment (%1 variable)"
-msgid_plural "Environment (%1 variables)"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/ContainerDetail.qml:349
-msgctxt "@info label count"
-msgid "Labels (%1)"
-msgid_plural "Labels (%1)"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/ContainerDetail.qml:386
-msgid "No network information."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:447
-msgid "MAC:"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:463
-msgid "Ports"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:471
-msgid "No published ports."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:493
-msgid "not published"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:517
-msgid "No mounts."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:568
-msgid "Container logs are not available yet."
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:569
-msgid ""
-"Streaming logs will be added in a later version. Until then, use the docker "
-"CLI or your container's own log destination."
-msgstr ""
-
-#: src/ui/MainPage.qml:43 src/ui/MainPage.qml:377 src/model/state_text.cpp:21
-msgid "Running"
-msgstr ""
-
-#: src/ui/MainPage.qml:49 src/ui/MainPage.qml:381 src/model/state_text.cpp:25
-msgid "Paused"
-msgstr ""
-
-#: src/ui/MainPage.qml:55 src/ui/MainPage.qml:385
+#: src/ui/MainPage.qml:55 src/ui/MainPage.qml:418
 msgid "Stopped"
 msgstr ""
 
-#: src/ui/MainPage.qml:73
+#: src/ui/MainPage.qml:76
 msgid "Loading Docker status…"
 msgstr ""
 
-#: src/ui/MainPage.qml:77
+#: src/ui/MainPage.qml:80
 msgid "Connected"
 msgstr ""
 
-#: src/ui/MainPage.qml:79
+#: src/ui/MainPage.qml:82
 msgid "Not connected"
 msgstr ""
 
-#: src/ui/MainPage.qml:96
+#: src/ui/MainPage.qml:99
 msgid "No containers found."
 msgstr ""
 
-#: src/ui/MainPage.qml:102
+#: src/ui/MainPage.qml:105
 msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:103 src/ui/MainPage.qml:128
+#: src/ui/MainPage.qml:106 src/ui/MainPage.qml:132
 msgid "Clear search"
 msgstr ""
 
-#: src/ui/MainPage.qml:107
+#: src/ui/MainPage.qml:110
 msgid "No containers match the current filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:108
+#: src/ui/MainPage.qml:111
 msgid "Show all containers"
 msgstr ""
 
-#: src/ui/MainPage.qml:121
+#: src/ui/MainPage.qml:124
 msgid "No images found."
 msgstr ""
 
-#: src/ui/MainPage.qml:127
+#: src/ui/MainPage.qml:126
+msgid "Pull an image"
+msgstr ""
+
+#: src/ui/MainPage.qml:131
 msgctxt "@info no image matches the search"
 msgid "No images match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:132
+#: src/ui/MainPage.qml:136
 msgid "No images match the current filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:133
+#: src/ui/MainPage.qml:137
 msgid "Show all images"
 msgstr ""
 
-#: src/ui/MainPage.qml:177
+#: src/ui/MainPage.qml:193
 msgctxt "@info last successful update"
 msgid "Updated %1 ago"
 msgstr ""
 
-#: src/ui/MainPage.qml:178
+#: src/ui/MainPage.qml:194
 msgid "Not updated yet"
 msgstr ""
 
-#: src/ui/MainPage.qml:184
+#: src/ui/MainPage.qml:200
 msgid "Update failed"
 msgstr ""
 
-#: src/ui/MainPage.qml:190
+#: src/ui/MainPage.qml:206
 msgid "Data is stale"
 msgstr ""
 
-#: src/ui/MainPage.qml:197
+#: src/ui/MainPage.qml:213
 msgid "Auto-refresh is off"
 msgstr ""
 
-#: src/ui/MainPage.qml:229
+#: src/ui/MainPage.qml:262
 msgid "Unable to connect to Docker Engine."
 msgstr ""
 
-#: src/ui/MainPage.qml:299
+#: src/ui/MainPage.qml:332
 msgid "Engine summary is unavailable"
 msgstr ""
 
-#: src/ui/MainPage.qml:307
+#: src/ui/MainPage.qml:340
 msgid ""
 "Container and image counts are unavailable because the engine summary could "
 "not be read."
 msgstr ""
 
-#: src/ui/MainPage.qml:329
+#: src/ui/MainPage.qml:362
 msgctxt "@title:tab container list"
 msgid "Containers (%1)"
 msgid_plural "Containers (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:332
+#: src/ui/MainPage.qml:365
 msgctxt "@title:tab image list"
 msgid "Images (%1)"
 msgid_plural "Images (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:335
+#: src/ui/MainPage.qml:368
 msgctxt "@title:tab engine information"
 msgid "Engine"
 msgstr ""
 
-#: src/ui/MainPage.qml:355
+#: src/ui/MainPage.qml:388
 msgid "Search containers (name, image, ID)…"
 msgstr ""
 
-#: src/ui/MainPage.qml:355
+#: src/ui/MainPage.qml:388
 msgid "Search images (repository, tag, ID)…"
 msgstr ""
 
-#: src/ui/MainPage.qml:373
+#: src/ui/MainPage.qml:406
 msgid "All states"
 msgstr ""
 
-#: src/ui/MainPage.qml:389 src/model/state_text.cpp:19
-msgid "Restarting"
-msgstr ""
-
-#: src/ui/MainPage.qml:393 src/model/state_text.cpp:29
-msgid "Dead"
-msgstr ""
-
-#: src/ui/MainPage.qml:399
+#: src/ui/MainPage.qml:432
 msgid "All images"
 msgstr ""
 
-#: src/ui/MainPage.qml:403
+#: src/ui/MainPage.qml:436
 msgid "In use"
 msgstr ""
 
-#: src/ui/MainPage.qml:407
+#: src/ui/MainPage.qml:440
 msgid "Dangling"
 msgstr ""
 
-#: src/ui/MainPage.qml:431
+#: src/ui/MainPage.qml:464
 msgid "Sort: Name"
 msgstr ""
 
-#: src/ui/MainPage.qml:435
+#: src/ui/MainPage.qml:468
 msgid "Sort: State"
 msgstr ""
 
-#: src/ui/MainPage.qml:439 src/ui/MainPage.qml:449
+#: src/ui/MainPage.qml:472 src/ui/MainPage.qml:482
 msgid "Sort: Created"
 msgstr ""
 
-#: src/ui/MainPage.qml:445
+#: src/ui/MainPage.qml:478
 msgid "Sort: Repository"
 msgstr ""
 
-#: src/ui/MainPage.qml:453
+#: src/ui/MainPage.qml:486
 msgid "Sort: Size"
 msgstr ""
 
-#: src/ui/MainPage.qml:489
+#: src/ui/MainPage.qml:535
 msgid "Unable to retrieve the container list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:546
+#: src/ui/MainPage.qml:593
 msgid "Unable to retrieve the image list: %1"
+msgstr ""
+
+#: src/ui/main.qml:44
+msgid "Auto-refresh"
 msgstr ""
 
 #: src/ui/ResourceView.qml:34
@@ -587,235 +1090,61 @@ msgstr[1] ""
 msgid "CPU:"
 msgstr ""
 
-#: src/ui/ResourceView.qml:90
+#: src/ui/ResourceView.qml:91
 msgid "Memory:"
 msgstr ""
 
-#: src/ui/ResourceView.qml:101
+#: src/ui/ResourceView.qml:102
 msgctxt "@info memory usage and limit"
 msgid "%1 / %2"
 msgstr ""
 
-#: src/ui/ResourceView.qml:126
-msgid "Network:"
-msgstr ""
-
-#: src/ui/ResourceView.qml:130
+#: src/ui/ResourceView.qml:132
 msgctxt "@info network receive rate"
 msgid "↓ %1"
 msgstr ""
 
-#: src/ui/ResourceView.qml:135
+#: src/ui/ResourceView.qml:137
 msgctxt "@info network transmit rate"
 msgid "↑ %1"
 msgstr ""
 
-#: src/ui/ResourceView.qml:147
+#: src/ui/ResourceView.qml:150
 msgid "Block I/O:"
 msgstr ""
 
-#: src/ui/ResourceView.qml:151
+#: src/ui/ResourceView.qml:154
 msgctxt "@info block read rate"
 msgid "Read %1"
 msgstr ""
 
-#: src/ui/ResourceView.qml:156
+#: src/ui/ResourceView.qml:159
 msgctxt "@info block write rate"
 msgid "Write %1"
 msgstr ""
 
-#: src/ui/ResourceView.qml:165
+#: src/ui/ResourceView.qml:168
 msgid "Sampling stopped."
 msgstr ""
 
-#: src/ui/ImageDetail.qml:84
-msgid "Image"
+#: src/ui/ContainerCard.qml:52
+msgid "Container %1, %2"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:103
-msgid "Loading image details…"
+#: src/ui/ContainerCard.qml:130
+msgctxt "@info container status line"
+msgid "%1 · created %2 ago · ID %3"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:112
-msgid "Unable to retrieve image details."
+#: src/ui/ContainerCard.qml:139
+msgctxt "@info published container ports"
+msgid "Ports: %1"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:142
-msgid "Repository:"
+#: src/ui/ContainerCard.qml:164
+msgid "Start container %1"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:144
-msgid "<none> (dangling)"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:145
-msgid "repository"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:149
-msgid "Tag:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:151 src/ui/ImageDetail.qml:158
-msgid "<none>"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:152
-msgid "tag"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:156
-msgid "Full reference:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:163
-msgid "Image ID:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:175
-msgid "Size:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:179
-msgid "Architecture:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:184
-msgid "OS:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:189
-msgid "Author:"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:199
-msgid "Tags"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:229
-msgid "Digests"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:273
-msgctxt "@info image layer count"
-msgid "Layers (%1)"
-msgid_plural "Layers (%1)"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/ImageDetail.qml:281
-msgid "The Docker API reports layer digests, not per-layer sizes."
-msgstr ""
-
-#: src/ui/ImageDetail.qml:320
-msgid "Show fewer layers"
-msgstr ""
-
-#: src/ui/ImageDetail.qml:320
-msgctxt "@info show all image layers"
-msgid "Show all %1 layers"
-msgid_plural "Show all %1 layers"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/ImageDetail.qml:336
-msgid "No containers use this image."
-msgstr ""
-
-#: src/model/format.cpp:35
-msgctxt "@info elapsed time just now"
-msgid "less than a minute"
-msgstr ""
-
-#: src/model/format.cpp:38
-msgctxt "@info elapsed time less than one minute"
-msgid "less than a minute"
-msgstr ""
-
-#: src/model/docker_error_text.cpp:19
-msgid "Docker Engine is not reachable."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:21
-msgid "Could not connect to the Docker daemon."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:23
-msgid "Permission denied while accessing the Docker socket."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:25
-msgid "The Docker daemon did not respond in time."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:27
-msgid "This Docker Engine version is not supported by Kontainer."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:29
-msgid "The requested Docker API endpoint was not found."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:31
-msgid "The Docker daemon rejected the request."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:33
-msgid "The Docker daemon reported an internal error."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:35
-msgid "The Docker daemon returned an unreadable response."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:37
-msgid "The Docker daemon returned unexpected data."
-msgstr ""
-
-#: src/model/docker_error_text.cpp:39
-msgid "Unknown Docker error."
-msgstr ""
-
-#: src/model/state_text.cpp:17
-msgid "Created"
-msgstr ""
-
-#: src/model/state_text.cpp:23
-msgid "Removing"
-msgstr ""
-
-#: src/model/state_text.cpp:27
-msgid "Exited"
-msgstr ""
-
-#: src/model/state_text.cpp:40
-msgid "No health check"
-msgstr ""
-
-#: src/model/state_text.cpp:42
-msgid "Starting"
-msgstr ""
-
-#: src/model/state_text.cpp:44
-msgid "Healthy"
-msgstr ""
-
-#: src/model/state_text.cpp:46
-msgid "Unhealthy"
-msgstr ""
-
-#: src/model/container_detail_controller.cpp:122
-msgid "No container selected."
-msgstr ""
-
-#: src/model/container_detail_controller.cpp:210
-msgid "IPv6"
-msgstr ""
-
-#: src/model/container_detail_controller.cpp:213
-msgid "Gateway"
-msgstr ""
-
-#: src/model/image_detail_controller.cpp:86
-msgid "No image selected."
+#: src/ui/ContainerCard.qml:177
+msgid "Stop container %1"
 msgstr ""

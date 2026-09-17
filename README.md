@@ -2,14 +2,17 @@
 
 KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM）。
 
-> **只读**：整个项目不会修改任何 Docker 状态（没有 start/stop/restart/remove/pull/push/prune，
-> 没有 POST/PUT/PATCH/DELETE）。这是设计约束，不是临时限制。
+> **默认只读，写操作按 socket 权限工作**：读取永远是安全的；启动 / 停止 / 重启 / 删除容器、
+> 拉取 / 删除镜像只在 Docker socket 对当前用户**可写**时出现，且不引入任何提权机制。
+> 详见[写操作与权限](#写操作与权限)。
 
 - 一期（[ARCH_V1.md](ARCH_V1.md)）：只读状态面板 —— Engine 概要、容器列表、镜像列表
 - 二期（[ARCH_V2.md](ARCH_V2.md)）：可交互的只读 Dashboard —— 卡片导航、详情页、搜索/过滤/排序、
   统一状态体系、刷新/Last Updated/Stale、容器资源监控、Docker 磁盘占用
 - 三期（[ARCH_V3.md](ARCH_V3.md)）：UI 收口 —— 组件归一（状态徽标 / 可复制字段 / 空状态）、
-  容器详情分区、镜像详情收敛、数据可视化色板、排版与响应；**仍然只读**
+  容器详情分区、镜像详情收敛、数据可视化色板、排版与响应
+- 四期（[ARCH_V4.md](ARCH_V4.md)）：首批写操作与信息架构 —— 容器与镜像操作、拉取进度与取消、
+  挂载分区重构（可在文件管理器中打开宿主目录）、端口映射改为芯片 + 连线拓扑
 
 ---
 
@@ -35,22 +38,70 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 | 存储可视化 | Overview 的存储区有横向堆叠条（镜像/容器/数据卷/构建缓存）+ 色块图例；不可用的类别显示 `—`，不伪装成 0 |
 | 数据可视化配色 | 趋势线与存储条使用 `ChartPalette` 的专用取色（亮/暗各一套，均通过 WCAG AA 4.5:1 校验），不再借用状态语义色 |
 | 排版与响应 | 详情页正文限宽 42 gridUnit 居中；资源数值右对齐；统计卡按窗口宽度 5/3/2 列重排；数值字号走 `Kirigami.Heading` |
+| **容器操作** | 启动 / 停止 / 重启（可逆，列表行内与详情页 footer 都可触发）、删除（仅详情页，运行中不给按钮并说明原因）。同目标串行，操作在途时按钮禁用并显示忙碌指示 |
+| **镜像操作** | 拉取（对话框内校验引用、缺 tag 时显式提示会补 `latest`、分层进度、可取消）、删除（单标签只删该标签；多标签另给「删除全部标签」入口，走 `force`） |
+| **操作反馈** | 所有操作结果走唯一的 `OperationMessage`：成功 / 已处于目标状态 / 已取消 / 失败，失败文案按「用户可自行解决 / 环境问题 / 意外」分级呈现，并附引擎原文 |
+| **挂载分区** | 类型（bind / volume / tmpfs）、`rw`/`ro`、命名卷名、宿主路径 → 容器路径；宿主路径不存在时给出警告且不提供打开动作；**可在系统文件管理器中打开宿主目录**（tmpfs 与匿名卷没有宿主目录） |
+| **端口映射** | 芯片 + 连线拓扑：左列容器端口、右列宿主绑定，一个容器端口对应多个宿主地址时画多条线；只 `EXPOSE` 未映射的端口单独成组、不画线；连线为纯装饰（`Accessible.ignored`），信息全部由文字承载 |
 | 国际化 | 全部用户可见文本走 KDE i18n（C++ 与 QML），含复数形式；已随附简体中文翻译；并有 lint 测试阻止裸字符串 |
 
 ---
 
-## 只读安全边界
+## 写操作与权限
 
-- 生产代码只发起 **GET**：`/_ping`、`/version`、`/info`、`/containers/json`、`/images/json`、
+### 权限模型
+
+**按 socket 实际权限工作，不引入提权**（决策记录见 [ARCH_V3.md](ARCH_V3.md) §1.3）：
+
+- 没有 KAuth helper、没有 polkit policy、不修改 socket 权限、不调用 `docker` CLI
+- 启动时探测 socket 文件对当前进程是否可写（内核 `access(2)` 语义）；
+  不可写时**写入口整体不出现**，并在页面顶部说明原因与解决方向
+- 运行中若引擎返回 403 / EACCES，**本次会话降级为只读**（不可逆，除非重开 KCM）
+- 非本机 unix socket（未来的远程 endpoint）按设计只读
+
+> ⚠️ **系统级（root daemon）Docker 下，把用户加入 docker 组等价于给予 root 权限。**
+> 本项目的目标部署形态是 rootless Docker（socket 由用户自己拥有），此时不涉及该权限放大。
+> 权限范围扩大属于次版本号变更：0.4.0 起包含写操作。
+
+### 写操作清单
+
+| 操作 | 位置 | 二次确认 | 前置条件与说明 |
+| --- | --- | --- | --- |
+| 启动 / 停止 / 重启容器 | 列表行内、详情页 footer | 否（可逆） | 已处于目标状态时引擎返回 304，界面显示「已经是运行中 / 已停止」 |
+| 删除容器 | 详情页 footer | **是** | 运行中不给按钮（提示先停止）；**不删除数据卷**（不传 `v`），确认文案里写明 |
+| 拉取镜像 | 镜像标签页、镜像空状态 | 否 | 提交前校验引用；缺 tag 时显式提示会补 `latest`；可随时取消；**匿名拉取** |
+| 删除镜像 | 镜像详情 footer | **是** | 单标签只删该标签；多标签另给「删除全部标签」（`force`）；被容器引用时引擎返回 409，文案说明原因，不自动 `force` |
+
+破坏性操作统一走 `ConfirmDialog`：固定句式「确定要 &lt;动作&gt; &lt;目标&gt;「&lt;名称&gt;」吗？」+
+**必填**的后果说明；确认按钮写动作名（「删除」），不写「确定」。
+
+### 一直成立的数据安全约定
+
+- 读取路径只发起 **GET**：`/_ping`、`/version`、`/info`、`/containers/json`、`/images/json`、
   `/system/df`、`/containers/{id}/json`、`/images/{id}/json`、`/containers/{id}/stats?stream=false`
-- 没有 KAuth helper、不修改 socket 权限、不使用 `docker` CLI 读数据（§24）
-- 日志只记录方法与路径、错误分类；**不输出 Docker JSON、environment、labels、mount 源路径、认证材料**
+- 日志只记录方法与路径、操作与结果、错误分类；**不输出 Docker JSON、environment、labels、
+  mount 源路径、认证材料**（打开宿主目录的动作也只记录结果，不记录路径）
 - Environment / Labels 默认只显示数量，用户显式展开才渲染取值（§40）
-- 剪贴板只提供标识类字段的复制（容器名称/ID、镜像仓库/标签/完整引用/ID），不提供“复制整个 inspect JSON”（§41）
+- 剪贴板只提供标识类字段的复制（容器名称/ID、镜像仓库/标签/完整引用/ID、挂载路径），
+  不提供「复制整个 inspect JSON」（§41）
 - UI 线程不做阻塞 I/O；全部请求基于 `QLocalSocket` + 事件循环
-- **只读边界由测试守着**：`tst_source_conventions` 会在生产代码里出现
-  `"POST"/"PUT"/"PATCH"/"DELETE"` 字面量，或引入 `QProcess` / `KAuth` 时直接失败——
-  打开写操作必须是一次显式的设计变更，而不是某次顺手加上的请求
+- 唯一不经过 Docker 的外部动作是「在文件管理器中打开宿主目录」，它被限制在
+  `backend/kio_host_path_service.*` 一个文件里，且只接受探测为目录的绝对路径
+- **不读取、不存储、不请求任何 registry 凭据**：不读 `~/.docker/config.json`，
+  不执行 `docker-credential-*`（那需要 `QProcess`）。私有镜像请用 CLI 登录后拉取
+
+### 边界由测试守着
+
+`tst_source_conventions` 把写操作钉在唯一咽喉点上，而不是靠约定：
+
+| 断言 | 规则 |
+| --- | --- |
+| `mutationsHaveSingleChokePoint` | 写动词字面量只允许出现在 `backend/docker_client.cpp` |
+| `restPathsStayInOneHeader` | REST 路径只允许出现在 `backend/docker_api_paths.h` |
+| `qmlNeverTalksHttp` | QML 里不得出现 `http` / 写动词 / socket 路径 / REST 路径 |
+| `kioStaysInHostPathService` | `KIO::` 只允许出现在 `backend/kio_host_path_service.*` |
+| `externalProcessesStayForbidden` | `QProcess` / `KAuth` 继续全面禁止 |
+| `tst_docker_capabilities` | 非 unix endpoint 永远不可写（远程 endpoint 的只读不变式） |
 
 ---
 
@@ -187,11 +238,17 @@ ctest --test-dir build --output-on-failure
 | `tst_detail_controllers` | 详情页生命周期（进入/离开）、列表构建、错误与重试、镜像与容器只读关联、停止采样 |
 | `tst_format` / `tst_status_controller` | 时间与体积格式化；整页/分区状态机、错误隔离、Last Updated 与 stale、刷新间隔来自 RefreshPolicy |
 | `tst_i18n_consistency` | 翻译域一致性、译文完整性、**裸字符串 lint**（界面里的 `text`/`title`/`Accessible.name`/`ToolTip.text` 等属性被赋字符串字面量即失败，并给出文件名与行号） |
-| `tst_source_conventions` | 复制动作只有 `CopyButton` 一个实现；状态语义色只出现在 `StatusPalette`；**只读边界**（生产代码不得出现写请求动词 / `QProcess` / `KAuth`） |
+| `tst_source_conventions` | 复制动作只有 `CopyButton` 一个实现；状态语义色只出现在 `StatusPalette`；**写操作咽喉点**（写动词只在 `docker_client.cpp`、REST 路径只在 `docker_api_paths.h`、QML 不碰传输层、`KIO::` 只在宿主路径服务里、`QProcess`/`KAuth` 全面禁止） |
+| `tst_json_line_reader` | 拉取流的行解析：一行跨多个 chunk、一个 chunk 多行、半行缓存、畸形行不中断流、超长行防御 |
+| `tst_image_reference` | 镜像引用解析与校验：裸名补 `latest`、`registry:port/repo:tag`、digest 形式、仓库名必须小写、非法输入拒绝 |
+| `tst_docker_capabilities` | 写权限门：可写 / 只读 / socket 缺失 / 非 unix endpoint 一律不可写 |
+| `tst_operation_controller` | 写操作编排：同目标串行、不同目标并行、拉取全局串行、写后即读、结果通道、403 → 会话降级为只读且不可逆 |
+| `tst_mount_list_model` | 挂载行字段映射、宿主路径探测（存在 / 缺失 / 不是目录 / 不适用）、命名卷、打开动作与失败提示、内容未变不重置模型 |
+| `tst_port_mapping_model` | 已发布 / 未发布分组、一对多映射、排序稳定、芯片文本、内容未变不重置模型 |
 | `tst_qml_load` | 逐个编译界面文件 + 真正实例化页面 + **触发卡片 activated 信号**验证导航接线 + 断言 Environment/Labels 默认折叠（§40）+ 状态徽标语义映射 + 复制按钮的空值禁用与剪贴板行为 + 三类空状态文案互不相同 + 容器详情五分区切换与「切分区不重新 inspect」+ 镜像层默认折叠前 5 层 + 捕获 QML 运行时错误（ReferenceError/TypeError）——这类错误在 kcmshell6 里只会显示错误页或静默失效 |
 | `tst_refresh_churn` / `tst_kcm_widget_churn` | 刷新抖动压力测试：数据、窗口尺寸、分区、页面进出反复变化；后者用 **QQuickWidget**（与 kcmshell6 相同的宿主形态）承载 `main.qml`，并断言「同一结构下的数值刷新不得重建统计块与存储图例的条目」——针对真实会话里出现过的布局 polish 段错误 |
 | `tst_qml_resource` | **从 qrc 加载界面**（与插件运行时完全一致的路径）：`main.qml` 能加载、源码目录里每个界面文件都在资源里且内容一致（期望值由扫描源码树得出，不维护第二份清单）、单例能从 qrc 解析。资源清单漏项这类问题不会被源码目录测试发现，只会让安装后的 KCM 打不开 |
-| `tst_docker_backend_against_fake_engine` | 进程内假 Engine：协商、chunked、去重、inspect/stats/df 解析、`/info` 失败后计数作废、版本不匹配、stats 生命周期 |
+| `tst_docker_backend_against_fake_engine` | 进程内假 Engine：协商、chunked、去重、inspect/stats/df 解析、`/info` 失败后计数作废、版本不匹配、stats 生命周期；**写操作契约**（动词与 query、`stop` 带 `t=`、删除容器不带 `v`、304 → 「已处于目标状态」、409 保留引擎原文、拉取进度聚合、流内 error 判失败、取消恰好上报一次、写操作等待版本握手） |
 | `tst_docker_backend_integration` | 真实 Docker 只读端到端（无 socket 时自动跳过） |
 
 > 注意：这台机器上的 Qt 6.11 只执行「无参测试函数 + `QFETCH`」形式的数据驱动用例，
@@ -303,6 +360,44 @@ po/                         翻译（zh_CN 已完整）
 
 ---
 
+## 四期（ARCH_V4）的偏离与设计决定
+
+| 条目 | 计划 | 实际 | 理由 |
+| --- | --- | --- | --- |
+| 写操作结果类型 | ARCH_V3_pre §2.2 建议模板 `Result<T, DockerError>` | `DockerError` 值类型 + `mutationFinished(mutation, target, outcome, error)` 信号 | 项目已有异步信号槽约定；事件循环里没有可返回值的位置。取消也不是错误，因此结果类型里额外有 `Unchanged` / `Cancelled` |
+| 全局通知通道 | ARCH_V3_pre §2.3 建议单例 | `OperationController`（挂在 `StatusController` 上）+ `OperationMessage` 组件 | 单例绕过注入与测试 |
+| 停止 / 重启是否确认 | ARCH_V3_pre §2.4 要求破坏性操作确认 | `start` / `stop` / `restart` 不确认，仅**删除类**强制确认 | 可逆操作每次确认会把配置面板变成确认机器；结果由 `OperationMessage` 与状态徽标兜底 |
+| REST 路径位置 | ARCH_V3_pre §2.1 建议放进 `docker_endpoint.h` | 新建 `backend/docker_api_paths.h` | `docker_endpoint.h` 承载的是连接端点（`DOCKER_HOST` / socket）语义，混在一起会让两个概念纠缠；单独一个头文件反而能被断言「路径只出现在这里」 |
+| 端口拓扑的连线 | 用户要求「可以考虑节点图」 | 采纳芯片 + 连线；连线用 `Canvas` 而非 `Shape` | `Shape` 的子对象必须是 `ShapePath`，而 `Repeater` 是 Item；`Canvas` 是单 Item、零 delegate，离三期段错误的诱因最远（ARCH_V4 附录 A.1 有实测） |
+| 挂载跳转范围 | 用户原话「详情页面中点击挂载的文件夹」 | 只做容器详情；镜像详情不加「声明的卷 / 暴露端口」 | 镜像本身没有宿主目录，加了也只是摆设；实际挂载只有容器详情能看到 |
+| 私有仓库凭据 | ARCH_V3_pre §2.4 未涉及 | 明确不支持：不读 `~/.docker/config.json`、不执行 credential helper | 读取凭据文件涉及敏感数据；执行 helper 需要 `QProcess`（被 §1.4 禁止）。失败时引导用户用 CLI |
+| 实施顺序 | ARCH_V4 初稿：4A → 4B → 4C → 4D | 实际：4B → 4C → 4D → 4A | 用户指示 4A 体量小，长任务应重点投入写操作；4A 与写操作无技术依赖（已回填进 ARCH_V4 §2.6 与偏离登记） |
+
+---
+
+## 四期完成定义（DoD）自查
+
+- 信息架构：挂载分区显示类型 / 读写模式 / 命名卷名 / 宿主 → 容器路径 ✅、
+  宿主路径缺失时给出警告且不提供打开动作 ✅、`tmpfs` 不显示宿主路径 ✅、
+  端口以「容器端口芯片 → 宿主绑定芯片 + 连线」呈现 ✅、一对多与未发布语义正确 ✅、
+  连线为装饰（信息全在文字里）✅、挂载源路径不进入任何日志 ✅
+- 写操作：REST 路径只在 `docker_api_paths.h`、写动词只在 `docker_client.cpp` ✅、
+  传输层支持 POST/DELETE + 流式增量 + 取消 + 独立超时 ✅、304 归一为「已处于目标状态」✅、
+  409 三类语义可区分 ✅、权限门与运行中降级 ✅、四个容器操作与两个镜像操作可用 ✅、
+  拉取有分层进度与取消、流内错误可呈现 ✅、结果经 `OperationMessage` 单通道呈现 ✅、
+  破坏性操作经 `ConfirmDialog` 且文案含后果 ✅、写后即读 ✅
+- 工程：`project VERSION` = 0.4.0 ✅、全部 25 个测试目标通过 ✅、`-Wall -Wextra` 0 警告 ✅、
+  六条咽喉点断言生效 ✅、`po/zh_CN` 完整 ✅、新 QML 全部进 qrc 并被 `tst_qml_load` 覆盖 ✅、
+  无 `QProcess` / KAuth / docker CLI ✅、新增依赖只有 `KF6::KIOGui` ✅
+- 文档与安全：顶部声明已改写 ✅、本文档新增「写操作与权限」章节（含 docker 组织等价 root 的提示）✅、
+  CHANGELOG 0.4.0 条目含 ⚠️ 权限说明 ✅、偏离登记已更新 ✅
+- KDE：`kcmshell6 --smoke-test kcm_docker` 退出码 0 ⏳（需安装后复核）、
+  亮/暗截图复核 ⏳、键盘走查 ⏳
+
+---
+
+---
+
 ## 三期完成定义（DoD）自查
 
 - 界面：`StatusChip` 是状态呈现的唯一实现 ✅、状态色 token 只在 `StatusPalette` ✅、
@@ -338,21 +433,18 @@ po/                         翻译（zh_CN 已完整）
 
 ---
 
-## 下一阶段（四期）
+## 下一阶段（五期）
 
-四期规约见 [ARCH_V4.md](ARCH_V4.md)（定稿待实施）。顺序与依赖如下：
+按 [ARCH_V4.md](ARCH_V4.md) §7：
 
-| 顺序 | 里程碑 | 内容 |
-| --- | --- | --- |
-| 1 | 4A | 挂载与端口的信息架构（仍只读）：挂载分区重构 + 在文件管理器中打开宿主目录；端口映射改为芯片 + 连线拓扑 |
-| 2 | 4B | 写操作地基：REST 路径集中、传输层动词 / 流式 / 取消、错误分级、socket 写权限门、`OperationController`、确认与反馈 |
-| 3 | 4C | 容器操作：start / stop / restart / remove（删除不删卷，强制二次确认） |
-| 4 | 4D | 镜像操作：pull（分层进度 + 取消）、remove（单标签 / 强制多标签语义） |
-| 5 | 4E | 质量门与文档收口：0.4.0、README 改写「只读」声明、CHANGELOG、po、测试矩阵 |
+| 顺序 | 内容 |
+| --- | --- |
+| 5A | 日志：chunked follow、离开页面主动断开、自动滚动 / 时间戳 / 搜索、大日志虚拟化 |
+| 5B | 卷与网络：列表 → 详情 → 操作三段式；Storage 数字点击跳转 |
+| 5C | 创建 / 克隆：先做「克隆现有容器配置」，端口冲突前置校验 |
+| 5D | exec / 终端：先定技术选型（自绘 vs konsolepart），hijack 双流的三种退出清理 |
+| 5E | 诊断导出（脱敏）；私有仓库凭据支持（需重新评估「不执行外部程序」的约束） |
+| 5F | Compose：包装宿主机 CLI，只做汇总视图 + up/down |
 
-权限模型沿用 [ARCH_V3.md](ARCH_V3.md) §1.3 的结论：**按 socket 实际权限工作，不引入提权机制**；
-本机是 rootless Docker，OS 层面已放行写权限，引入 root helper 属于权限放大。
-写操作上线时（4C/4D）必须同步改写本文档顶部的「只读安全边界」章节并升次版本号到 0.4.0。
-
-四期不做：日志流、exec、卷/网络管理页、创建/克隆、Compose、prune、registry 凭据支持
-（理由见 ARCH_V4.md §1.4）。
+四期遗留、需在五期重新评估：`prune` / `kill` / `pause`、多架构镜像的平台选择（`platform` 参数）、
+镜像详情的声明卷与暴露端口。
