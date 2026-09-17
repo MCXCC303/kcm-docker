@@ -164,6 +164,14 @@ public:
     Q_INVOKABLE bool restoreBackup(const QString &backupPath = QString());
 
     /*! helper 不可用时的"自己动手"命令（可直接复制到终端执行）。 */
+    /*!
+     * 可选日志驱动（含首项空串 = 使用 daemon 默认）。
+     *
+     * 名单来自 helper 的白名单（`PrivilegedConfigRequest::allowedLogDrivers`），
+     * 界面不再自己抄一份：抄一份的下场是界面能选、helper 拒绝。
+     */
+    Q_INVOKABLE QStringList selectableLogDrivers() const;
+
     Q_INVOKABLE QString privilegedCommand() const;
 
     /*! 重启 Docker（系统级走 helper，rootless 走会话 systemd）。 */

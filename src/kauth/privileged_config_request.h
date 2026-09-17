@@ -59,13 +59,23 @@ public:
     /*! 额外允许的参数键（不是 daemon.json 的键，而是请求本身的开关）。 */
     static QStringList allowedControlKeys();
 
+    /*!
+     * 允许被**删除**的键（回到 daemon 默认）。
+     *
+     * 「设成默认值」与「删掉这个键」不是一回事：daemon 自己的默认值会随版本变化，
+     * 而且用户文件里那个键可能是他手动写的。所以删除要作为独立意图传进来
+     * （control key `remove`，值是键名列表），并且只接受我们管理的键。
+     */
+    static QStringList removableKeys();
+
     /*! 日志驱动白名单：接受的值只有这些（其余一律拒绝）。 */
     static QStringList allowedLogDrivers();
 
     /*!
      * 从 KAuth 参数解析编辑意图。
      *
-     * 失败时返回 false 并给出原因 key（`unknownKey` / `invalidValue` / `tooLarge` / `noEdits`）。
+     * 失败时返回 false 并给出原因 key（`unknownKey` / `invalidValue` / `tooLarge` / `noEdits`
+     * / `conflictingKeys`：同一个键既赋值又要求删除）。
      * **任何无法识别的键都会导致整请求被拒绝**，而不是被忽略——
      * "忽略未知参数"会让调用方误以为请求生效了。
      */
@@ -73,7 +83,8 @@ public:
 
     bool isEmpty() const
     {
-        return !m_setRegistryMirrors && !m_setInsecureRegistries && m_maxConcurrentDownloads <= 0 && m_logDriver.isEmpty();
+        return !m_setRegistryMirrors && !m_setInsecureRegistries && !m_setMaxConcurrentDownloads && !m_setLogDriver
+            && m_removeKeys.isEmpty();
     }
     /*!
      * 只做校验、不写文件。
@@ -85,6 +96,11 @@ public:
     bool dryRun() const
     {
         return m_dryRun;
+    }
+    /*! 要求删除的键（值是我们管理的键名，已校验）。 */
+    QStringList removeKeys() const
+    {
+        return m_removeKeys;
     }
     bool setRegistryMirrors() const
     {
@@ -102,9 +118,17 @@ public:
     {
         return m_insecureRegistries;
     }
+    bool setMaxConcurrentDownloads() const
+    {
+        return m_setMaxConcurrentDownloads;
+    }
     int maxConcurrentDownloads() const
     {
         return m_maxConcurrentDownloads;
+    }
+    bool setLogDriver() const
+    {
+        return m_setLogDriver;
     }
     QString logDriver() const
     {
@@ -129,8 +153,11 @@ private:
     QStringList m_registryMirrors;
     bool m_setInsecureRegistries = false;
     QStringList m_insecureRegistries;
+    bool m_setMaxConcurrentDownloads = false;
     int m_maxConcurrentDownloads = 0;
+    bool m_setLogDriver = false;
     QString m_logDriver;
+    QStringList m_removeKeys;
     bool m_dryRun = false;
 };
 

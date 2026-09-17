@@ -41,6 +41,8 @@ KCM.AbstractKCM {
     readonly property bool editable: !page.protectedScope || page.controller.unlocked
     readonly property var engine: kcm.controller.engine
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
+    /*! 可编辑行的标签列宽度（与只读行、KeyValueListEditor 对齐）。 */
+    readonly property real labelColumnWidth: Kirigami.Units.gridUnit * 10
 
     /*! 授权/降级相关的界面状态。 */
     property bool showManualCommands: false
@@ -95,14 +97,6 @@ KCM.AbstractKCM {
         });
 
         settingsRows.clear();
-        settingsRows.append({
-            label: i18n("Concurrent downloads"),
-            value: page.controller.maxConcurrentDownloads > 0 ? String(page.controller.maxConcurrentDownloads) : i18n("default")
-        });
-        settingsRows.append({
-            label: i18n("Log driver"),
-            value: page.controller.logDriver.length > 0 ? page.controller.logDriver : i18n("default")
-        });
         settingsRows.append({
             label: i18n("Data directory"),
             value: page.controller.dataRoot.length > 0 ? page.controller.dataRoot : i18n("default")
@@ -368,6 +362,65 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     level: 3
                     text: i18n("Other settings")
+                }
+
+                /* 可编辑的两项：用两列网格而不是 Kirigami.FormLayout——
+                   后者会把整个表单居中，而这一页其余内容都是左对齐的 */
+                GridLayout {
+                    Layout.fillWidth: true
+                    columns: 2
+                    columnSpacing: Kirigami.Units.largeSpacing
+                    rowSpacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        Layout.preferredWidth: page.labelColumnWidth
+                        text: i18n("Concurrent downloads")
+                    }
+
+                    QQC2.SpinBox {
+                        id: concurrentDownloadsSpin
+
+                        objectName: "concurrentDownloadsSpin"
+                        // 0 = 使用 daemon 默认（保存时把这个键删掉，而不是写一个 0）
+                        from: 0
+                        to: 1024
+                        editable: page.editable
+                        value: page.controller.maxConcurrentDownloads
+                        textFromValue: function (value) {
+                            return value === 0 ? i18n("default") : String(value);
+                        }
+                        valueFromText: function (text) {
+                            const parsed = parseInt(text, 10);
+                            return isNaN(parsed) ? 0 : parsed;
+                        }
+                        // onValueModified 只在用户改的时候发；程序化赋值（读盘/保存后刷新）不会触发
+                        onValueModified: page.controller.setMaxConcurrentDownloads(value)
+                        Accessible.name: i18n("Concurrent downloads")
+                    }
+
+                    QQC2.Label {
+                        Layout.preferredWidth: page.labelColumnWidth
+                        text: i18n("Log driver")
+                    }
+
+                    QQC2.ComboBox {
+                        id: logDriverCombo
+
+                        objectName: "logDriverCombo"
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                        enabled: page.editable
+                        // 名单来自 helper 的白名单（首项空串 = 用默认），界面不另抄一份
+                        model: page.controller.selectableLogDrivers()
+                        textRole: ""
+                        displayText: currentIndex === 0 ? i18n("default") : currentText
+                        currentIndex: {
+                            const index = page.controller.selectableLogDrivers().indexOf(page.controller.logDriver);
+                            return index >= 0 ? index : 0;
+                        }
+                        // onActivated 只在用户选择时发（currentIndex 的程序化变化不会触发）
+                        onActivated: page.controller.setLogDriver(currentIndex === 0 ? "" : currentText)
+                        Accessible.name: i18n("Log driver")
+                    }
                 }
 
                 Components.KeyValueList {

@@ -11,6 +11,8 @@
 #include "support/mock_docker_backend.h"
 #include "support/qml_stub_kcm.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QQmlComponent>
 #include <QQuickItem>
 #include <QQuickWindow>
@@ -28,6 +30,21 @@
 
 using namespace Kontainer;
 using MutationOutcome = DockerBackendInterface::MutationOutcome;
+
+namespace
+{
+/*! 在已经实例化的页面里按 objectName 找控件（页面没有窗口，直接遍历子对象即可）。 */
+QQuickItem *findItemByName(QObject *root, const QString &objectName)
+{
+    const QList<QQuickItem *> items = root->findChildren<QQuickItem *>();
+    for (QQuickItem *item : items) {
+        if (item->objectName() == objectName) {
+            return item;
+        }
+    }
+    return nullptr;
+}
+} // namespace
 
 /*!
  * QML 加载测试（ARCH_V2 §46）。
@@ -51,6 +68,7 @@ private Q_SLOTS:
     void loadsAllQmlFiles();
     void instantiatesPages_data();
     void instantiatesPages();
+    void configPageEditorsWriteThroughToTheController();
     void sensitiveSectionsAreCollapsedByDefault();
     void delegateActivationIsWired();
     void statusChipMapsSemanticKeys_data();
@@ -246,6 +264,82 @@ void QmlLoadTest::delegateActivationIsWired()
     QVERIFY(QMetaObject::invokeMethod(imageCard, "activated"));
     QCOMPARE(imageSpy.count(), 1);
     QCOMPARE(imageSpy.first().first().toString(), QStringLiteral("sha256:aaaa"));
+}
+
+/*!
+ * 配置页的两个可编辑控件（ARCH_V5_V8 §2.2）。
+ *
+ * 为什么单独测：助手里早就支持 `max-concurrent-downloads` / `log-driver` 了，
+ * 但页面上它们一度只是**只读的一行文字**——用户根本改不了（真实反馈）。
+ * 这里钉住"控件存在、用户改动会写回控制器、选「默认」产生的是删除而不是写 0/空串"。
+ */
+void QmlLoadTest::configPageEditorsWriteThroughToTheController()
+{
+    Kontainer::DaemonConfigController *controller = m_stubKcm->controller()->daemonConfigUser();
+    QVERIFY(controller);
+
+    QQmlComponent component(m_engine.get(),
+                            QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("scope"), QStringLiteral("user")); // 用户级：不需要解锁就能编辑
+    QScopedPointer<QObject> page(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    if (page.isNull()) {
+        QFAIL(qPrintable(component.errorString()));
+    }
+
+    QQuickItem *spin = findItemByName(page.data(), QStringLiteral("concurrentDownloadsSpin"));
+    QVERIFY2(spin, "the concurrent-downloads spin box is missing");
+    QQuickItem *combo = findItemByName(page.data(), QStringLiteral("logDriverCombo"));
+    QVERIFY2(combo, "the log-driver combo box is missing");
+
+    const QString state = QStringLiteral("editable=%1 protected=%2 unlocked=%3 writable=%4 requires=%5 path=%6 count=%7 spinEditable=%8 spinEnabled=%9")
+                                .arg(page->property("editable").toBool())
+                                .arg(page->property("protectedScope").toBool())
+                                .arg(controller->property("unlocked").toBool())
+                                .arg(controller->configWritable())
+                                .arg(controller->requiresPrivilege())
+                                .arg(controller->configPath())
+                                .arg(combo->property("count").toInt())
+                                .arg(spin->property("editable").toBool())
+                                .arg(spin->property("enabled").toBool());
+
+    QVERIFY2(spin->property("editable").toBool() && spin->property("enabled").toBool(), qPrintable(state));
+    QVERIFY2(combo->property("enabled").toBool(), qPrintable(state));
+    // 「默认」+ helper 白名单里的驱动
+    QCOMPARE(combo->property("count").toInt(), controller->selectableLogDrivers().size());
+    QCOMPARE(combo->property("count").toInt(), 6);
+
+    // 程序化赋值不得被当成用户改动（读盘刷新后不能变成"未保存的修改"）
+    QVERIFY(spin->setProperty("value", 9));
+    QVERIFY2(!controller->dirty(), "programmatic value changes must not mark the page dirty");
+
+    // 用户真的改了：valueModified 只在交互时发出
+    QVERIFY(spin->setProperty("value", 9));
+    QVERIFY(QMetaObject::invokeMethod(spin, "valueModified"));
+    QVERIFY(controller->dirty());
+    QCOMPARE(controller->maxConcurrentDownloads(), 9);
+    // 写进文件的是值本身
+    QJsonObject merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
+    QCOMPARE(merged.value(QStringLiteral("max-concurrent-downloads")).toInt(), 9);
+
+    // 选一个具体驱动 → Set
+    QVERIFY(combo->setProperty("currentIndex", 1));
+    QVERIFY(QMetaObject::invokeMethod(combo, "activated", Q_ARG(int, 1)));
+    QCOMPARE(controller->logDriver(), QStringLiteral("json-file"));
+    merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
+    QCOMPARE(merged.value(QStringLiteral("log-driver")).toString(), QStringLiteral("json-file"));
+
+    // 选回「默认」→ **删除这个键**（不是写空串），并发下载数同理
+    QVERIFY(combo->setProperty("currentIndex", 0));
+    QVERIFY(QMetaObject::invokeMethod(combo, "activated", Q_ARG(int, 0)));
+    QVERIFY2(controller->logDriver().isEmpty(), "selecting the default must clear the value");
+    QVERIFY(spin->setProperty("value", 0));
+    QVERIFY(QMetaObject::invokeMethod(spin, "valueModified"));
+    QCOMPARE(controller->maxConcurrentDownloads(), 0);
+    merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
+    QVERIFY2(!merged.contains(QStringLiteral("log-driver")), "the key must be removed, not emptied");
+    QVERIFY2(!merged.contains(QStringLiteral("max-concurrent-downloads")), "the key must be removed, not zeroed");
 }
 
 void QmlLoadTest::loadsAllQmlFiles_data()

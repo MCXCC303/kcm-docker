@@ -20,6 +20,8 @@ constexpr auto kRegistryMirrors = "registry-mirrors";
 constexpr auto kInsecureRegistries = "insecure-registries";
 constexpr auto kMaxConcurrentDownloads = "max-concurrent-downloads";
 constexpr auto kLogDriver = "log-driver";
+/*! 控制键：要删除的键名列表（不是 daemon.json 的键）。 */
+constexpr auto kRemove = "remove";
 
 /*! 与界面侧 `Presentation::registryMirrorErrorKey` 相同的形态；helper 侧必须独立校验（不信任调用方）。 */
 bool isValidMirror(const QString &value)
@@ -59,7 +61,13 @@ bool parseStringList(const QVariant &value, QStringList *out)
 
 QStringList PrivilegedConfigRequest::allowedControlKeys()
 {
-    return {QStringLiteral("dryRun")};
+    return {QStringLiteral("dryRun"), QStringLiteral("remove")};
+}
+
+QStringList PrivilegedConfigRequest::removableKeys()
+{
+    // 只允许删除我们管理的键：helper 不能删掉它看不懂的东西
+    return allowedKeys();
 }
 
 QStringList PrivilegedConfigRequest::allowedKeys()
@@ -146,6 +154,7 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
         if (!ok || value < 1 || value > 1024) {
             return fail("invalidValue");
         }
+        parsed.m_setMaxConcurrentDownloads = true;
         parsed.m_maxConcurrentDownloads = value;
     }
 
@@ -154,7 +163,32 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
         if (!allowedLogDrivers().contains(driver)) {
             return fail("invalidValue");
         }
+        parsed.m_setLogDriver = true;
         parsed.m_logDriver = driver;
+    }
+
+    if (arguments.contains(QLatin1String(kRemove))) {
+        QStringList keys;
+        if (!parseStringList(arguments.value(QLatin1String(kRemove)), &keys)) {
+            return fail("invalidValue");
+        }
+        if (keys.size() > kMaxListEntries) {
+            return fail("tooLarge");
+        }
+        for (const QString &key : keys) {
+            if (!removableKeys().contains(key)) {
+                // 不在管理范围内的键一律拒绝（"忽略"会让调用方以为删掉了）
+                return fail("unknownKey");
+            }
+            // 同一个键既赋值又要求删除：拒绝，而不是替调用方猜哪个优先
+            if ((key == QLatin1String(kMaxConcurrentDownloads) && parsed.m_setMaxConcurrentDownloads)
+                || (key == QLatin1String(kLogDriver) && parsed.m_setLogDriver)
+                || (key == QLatin1String(kRegistryMirrors) && parsed.m_setRegistryMirrors)
+                || (key == QLatin1String(kInsecureRegistries) && parsed.m_setInsecureRegistries)) {
+                return fail("conflictingKeys");
+            }
+        }
+        parsed.m_removeKeys = keys;
     }
 
     // dryRun 允许空编辑集（「解锁」时用户还没改任何东西）
@@ -183,8 +217,24 @@ QByteArray PrivilegedConfigRequest::mergeInto(const QByteArray &existingContent)
     edits.registryMirrors = m_registryMirrors;
     edits.setInsecureRegistries = m_setInsecureRegistries;
     edits.insecureRegistries = m_insecureRegistries;
+    edits.concurrentDownloadsEdit = m_setMaxConcurrentDownloads ? ConfigEdit::Set : ConfigEdit::Unchanged;
     edits.maxConcurrentDownloads = m_maxConcurrentDownloads;
+    edits.logDriverEdit = m_setLogDriver ? ConfigEdit::Set : ConfigEdit::Unchanged;
     edits.logDriver = m_logDriver;
+    // 删除意图（remove 列表里的每个键都对应一次 Remove）
+    for (const QString &key : m_removeKeys) {
+        if (key == QLatin1String(kMaxConcurrentDownloads)) {
+            edits.concurrentDownloadsEdit = ConfigEdit::Remove;
+        } else if (key == QLatin1String(kLogDriver)) {
+            edits.logDriverEdit = ConfigEdit::Remove;
+        } else if (key == QLatin1String(kRegistryMirrors)) {
+            edits.setRegistryMirrors = true;
+            edits.registryMirrors.clear();
+        } else if (key == QLatin1String(kInsecureRegistries)) {
+            edits.setInsecureRegistries = true;
+            edits.insecureRegistries.clear();
+        }
+    }
     return document.merged(edits);
 }
 

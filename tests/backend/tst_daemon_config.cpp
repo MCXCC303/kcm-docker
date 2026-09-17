@@ -47,6 +47,8 @@ private Q_SLOTS:
     void mergePreservesUnknownKeys();
     void mergeCanRemoveASetting();
     void mergeOnlyTouchesRequestedKeys();
+    void mergeCanRemoveScalarKeys();
+    void removeIntentIsNotAnEmptyEdit();
     void atomicWriteCreatesBackupAndKeepsContent();
     void refusingEmptyContent();
     void backupsAreListedNewestFirst();
@@ -172,11 +174,45 @@ void DaemonConfigTest::mergeOnlyTouchesRequestedKeys()
 
     const DaemonConfigDocument document = DaemonConfigDocument::fromFile(path);
     DaemonConfigEdits edits;
-    edits.maxConcurrentDownloads = 3; // 只改这一项
+    edits.concurrentDownloadsEdit = ConfigEdit::Set; // 只改这一项
+    edits.maxConcurrentDownloads = 3;
     const QJsonObject root = QJsonDocument::fromJson(document.merged(edits)).object();
     QCOMPARE(root.value(QStringLiteral("registry-mirrors")).toArray().first().toString(), QStringLiteral("https://keep.example.com"));
     QCOMPARE(root.value(QStringLiteral("log-driver")).toString(), QStringLiteral("json-file"));
     QCOMPARE(root.value(QStringLiteral("max-concurrent-downloads")).toInt(), 3);
+}
+
+void DaemonConfigTest::mergeCanRemoveScalarKeys()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.path() + QStringLiteral("/daemon.json");
+    writeFile(path,
+              QByteArrayLiteral("{\"max-concurrent-downloads\":5,\"log-driver\":\"json-file\",\"data-root\":\"/srv\"}"));
+
+    // 「回到默认」= 删掉这个键：不是写 0，也不写空串
+    // （daemon 的默认值会随版本变化，而且那个键可能是用户自己写的）
+    const DaemonConfigDocument document = DaemonConfigDocument::fromFile(path);
+    DaemonConfigEdits edits;
+    edits.concurrentDownloadsEdit = ConfigEdit::Remove;
+    edits.logDriverEdit = ConfigEdit::Remove;
+    const QJsonObject root = QJsonDocument::fromJson(document.merged(edits)).object();
+
+    QVERIFY2(!root.contains(QStringLiteral("max-concurrent-downloads")), "the key must be gone");
+    QVERIFY2(!root.contains(QStringLiteral("log-driver")), "the key must be gone");
+    // 我们不懂的键照旧保留
+    QCOMPARE(root.value(QStringLiteral("data-root")).toString(), QStringLiteral("/srv"));
+}
+
+void DaemonConfigTest::removeIntentIsNotAnEmptyEdit()
+{
+    // 纯删除也是编辑：不能因为"没有值"就被当成"什么都没改"而拒绝保存
+    DaemonConfigEdits edits;
+    edits.logDriverEdit = ConfigEdit::Remove;
+    QVERIFY(!edits.isEmpty());
+
+    DaemonConfigEdits untouched;
+    QVERIFY(untouched.isEmpty());
 }
 
 void DaemonConfigTest::atomicWriteCreatesBackupAndKeepsContent()

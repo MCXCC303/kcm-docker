@@ -176,11 +176,25 @@ QByteArray DaemonConfigDocument::merged(const DaemonConfigEdits &edits) const
             root.insert(QLatin1String(kInsecureRegistries), array);
         }
     }
-    if (edits.maxConcurrentDownloads > 0) {
+    switch (edits.concurrentDownloadsEdit) {
+    case ConfigEdit::Set:
         root.insert(QLatin1String(kMaxConcurrentDownloads), edits.maxConcurrentDownloads);
+        break;
+    case ConfigEdit::Remove:
+        root.remove(QLatin1String(kMaxConcurrentDownloads));
+        break;
+    case ConfigEdit::Unchanged:
+        break;
     }
-    if (!edits.logDriver.isEmpty()) {
+    switch (edits.logDriverEdit) {
+    case ConfigEdit::Set:
         root.insert(QLatin1String(kLogDriver), edits.logDriver);
+        break;
+    case ConfigEdit::Remove:
+        root.remove(QLatin1String(kLogDriver));
+        break;
+    case ConfigEdit::Unchanged:
+        break;
     }
 
     QByteArray content = QJsonDocument(root).toJson(QJsonDocument::Indented);

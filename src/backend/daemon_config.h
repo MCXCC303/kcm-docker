@@ -19,6 +19,22 @@ namespace Kontainer
  * 用户可能配置了 data-root、features、runtimes 等我们不懂的东西，
  * 一个"配置编辑器"把它们弄丢是最不可接受的失败方式。
  */
+/*!
+ * 标量键的编辑意图（ARCH_V5_V8 §2.3）。
+ *
+ * 为什么是三态而不是"用值域兼职"：并发下载数曾经用 `<= 0` 同时表示"不修改"，
+ * 于是**没法表达"删掉这个键、回到 daemon 默认"**——用户把日志驱动设错之后
+ * 只能靠备份或手动编辑回退。Set 与 Remove 分开，界面才能给出「默认」这一项。
+ */
+enum class ConfigEdit {
+    /*! 不动这个键（文件里原来的值原样保留，哪怕我们不懂它）。 */
+    Unchanged,
+    /*! 写入新值。 */
+    Set,
+    /*! 删除这个键（回到 daemon 自己的默认值）。 */
+    Remove,
+};
+
 struct DaemonConfigEdits {
     /*! 是否修改镜像加速器列表。 */
     bool setRegistryMirrors = false;
@@ -26,15 +42,18 @@ struct DaemonConfigEdits {
     /*! 是否修改不安全仓库列表。 */
     bool setInsecureRegistries = false;
     QStringList insecureRegistries;
-    /*! 是否修改并发下载数（<= 0 表示不修改）。 */
-    int maxConcurrentDownloads = -1;
-    /*! 是否修改日志驱动（空表示不修改）。 */
+    /*! 并发下载数：Set 时取 maxConcurrentDownloads，Remove 时删除该键。 */
+    ConfigEdit concurrentDownloadsEdit = ConfigEdit::Unchanged;
+    int maxConcurrentDownloads = 0;
+    /*! 日志驱动：Set 时取 logDriver，Remove 时删除该键。 */
+    ConfigEdit logDriverEdit = ConfigEdit::Unchanged;
     QString logDriver;
 
     /*! 是否什么都没改。 */
     bool isEmpty() const
     {
-        return !setRegistryMirrors && !setInsecureRegistries && maxConcurrentDownloads <= 0 && logDriver.isEmpty();
+        return !setRegistryMirrors && !setInsecureRegistries && concurrentDownloadsEdit == ConfigEdit::Unchanged
+            && logDriverEdit == ConfigEdit::Unchanged;
     }
 };
 

@@ -107,11 +107,30 @@ void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
     if (edits.setInsecureRegistries) {
         arguments.insert(QStringLiteral("insecure-registries"), edits.insecureRegistries);
     }
-    if (edits.maxConcurrentDownloads > 0) {
+    QStringList removeKeys;
+    switch (edits.concurrentDownloadsEdit) {
+    case ConfigEdit::Set:
         arguments.insert(QStringLiteral("max-concurrent-downloads"), edits.maxConcurrentDownloads);
+        break;
+    case ConfigEdit::Remove:
+        removeKeys.append(QStringLiteral("max-concurrent-downloads"));
+        break;
+    case ConfigEdit::Unchanged:
+        break;
     }
-    if (!edits.logDriver.isEmpty()) {
+    switch (edits.logDriverEdit) {
+    case ConfigEdit::Set:
         arguments.insert(QStringLiteral("log-driver"), edits.logDriver);
+        break;
+    case ConfigEdit::Remove:
+        removeKeys.append(QStringLiteral("log-driver"));
+        break;
+    case ConfigEdit::Unchanged:
+        break;
+    }
+    if (!removeKeys.isEmpty()) {
+        // 显式的删除意图：helper 只接受它管理范围内的键名
+        arguments.insert(QStringLiteral("remove"), removeKeys);
     }
     runHelperAction(QString::fromLatin1(kSaveActionName), arguments, Operation::WriteConfig);
 }

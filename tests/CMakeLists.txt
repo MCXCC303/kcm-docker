@@ -62,6 +62,11 @@ kontainer_add_test(tst_operation_controller model/tst_operation_controller.cpp)
 kontainer_add_test(tst_mount_list_model model/tst_mount_list_model.cpp)
 kontainer_add_test(tst_port_mapping_model model/tst_port_mapping_model.cpp)
 kontainer_add_test(tst_qml_load ui/tst_qml_load.cpp)
+# 配置页用例要断言"用户级配置可写 → 控件可编辑"，而 ~/.config 是否可写取决于运行环境
+# （沙箱/CI 里可能不可写）。给它一个自己的 HOME，断言才不随环境漂移。
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tst-home")
+set_tests_properties(tst_qml_load PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;HOME=${CMAKE_BINARY_DIR}/tst-home")
 
 # 从 qrc 加载界面（与插件运行时的加载路径完全一致）。
 #

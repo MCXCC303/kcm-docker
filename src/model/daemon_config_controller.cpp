@@ -5,6 +5,10 @@
 
 #include "model/daemon_config_controller.h"
 
+#include "kauth/privileged_config_request.h"
+
+#include <algorithm>
+
 #include "backend/privileged_config_client.h"
 
 #include <QFileInfo>
@@ -222,12 +226,25 @@ QStringList DaemonConfigController::insecureRegistries() const
 
 int DaemonConfigController::maxConcurrentDownloads() const
 {
-    return m_edits.maxConcurrentDownloads > 0 ? m_edits.maxConcurrentDownloads : m_document.maxConcurrentDownloads();
+    // 0 表示"用 daemon 默认"（界面上显示为「默认」）：包括"删掉这个键"的编辑意图
+    if (m_edits.concurrentDownloadsEdit == ConfigEdit::Set) {
+        return m_edits.maxConcurrentDownloads;
+    }
+    if (m_edits.concurrentDownloadsEdit == ConfigEdit::Remove) {
+        return 0;
+    }
+    return m_document.maxConcurrentDownloads();
 }
 
 QString DaemonConfigController::logDriver() const
 {
-    return m_edits.logDriver.isEmpty() ? m_document.logDriver() : m_edits.logDriver;
+    if (m_edits.logDriverEdit == ConfigEdit::Set) {
+        return m_edits.logDriver;
+    }
+    if (m_edits.logDriverEdit == ConfigEdit::Remove) {
+        return QString();
+    }
+    return m_document.logDriver();
 }
 
 QString DaemonConfigController::dataRoot() const
@@ -335,13 +352,17 @@ void DaemonConfigController::setInsecureRegistries(const QStringList &registries
 
 void DaemonConfigController::setMaxConcurrentDownloads(int value)
 {
-    m_edits.maxConcurrentDownloads = value;
+    // 0 = 回到默认（删除该键），> 0 = 写入
+    m_edits.concurrentDownloadsEdit = value > 0 ? ConfigEdit::Set : ConfigEdit::Remove;
+    m_edits.maxConcurrentDownloads = std::max(0, value);
     setDirty(true);
     Q_EMIT changed();
 }
 
 void DaemonConfigController::setLogDriver(const QString &driver)
 {
+    // 空字符串 = 回到默认（删除该键）
+    m_edits.logDriverEdit = driver.isEmpty() ? ConfigEdit::Remove : ConfigEdit::Set;
     m_edits.logDriver = driver;
     setDirty(true);
     Q_EMIT changed();
@@ -445,6 +466,14 @@ bool DaemonConfigController::restoreBackup(const QString &backupPath)
     Q_EMIT resultChanged();
     Q_EMIT saved();
     return true;
+}
+
+QStringList DaemonConfigController::selectableLogDrivers() const
+{
+    QStringList drivers;
+    drivers.append(QString()); // 「默认」：删除 log-driver 键
+    drivers.append(PrivilegedConfigRequest::allowedLogDrivers());
+    return drivers;
 }
 
 QString DaemonConfigController::privilegedCommand() const

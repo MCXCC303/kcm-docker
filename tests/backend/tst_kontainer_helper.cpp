@@ -36,6 +36,10 @@ private Q_SLOTS:
     void refusesToMergeIntoUnparsableContent();
     void dryRunIsAcceptedWithoutEdits();
     void dryRunStillRejectsUnknownKeys();
+    void acceptsRemovalOfManagedKeys();
+    void rejectsRemovalOfUnmanagedKeys();
+    void rejectsConflictingSetAndRemove();
+    void removalPreservesUnmanagedKeys();
 };
 
 namespace
@@ -197,6 +201,65 @@ void KontainerHelperTest::refusesToMergeIntoUnparsableContent()
 
     // 现有文件是坏 JSON：helper 必须拒绝写（否则会把用户可用的配置换成起不来的）
     QVERIFY2(request.mergeInto(QByteArrayLiteral("{ broken")).isEmpty(), "must not overwrite an unparsable config");
+}
+
+void KontainerHelperTest::acceptsRemovalOfManagedKeys()
+{
+    QVariantMap arguments;
+    arguments.insert(QStringLiteral("remove"), QStringList {QStringLiteral("log-driver"), QStringLiteral("max-concurrent-downloads")});
+
+    PrivilegedConfigRequest request;
+    QString errorKey;
+    QVERIFY(PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey));
+    QCOMPARE(request.removeKeys(), QStringList({QStringLiteral("log-driver"), QStringLiteral("max-concurrent-downloads")}));
+    // 纯删除不是"空请求"：否则界面点保存会被 noEdits 拒掉
+    QVERIFY(!request.isEmpty());
+}
+
+void KontainerHelperTest::rejectsRemovalOfUnmanagedKeys()
+{
+    // helper 只能删它管得着的键：data-root / 任意路径都不行
+    for (const QString &key : {QStringLiteral("data-root"),
+                               QStringLiteral("storage-driver"),
+                               QStringLiteral("features"),
+                               QStringLiteral("../../etc/passwd")}) {
+        QVariantMap arguments;
+        arguments.insert(QStringLiteral("remove"), QStringList {key});
+        PrivilegedConfigRequest request;
+        QString errorKey;
+        QVERIFY2(!PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey), qPrintable(key));
+        QCOMPARE(errorKey, QStringLiteral("unknownKey"));
+    }
+}
+
+void KontainerHelperTest::rejectsConflictingSetAndRemove()
+{
+    // 同一个键既赋值又要求删除：拒绝，而不是替调用方猜哪个优先
+    QVariantMap arguments;
+    arguments.insert(QStringLiteral("log-driver"), QStringLiteral("json-file"));
+    arguments.insert(QStringLiteral("remove"), QStringList {QStringLiteral("log-driver")});
+
+    PrivilegedConfigRequest request;
+    QString errorKey;
+    QVERIFY(!PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey));
+    QCOMPARE(errorKey, QStringLiteral("conflictingKeys"));
+}
+
+void KontainerHelperTest::removalPreservesUnmanagedKeys()
+{
+    const QByteArray existing = QByteArrayLiteral(
+        "{\"log-driver\":\"json-file\",\"max-concurrent-downloads\":5,\"data-root\":\"/srv\"}");
+
+    QVariantMap arguments;
+    arguments.insert(QStringLiteral("remove"), QStringList {QStringLiteral("log-driver")});
+    PrivilegedConfigRequest request;
+    QString errorKey;
+    QVERIFY(PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey));
+
+    const QJsonObject root = QJsonDocument::fromJson(request.mergeInto(existing)).object();
+    QVERIFY(!root.contains(QStringLiteral("log-driver")));
+    QCOMPARE(root.value(QStringLiteral("max-concurrent-downloads")).toInt(), 5);
+    QCOMPARE(root.value(QStringLiteral("data-root")).toString(), QStringLiteral("/srv"));
 }
 
 void KontainerHelperTest::dryRunIsAcceptedWithoutEdits()
