@@ -37,12 +37,16 @@ private Q_SLOTS:
     void readsImageList();
     void missingSocketProducesClearError();
     void pullsAnImageWhenExplicitlyRequested();
+    void readsHistoricalLogsOfAnExistingContainer();
 };
 
 void DockerBackendIntegrationTest::initTestCase()
 {
     setupTranslationDomain();
     qRegisterMetaType<Kontainer::DockerError>("Kontainer::DockerError");
+    qRegisterMetaType<Kontainer::LogLine>("Kontainer::LogLine");
+    qRegisterMetaType<QList<Kontainer::LogLine>>("QList<Kontainer::LogLine>");
+    qRegisterMetaType<Kontainer::DockerBackendInterface::LogStreamEnd>("Kontainer::DockerBackendInterface::LogStreamEnd");
 
     const DockerEndpoint endpoint = DockerEndpoint::fromEnvironment();
     if (!endpoint.isValid() || !QFileInfo::exists(endpoint.socketPath())) {
@@ -194,6 +198,68 @@ void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
         }
     }
     QVERIFY2(sawComplete, "the pull stream must end with a completed state");
+}
+
+/*!
+ * 真实 daemon 的历史日志（ARCH_V5_V8 §3.1.5）。
+ *
+ * **只读**：`GET /containers/{id}/logs?follow=0`，不创建、不启动、不停止任何容器。
+ * 机器上没有容器时跳过——测试不得以"用户的 Docker 环境"为唯一 fixture（ARCH_V4 §5.3）。
+ */
+void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
+{
+    DockerBackend backend;
+    QSignalSpy containersSpy(&backend, &DockerBackend::containersUpdated);
+    backend.refreshAll();
+    QTRY_VERIFY_WITH_TIMEOUT(containersSpy.count() > 0, 15000);
+
+    const QList<Container> containers = backend.containers();
+    if (containers.isEmpty()) {
+        QSKIP("no container on this machine to read logs from");
+    }
+
+    // 从有输出的容器里挑一个：纯"读了但一行都没有"无法验证解复用真的工作。
+    // 只读（follow=0），不改动任何容器；全部容器都没有输出时跳过。
+    int inspected = 0;
+    for (const Container &container : containers) {
+        if (++inspected > 8) {
+            break; // 别把整个列表都扫一遍
+        }
+        QSignalSpy detailSpy(&backend, &DockerBackend::containerDetailUpdated);
+        backend.inspectContainer(container.id);
+        QTRY_VERIFY_WITH_TIMEOUT(detailSpy.count() > 0, 15000);
+        const bool tty = backend.containerDetail().tty;
+
+        QSignalSpy linesSpy(&backend, &DockerBackend::containerLogLines);
+        QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
+        backend.startContainerLogs(container.id, tty, false, 20); // follow=0：读完历史就结束
+        QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() > 0, 20000);
+
+        const auto end = finishedSpy.at(0).at(1).value<DockerBackendInterface::LogStreamEnd>();
+        if (end == DockerBackendInterface::LogStreamEnd::Failed) {
+            // journald / syslog 之类的日志驱动本来就不可读：换下一个
+            continue;
+        }
+        QCOMPARE(end, DockerBackendInterface::LogStreamEnd::Ended);
+
+        int lineCount = 0;
+        for (const QVariantList &call : linesSpy) {
+            const QList<LogLine> lines = call.at(1).value<QList<LogLine>>();
+            for (const LogLine &line : lines) {
+                ++lineCount;
+                // 解复用出来的行必须是可读文本：不能残留 8 字节帧头那种控制字符
+                QVERIFY2(!line.text.contains(QChar(0x01)) && !line.text.contains(QChar(0x02)),
+                         "frame header bytes must never end up in the log text");
+                QVERIFY2(!line.text.contains(QChar(0x1b)), "ANSI escapes must be stripped");
+            }
+        }
+        if (lineCount > 0) {
+            qInfo("read %d log line(s) from container %s (tty=%d)", lineCount, qPrintable(container.name), int(tty));
+            return;
+        }
+    }
+
+    QSKIP("no container on this machine has readable log output");
 }
 
 QTEST_GUILESS_MAIN(DockerBackendIntegrationTest)
