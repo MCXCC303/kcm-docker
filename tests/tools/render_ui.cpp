@@ -646,6 +646,14 @@ int main(int argc, char **argv)
         backend->emitLogLines(QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"), lines);
     }
 
+    // QML 运行期警告必须看得见：截图上"少了一块"往往就是某个 delegate 没建起来，
+    // 而 qWarning 在离屏环境里可能被吞掉（这里显式打到 stderr）
+    QObject::connect(&engine, &QQmlEngine::warnings, [](const QList<QQmlError> &warnings) {
+        for (const QQmlError &warning : warnings) {
+            std::fprintf(stderr, "QML: %s\n", qPrintable(warning.toString()));
+        }
+    });
+
     // 等布局与 delegate 完成（一次事件循环 + 一小段等待即可）
     QTimer::singleShot(900, &app, [&]() {
         const QImage image = window.grabWindow();

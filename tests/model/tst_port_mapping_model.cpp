@@ -32,6 +32,9 @@ private Q_SLOTS:
     void sortsByContainerPortThenProtocol();
     void chipTextsAreStable();
     void unchangedPortsDoNotResetTheModels();
+    void groupsBindingsOfTheSameContainerPort();
+    void groupingKeepsProtocolsApartAndIgnoresUnpublished();
+    void groupsDoNotResetWhenUnchanged();
 
 private:
     ContainerDetail detailWithPorts(const QList<Port> &ports);
@@ -167,6 +170,92 @@ void PortMappingModelTest::unchangedPortsDoNotResetTheModels()
     backend.completeRefresh();
     QCOMPARE(publishedReset.count(), 0);
     QCOMPARE(unpublishedReset.count(), 0);
+}
+
+/*!
+ * 分组（ARCH_V5_V8 §2.1 拓扑形态修订）：同一个容器端口的多条绑定合成一组，
+ * 左列只出现一枚芯片，右侧按绑定数分支。
+ */
+void PortMappingModelTest::groupsBindingsOfTheSameContainerPort()
+{
+    MockDockerBackend backend;
+    ContainerDetailController controller(&backend);
+
+    backend.setContainerDetail(detailWithPorts({
+        Port {QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
+        Port {QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")},
+        Port {QStringLiteral("127.0.0.1"), 8888, 20204, QStringLiteral("tcp")},
+        Port {QStringLiteral("0.0.0.0"), 4800, 4800, QStringLiteral("tcp")},
+    }));
+
+    controller.setContainerId(QStringLiteral("cid-1"));
+    controller.start();
+    backend.completeRefresh();
+
+    PortMappingGroupModel *groups = controller.portGroups();
+    QVERIFY(groups);
+    QCOMPARE(groups->count(), 2);
+    QCOMPARE(groups->bindingCount(), 4);
+
+    const QModelIndex first = groups->index(0, 0);
+    QCOMPARE(first.data(PortMappingGroupModel::ContainerChipTextRole).toString(), QStringLiteral("4800/tcp"));
+    QCOMPARE(first.data(PortMappingGroupModel::BindingCountRole).toInt(), 1);
+
+    const QModelIndex second = groups->index(1, 0);
+    QCOMPARE(second.data(PortMappingGroupModel::ContainerChipTextRole).toString(), QStringLiteral("8888/tcp"));
+    QCOMPARE(second.data(PortMappingGroupModel::BindingCountRole).toInt(), 3);
+    // 组内顺序确定：按宿主端口、宿主地址（刷新时行不会跳）
+    QCOMPARE(second.data(PortMappingGroupModel::HostChipTextsRole).toStringList(),
+             QStringList({QStringLiteral("0.0.0.0:20004"), QStringLiteral(":::20004"), QStringLiteral("127.0.0.1:20204")}));
+}
+
+void PortMappingModelTest::groupingKeepsProtocolsApartAndIgnoresUnpublished()
+{
+    MockDockerBackend backend;
+    ContainerDetailController controller(&backend);
+
+    // 同号但协议不同 = 两个不同的端口；未发布的端口没有宿主端点，不进拓扑
+    backend.setContainerDetail(detailWithPorts({
+        Port {QStringLiteral("0.0.0.0"), 53, 53, QStringLiteral("tcp")},
+        Port {QStringLiteral("0.0.0.0"), 53, 53, QStringLiteral("udp")},
+        Port {QString(), 9000, 0, QStringLiteral("tcp")},
+    }));
+
+    controller.setContainerId(QStringLiteral("cid-1"));
+    controller.start();
+    backend.completeRefresh();
+
+    QCOMPARE(controller.portGroups()->count(), 2);
+    QCOMPARE(controller.portGroups()->index(0, 0).data(PortMappingGroupModel::ProtocolRole).toString(), QStringLiteral("tcp"));
+    QCOMPARE(controller.portGroups()->index(1, 0).data(PortMappingGroupModel::ProtocolRole).toString(), QStringLiteral("udp"));
+    QCOMPARE(controller.portGroups()->bindingCount(), 2);
+    // 未发布的仍然出现在它自己的模型里（页面单独成组说明）
+    QCOMPARE(controller.unpublishedPorts()->count(), 1);
+}
+
+void PortMappingModelTest::groupsDoNotResetWhenUnchanged()
+{
+    MockDockerBackend backend;
+    ContainerDetailController controller(&backend);
+    const auto detail = detailWithPorts({
+        Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
+        Port {QStringLiteral("127.0.0.1"), 80, 8081, QStringLiteral("tcp")},
+    });
+    backend.setContainerDetail(detail);
+
+    controller.setContainerId(QStringLiteral("cid-1"));
+    controller.start();
+    backend.completeRefresh();
+
+    QSignalSpy resetSpy(controller.portGroups(), &QAbstractItemModel::modelReset);
+    QCOMPARE(resetSpy.count(), 0);
+    // 再刷新一次同样的数据：不重建模型（delegate 不会被销毁重建）
+    backend.setContainerDetail(detail);
+    controller.refresh();
+    backend.completeRefresh();
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(controller.portGroups()->count(), 1);
+    QCOMPARE(controller.portGroups()->bindingCount(), 2);
 }
 
 QTEST_MAIN(PortMappingModelTest)

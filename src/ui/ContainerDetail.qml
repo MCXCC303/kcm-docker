@@ -596,8 +596,9 @@ KCM.AbstractKCM {
                     /* 拓扑：左列容器端口、右列宿主绑定，连线为装饰（§2.1.2） */
                     Components.PortTopology {
                         Layout.fillWidth: true
-                        visible: !page.controller.publishedPorts.empty
-                        model: page.controller.publishedPorts
+                        // 用**分组**模型：同一个容器端口的多条绑定会合并成一条分支线
+                        visible: !page.controller.portGroups.empty
+                        model: page.controller.portGroups
                         containerLabel: page.controller.name.length > 0 ? page.controller.name : i18n("Container")
                         hostLabel: page.engineHostName
                         // 同一个容器永远同色：种子就是容器 id（ARCH_V4 §2.1.2）

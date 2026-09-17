@@ -1888,6 +1888,7 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     QQuickItem *topology = childByObjectName(page, QStringLiteral("portTopology"));
     QVERIFY2(topology, "port topology not found");
     QVERIFY2(topology->property("visible").toBool(), "published ports must render the topology");
+    // 分组：80/tcp 有两条绑定、443/tcp 一条 → 高度之和仍与"一行一条"时相同
     QCOMPARE(topology->property("implicitHeight").toReal(), topology->property("headerHeight").toReal() + 3 * topology->property("rowHeight").toReal());
 
     int rows = 0;
@@ -1908,9 +1909,9 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     };
     count(topology);
 
-    // 一条映射 = 一行 = 两侧各一枚芯片（两个宿主地址属于同一个容器端口 → 两行）
-    QCOMPARE(rows, 3);
-    QCOMPARE(containerChips, 3);
+    // 合并：同一个容器端口的多条绑定只占**一行**（左侧一枚芯片），右侧仍然一条一枚
+    QCOMPARE(rows, 2);
+    QCOMPARE(containerChips, 2);
     QCOMPARE(hostChips, 3);
 
     {
@@ -1933,10 +1934,12 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         QVERIFY(row0 && chip);
         const qreal headerHeight = topology->property("headerHeight").toReal();
         const qreal rowHeight = topology->property("rowHeight").toReal();
-        QCOMPARE(row0->y(), headerHeight);
-        QCOMPARE(row0->height(), rowHeight);
-        // 允许 1px 的取整误差：连线画在 rowHeight / 2 上
-        QVERIFY(qAbs(chip->y() + chip->height() / 2 - rowHeight / 2) <= 1.0);
+        // 行的 y 是相对列定位器的，比较时换算到拓扑的坐标系
+        QCOMPARE(row0->mapToItem(topology, QPointF(0, 0)).y(), headerHeight);
+        // 两条绑定的分组占两行高；左侧芯片垂直居中于整组（连线起点也在组中心）
+        QCOMPARE(row0->height(), 2 * rowHeight);
+        QVERIFY2(qAbs(chip->y() + chip->height() / 2 - row0->height() / 2) <= 1.0,
+                 "the container chip must sit at the centre of its group");
     }
 
     // 连线层只是装饰（QML 里标了 Accessible.ignored）：这里断言「信息不在图形里」——
@@ -1950,14 +1953,19 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
                 ++linkLayers;
                 QCOMPARE(child->width(), child->parentItem()->width());
                 QCOMPARE(child->height(), child->parentItem()->height());
-                linkColors.insert(child->property("linkColor").value<QColor>().name());
+                const QVariantList colors = child->property("branchColors").toList();
+                QCOMPARE(colors.size(), child->property("branchCount").toInt());
+                for (const QVariant &color : colors) {
+                    linkColors.insert(color.toString());
+                }
             }
             collectLinks(child);
         }
     };
     collectLinks(topology);
-    QCOMPARE(linkLayers, 3);
-    QVERIFY2(linkColors.size() >= 2, "links of different mappings must be distinguishable");
+    // 每个分组一张 Canvas（两条分支共用同一张，起点只画一次）
+    QCOMPARE(linkLayers, 2);
+    QVERIFY2(linkColors.size() >= 2, "branches of different bindings must be distinguishable");
 
     int nonEmptyChips = 0;
     std::function<void(QQuickItem *)> checkText = [&](QQuickItem *item) {
@@ -1971,7 +1979,8 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         }
     };
     checkText(topology);
-    QCOMPARE(nonEmptyChips, 6);
+    // 合并后：2 枚容器端口芯片 + 3 枚宿主绑定芯片，全部有文字（信息不在图形里）
+    QCOMPARE(nonEmptyChips, 5);
 }
 
 /*!

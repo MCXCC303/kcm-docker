@@ -111,6 +111,8 @@ add_library(kontainer_core STATIC
     model/mount_list_model.h
     model/operation_controller.cpp
     model/operation_controller.h
+    model/port_mapping_group_model.cpp
+    model/port_mapping_group_model.h
     model/port_mapping_model.cpp
     model/port_mapping_model.h
     model/presentation.cpp

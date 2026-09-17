@@ -10,6 +10,7 @@
 #include "backend/host_path_service.h"
 #include "model/detail_list_model.h"
 #include "model/mount_list_model.h"
+#include "model/port_mapping_group_model.h"
 #include "model/port_mapping_model.h"
 #include "model/container_log_controller.h"
 #include "model/metrics_model.h"
@@ -79,6 +80,13 @@ class ContainerDetailController : public QObject
     Q_PROPERTY(Kontainer::PortMappingModel *publishedPorts READ publishedPorts CONSTANT)
     /*! 只 EXPOSE、没有映射到宿主的端口。 */
     Q_PROPERTY(Kontainer::PortMappingModel *unpublishedPorts READ unpublishedPorts CONSTANT)
+    /*!
+     * 按容器端口分组后的已发布映射（拓扑图用）。
+     *
+     * 同一个容器端口映射到多个宿主地址时，左列只出现一次、右侧用分支连出去
+     * （ARCH_V5_V8 §2.1 拓扑形态修订）。
+     */
+    Q_PROPERTY(Kontainer::PortMappingGroupModel *portGroups READ portGroups CONSTANT)
     Q_PROPERTY(Kontainer::DetailListModel *networks READ networks CONSTANT)
     Q_PROPERTY(Kontainer::MountListModel *mounts READ mounts CONSTANT)
     /*! 最近一次「打开宿主目录」的失败说明；为空表示没有失败。 */
@@ -214,6 +222,10 @@ public:
     {
         return m_unpublishedPorts;
     }
+    PortMappingGroupModel *portGroups() const
+    {
+        return m_portGroups;
+    }
     DetailListModel *networks() const
     {
         return m_networks;
@@ -296,6 +308,7 @@ private:
     MetricsModel *m_metrics = nullptr;
     ContainerLogController *m_logs = nullptr;
     PortMappingModel *m_publishedPorts = nullptr;
+    PortMappingGroupModel *m_portGroups = nullptr;
     PortMappingModel *m_unpublishedPorts = nullptr;
     DetailListModel *m_networks = nullptr;
     MountListModel *m_mounts = nullptr;

@@ -27,6 +27,7 @@ ContainerDetailController::ContainerDetailController(DockerBackendInterface *bac
     , m_metrics(new MetricsModel(this))
     , m_logs(new ContainerLogController(backend, this))
     , m_publishedPorts(new PortMappingModel(this))
+    , m_portGroups(new PortMappingGroupModel(this))
     , m_unpublishedPorts(new PortMappingModel(this))
     , m_networks(new DetailListModel(this))
     , m_mounts(new MountListModel(this))
@@ -297,6 +298,7 @@ void ContainerDetailController::rebuildPorts()
 
     m_publishedPorts->setMappings(published);
     m_unpublishedPorts->setMappings(unpublished);
+    m_portGroups->setEntries(published);
 }
 
 QList<MountEntry> ContainerDetailController::mountEntries() const
