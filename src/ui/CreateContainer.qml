@@ -39,7 +39,7 @@ Kirigami.Page {
     objectName: "createContainerPage"
 
     /*! 预设管理面板是否展开（挂载步骤里）。 */
-    property bool presetPanelOpen: bool = false
+    property bool presetPanelOpen: false
 
     /*! 点击步骤按钮被拒绝时的原因 key（空 = 没有）。 */
     property string stepJumpErrorKey: ""

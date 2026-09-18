@@ -81,6 +81,7 @@ class SourceConventionsTest : public QObject
 
 private Q_SLOTS:
     void copyActionHasSingleImplementation();
+    void qmlPropertiesUseValidSyntax();
     void statusColorsStayInPalettes();
     void mutationsHaveSingleChokePoint();
     void restPathsStayInOneHeader();
@@ -116,6 +117,37 @@ void SourceConventionsTest::copyActionHasSingleImplementation()
  * 状态语义色只允许出现在 StatusPalette 里（ARCH_V2 §12 / ARCH_V3 §2.1）。
  * 数据可视化使用 ChartPalette 的固定取色，两者不得混用。
  */
+/*!
+ * QML 属性声明必须是合法写法（`property bool foo: false`）。
+ *
+ * 这条是拿一次真实事故换来的：`property bool foo: bool = false` 这种写法在**运行时**才报
+ * `Error: Invalid write to global property "bool"`，属性根本没被声明成功（界面上的开关因此
+ * 静默失效），而单元测试与编译都不会报错——因为它是合法 JSON 意义上的"表达式"，
+ * 要跑起来才炸。这里用源码扫描把它挡在提交之前。
+ */
+void SourceConventionsTest::qmlPropertiesUseValidSyntax()
+{
+    const QMap<QString, QString> files = collectFiles(sourceDir() + QStringLiteral("/src/ui"), {QStringLiteral("*.qml")});
+    QVERIFY(!files.isEmpty());
+
+    // property <type> <name>: <type> = ...  ← 冒号后面又写了一次类型，是错的
+    static const QRegularExpression suspicious(
+        QStringLiteral(R"(^\s*property\s+\w+\s+\w+\s*:\s*(bool|int|real|string|var|double|url|color)\s*=)"));
+    QStringList violations;
+    for (auto it = files.constBegin(); it != files.constEnd(); ++it) {
+        const QStringList lines = it.value().split(QLatin1Char('\n'));
+        for (int index = 0; index < lines.size(); ++index) {
+            const QRegularExpressionMatch match = suspicious.match(lines.at(index));
+            if (match.hasMatch()) {
+                violations.append(QStringLiteral("%1:%2  %3").arg(it.key()).arg(index + 1).arg(lines.at(index).trimmed()));
+            }
+        }
+    }
+    QVERIFY2(violations.isEmpty(),
+             qPrintable(QStringLiteral("invalid QML property declaration (property <type> <name>: <type> = …):\n")
+                        + violations.join(QLatin1Char('\n'))));
+}
+
 void SourceConventionsTest::statusColorsStayInPalettes()
 {
     const QMap<QString, QString> files = collectFiles(sourceDir() + QStringLiteral("/src/ui"), {QStringLiteral("*.qml")});
