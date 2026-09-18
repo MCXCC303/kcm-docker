@@ -6,6 +6,7 @@
 #include "domain/container.h"
 #include "domain/container_create_request.h"
 #include "model/container_detail_controller.h"
+#include "model/command_history_store.h"
 #include "model/create_container_controller.h"
 #include "model/mount_preset_store.h"
 #include "model/operation_controller.h"
@@ -45,6 +46,7 @@ private Q_SLOTS:
     void wizardBuildsTheRequestAndSubmits();
     void cloneCopiesTheFullConfiguration();
     void suggestsNamesFromTheImageAndOccupancy();
+    void commandHistoryRecordsAndMerges();
     void presetStoreDeduplicatesAndTrimsRecents();
 };
 
@@ -623,6 +625,70 @@ void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
     QVERIFY2(joined.contains(QStringLiteral("/app")), qPrintable(joined));
     QVERIFY2(joined.contains(QStringLiteral("1000:1000")), qPrintable(joined));
 }
+
+/*!
+ * 命令历史（F3）：本地记录（去重 / 上限 / 持久化）+ 已有容器命令的合并。
+ */
+void ContainerCreateTest::commandHistoryRecordsAndMerges()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("kontainerrc"));
+
+    {
+        CommandHistoryStore history(path);
+        QVERIFY(history.empty());
+
+        // 多行命令要整条存下来（用 QStringList 存会被换行拆散，所以底层是 JSON 数组）
+        history.record(QStringLiteral("sh\n-c\nsleep infinity"));
+        history.record(QStringLiteral("nginx -g 'daemon off;'"));
+        QCOMPARE(history.commands().size(), 2);
+        QCOMPARE(history.commands().first(), QStringLiteral("nginx -g 'daemon off;'")); // 最近的在最前
+
+        // 重复的提到最前，不新增
+        history.record(QStringLiteral("sh\n-c\nsleep infinity"));
+        QCOMPARE(history.commands().size(), 2);
+        QCOMPARE(history.commands().first(), QStringLiteral("sh\n-c\nsleep infinity"));
+
+        // 空命令不记
+        history.record(QStringLiteral("   "));
+        QCOMPARE(history.commands().size(), 2);
+
+        // 上限：超出后丢弃最旧的
+        for (int i = 0; i < CommandHistoryStore::kMaxEntries + 5; ++i) {
+            history.record(QStringLiteral("cmd-%1").arg(i));
+        }
+        QCOMPARE(history.commands().size(), CommandHistoryStore::kMaxEntries);
+        QVERIFY(history.commands().first() == QStringLiteral("cmd-%1").arg(CommandHistoryStore::kMaxEntries + 4));
+
+        // 已有容器的命令：合并进来（不写盘），并且去重
+        history.mergeExternal({QStringLiteral("nginx -g 'daemon off;'"), QStringLiteral("from-container")});
+        QVERIFY(history.commands().contains(QStringLiteral("from-container")));
+        QCOMPARE(history.commands().count(QStringLiteral("nginx -g 'daemon off;'")), 1);
+        // 外部来源标记为 container
+        bool foundExternal = false;
+        for (const QVariant &entry : history.entries()) {
+            const QVariantMap row = entry.toMap();
+            if (row.value(QStringLiteral("command")).toString() == QLatin1String("from-container")) {
+                foundExternal = row.value(QStringLiteral("source")).toString() == QLatin1String("container");
+            }
+        }
+        QVERIFY2(foundExternal, "commands from existing containers must be marked as such");
+    }
+
+    // 重新打开：只有**本地记录**被持久化（外部来源是临时的）
+    CommandHistoryStore reopened(path);
+    QCOMPARE(reopened.commands().size(), CommandHistoryStore::kMaxEntries);
+    QVERIFY(!reopened.commands().contains(QStringLiteral("from-container")));
+    QVERIFY(reopened.commands().first() == QStringLiteral("cmd-%1").arg(CommandHistoryStore::kMaxEntries + 4));
+
+    // 清空本地记录
+    reopened.clearLocal();
+    QVERIFY(reopened.empty());
+    CommandHistoryStore afterClear(path);
+    QVERIFY2(afterClear.empty(), "clearing must persist");
+}
+
 
 QTEST_MAIN(ContainerCreateTest)
 

@@ -295,31 +295,30 @@ Kirigami.Page {
                         Layout.fillWidth: true
                         text: i18n("Local images:")
                         font.bold: true
-                        visible: imageRepeater.count > 0
+                        visible: page.controller.availableImages.length > 0
                     }
 
-                    Repeater {
-                        id: imageRepeater
+                    // 可搜索下拉（用户实测 F3：镜像版本多时逐个点选太慢）
+                    Components.FilteredComboBox {
+                        id: imageCombo
 
-                        model: page.controller.availableImages
-
-                        delegate: QQC2.RadioButton {
-                            id: imageOption
-
-                            required property var modelData
-
-                            objectName: "wizardImageOption"
-                            Layout.fillWidth: true
-                            checked: page.controller.image === imageOption.modelData.reference
-                            text: imageOption.modelData.reference
-                            onClicked: page.controller.image = imageOption.modelData.reference
+                        objectName: "wizardImageCombo"
+                        Layout.fillWidth: true
+                        visible: page.controller.availableImages.length > 0
+                        entries: page.controller.availableImages
+                        textRole: "reference"
+                        searchPlaceholder: i18n("Search images…")
+                        onSelected: function (entry) {
+                            page.controller.image = entry.reference;
                         }
                     }
 
                     Components.EmptyPlaceholder {
                         objectName: "wizardNoLocalImages"
                         Layout.fillWidth: true
-                        message: imageRepeater.count === 0 ? i18n("No local images. Pull one from the Images tab first.") : ""
+                        message: page.controller.availableImages.length === 0
+                            ? i18n("No local images. Pull one from the Images tab first.")
+                            : ""
                     }
                 }
 
@@ -473,6 +472,21 @@ Kirigami.Page {
                         Layout.fillWidth: true
                         text: i18n("Command and entry point (optional)")
                         font.bold: true
+                    }
+
+                    // 命令历史（F3）：本地记录 + 已有容器的命令，挑一条直接填进下面的输入框
+                    Components.FilteredComboBox {
+                        id: commandHistoryCombo
+
+                        objectName: "wizardCommandHistoryCombo"
+                        Layout.fillWidth: true
+                        entries: page.controller.commandHistory.entries
+                        textRole: "command"
+                        searchPlaceholder: i18n("Search previous commands…")
+                        placeholder: i18n("Reuse a previous command…")
+                        onSelected: function (entry) {
+                            page.controller.commandText = entry.command;
+                        }
                     }
 
                     QQC2.TextArea {

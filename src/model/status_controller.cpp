@@ -55,7 +55,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
     // 挂载预设是"这个工具的数据"（~/.config/kontainerrc），不是系统设置（§1.5.3）
     // 挂载预设：注入时用注入的（测试/渲染用临时文件，绝不写用户真实配置）
     , m_mountPresets(mountPresetStore ? mountPresetStore : new MountPresetStore({}, this))
-    , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, this))
+    , m_commandHistory(new CommandHistoryStore({}, this))
+    , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, m_commandHistory, this))
     // 目录选择：注入时用注入的（测试与离屏渲染不弹真实对话框）
     , m_directoryPicker(directoryPicker ? directoryPicker : new SystemDirectoryPicker(this))
     , m_busyWatchdog(new QTimer(this))

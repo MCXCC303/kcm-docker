@@ -16,6 +16,7 @@
 namespace Kontainer
 {
 
+class CommandHistoryStore;
 class ContainerDetailController;
 class OperationController;
 
@@ -75,7 +76,8 @@ class CreateContainerController : public QObject
     Q_PROPERTY(QVariantList labelRows READ labelRows WRITE setLabelRows NOTIFY changed)
     Q_PROPERTY(QVariantList mountRows READ mountRows WRITE setMountRows NOTIFY changed)
 
-    /*! 挂载预设（摘要形式，界面据此铺"快速添加"列表）。 */
+    /*! 命令历史（本地记录 + 已有容器的命令）。 */
+    Q_PROPERTY(Kontainer::CommandHistoryStore *commandHistory READ commandHistory CONSTANT)
     Q_PROPERTY(QVariantList presets READ presets NOTIFY presetsChanged)
     /*!
      * 选择列表：本地镜像与可用网络。
@@ -94,6 +96,7 @@ public:
                               MountPresetStore *presets,
                               DockerBackendInterface *backend,
                               ContainerDetailController *containerDetail = nullptr,
+                              CommandHistoryStore *commandHistory = nullptr,
                               QObject *parent = nullptr);
 
     /*! 步骤 key 顺序（界面与测试共用；不要在 QML 里另抄一份）。 */
@@ -133,6 +136,10 @@ public:
     QVariantList labelRows() const;
     QVariantList mountRows() const;
     QVariantList presets() const;
+    CommandHistoryStore *commandHistory() const
+    {
+        return m_commandHistory;
+    }
     QVariantList summary() const;
 
     void setName(const QString &value);
@@ -161,6 +168,13 @@ public:
 
     /*! 从空白开始（可选预填镜像，供镜像卡片/详情进入时使用）。 */
     Q_INVOKABLE void reset(const QString &presetImage = {});
+    /*!
+     * 把"已有容器的命令"并入命令历史候选（不写盘）：当前打开的那个容器详情里的命令。
+     *
+     * 容器列表本身没有命令（要 inspect 才有），因此这里只取**已经加载过**的那一份——
+     * 为了一次下拉去逐个 inspect 所有容器不值得（登记为偏离，见 ARCH）。
+     */
+    Q_INVOKABLE int mergeCommandsFromExistingContainers();
     /*! 克隆：用现有容器的**配置**预填（不复制运行时状态，§4.5）。 */
     Q_INVOKABLE bool prefillFromContainer(const QString &containerId);
     /*! 名称冲突时给一个可用的候选名（`web` → `web-copy`）。 */
@@ -233,6 +247,7 @@ private:
     DockerBackendInterface *m_backend = nullptr;
     /*! 容器详情控制器（可能为空）：克隆时用它拿命令/入口点/环境/标签等完整配置。 */
     ContainerDetailController *m_containerDetail = nullptr;
+    CommandHistoryStore *m_commandHistory = nullptr;
 
     int m_stepIndex = 0;
 

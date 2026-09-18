@@ -6,6 +6,7 @@
 #include "model/create_container_controller.h"
 
 #include "domain/container.h"
+#include "model/command_history_store.h"
 #include "model/container_detail_controller.h"
 #include "model/operation_controller.h"
 
@@ -43,12 +44,14 @@ CreateContainerController::CreateContainerController(OperationController *operat
                                                      MountPresetStore *presets,
                                                      DockerBackendInterface *backend,
                                                      ContainerDetailController *containerDetail,
+                                                     CommandHistoryStore *commandHistory,
                                                      QObject *parent)
     : QObject(parent)
     , m_operations(operations)
     , m_presets(presets)
     , m_backend(backend)
     , m_containerDetail(containerDetail)
+    , m_commandHistory(commandHistory)
 {
     Q_ASSERT(m_operations);
     Q_ASSERT(m_presets);
@@ -1050,6 +1053,20 @@ QVariantMap CreateContainerController::requestMap() const
     return request;
 }
 
+int CreateContainerController::mergeCommandsFromExistingContainers()
+{
+    if (!m_commandHistory) {
+        return 0;
+    }
+    QStringList commands;
+    if (m_containerDetail && m_containerDetail->hasDetail() && !m_containerDetail->command().isEmpty()) {
+        commands.append(m_containerDetail->command().join(QLatin1Char(' ')));
+    }
+    const int before = m_commandHistory->commands().size();
+    m_commandHistory->mergeExternal(commands);
+    return m_commandHistory->commands().size() - before;
+}
+
 bool CreateContainerController::submit()
 {
     if (!canAdvance()) {
@@ -1070,6 +1087,10 @@ bool CreateContainerController::submit()
         mounts.append(mount);
     }
     m_presets->noteUsed(mounts);
+    // 成功提交后记下命令（F3：下次可以直接从历史里挑）
+    if (m_commandHistory && !m_commandText.trimmed().isEmpty()) {
+        m_commandHistory->record(m_commandText);
+    }
     return true;
 }
 

@@ -175,6 +175,7 @@ private Q_SLOTS:
     void topologyAlignsTheContainerChipWithTheFirstBinding();
     void portEditorColoursEachRowDifferently();
     void serviceCardConfirmsRiskyActions();
+    void filteredComboBoxNarrowsAndSelects();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2275,6 +2276,71 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
 }
 
 
+/*!
+ * 可搜索下拉（F3）：输入过滤、没有匹配时给提示、选中把整条数据交回去。
+ */
+void QmlLoadTest::filteredComboBoxNarrowsAndSelects()
+{
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/FilteredComboBox.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+
+    QVariantList entries;
+    for (const QString &reference : {QStringLiteral("alpine:3.19"), QStringLiteral("alpine:latest"),
+                                     QStringLiteral("postgres:17-alpine"), QStringLiteral("registry.example.com/team/app:1.0")}) {
+        entries.append(QVariantMap {{QStringLiteral("reference"), reference}});
+    }
+    QVariantMap initial;
+    initial.insert(QStringLiteral("entries"), entries);
+    initial.insert(QStringLiteral("textRole"), QStringLiteral("reference"));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *combo = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(combo);
+
+    QQuickWindow window;
+    window.resize(700, 400);
+    combo->setParentItem(window.contentItem());
+    combo->setWidth(700);
+    combo->setHeight(400);
+    window.show();
+    QTRY_VERIFY(combo->width() > 0);
+
+    QQuickItem *list = findItemDeep(window.contentItem(), QStringLiteral("filteredComboBoxList"));
+    QQuickItem *search = findItemDeep(window.contentItem(), QStringLiteral("filteredComboBoxSearch"));
+    QQuickItem *emptyHint = findItemDeep(window.contentItem(), QStringLiteral("filteredComboBoxEmpty"));
+    QVERIFY(list && search && emptyHint);
+
+    // 初始：全部四条，没有"没有匹配"的提示
+    QCOMPARE(list->property("count").toInt(), 4);
+    QVERIFY(!emptyHint->property("visible").toBool());
+
+    // 输入过滤（不区分大小写）：注意 `postgres:17-alpine` 也含 "alpine"，所以是 3 条
+    search->setProperty("text", QStringLiteral("ALPINE"));
+    QTRY_COMPARE(list->property("count").toInt(), 3);
+    // 更精确的匹配
+    search->setProperty("text", QStringLiteral("alpine:3"));
+    QTRY_COMPARE(list->property("count").toInt(), 1);
+
+    // 没有匹配：列表为空并给提示
+    search->setProperty("text", QStringLiteral("does-not-exist"));
+    QTRY_COMPARE(list->property("count").toInt(), 0);
+    QTRY_VERIFY(emptyHint->property("visible").toBool());
+    QVERIFY2(!list->property("enabled").toBool(), "an empty list must not be selectable");
+
+    // 清空搜索：恢复全部
+    search->setProperty("text", QString());
+    QTRY_COMPARE(list->property("count").toInt(), 4);
+
+    // 选中：selected(entry) 交回整条数据
+    QSignalSpy selectedSpy(combo, SIGNAL(selected(QVariant)));
+    QVERIFY(QMetaObject::invokeMethod(list, "activated", Q_ARG(int, 2)));
+    QCOMPARE(selectedSpy.count(), 1);
+    QCOMPARE(selectedSpy.at(0).at(0).toMap().value(QStringLiteral("reference")).toString(),
+             QStringLiteral("postgres:17-alpine"));
+}
+
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -2315,6 +2381,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/PortMappingEditor.qml"),
         QStringLiteral("components/MountPresetManager.qml"),
         QStringLiteral("components/ServiceCard.qml"),
+        QStringLiteral("components/FilteredComboBox.qml"),
         QStringLiteral("components/FieldChip.qml"),
         QStringLiteral("components/PortTopology.qml"),
         QStringLiteral("components/ImageRefInput.qml"),

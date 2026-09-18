@@ -23,6 +23,7 @@
 #include "model/network_filter_model.h"
 #include "model/network_detail_controller.h"
 #include "model/network_model.h"
+#include "model/command_history_store.h"
 #include "model/create_container_controller.h"
 #include "model/mount_preset_store.h"
 #include "model/volume_detail_controller.h"
@@ -354,6 +355,10 @@ public:
     {
         return m_services;
     }
+    CommandHistoryStore *commandHistory() const
+    {
+        return m_commandHistory;
+    }
     /*! 细化的连接状态（见 connectionKey 的说明）。 */
     QString connectionKey() const;
     /*! 服务状态变化（连接 key 随之可能变化）。 */
@@ -509,6 +514,8 @@ private:
     /* 注意：这两个依赖 m_operations，**必须**声明在它后面——
        成员初始化顺序按声明顺序走，放在前面会让向导拿到还没构造的 OperationController。 */
     MountPresetStore *m_mountPresets = nullptr;
+    /*! 命令历史（同样是"这个工具的数据"→ ~/.config/kontainerrc）；向导依赖它，必须排在前面。 */
+    CommandHistoryStore *m_commandHistory = nullptr;
     CreateContainerController *m_createContainer = nullptr;
     /*! 目录选择：默认用系统原生对话框；测试/渲染注入替身。 */
     DirectoryPicker *m_directoryPicker = nullptr;

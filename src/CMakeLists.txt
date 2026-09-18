@@ -124,6 +124,8 @@ add_library(kontainer_core STATIC
     model/image_filter_model.h
     model/network_detail_controller.cpp
     model/network_detail_controller.h
+    model/command_history_store.cpp
+    model/command_history_store.h
     model/create_container_controller.cpp
     model/create_container_controller.h
     model/mount_preset_store.cpp
