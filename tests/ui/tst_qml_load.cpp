@@ -174,6 +174,7 @@ private Q_SLOTS:
     void detailOffersCopyForCommandAndEntrypoint();
     void topologyAlignsTheContainerChipWithTheFirstBinding();
     void portEditorColoursEachRowDifferently();
+    void serviceCardConfirmsRiskyActions();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2195,6 +2196,85 @@ void QmlLoadTest::portEditorColoursEachRowDifferently()
 }
 
 
+/*!
+ * 服务卡片（B1）：三行状态、危险动作必须二次确认，确认后才真的发请求。
+ */
+void QmlLoadTest::serviceCardConfirmsRiskyActions()
+{
+    auto *services = m_stubKcm->serviceStatus();
+    QVERIFY(services);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ServiceCard.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("controller"), QVariant::fromValue(m_stubKcm->controller()->daemonConfigSystem()));
+    initial.insert(QStringLiteral("services"), QVariant::fromValue(services));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *card = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(card);
+
+    QQuickWindow window;
+    window.resize(1100, 600);
+    card->setParentItem(window.contentItem());
+    card->setWidth(1100);
+    card->setHeight(600);
+    window.show();
+    QTRY_VERIFY(card->width() > 0);
+
+    // 三行状态（socket / service / containerd），并且默认都是"运行中"
+    QList<QQuickItem *> rows;
+    QList<QQuickItem *> stateLabels;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        rows.clear();
+        stateLabels.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("serviceRow")) {
+                rows.append(node);
+            } else if (node->objectName() == QLatin1String("serviceStateLabel")) {
+                stateLabels.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return rows.size() == 3 && stateLabels.size() == 3;
+    }(), 5000);
+    QVERIFY2(!stateLabels.first()->property("text").toString().isEmpty(), "the state must be readable in text form");
+
+    // 「停止」是危险动作：点了先弹确认，**确认之前一个请求都不发**
+    QQuickItem *stopButton = findItemDeep(window.contentItem(), QStringLiteral("serviceStopButton"));
+    QVERIFY2(stopButton && stopButton->property("visible").toBool(), "a running service offers Stop");
+    QObject *dialog = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((dialog = card->findChild<QObject *>(QStringLiteral("serviceConfirmDialog"))) != nullptr, 5000);
+    QVERIFY(QMetaObject::invokeMethod(stopButton, "clicked"));
+    QTest::qWait(20);
+    QCOMPARE(m_stubKcm->privilegedClient()->serviceRequests, 0);
+    QVERIFY2(!dialog->property("consequenceText").toString().isEmpty(),
+             "a risky action must explain what happens");
+    QTRY_VERIFY(dialog->property("visible").toBool());
+
+    // 确认后才发出请求（unit + 动词与按钮一致）
+    QVERIFY(QMetaObject::invokeMethod(dialog, "confirmed"));
+    QTRY_COMPARE(m_stubKcm->privilegedClient()->serviceRequests, 1);
+    QCOMPARE(m_stubKcm->privilegedClient()->lastServiceUnit, QStringLiteral("docker.socket"));
+    QCOMPARE(m_stubKcm->privilegedClient()->lastServiceVerb, QStringLiteral("stop"));
+    QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+
+    // 「重启」不是危险动作：直接发（不弹确认）
+    QQuickItem *restartButton = findItemDeep(window.contentItem(), QStringLiteral("serviceRestartButton"));
+    QVERIFY(restartButton);
+    QVERIFY(QMetaObject::invokeMethod(restartButton, "clicked"));
+    QTRY_COMPARE(m_stubKcm->privilegedClient()->serviceRequests, 2);
+    QCOMPARE(m_stubKcm->privilegedClient()->lastServiceVerb, QStringLiteral("restart"));
+}
+
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -2234,6 +2314,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/BuildImagePanel.qml"),
         QStringLiteral("components/PortMappingEditor.qml"),
         QStringLiteral("components/MountPresetManager.qml"),
+        QStringLiteral("components/ServiceCard.qml"),
         QStringLiteral("components/FieldChip.qml"),
         QStringLiteral("components/PortTopology.qml"),
         QStringLiteral("components/ImageRefInput.qml"),

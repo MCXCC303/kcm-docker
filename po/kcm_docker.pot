@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:51+0800\n"
+"POT-Creation-Date: 2026-09-19 05:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -38,7 +38,8 @@ msgstr ""
 msgid "Restarting"
 msgstr ""
 
-#: src/model/state_text.cpp:21 src/ui/MainPage.qml:77 src/ui/MainPage.qml:495
+#: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
+#: src/ui/MainPage.qml:77 src/ui/MainPage.qml:495
 msgid "Running"
 msgstr ""
 
@@ -58,9 +59,10 @@ msgstr ""
 msgid "Dead"
 msgstr ""
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:428
-#: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
-#: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
+#: src/model/state_text.cpp:33 src/ui/components/ServiceCard.qml:68
+#: src/ui/ContainerDetail.qml:428 src/ui/EngineStatusView.qml:29
+#: src/ui/EngineStatusView.qml:35 src/ui/EngineStatusView.qml:42
+#: src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
 msgstr ""
 
@@ -80,26 +82,26 @@ msgstr ""
 msgid "Unhealthy"
 msgstr ""
 
-#: src/model/status_controller.cpp:120 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:129 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr ""
 
-#: src/model/status_controller.cpp:123
+#: src/model/status_controller.cpp:132
 msgid "The host path is not a directory."
 msgstr ""
 
-#: src/model/status_controller.cpp:126
+#: src/model/status_controller.cpp:135
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr ""
 
-#: src/model/status_controller.cpp:481
+#: src/model/status_controller.cpp:490
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr ""
 
-#: src/model/status_controller.cpp:714
+#: src/model/status_controller.cpp:723
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
@@ -1340,6 +1342,102 @@ msgstr ""
 msgid "The container path must be absolute."
 msgstr ""
 
+#: src/ui/components/ServiceCard.qml:44
+msgid "Docker socket"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:46
+msgid "Docker service"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:48
+msgid "containerd service"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:60 src/ui/MainPage.qml:89
+#: src/ui/MainPage.qml:503
+msgid "Stopped"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:62
+msgid "Failed"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:64
+msgid "Starting…"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:66
+msgid "Stopping…"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:90 src/ui/ContainerDetail.qml:196
+#: src/ui/ContainerCard.qml:163 src/ui/ContainerCard.qml:167
+msgid "Start"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:92 src/ui/ContainerDetail.qml:204
+#: src/ui/ContainerCard.qml:202 src/ui/ContainerCard.qml:206
+msgid "Stop"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:94 src/ui/ContainerDetail.qml:228
+#: src/ui/DaemonConfigPage.qml:578
+msgid "Restart"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:96
+msgid "Enable at boot"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:98
+msgid "Disable at boot"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:123
+msgid ""
+"Kontainer will not be able to reach the Docker daemon until the socket is "
+"started again."
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:126
+msgid "Running containers of this daemon will be stopped."
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:129
+msgid "The service will not be started automatically at boot."
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:140
+msgid "Services"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:145
+msgid ""
+"Managing these units needs administrator rights; Kontainer asks for them "
+"when you use a button."
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:156
+msgid "The service action failed: %1"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:202
+msgid "Enabled at boot"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:202
+msgid "Not enabled at boot"
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:271
+msgid "The state of these services cannot be read (systemd is not reachable)."
+msgstr ""
+
+#: src/ui/components/ServiceCard.qml:283
+msgid "%1 “%2”?"
+msgstr ""
+
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr ""
@@ -1584,20 +1682,6 @@ msgstr ""
 
 #: src/ui/ContainerDetail.qml:165 src/ui/ContainerDetail.qml:777
 msgid "Disconnect"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:196 src/ui/ContainerCard.qml:163
-#: src/ui/ContainerCard.qml:167
-msgid "Start"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:204 src/ui/ContainerCard.qml:202
-#: src/ui/ContainerCard.qml:206
-msgid "Stop"
-msgstr ""
-
-#: src/ui/ContainerDetail.qml:228 src/ui/DaemonConfigPage.qml:578
-msgid "Restart"
 msgstr ""
 
 #: src/ui/ContainerDetail.qml:246
@@ -2006,10 +2090,6 @@ msgid_plural "%1 volumes of unknown size"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:89 src/ui/MainPage.qml:503
-msgid "Stopped"
-msgstr ""
-
 #: src/ui/MainPage.qml:115 src/ui/MainPage.qml:137
 msgid "Connected"
 msgstr ""
@@ -2342,11 +2422,11 @@ msgid ""
 "administrator rights."
 msgstr ""
 
-#: src/ui/MainPage.qml:1190
+#: src/ui/MainPage.qml:1196
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:1195
+#: src/ui/MainPage.qml:1201
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."

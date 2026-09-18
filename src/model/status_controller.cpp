@@ -76,6 +76,15 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_busyWatchdog->setInterval(int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kInFlightWatchdog).count()));
     connect(m_busyWatchdog, &QTimer::timeout, this, &StatusController::onBusyWatchdogTimeout);
 
+    // 服务动作成功后重新查询状态（界面因此立刻看到"已停止/已启动"）
+    for (DaemonConfigController *config : {m_daemonConfigUser, m_daemonConfigSystem}) {
+        connect(config, &DaemonConfigController::serviceControlled, this, [this](const QString &, const QString &, bool success, const QString &) {
+            if (success) {
+                m_services->query();
+            }
+        });
+    }
+
     // 服务状态：查询回来后连接 key 可能变化（"已连接"要能因为服务停了而变成"服务未运行"）
     connect(m_services, &ServiceStatusBackend::servicesChanged, this, [this] {
         Q_EMIT serviceStatesChanged();

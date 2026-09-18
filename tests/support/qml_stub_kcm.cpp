@@ -19,6 +19,7 @@ QmlStubKcm::QmlStubKcm(DockerBackendInterface *backend, QObject *parent)
     , m_mountPresets(new MountPresetStore(m_configDir->filePath(QStringLiteral("kontainerrc"))))
     , m_directoryPicker(new FakeDirectoryPicker())
     , m_serviceStatus(new FakeServiceStatus())
+    , m_privilegedClient(new FakePrivilegedClient())
     , m_controller(new StatusController(backend,
                                         m_hostPaths,
                                         this,
@@ -27,10 +28,15 @@ QmlStubKcm::QmlStubKcm(DockerBackendInterface *backend, QObject *parent)
                                         m_directoryPicker,
                                         m_serviceStatus))
 {
+    // 与 docker_kcm.cpp 的接线一致：提权客户端只在这一层注入
+    // （core 里没有它时，配置页会自动走"自己动手"的降级路径）
+    m_controller->daemonConfigUser()->setPrivilegedClient(m_privilegedClient);
+    m_controller->daemonConfigSystem()->setPrivilegedClient(m_privilegedClient);
 }
 
 QmlStubKcm::~QmlStubKcm()
 {
+    delete m_privilegedClient;
     delete m_serviceStatus;
     delete m_directoryPicker;
     delete m_mountPresets;

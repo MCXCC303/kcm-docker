@@ -8,6 +8,7 @@
 #include "backend/docker_backend_interface.h"
 #include "support/fake_credential_backend.h"
 #include "support/fake_host_path_service.h"
+#include "support/fake_privileged_client.h"
 #include "backend/directory_picker.h"
 #include "model/mount_preset_store.h"
 #include "model/status_controller.h"
@@ -76,6 +77,12 @@ public:
         return m_serviceStatus;
     }
 
+    /*! 提权客户端替身：服务卡片用例用它断言"确认后才发请求"。 */
+    FakePrivilegedClient *privilegedClient() const
+    {
+        return m_privilegedClient;
+    }
+
     /*!
      * 挂载预设存储（指向临时目录）。
      *
@@ -113,6 +120,7 @@ private:
     MountPresetStore *m_mountPresets = nullptr;
     FakeDirectoryPicker *m_directoryPicker = nullptr;
     FakeServiceStatus *m_serviceStatus = nullptr;
+    FakePrivilegedClient *m_privilegedClient = nullptr;
     StatusController *m_controller = nullptr;
 };
 

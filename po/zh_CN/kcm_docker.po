@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.8.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:51+0800\n"
+"POT-Creation-Date: 2026-09-19 05:17+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -32,7 +32,8 @@ msgstr "已创建"
 msgid "Restarting"
 msgstr "重启中"
 
-#: src/model/state_text.cpp:21 src/ui/MainPage.qml:77 src/ui/MainPage.qml:495
+#: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
+#: src/ui/MainPage.qml:77 src/ui/MainPage.qml:495
 msgid "Running"
 msgstr "运行中"
 
@@ -52,9 +53,10 @@ msgstr "已退出"
 msgid "Dead"
 msgstr "已失效"
 
-#: src/model/state_text.cpp:33 src/ui/ContainerDetail.qml:428
-#: src/ui/EngineStatusView.qml:29 src/ui/EngineStatusView.qml:35
-#: src/ui/EngineStatusView.qml:42 src/ui/DaemonConfigPage.qml:84
+#: src/model/state_text.cpp:33 src/ui/components/ServiceCard.qml:68
+#: src/ui/ContainerDetail.qml:428 src/ui/EngineStatusView.qml:29
+#: src/ui/EngineStatusView.qml:35 src/ui/EngineStatusView.qml:42
+#: src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
 msgstr "未知"
 
@@ -74,26 +76,26 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:120 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:129 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:123
+#: src/model/status_controller.cpp:132
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:126
+#: src/model/status_controller.cpp:135
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:481
+#: src/model/status_controller.cpp:490
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr "Docker 一直没有响应，已放弃这次请求。等服务恢复后再重试。"
 
-#: src/model/status_controller.cpp:714
+#: src/model/status_controller.cpp:723
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -1341,6 +1343,102 @@ msgstr "bind 挂载需要绝对宿主路径（命名卷请直接填卷名）。"
 msgid "The container path must be absolute."
 msgstr "容器路径必须是绝对路径。"
 
+#: src/ui/components/ServiceCard.qml:44
+msgid "Docker socket"
+msgstr "Docker socket"
+
+#: src/ui/components/ServiceCard.qml:46
+msgid "Docker service"
+msgstr "Docker 服务"
+
+#: src/ui/components/ServiceCard.qml:48
+msgid "containerd service"
+msgstr "containerd 服务"
+
+#: src/ui/components/ServiceCard.qml:60 src/ui/MainPage.qml:89
+#: src/ui/MainPage.qml:503
+msgid "Stopped"
+msgstr "已停止"
+
+#: src/ui/components/ServiceCard.qml:62
+msgid "Failed"
+msgstr "失败"
+
+#: src/ui/components/ServiceCard.qml:64
+msgid "Starting…"
+msgstr "正在启动…"
+
+#: src/ui/components/ServiceCard.qml:66
+msgid "Stopping…"
+msgstr "正在停止…"
+
+#: src/ui/components/ServiceCard.qml:90 src/ui/ContainerDetail.qml:196
+#: src/ui/ContainerCard.qml:163 src/ui/ContainerCard.qml:167
+msgid "Start"
+msgstr "启动"
+
+#: src/ui/components/ServiceCard.qml:92 src/ui/ContainerDetail.qml:204
+#: src/ui/ContainerCard.qml:202 src/ui/ContainerCard.qml:206
+msgid "Stop"
+msgstr "停止"
+
+#: src/ui/components/ServiceCard.qml:94 src/ui/ContainerDetail.qml:228
+#: src/ui/DaemonConfigPage.qml:578
+msgid "Restart"
+msgstr "重启"
+
+#: src/ui/components/ServiceCard.qml:96
+msgid "Enable at boot"
+msgstr "开机自启"
+
+#: src/ui/components/ServiceCard.qml:98
+msgid "Disable at boot"
+msgstr "取消开机自启"
+
+#: src/ui/components/ServiceCard.qml:123
+msgid ""
+"Kontainer will not be able to reach the Docker daemon until the socket is "
+"started again."
+msgstr "在重新启动 socket 之前，Kontainer 将无法访问 Docker 守护进程。"
+
+#: src/ui/components/ServiceCard.qml:126
+msgid "Running containers of this daemon will be stopped."
+msgstr "该守护进程上正在运行的容器会被停止。"
+
+#: src/ui/components/ServiceCard.qml:129
+msgid "The service will not be started automatically at boot."
+msgstr "该服务不会再开机自动启动。"
+
+#: src/ui/components/ServiceCard.qml:140
+msgid "Services"
+msgstr "系统服务"
+
+#: src/ui/components/ServiceCard.qml:145
+msgid ""
+"Managing these units needs administrator rights; Kontainer asks for them "
+"when you use a button."
+msgstr "管理这些单元需要管理员权限；使用按钮时会向你请求授权。"
+
+#: src/ui/components/ServiceCard.qml:156
+msgid "The service action failed: %1"
+msgstr "服务操作失败：%1"
+
+#: src/ui/components/ServiceCard.qml:202
+msgid "Enabled at boot"
+msgstr "已开机自启"
+
+#: src/ui/components/ServiceCard.qml:202
+msgid "Not enabled at boot"
+msgstr "未开机自启"
+
+#: src/ui/components/ServiceCard.qml:271
+msgid "The state of these services cannot be read (systemd is not reachable)."
+msgstr "读不到这些服务的状态（无法访问 systemd）。"
+
+#: src/ui/components/ServiceCard.qml:283
+msgid "%1 “%2”?"
+msgstr "要%1“%2”吗？"
+
 #: src/ui/ImageCard.qml:45
 msgid "Dangling image %1"
 msgstr "悬空镜像 %1"
@@ -1582,20 +1680,6 @@ msgstr "容器会失去这个网络上的地址与别名，经由该网络的连
 #: src/ui/ContainerDetail.qml:165 src/ui/ContainerDetail.qml:777
 msgid "Disconnect"
 msgstr "断开"
-
-#: src/ui/ContainerDetail.qml:196 src/ui/ContainerCard.qml:163
-#: src/ui/ContainerCard.qml:167
-msgid "Start"
-msgstr "启动"
-
-#: src/ui/ContainerDetail.qml:204 src/ui/ContainerCard.qml:202
-#: src/ui/ContainerCard.qml:206
-msgid "Stop"
-msgstr "停止"
-
-#: src/ui/ContainerDetail.qml:228 src/ui/DaemonConfigPage.qml:578
-msgid "Restart"
-msgstr "重启"
 
 #: src/ui/ContainerDetail.qml:246
 msgid "Stop the container to delete it."
@@ -2000,10 +2084,6 @@ msgid "one volume of unknown size"
 msgid_plural "%1 volumes of unknown size"
 msgstr[0] "1 个大小未知的卷"
 
-#: src/ui/MainPage.qml:89 src/ui/MainPage.qml:503
-msgid "Stopped"
-msgstr "已停止"
-
 #: src/ui/MainPage.qml:115 src/ui/MainPage.qml:137
 msgid "Connected"
 msgstr "已连接"
@@ -2333,11 +2413,11 @@ msgid ""
 "administrator rights."
 msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
 
-#: src/ui/MainPage.qml:1190
+#: src/ui/MainPage.qml:1196
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:1195
+#: src/ui/MainPage.qml:1201
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."

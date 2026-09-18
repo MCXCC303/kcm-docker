@@ -1163,6 +1163,12 @@ Kirigami.Page {
                     }
                 }
 
+                Components.ServiceCard {
+                    Layout.fillWidth: true
+                    controller: root.controller.daemonConfigSystem
+                    services: root.controller.services
+                }
+
                 QQC2.ScrollView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true

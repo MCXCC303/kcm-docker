@@ -37,6 +37,16 @@ class DaemonConfigController : public QObject
 
     /* --- 作用域（ARCH_V5_V8 §2.2 修正：按"哪个 daemon 读这个文件"分离） --- */
     /*! `user`（~/.config/docker/daemon.json）或 `system`（/etc/docker/daemon.json）。 */
+    /*!
+     * 服务控制（B1）：非法请求会被拒绝并给出稳定 key；进行中时界面禁用按钮。
+     * 这些属性必须声明成 Q_PROPERTY——否则 QML 里读到的永远是 undefined
+     * （踩过一次：属性值正确、QML 却报 "Unable to assign [undefined] to bool"）。
+     */
+    Q_PROPERTY(QString serviceErrorKey READ serviceErrorKey NOTIFY changed)
+    Q_PROPERTY(QString serviceUnit READ serviceUnit NOTIFY changed)
+    Q_PROPERTY(QString serviceVerb READ serviceVerb NOTIFY changed)
+    Q_PROPERTY(bool serviceInFlight READ serviceInFlight NOTIFY changed)
+
     Q_PROPERTY(QString scope READ scope NOTIFY changed)
     /*! 这个作用域是否就是正在运行的 daemon 读取的那一个。 */
     Q_PROPERTY(bool activeScope READ activeScope NOTIFY changed)
