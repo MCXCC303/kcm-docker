@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(kontainer
-    VERSION 0.8.0
+    VERSION 0.9.0
     DESCRIPTION "Docker/容器的 KDE 系统设置模块 (KCM)"
     LANGUAGES CXX
 )
