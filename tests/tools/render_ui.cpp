@@ -698,7 +698,14 @@ int main(int argc, char **argv)
     // 对话框（弹层）**必须在窗口就绪之后**才打开：它的内容在打开时创建，
     // 若此时还没有窗口，内容永远不会被布局，截图上就是一片空白（实测踩过）
     QTimer::singleShot(600, &app, [&]() {
-        // KONTAINER_RENDER_WIZARD_STEP=<step key>：把创建向导直接推进到某一步（复核表单排版）
+        // 挂载预设：向导的挂载步骤与"挂载预设"标签页都用它（两条覆盖 bind 与命名卷 + 收藏）
+    stub->controller()->mountPresets()->add(QStringLiteral("/srv/data"), QStringLiteral("/data"),
+                                            QStringLiteral("bind"), true, QStringLiteral("数据目录"));
+    stub->controller()->mountPresets()->add(QStringLiteral("pgdata"), QStringLiteral("/var/lib/postgresql/data"),
+                                            QStringLiteral("volume"), false, QString());
+    stub->controller()->mountPresets()->setFavorite(QStringLiteral("preset-1"), true);
+
+    // KONTAINER_RENDER_WIZARD_STEP=<step key>：把创建向导直接推进到某一步（复核表单排版）
     if (qEnvironmentVariableIsSet("KONTAINER_RENDER_WIZARD_STEP")) {
         auto *controller = stub->controller()->createContainer();
         const QString step = qEnvironmentVariable("KONTAINER_RENDER_WIZARD_STEP");
@@ -715,13 +722,6 @@ int main(int argc, char **argv)
                                                {QStringLiteral("destination"), QStringLiteral("/var/lib/postgresql/data")},
                                                {QStringLiteral("readOnly"), false}}});
         controller->setNetwork(QStringLiteral("app_default"));
-        // 挂载步骤：加两条预设并展开管理面板，用来复核预设列表与管理控件
-        if (step == QLatin1String("mounts") || step == QLatin1String("all")) {
-            stub->controller()->mountPresets()->add(QStringLiteral("/srv/data"), QStringLiteral("/data"),
-                                                    QStringLiteral("bind"), true, QStringLiteral("数据目录"));
-            stub->controller()->mountPresets()->add(QStringLiteral("pgdata"), QStringLiteral("/var/lib/postgresql/data"),
-                                                    QStringLiteral("volume"), false, QString());
-        }
         const QString target = (step == QLatin1String("summary") || step == QLatin1String("all")) ? QStringLiteral("summary") : step;
         const bool moved = controller->goToStep(target);
         std::fprintf(stderr, "DBG wizard target=%s moved=%d now=%s error=%s\n", qPrintable(target), int(moved),
@@ -730,6 +730,15 @@ int main(int argc, char **argv)
         for (const QString &key : Kontainer::CreateContainerController::stepKeys()) {
             std::fprintf(stderr, "DBG   step %s error=%s\n", qPrintable(key), qPrintable(controller->stepErrorKeyForStep(key)));
         }
+    }
+
+    // KONTAINER_RENDER_WIZARD_STEP=ports 时填两条端口映射，复核节点图风格的编辑器
+    if (qEnvironmentVariable("KONTAINER_RENDER_WIZARD_STEP") == QLatin1String("ports")) {
+        auto *controller = stub->controller()->createContainer();
+        controller->clearPortRows();
+        controller->addPortRow(80, 8080, QStringLiteral("0.0.0.0"), QStringLiteral("tcp"));
+        controller->addPortRow(443, 0, QStringLiteral("127.0.0.1"), QStringLiteral("tcp"));
+        controller->addPortRow(53, 5353, QString(), QStringLiteral("udp"));
     }
 
     // KONTAINER_RENDER_OPEN_BUILD=1：展开镜像页的构建表单，并造一条进行中与一条失败的构建

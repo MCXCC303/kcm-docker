@@ -96,6 +96,8 @@ set(KONTAINER_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/PullImageDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/PullProgressList.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/BuildImagePanel.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/PortMappingEditor.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/MountPresetManager.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/FieldChip.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/PortTopology.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/ImageRefInput.qml"

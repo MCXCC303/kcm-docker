@@ -423,6 +423,9 @@ Kirigami.Page {
             QQC2.TabButton {
                 text: i18nc("@title:tab engine information", "Engine")
             }
+            QQC2.TabButton {
+                text: i18nc("@title:tab mount presets", "Mount presets")
+            }
         }
 
         Kirigami.Separator {
@@ -1144,6 +1147,36 @@ Kirigami.Page {
                         engine: root.controller.engine
                         buildStamp: root.controller.buildStamp
                     }
+                }
+            }
+
+            /* ------------------------ 挂载预设（七期 §4.2） ------------------------ */
+            /* 用户实测反馈：在创建向导里管理预设不方便，因此独立成标签页 */
+            ColumnLayout {
+                id: presetsTab
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.Heading {
+                    Layout.fillWidth: true
+                    level: 3
+                    text: i18n("Mount presets")
+                }
+
+                QQC2.Label {
+                    Layout.fillWidth: true
+                    text: i18n("Presets are stored in your own configuration (~/.config/kontainerrc) and offered as quick-add buttons in the container wizard.")
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.75
+                    wrapMode: Text.WordWrap
+                }
+
+                Components.MountPresetManager {
+                    objectName: "mountPresetManager"
+                    Layout.fillWidth: true
+                    store: root.controller.mountPresets
                 }
             }
         }

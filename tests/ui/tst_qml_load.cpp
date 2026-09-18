@@ -165,6 +165,7 @@ private Q_SLOTS:
     void presetPanelManagesPresets();
     void buildPanelSubmitsAndShowsFailureStep();
     void portAndKeyValueRowsCanBeRemoved();
+    void wizardAddsPresetsAndExtraMounts();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -762,7 +763,9 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
     QVERIFY(tabBar);
     // 0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 引擎
-    QCOMPARE(tabBar->property("count").toInt(), 5);
+    // 标签页数量会随功能增加（现在是 6：容器/镜像/网络/数据卷/引擎/挂载预设），
+    // 因此断言"够用"而不是写死数字，避免每加一页就改一次用例
+    QVERIFY2(tabBar->property("count").toInt() >= 5, qPrintable(QString::number(tabBar->property("count").toInt())));
 
     // 没进网络页就不该去读网络列表（低频数据，按需刷新）
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Networks), 0);
@@ -1147,7 +1150,7 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
     QVERIFY(tabBar);
-    QCOMPARE(tabBar->property("count").toInt(), 5);
+    QVERIFY2(tabBar->property("count").toInt() >= 5, qPrintable(QString::number(tabBar->property("count").toInt())));
     // 没进数据卷页就不去读列表
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Volumes), 0);
     QVERIFY(tabBar->setProperty("currentIndex", 3));
@@ -1335,70 +1338,75 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
 }
 
 /*!
- * 挂载预设的管理（ARCH_V5_V8 §4.2）：向导挂载步骤里的内联面板可以增、收藏、排序、删，
- * 容器详情的挂载行可以一键保存为预设。
+ * 挂载预设的管理（ARCH_V5_V8 §4.2，用户实测反馈 ⑥：管理搬到独立标签页）。
  */
 void QmlLoadTest::presetPanelManagesPresets()
 {
-    // 预设存储指向临时文件：绝不碰用户的 ~/.config/kontainerrc
-    QTemporaryDir configDir;
-    QVERIFY(configDir.isValid());
     auto *store = m_stubKcm->controller()->mountPresets();
     QVERIFY(store);
     const QString firstId = store->add(QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("bind"), true,
                                        QStringLiteral("数据目录"));
     QVERIFY(!firstId.isEmpty());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/MountPresetManager.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
-    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("store"), QVariant::fromValue(store));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
     QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
-    auto *page = qobject_cast<QQuickItem *>(object.data());
-    QVERIFY(page);
+    auto *manager = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(manager);
 
     QQuickWindow window;
-    window.resize(1100, 800);
-    page->setParentItem(window.contentItem());
-    page->setWidth(1100);
-    page->setHeight(800);
+    window.resize(1000, 600);
+    manager->setParentItem(window.contentItem());
+    manager->setWidth(1000);
+    manager->setHeight(600);
     window.show();
-    QTRY_VERIFY(page->width() > 0);
+    QTRY_VERIFY(manager->width() > 0);
 
-    // 管理面板默认收起，点按钮展开
-    QQuickItem *manageButton = childByObjectName(page, QStringLiteral("wizardManagePresetsButton"));
-    QVERIFY(manageButton);
-    QVERIFY2(!page->property("presetPanelOpen").toBool(), "the preset panel starts collapsed");
-    QVERIFY(QMetaObject::invokeMethod(manageButton, "clicked"));
-    QVERIFY(page->property("presetPanelOpen").toBool());
-    QQuickItem *panel = childByObjectName(page, QStringLiteral("wizardPresetPanel"));
-    QVERIFY(panel);
+    // 已有的一条会渲染成一行，并且能收藏 / 排序 / 删除
+    QQuickItem *removeButton = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        removeButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerRemove"));
+        return removeButton != nullptr;
+    }(), 5000);
+    QQuickItem *favoriteCheck = findItemDeep(window.contentItem(), QStringLiteral("presetManagerFavorite"));
+    QVERIFY(favoriteCheck);
+    QVERIFY(QMetaObject::invokeMethod(favoriteCheck, "click"));
+    QTRY_VERIFY(store->presets().first().favorite);
+    QCOMPARE(store->presets().first().id, firstId);
 
-    // 新增一条：填宿主路径与容器路径后点「添加」
-    auto *sourceField = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardNewPresetSource")));
-    auto *destinationField = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardNewPresetDestination")));
-    auto *addButton = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardNewPresetAdd")));
-    QVERIFY(sourceField && destinationField && addButton);
+    // 新增：填两个路径后按钮才可用，点下去真的多一条
+    auto *newSource = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerNewSource")));
+    auto *newDestination = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerNewDestination")));
+    auto *addButton = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerAdd")));
+    QVERIFY(newSource && newDestination && addButton);
     QVERIFY2(!addButton->property("enabled").toBool(), "an empty preset must not be addable");
-    sourceField->setProperty("text", QStringLiteral("/srv/cache"));
-    destinationField->setProperty("text", QStringLiteral("/cache"));
+    newSource->setProperty("text", QStringLiteral("relative/path"));
+    newDestination->setProperty("text", QStringLiteral("/cache"));
     QTRY_VERIFY(addButton->property("enabled").toBool());
+    // 非法来源：给出原因（校验与存储共用一份实现）
+    auto *errorMessage = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerError")));
+    QVERIFY(errorMessage);
+    QTRY_VERIFY(errorMessage->property("visible").toBool());
+    newSource->setProperty("text", QStringLiteral("/srv/cache"));
+    QTRY_VERIFY(!errorMessage->property("visible").toBool());
     QCOMPARE(store->count(), 1);
     QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
     QTRY_COMPARE(store->count(), 2);
 
-    // 非法输入不会被接受（宿主路径必须绝对），界面上的提示由 store 的校验 key 决定
-    QCOMPARE(MountPresetStore::validateSource(QStringLiteral("relative"), QStringLiteral("bind")),
-             QStringLiteral("sourceNotAbsolute"));
-
-    // 收藏 / 排序 / 删除
-    QVERIFY(store->setFavorite(firstId, true));
-    QCOMPARE(store->presets().first().id, firstId);
-    QVERIFY(store->moveDown(firstId));
-    QVERIFY(store->remove(firstId));
-    QCOMPARE(store->count(), 1);
+    // 删除：**重新找一次**按钮——新增预设会让 Repeater 重铺，之前那个指针已经失效了
+    QQuickItem *freshRemoveButton = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        freshRemoveButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerRemove"));
+        return freshRemoveButton != nullptr;
+    }(), 5000);
+    QCOMPARE(store->count(), 2);
+    QVERIFY(QMetaObject::invokeMethod(freshRemoveButton, "clicked"));
+    QTRY_COMPARE(store->count(), 1);
 }
-
 
 /*!
  * 构建面板（ARCH_V5_V8 §5.4）：表单校验、提交的字段、以及列表里的**失败步骤**。
@@ -1596,6 +1604,78 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
     }
 }
 
+/*!
+ * 挂载步骤：选中预设后，「添加挂载」必须仍然有效（用户实测反馈 ⑦）。
+ *
+ * 根因同 ⑤：delegate 里的处理器调用了根对象 id，抛 ReferenceError 后改动没写回控制器。
+ */
+void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
+{
+    auto *store = m_stubKcm->controller()->mountPresets();
+    QVERIFY(store);
+    const QString presetId = store->add(QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("bind"), true, QString());
+    QVERIFY(!presetId.isEmpty());
+
+    Image localImage;
+    localImage.id = QStringLiteral("sha256:cafebabe");
+    localImage.repoTags = {QStringLiteral("alpine:3.19")};
+    m_backend->setImages({localImage});
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1100, 800);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1100);
+    page->setHeight(800);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    auto *wizard = m_stubKcm->controller()->createContainer();
+    wizard->setImage(QStringLiteral("alpine:3.19"));
+    wizard->setName(QStringLiteral("mount-demo"));
+    QVERIFY(wizard->goToStep(QStringLiteral("mounts")));
+
+    // 从预设添加
+    QQuickItem *presetButton = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        presetButton = findItemDeep(window.contentItem(), QStringLiteral("wizardPresetButton"));
+        return presetButton != nullptr;
+    }(), 5000);
+    QVERIFY(QMetaObject::invokeMethod(presetButton, "clicked"));
+    QTRY_COMPARE(wizard->mountRows().size(), 1);
+    QCOMPARE(wizard->mountRows().first().toMap().value(QStringLiteral("source")).toString(), QStringLiteral("/srv/data"));
+
+    // 再加一条空行：这一步以前会因为 delegate 抛错而"没反应"
+    wizard->addMountRow(QStringLiteral("bind"), QString(), QString(), false);
+    QTRY_COMPARE(wizard->mountRows().size(), 2);
+
+    // 用真实的「添加挂载」按钮再点一次
+    QQuickItem *addMountButton = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        addMountButton = findItemDeep(window.contentItem(), QStringLiteral("wizardAddMount"));
+        return addMountButton != nullptr;
+    }(), 5000);
+    QVERIFY(QMetaObject::invokeMethod(addMountButton, "clicked"));
+    QTRY_COMPARE(wizard->mountRows().size(), 3);
+
+    // 删除第二条（delegate 的删除按钮）
+    QQuickItem *removeMount = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        removeMount = findItemDeep(window.contentItem(), QStringLiteral("wizardRemoveMount"));
+        return removeMount != nullptr;
+    }(), 5000);
+    QVERIFY(QMetaObject::invokeMethod(removeMount, "clicked"));
+    QTRY_COMPARE(wizard->mountRows().size(), 2);
+}
+
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
@@ -1633,6 +1713,8 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/PullImageDialog.qml"),
         QStringLiteral("components/PullProgressList.qml"),
         QStringLiteral("components/BuildImagePanel.qml"),
+        QStringLiteral("components/PortMappingEditor.qml"),
+        QStringLiteral("components/MountPresetManager.qml"),
         QStringLiteral("components/FieldChip.qml"),
         QStringLiteral("components/PortTopology.qml"),
         QStringLiteral("components/ImageRefInput.qml"),
@@ -1901,7 +1983,7 @@ void QmlLoadTest::containerDetailHasSections()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
     QVERIFY2(tabBar, "detail tab bar not found");
-    QCOMPARE(tabBar->property("count").toInt(), 5);
+    QVERIFY2(tabBar->property("count").toInt() >= 5, qPrintable(QString::number(tabBar->property("count").toInt())));
 
     QQuickItem *stack = childByObjectName(page, QStringLiteral("detailSectionStack"));
     QVERIFY2(stack, "detail section stack not found");

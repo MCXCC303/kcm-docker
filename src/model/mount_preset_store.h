@@ -62,6 +62,14 @@ class MountPresetStore : public QObject
 
     Q_PROPERTY(int count READ count NOTIFY changed)
     Q_PROPERTY(bool empty READ empty NOTIFY changed)
+    /*!
+     * 预设摘要，做成**属性**而不是只用 Q_INVOKABLE。
+     *
+     * QML 里 `model: store.summaries()` 是函数调用——**不建立依赖**，Repeater 只在创建时
+     * 取一次值，之后新增/删除都不会重铺（实测：预设标签页里看不到已有的预设）。
+     * 属性 + NOTIFY 才会跟着变。这个坑在日志、网络、数据卷、预览按钮上已经踩过四次。
+     */
+    Q_PROPERTY(QVariantList summaries READ summariesProperty NOTIFY changed)
 
 public:
     /*! 最近使用的上限（§4.1）：超出后按时间淘汰最旧的**非收藏**项。 */
@@ -80,6 +88,11 @@ public:
     QList<MountPreset> presets() const;
     /*! 界面用的纯数据摘要 `[{id, source, destination, type, readOnly, note, favorite}]`。 */
     Q_INVOKABLE QVariantList summaries() const;
+    /*! 同上，属性形式（QML 的 Repeater 必须用属性）。 */
+    QVariantList summariesProperty() const
+    {
+        return summaries();
+    }
 
     /*! 新增（同宿主 + 同容器路径已存在时返回它的 id，不重复添加）。 */
     Q_INVOKABLE QString add(const QString &source,
@@ -103,6 +116,18 @@ public:
     /*! 校验（稳定 key）：宿主路径绝对或卷名合法、容器路径绝对、去重。 */
     static QString validateSource(const QString &source, const QString &type);
     static QString validateDestination(const QString &destination);
+    /*!
+     * 上面两个的**实例版**：QML 只能调用 Q_INVOKABLE / 槽 / 属性，
+     * 静态成员函数在 QML 里是 undefined（调用会抛 TypeError）。
+     */
+    Q_INVOKABLE QString sourceError(const QString &source, const QString &type) const
+    {
+        return validateSource(source, type);
+    }
+    Q_INVOKABLE QString destinationError(const QString &destination) const
+    {
+        return validateDestination(destination);
+    }
 
 Q_SIGNALS:
     void changed();
