@@ -5,6 +5,8 @@
 
 #include "model/daemon_config_controller.h"
 
+#include "backend/service_control.h"
+
 #include "kauth/privileged_config_request.h"
 
 #include <algorithm>
@@ -136,6 +138,16 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedClient *client)
         return;
     }
     connect(client, &PrivilegedClient::finished, this, [this](PrivilegedClient::Operation operation, bool success, const QString &errorKey) {
+        if (operation == PrivilegedClient::Operation::ServiceControl) {
+            if (!m_serviceInFlight) {
+                return; // 别的页面发起的服务操作
+            }
+            m_serviceInFlight = false;
+            m_serviceErrorKey = success ? QString() : (errorKey.isEmpty() ? QStringLiteral("serviceControlFailed") : errorKey);
+            Q_EMIT changed();
+            Q_EMIT serviceControlled(m_serviceUnit, m_serviceVerb, success, m_serviceErrorKey);
+            return;
+        }
         if (operation == PrivilegedClient::Operation::Authorize) {
             if (!m_awaitingAuthorize) {
                 // 别的页面发起的授权：与我无关（共享客户端会广播结果）
@@ -190,6 +202,33 @@ void DaemonConfigController::setRunningContainerCount(int count)
 int DaemonConfigController::runningContainers() const
 {
     return m_runningContainers;
+}
+
+bool DaemonConfigController::controlService(const QString &unit, const QString &verbKey)
+{
+    // 白名单校验：非法请求在这里就被拒绝，**不会**发起任何提权动作
+    const QString argumentError = serviceControlArgumentError(unit, verbKey);
+    if (!argumentError.isEmpty()) {
+        m_serviceErrorKey = argumentError;
+        m_serviceUnit = unit;
+        m_serviceVerb = verbKey;
+        Q_EMIT changed();
+        return false;
+    }
+    if (!m_privilegedClient) {
+        m_serviceErrorKey = QStringLiteral("helperUnavailable");
+        m_serviceUnit = unit;
+        m_serviceVerb = verbKey;
+        Q_EMIT changed();
+        return false;
+    }
+    m_serviceUnit = unit;
+    m_serviceVerb = verbKey;
+    m_serviceErrorKey.clear();
+    m_serviceInFlight = true;
+    Q_EMIT changed();
+    m_privilegedClient->controlService(unit, verbKey);
+    return true;
 }
 
 void DaemonConfigController::restartDocker()

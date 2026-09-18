@@ -65,6 +65,7 @@ private Q_SLOTS:
     void mergePreservesUnknownKeys();
     void mergeCanRemoveASetting();
     void mergeOnlyTouchesRequestedKeys();
+    void serviceControlValidatesAndReports();
     void mergeCanRemoveScalarKeys();
     void periodicRefreshKeepsPendingEdits();
     void removeIntentIsNotAnEmptyEdit();
@@ -413,6 +414,56 @@ void DaemonConfigTest::switchingScopeLocksAgain()
     // 授权是给"那个文件"的：换作用域必须重新授权
     controller.setScope(QStringLiteral("user"));
     QVERIFY2(!controller.unlocked(), "switching scope must drop the authorization");
+}
+
+
+/*!
+ * B1：服务控制的边界与结果。
+ *
+ * 关键点：**非法请求不发起任何提权动作**（这是唯一新增的提权面，必须守住）；
+ * 合法请求的结果经同一条结果通道回来，失败时给出稳定 key。
+ */
+void DaemonConfigTest::serviceControlValidatesAndReports()
+{
+    FakePrivilegedClient client;
+    DaemonConfigController controller;
+    controller.setPrivilegedClient(&client);
+    controller.setEngineInfo(systemEngine());
+    QSignalSpy controlledSpy(&controller, &DaemonConfigController::serviceControlled);
+
+    // 白名单之外的 unit：拒绝，且**没有**发起任何请求
+    QVERIFY(!controller.controlService(QStringLiteral("sshd.service"), QStringLiteral("start")));
+    QCOMPARE(controller.serviceErrorKey(), QStringLiteral("unitNotManaged"));
+    QCOMPARE(client.serviceRequests, 0);
+
+    // 不认识的动词：同样拒绝
+    QVERIFY(!controller.controlService(QStringLiteral("docker.service"), QStringLiteral("mask")));
+    QCOMPARE(controller.serviceErrorKey(), QStringLiteral("verbNotManaged"));
+    QCOMPARE(client.serviceRequests, 0);
+
+    // 合法请求：交给客户端，进入"进行中"
+    QVERIFY(controller.controlService(QStringLiteral("docker.service"), QStringLiteral("restart")));
+    QCOMPARE(client.serviceRequests, 1);
+    QCOMPARE(client.lastServiceUnit, QStringLiteral("docker.service"));
+    QCOMPARE(client.lastServiceVerb, QStringLiteral("restart"));
+    QVERIFY(controller.serviceInFlight());
+    QVERIFY(controller.serviceErrorKey().isEmpty());
+
+    // 成功：结果带 unit/动词，错误 key 为空
+    Q_EMIT client.finished(PrivilegedClient::Operation::ServiceControl, true, QString());
+    QCOMPARE(controlledSpy.count(), 1);
+    QCOMPARE(controlledSpy.at(0).at(0).toString(), QStringLiteral("docker.service"));
+    QCOMPARE(controlledSpy.at(0).at(1).toString(), QStringLiteral("restart"));
+    QCOMPARE(controlledSpy.at(0).at(2).toBool(), true);
+    QVERIFY(!controller.serviceInFlight());
+
+    // 失败（用户取消）：如实回报，可重试
+    QVERIFY(controller.controlService(QStringLiteral("containerd.service"), QStringLiteral("stop")));
+    Q_EMIT client.finished(PrivilegedClient::Operation::ServiceControl, false, QStringLiteral("cancelled"));
+    QCOMPARE(controlledSpy.count(), 2);
+    QCOMPARE(controlledSpy.at(1).at(3).toString(), QStringLiteral("cancelled"));
+    QCOMPARE(controller.serviceErrorKey(), QStringLiteral("cancelled"));
+    QVERIFY(!controller.serviceInFlight());
 }
 
 QTEST_MAIN(DaemonConfigTest)

@@ -5,6 +5,8 @@
 
 #include "backend/privileged_config_client.h"
 
+#include "backend/service_control.h"
+
 #include "backend/privileged_client.h"
 
 #include "kauth/privileged_config_request.h"
@@ -181,6 +183,17 @@ void PrivilegedConfigClient::runHelperAction(const QString &actionName, const QV
         job->deleteLater();
     });
     job->start();
+}
+
+void PrivilegedConfigClient::controlService(const QString &unit, const QString &verbKey)
+{
+    ServiceVerb verb = ServiceVerb::Start;
+    if (!serviceControlArgumentError(unit, verbKey).isEmpty() || !serviceVerbFromKey(verbKey, &verb)) {
+        // 非法请求：不发任何提权动作，直接按失败上报（错误 key 由调用方按同一函数算出来）
+        Q_EMIT finished(Operation::ServiceControl, false, serviceControlArgumentError(unit, verbKey));
+        return;
+    }
+    runHelperAction(serviceActionName(verb), {{QStringLiteral("unit"), unit}}, Operation::ServiceControl);
 }
 
 void PrivilegedConfigClient::restartViaSessionSystemd()

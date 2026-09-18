@@ -3,6 +3,7 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include "backend/service_control.h"
 #include "kauth/privileged_config_request.h"
 
 #include <QDir>
@@ -214,9 +215,18 @@ void KauthWiringTest::actionsFileDefinesExactlyOurActions()
         }
     }
     actionSections.sort();
+    // 期望值来自**单一来源**：`.actions` 里应该有的动作 = 配置读写两个 + 服务管理的五个
+    // （服务管理的 unit/动词白名单在 service_control 里，这里只核对"动作名齐全"）
     QStringList expected {QString::fromLatin1(kRestartActionName), QString::fromLatin1(kSaveActionName)};
+    for (const QString &verb : managedServiceVerbs()) {
+        ServiceVerb parsed = ServiceVerb::Start;
+        if (serviceVerbFromKey(verb, &parsed)) {
+            expected.append(serviceActionName(parsed));
+        }
+    }
     expected.sort();
     QCOMPARE(actionSections, expected);
+    QCOMPARE(expected.size(), 7);
 
     for (const QString &name : expected) {
         const auto action = sections.value(name);
@@ -267,14 +277,16 @@ void KauthWiringTest::generatedPolicyIsNotSilentlyEmpty()
     // 这就是那个真实踩过的坑：把 XML 交给 kauth-policy-gen 会"成功"生成
     // 一个没有动作的空策略，安装后所有授权都失败但没有任何报错
     const int actionCount = policy.count(QLatin1String("<action id="));
-    QCOMPARE(actionCount, 2);
+    // 配置读写 2 个 + 服务管理 5 个
+    QCOMPARE(actionCount, 7);
 
     for (const char *action : {kSaveActionName, kRestartActionName}) {
         QVERIFY2(policy.contains(QString::fromLatin1(action)), action);
     }
     // 授权窗口（polkit 下 = 保持几分钟）与最小暴露面
-    QCOMPARE(policy.count(QLatin1String("<allow_active>auth_admin_keep</allow_active>")), 2);
-    QCOMPARE(policy.count(QLatin1String("<allow_inactive>no</allow_inactive>")), 2);
+    // 七个动作都应该是 auth_admin + keep（服务管理的五个同样是 session 级授权）
+    QCOMPARE(policy.count(QLatin1String("<allow_active>auth_admin_keep</allow_active>")), 7);
+    QCOMPARE(policy.count(QLatin1String("<allow_inactive>no</allow_inactive>")), 7);
     QVERIFY2(!policy.contains(QLatin1String("<allow_any>")),
              "allow_any must stay at its default (no): only active sessions may authorize");
 }

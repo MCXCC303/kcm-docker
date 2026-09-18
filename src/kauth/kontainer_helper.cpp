@@ -22,6 +22,7 @@
 */
 
 #include "backend/daemon_config.h"
+#include "backend/service_control.h"
 #include "kauth/privileged_config_request.h"
 #include "logging.h"
 
@@ -64,6 +65,15 @@ class KontainerHelper : public QObject
 {
     Q_OBJECT
 
+private:
+    /*!
+     * 五个服务动作的共用实现（定义见下方 private 区）。
+     *
+     * 只接受 `unit` 一个参数，且必须命中 `managedServiceUnits()` 白名单——
+     * 这样即使有人绕过会话侧直接调用 D-Bus 动作，也执行不了白名单之外的东西。
+     */
+    ActionReply runServiceAction(ServiceVerb verb, const QVariantMap &arguments);
+
 public Q_SLOTS:
     /*! 写入 daemon.json（白名单键的编辑意图）。对应动作 org.kde.kontainer.daemon.save。 */
     ActionReply daemon_save(const QVariantMap &arguments)
@@ -101,6 +111,33 @@ public Q_SLOTS:
         data.insert(QStringLiteral("keys"), PrivilegedConfigRequest::allowedKeys());
         reply.setData(data);
         return reply;
+    }
+
+    /*!
+     * 服务管理（B1）：三个固定 unit × 五个固定动词。
+     *
+     * 每个动词一个槽（动作名 → 槽名的规则见 .actions 里的说明），
+     * 但实现共用：**参数校验在白名单函数里**（会话侧与这里都调用它，纵深防御）。
+     */
+    ActionReply service_start(const QVariantMap &arguments)
+    {
+        return runServiceAction(ServiceVerb::Start, arguments);
+    }
+    ActionReply service_stop(const QVariantMap &arguments)
+    {
+        return runServiceAction(ServiceVerb::Stop, arguments);
+    }
+    ActionReply service_restart(const QVariantMap &arguments)
+    {
+        return runServiceAction(ServiceVerb::Restart, arguments);
+    }
+    ActionReply service_enable(const QVariantMap &arguments)
+    {
+        return runServiceAction(ServiceVerb::Enable, arguments);
+    }
+    ActionReply service_disable(const QVariantMap &arguments)
+    {
+        return runServiceAction(ServiceVerb::Disable, arguments);
     }
 
     /*! 通过 systemd D-Bus 重启 docker.service（不调用 systemctl 二进制）。
@@ -144,6 +181,55 @@ private:
         RestartFailed = 5,
     };
 };
+
+ActionReply KontainerHelper::runServiceAction(ServiceVerb verb, const QVariantMap &arguments)
+{
+    // 纵深防御：会话侧已经校验过一次，这里**再校验一次**——即使有人绕过会话侧
+    // 直接调用 D-Bus 动作，也只能操作白名单里的三个 unit 与五个固定动词。
+    const QString unit = arguments.value(QStringLiteral("unit")).toString();
+    const QString errorKey = serviceControlArgumentError(unit, serviceVerbKey(verb));
+    if (!errorKey.isEmpty()) {
+        qCWarning(kontainerModel) << "service action rejected:" << errorKey << unit;
+        return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::InvalidRequest));
+    }
+
+    QDBusInterface manager(QStringLiteral("org.freedesktop.systemd1"),
+                           QStringLiteral("/org/freedesktop/systemd1"),
+                           QStringLiteral("org.freedesktop.systemd1.Manager"),
+                           QDBusConnection::systemBus());
+    if (!manager.isValid()) {
+        return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::SystemdUnavailable));
+    }
+
+    if (verb == ServiceVerb::Enable || verb == ServiceVerb::Disable) {
+        // Enable/Disable 的返回类型与 Start/Stop 不同，单独走消息调用
+        const bool enable = verb == ServiceVerb::Enable;
+        const QDBusMessage reply = manager.call(enable ? QStringLiteral("EnableUnitFiles") : QStringLiteral("DisableUnitFiles"),
+                                                QStringList {unit},
+                                                false, // runtime=false：写盘（持久）
+                                                true); // force
+        if (reply.type() == QDBusMessage::ErrorMessage) {
+            qCWarning(kontainerModel) << "helper could not" << serviceVerbKey(verb) << unit << reply.errorMessage();
+            return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::RestartFailed));
+        }
+    } else {
+        const QString method = verb == ServiceVerb::Start    ? QStringLiteral("StartUnit")
+            : verb == ServiceVerb::Stop                     ? QStringLiteral("StopUnit")
+                                                            : QStringLiteral("RestartUnit");
+        const QDBusReply<QDBusObjectPath> reply = manager.call(method, unit, QStringLiteral("replace"));
+        if (!reply.isValid()) {
+            qCWarning(kontainerModel) << "helper could not" << serviceVerbKey(verb) << unit << reply.error().message();
+            return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::RestartFailed));
+        }
+    }
+
+    ActionReply ok = ActionReply::SuccessReply();
+    QVariantMap data;
+    data.insert(QStringLiteral("unit"), unit);
+    data.insert(QStringLiteral("verb"), serviceVerbKey(verb));
+    ok.setData(data);
+    return ok;
+}
 
 } // namespace Kontainer
 

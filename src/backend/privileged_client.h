@@ -35,6 +35,8 @@ public:
         Authorize,
         WriteConfig,
         Restart,
+        /*! 对 docker.socket / docker.service / containerd.service 执行固定动作（B1）。 */
+        ServiceControl,
     };
     Q_ENUM(Operation)
 
@@ -58,6 +60,12 @@ public:
     virtual void writeConfig(const DaemonConfigEdits &edits) = 0;
     /*! 重启 Docker：系统级走 helper，rootless 走会话 systemd。 */
     virtual void restartDocker(bool systemService) = 0;
+    /*!
+     * 控制一个 Docker 相关服务（B1）：`unit` 必须在白名单里，`verbKey` 必须是五个固定动词之一。
+     *
+     * 校验在 `serviceControlArgumentError()`（纯函数）里，非法请求**不发起任何提权动作**。
+     */
+    virtual void controlService(const QString &unit, const QString &verbKey) = 0;
 
 Q_SIGNALS:
     /*! 操作结果（`errorKey` 为空表示成功）。 */

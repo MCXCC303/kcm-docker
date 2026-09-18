@@ -49,11 +49,22 @@ public:
         lastSystemService = systemService;
     }
 
+    void controlService(const QString &unit, const QString &verbKey) override
+    {
+        ++serviceRequests;
+        lastServiceUnit = unit;
+        lastServiceVerb = verbKey;
+    }
+
     /*! `writeAvailable()` 的返回值（默认可用）。 */
     bool available = true;
     int authorizeRequests = 0;
     int writeRequests = 0;
     int restartRequests = 0;
+    /*! 服务控制请求（B1）：次数 + 最近一次的 unit/动词。 */
+    int serviceRequests = 0;
+    QString lastServiceUnit;
+    QString lastServiceVerb;
     bool lastSystemService = true;
     DaemonConfigEdits lastEdits;
 };

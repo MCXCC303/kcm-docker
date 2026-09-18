@@ -132,6 +132,23 @@ public:
 
     /*! 切换作用域（界面按作用域分成两页/两个入口）。 */
     Q_INVOKABLE void setScope(const QString &scope);
+    QString serviceErrorKey() const
+    {
+        return m_serviceErrorKey;
+    }
+    QString serviceUnit() const
+    {
+        return m_serviceUnit;
+    }
+    QString serviceVerb() const
+    {
+        return m_serviceVerb;
+    }
+    bool serviceInFlight() const
+    {
+        return m_serviceInFlight;
+    }
+
     QString scope() const;
     bool activeScope() const;
 
@@ -175,6 +192,11 @@ public:
     Q_INVOKABLE QString privilegedCommand() const;
 
     /*! 重启 Docker（系统级走 helper，rootless 走会话 systemd）。 */
+    /*!
+     * 控制一个 Docker 相关服务（B1）：unit 必须在白名单里，verbKey 是五个固定动词之一。
+     * 非法请求在这里就被拒绝（稳定 key，不发任何提权动作）。
+     */
+    Q_INVOKABLE bool controlService(const QString &unit, const QString &verbKey);
     Q_INVOKABLE void restartDocker();
     /*! 运行中的容器数：重启确认文案要用它（"将停止 N 个运行中的容器"）。 */
     Q_PROPERTY(int runningContainers READ runningContainers NOTIFY changed)
@@ -187,6 +209,8 @@ Q_SIGNALS:
     void dirtyChanged();
     /*! 保存成功（页面据此提示"待重启生效"或"已写入"）。 */
     void saved();
+    /*! 服务控制结束（成功或失败）：界面据此刷新状态与提示。 */
+    void serviceControlled(const QString &unit, const QString &verb, bool success, const QString &errorKey);
     /*! 重启结果（页面据此提示；成功时 daemon 会短暂不可用）。 */
     void restarted(bool success, const QString &errorKey);
 
@@ -226,6 +250,11 @@ private:
     bool m_awaitingAuthorize = false;
     bool m_awaitingWrite = false;
     bool m_awaitingRestart = false;
+    /*! 服务控制（B1）：最近一次请求与结果。 */
+    QString m_serviceUnit;
+    QString m_serviceVerb;
+    QString m_serviceErrorKey;
+    bool m_serviceInFlight = false;
     int m_runningContainers = 0;
     /*! 当前作用域（user / system）与"是否就是运行中的 daemon 读的那个文件"。 */
     QString m_scope = QStringLiteral("system");

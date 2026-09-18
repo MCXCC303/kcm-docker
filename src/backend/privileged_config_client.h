@@ -41,6 +41,7 @@ public:
     void requestAuthorization() override;
     void writeConfig(const DaemonConfigEdits &edits) override;
     void restartDocker(bool systemService) override;
+    void controlService(const QString &unit, const QString &verbKey) override;
 
 private:
     void runHelperAction(const QString &actionName, const QVariantMap &arguments, Operation operation);

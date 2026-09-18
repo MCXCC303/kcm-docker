@@ -48,3 +48,46 @@ Description=Kontainer wants to restart the Docker service. Running containers wi
 Description[zh_CN]=Kontainer 需要重启 Docker 服务；正在运行的容器会被停止。
 Policy=auth_admin
 Persistence=session
+
+# 服务管理（B1）：三个固定 unit × 五个固定动词。
+# 会话侧与 helper 侧都会用 serviceControlArgumentError() 校验 unit/动词白名单，
+# polkit 这一层只负责"要不要管理员授权"。
+[org.kde.kontainer.service.start]
+Name=Start a Docker-related service
+Name[zh_CN]=启动 Docker 相关服务
+Description=Kontainer wants to start docker.socket, docker.service or containerd.service
+Description[zh_CN]=Kontainer 需要启动 docker.socket、docker.service 或 containerd.service
+Policy=auth_admin
+Persistence=session
+
+[org.kde.kontainer.service.stop]
+Name=Stop a Docker-related service
+Name[zh_CN]=停止 Docker 相关服务
+Description=Kontainer wants to stop docker.socket, docker.service or containerd.service. Running containers may be stopped.
+Description[zh_CN]=Kontainer 需要停止 docker.socket、docker.service 或 containerd.service；正在运行的容器可能会被停止。
+Policy=auth_admin
+Persistence=session
+
+[org.kde.kontainer.service.restart]
+Name=Restart a Docker-related service
+Name[zh_CN]=重启 Docker 相关服务
+Description=Kontainer wants to restart docker.socket, docker.service or containerd.service. Running containers may be stopped.
+Description[zh_CN]=Kontainer 需要重启 docker.socket、docker.service 或 containerd.service；正在运行的容器可能会被停止。
+Policy=auth_admin
+Persistence=session
+
+[org.kde.kontainer.service.enable]
+Name=Enable a Docker-related service
+Name[zh_CN]=启用 Docker 相关服务
+Description=Kontainer wants to enable docker.socket, docker.service or containerd.service at boot
+Description[zh_CN]=Kontainer 需要让 docker.socket、docker.service 或 containerd.service 开机自启
+Policy=auth_admin
+Persistence=session
+
+[org.kde.kontainer.service.disable]
+Name=Disable a Docker-related service
+Name[zh_CN]=禁用 Docker 相关服务
+Description=Kontainer wants to disable docker.socket, docker.service or containerd.service at boot
+Description[zh_CN]=Kontainer 需要取消 docker.socket、docker.service 或 containerd.service 的开机自启
+Policy=auth_admin
+Persistence=session
