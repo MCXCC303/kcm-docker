@@ -46,6 +46,8 @@ add_library(kontainer_core STATIC
     backend/kwallet_credential_store.cpp
     backend/kwallet_credential_store.h
     backend/registry_auth.cpp
+    backend/service_status.cpp
+    backend/service_status.h
     backend/registry_auth.h
     backend/privileged_config_client.cpp
     backend/privileged_config_client.h

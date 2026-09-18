@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.8.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:35+0800\n"
+"POT-Creation-Date: 2026-09-19 04:51+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -28,11 +28,11 @@ msgstr "未选择镜像。"
 msgid "Created"
 msgstr "已创建"
 
-#: src/model/state_text.cpp:19 src/ui/MainPage.qml:482
+#: src/model/state_text.cpp:19 src/ui/MainPage.qml:507
 msgid "Restarting"
 msgstr "重启中"
 
-#: src/model/state_text.cpp:21 src/ui/MainPage.qml:77 src/ui/MainPage.qml:470
+#: src/model/state_text.cpp:21 src/ui/MainPage.qml:77 src/ui/MainPage.qml:495
 msgid "Running"
 msgstr "运行中"
 
@@ -40,7 +40,7 @@ msgstr "运行中"
 msgid "Removing"
 msgstr "删除中"
 
-#: src/model/state_text.cpp:25 src/ui/MainPage.qml:83 src/ui/MainPage.qml:474
+#: src/model/state_text.cpp:25 src/ui/MainPage.qml:83 src/ui/MainPage.qml:499
 msgid "Paused"
 msgstr "已暂停"
 
@@ -48,7 +48,7 @@ msgstr "已暂停"
 msgid "Exited"
 msgstr "已退出"
 
-#: src/model/state_text.cpp:29 src/ui/MainPage.qml:486
+#: src/model/state_text.cpp:29 src/ui/MainPage.qml:511
 msgid "Dead"
 msgstr "已失效"
 
@@ -74,26 +74,26 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:112 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:120 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:115
+#: src/model/status_controller.cpp:123
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:118
+#: src/model/status_controller.cpp:126
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:446
+#: src/model/status_controller.cpp:481
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr "Docker 一直没有响应，已放弃这次请求。等服务恢复后再重试。"
 
-#: src/model/status_controller.cpp:679
+#: src/model/status_controller.cpp:714
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -545,8 +545,8 @@ msgstr "不到一分钟"
 msgid "Image"
 msgstr "镜像"
 
-#: src/model/create_container_controller.cpp:917 src/ui/MainPage.qml:819
-#: src/ui/MainPage.qml:922
+#: src/model/create_container_controller.cpp:917 src/ui/MainPage.qml:844
+#: src/ui/MainPage.qml:947
 msgid "Name"
 msgstr "名称"
 
@@ -659,7 +659,7 @@ msgstr "复制"
 #: src/ui/components/CopyableText.qml:50 src/ui/components/StorageBar.qml:85
 #: src/ui/StorageView.qml:36 src/ui/ResourceView.qml:34
 #: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
-#: src/ui/MainPage.qml:362 src/ui/NetworkDetail.qml:155
+#: src/ui/MainPage.qml:387 src/ui/NetworkDetail.qml:155
 #: src/ui/NetworkDetail.qml:161 src/ui/VolumeCard.qml:114
 #: src/ui/VolumeDetail.qml:156 src/ui/VolumeDetail.qml:163
 msgid "—"
@@ -672,7 +672,7 @@ msgstr "镜像"
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:367
 #: src/ui/ContainerDetail.qml:284 src/ui/MainPage.qml:71
-#: src/ui/MainPage.qml:822 src/ui/MainPage.qml:925
+#: src/ui/MainPage.qml:847 src/ui/MainPage.qml:950
 msgid "Containers"
 msgstr "容器"
 
@@ -722,7 +722,7 @@ msgstr "刷新"
 msgid "Dismiss"
 msgstr "关闭提示"
 
-#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:603
+#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:628
 msgid "Pull image"
 msgstr "拉取镜像"
 
@@ -1065,7 +1065,7 @@ msgstr "内部网络（无外部访问）"
 msgid "Allow containers to be attached at runtime"
 msgstr "允许容器在运行时加入"
 
-#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:984
+#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:1009
 #: src/ui/CreateContainer.qml:972
 msgid "Create"
 msgstr "创建"
@@ -1196,7 +1196,7 @@ msgstr ""
 "下一次构建需要重做被缓存的工作。已构建的镜像不受影响，只会删除中间层与缓存记"
 "录。"
 
-#: src/ui/components/BuildImagePanel.qml:351 src/ui/MainPage.qml:1047
+#: src/ui/components/BuildImagePanel.qml:351 src/ui/MainPage.qml:1072
 msgid "Clean up"
 msgstr "清理"
 
@@ -1387,7 +1387,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr "无法读取 Docker 磁盘占用：%1"
 
 #: src/ui/StorageView.qml:64 src/ui/ImageDetail.qml:154
-#: src/ui/ContainerDetail.qml:326 src/ui/MainPage.qml:299
+#: src/ui/ContainerDetail.qml:326 src/ui/MainPage.qml:324
 msgid "Retry"
 msgstr "重试"
 
@@ -1403,11 +1403,11 @@ msgstr "正在加载镜像详情…"
 msgid "Unable to retrieve image details."
 msgstr "无法获取镜像详情。"
 
-#: src/ui/ImageDetail.qml:143 src/ui/MainPage.qml:577
+#: src/ui/ImageDetail.qml:143 src/ui/MainPage.qml:602
 msgid "Create container…"
 msgstr "创建容器…"
 
-#: src/ui/ImageDetail.qml:149 src/ui/MainPage.qml:591
+#: src/ui/ImageDetail.qml:149 src/ui/MainPage.qml:616
 msgid "Registry logins…"
 msgstr "仓库登录…"
 
@@ -2000,310 +2000,318 @@ msgid "one volume of unknown size"
 msgid_plural "%1 volumes of unknown size"
 msgstr[0] "1 个大小未知的卷"
 
-#: src/ui/MainPage.qml:89 src/ui/MainPage.qml:478
+#: src/ui/MainPage.qml:89 src/ui/MainPage.qml:503
 msgid "Stopped"
 msgstr "已停止"
 
-#: src/ui/MainPage.qml:110
-msgid "Loading Docker status…"
-msgstr "正在加载 Docker 状态…"
-
-#: src/ui/MainPage.qml:114
+#: src/ui/MainPage.qml:115 src/ui/MainPage.qml:137
 msgid "Connected"
 msgstr "已连接"
 
-#: src/ui/MainPage.qml:116
+#: src/ui/MainPage.qml:117
+msgid "Connected, but a service is not running"
+msgstr "已连接，但有服务未运行"
+
+#: src/ui/MainPage.qml:119
+msgid "Not connected: a service is not running"
+msgstr "未连接：有服务未运行"
+
+#: src/ui/MainPage.qml:121 src/ui/MainPage.qml:139
 msgid "Not connected"
 msgstr "未连接"
 
 #: src/ui/MainPage.qml:133
+msgid "Loading Docker status…"
+msgstr "正在加载 Docker 状态…"
+
+#: src/ui/MainPage.qml:156
 msgid "No containers found."
 msgstr "没有容器。"
 
-#: src/ui/MainPage.qml:139
+#: src/ui/MainPage.qml:162
 msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr "没有匹配“%1”的容器。"
 
-#: src/ui/MainPage.qml:140 src/ui/MainPage.qml:166
+#: src/ui/MainPage.qml:163 src/ui/MainPage.qml:189
 msgid "Clear search"
 msgstr "清除搜索"
 
-#: src/ui/MainPage.qml:144
+#: src/ui/MainPage.qml:167
 msgid "No containers match the current filter."
 msgstr "没有符合当前过滤条件的容器。"
 
-#: src/ui/MainPage.qml:145
+#: src/ui/MainPage.qml:168
 msgid "Show all containers"
 msgstr "显示全部容器"
 
-#: src/ui/MainPage.qml:158
+#: src/ui/MainPage.qml:181
 msgid "No images found."
 msgstr "没有镜像。"
 
-#: src/ui/MainPage.qml:160
+#: src/ui/MainPage.qml:183
 msgid "Pull an image"
 msgstr "拉取一个镜像"
 
-#: src/ui/MainPage.qml:165
+#: src/ui/MainPage.qml:188
 msgctxt "@info no image matches the search"
 msgid "No images match “%1”."
 msgstr "没有匹配“%1”的镜像。"
 
-#: src/ui/MainPage.qml:170
+#: src/ui/MainPage.qml:193
 msgid "No images match the current filter."
 msgstr "没有符合当前过滤条件的镜像。"
 
-#: src/ui/MainPage.qml:171
+#: src/ui/MainPage.qml:194
 msgid "Show all images"
 msgstr "显示全部镜像"
 
-#: src/ui/MainPage.qml:227
+#: src/ui/MainPage.qml:252
 msgctxt "@info last successful update"
 msgid "Updated %1 ago"
 msgstr "更新于 %1前"
 
-#: src/ui/MainPage.qml:228
+#: src/ui/MainPage.qml:253
 msgid "Not updated yet"
 msgstr "尚未更新"
 
-#: src/ui/MainPage.qml:234
+#: src/ui/MainPage.qml:259
 msgid "Update failed"
 msgstr "更新失败"
 
-#: src/ui/MainPage.qml:240
+#: src/ui/MainPage.qml:265
 msgid "Data is stale"
 msgstr "数据已过期"
 
-#: src/ui/MainPage.qml:247
+#: src/ui/MainPage.qml:272
 msgid "Auto-refresh is off"
 msgstr "自动刷新已关闭"
 
-#: src/ui/MainPage.qml:296
+#: src/ui/MainPage.qml:321
 msgid "Unable to connect to Docker Engine."
 msgstr "无法连接到 Docker 引擎。"
 
-#: src/ui/MainPage.qml:366
+#: src/ui/MainPage.qml:391
 msgid "Engine summary is unavailable"
 msgstr "引擎概要不可用"
 
-#: src/ui/MainPage.qml:374
+#: src/ui/MainPage.qml:399
 msgid ""
 "Container and image counts are unavailable because the engine summary could "
 "not be read."
 msgstr "无法读取引擎概要，容器与镜像数量暂不可用。"
 
-#: src/ui/MainPage.qml:412
+#: src/ui/MainPage.qml:437
 msgctxt "@title:tab container list"
 msgid "Containers (%1)"
 msgid_plural "Containers (%1)"
 msgstr[0] "容器（%1）"
 
-#: src/ui/MainPage.qml:415
+#: src/ui/MainPage.qml:440
 msgctxt "@title:tab image list"
 msgid "Images (%1)"
 msgid_plural "Images (%1)"
 msgstr[0] "镜像（%1）"
 
-#: src/ui/MainPage.qml:418
+#: src/ui/MainPage.qml:443
 msgctxt "@title:tab network list"
 msgid "Networks (%1)"
 msgid_plural "Networks (%1)"
 msgstr[0] "网络 (%1)"
 
-#: src/ui/MainPage.qml:421
+#: src/ui/MainPage.qml:446
 msgctxt "@title:tab volume list"
 msgid "Volumes (%1)"
 msgid_plural "Volumes (%1)"
 msgstr[0] "数据卷 (%1)"
 
-#: src/ui/MainPage.qml:424
+#: src/ui/MainPage.qml:449
 msgctxt "@title:tab engine information"
 msgid "Engine"
 msgstr "引擎"
 
-#: src/ui/MainPage.qml:427
+#: src/ui/MainPage.qml:452
 msgctxt "@title:tab mount presets"
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:448
+#: src/ui/MainPage.qml:473
 msgid "Search containers (name, image, ID)…"
 msgstr "搜索容器（名称、镜像、ID）…"
 
-#: src/ui/MainPage.qml:448
+#: src/ui/MainPage.qml:473
 msgid "Search images (repository, tag, ID)…"
 msgstr "搜索镜像（仓库、标签、ID）…"
 
-#: src/ui/MainPage.qml:466
+#: src/ui/MainPage.qml:491
 msgid "All states"
 msgstr "所有状态"
 
-#: src/ui/MainPage.qml:492
+#: src/ui/MainPage.qml:517
 msgid "All images"
 msgstr "所有镜像"
 
-#: src/ui/MainPage.qml:496 src/ui/MainPage.qml:909
+#: src/ui/MainPage.qml:521 src/ui/MainPage.qml:934
 msgid "In use"
 msgstr "使用中"
 
-#: src/ui/MainPage.qml:500
+#: src/ui/MainPage.qml:525
 msgid "Dangling"
 msgstr "悬空"
 
-#: src/ui/MainPage.qml:524
+#: src/ui/MainPage.qml:549
 msgid "Sort: Name"
 msgstr "排序：名称"
 
-#: src/ui/MainPage.qml:528
+#: src/ui/MainPage.qml:553
 msgid "Sort: State"
 msgstr "排序：状态"
 
-#: src/ui/MainPage.qml:532 src/ui/MainPage.qml:542
+#: src/ui/MainPage.qml:557 src/ui/MainPage.qml:567
 msgid "Sort: Created"
 msgstr "排序：创建时间"
 
-#: src/ui/MainPage.qml:538
+#: src/ui/MainPage.qml:563
 msgid "Sort: Repository"
 msgstr "排序：仓库"
 
-#: src/ui/MainPage.qml:546
+#: src/ui/MainPage.qml:571
 msgid "Sort: Size"
 msgstr "排序：大小"
 
-#: src/ui/MainPage.qml:568
+#: src/ui/MainPage.qml:593
 msgid "Build image…"
 msgstr "构建镜像…"
 
-#: src/ui/MainPage.qml:602
+#: src/ui/MainPage.qml:627
 msgid "Pull image (%1 running)"
 msgstr "拉取镜像（%1 个进行中）"
 
-#: src/ui/MainPage.qml:629
+#: src/ui/MainPage.qml:654
 msgid "Unable to retrieve the container list: %1"
 msgstr "无法获取容器列表：%1"
 
-#: src/ui/MainPage.qml:687
+#: src/ui/MainPage.qml:712
 msgid "Unable to retrieve the image list: %1"
 msgstr "无法获取镜像列表：%1"
 
-#: src/ui/MainPage.qml:769
+#: src/ui/MainPage.qml:794
 msgid "Unable to retrieve the network list: %1"
 msgstr "无法读取网络列表：%1"
 
-#: src/ui/MainPage.qml:780
+#: src/ui/MainPage.qml:805
 msgid "Search by name, ID, driver or subnet…"
 msgstr "按名称、ID、驱动或子网搜索…"
 
-#: src/ui/MainPage.qml:789
+#: src/ui/MainPage.qml:814
 msgid "Create network…"
 msgstr "创建网络…"
 
-#: src/ui/MainPage.qml:804
+#: src/ui/MainPage.qml:829
 msgid "All networks"
 msgstr "所有网络"
 
-#: src/ui/MainPage.qml:805
+#: src/ui/MainPage.qml:830
 msgid "Built-in"
 msgstr "内置"
 
-#: src/ui/MainPage.qml:806
+#: src/ui/MainPage.qml:831
 msgid "User-defined"
 msgstr "自建"
 
-#: src/ui/MainPage.qml:820 src/ui/MainPage.qml:923
+#: src/ui/MainPage.qml:845 src/ui/MainPage.qml:948
 msgid "Driver"
 msgstr "驱动"
 
-#: src/ui/MainPage.qml:821
+#: src/ui/MainPage.qml:846
 msgid "Scope"
 msgstr "范围"
 
-#: src/ui/MainPage.qml:834
+#: src/ui/MainPage.qml:859
 msgid "No network matches the current search or filter."
 msgstr "没有网络符合当前的搜索或过滤条件。"
 
-#: src/ui/MainPage.qml:835
+#: src/ui/MainPage.qml:860
 msgid "No networks found."
 msgstr "没有找到网络。"
 
-#: src/ui/MainPage.qml:837
+#: src/ui/MainPage.qml:862
 msgid "Clear the search field or switch the filter back to “All networks”."
 msgstr "清空搜索框，或把过滤条件切回“所有网络”。"
 
-#: src/ui/MainPage.qml:839
+#: src/ui/MainPage.qml:864
 msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr "Docker 至少会提供内置的 bridge、host 与 none 三个网络。"
 
-#: src/ui/MainPage.qml:841 src/ui/MainPage.qml:1077
+#: src/ui/MainPage.qml:866 src/ui/MainPage.qml:1102
 msgid "Clear filters"
 msgstr "清除过滤条件"
 
-#: src/ui/MainPage.qml:885
+#: src/ui/MainPage.qml:910
 msgid "Unable to retrieve the volume list: %1"
 msgstr "无法读取数据卷列表：%1"
 
-#: src/ui/MainPage.qml:895
+#: src/ui/MainPage.qml:920
 msgid "Search by name, driver or mount point…"
 msgstr "按名称、驱动或挂载点搜索…"
 
-#: src/ui/MainPage.qml:907
+#: src/ui/MainPage.qml:932
 msgid "All volumes"
 msgstr "所有数据卷"
 
-#: src/ui/MainPage.qml:908
+#: src/ui/MainPage.qml:933
 msgid "Unused"
 msgstr "未使用"
 
-#: src/ui/MainPage.qml:924
+#: src/ui/MainPage.qml:949
 msgid "Size"
 msgstr "大小"
 
-#: src/ui/MainPage.qml:935
+#: src/ui/MainPage.qml:960
 msgid "Create volume…"
 msgstr "创建数据卷…"
 
-#: src/ui/MainPage.qml:944
+#: src/ui/MainPage.qml:969
 msgid "Clean up unused…"
 msgstr "清理未使用…"
 
-#: src/ui/MainPage.qml:978 src/ui/MainPage.qml:979
+#: src/ui/MainPage.qml:1003 src/ui/MainPage.qml:1004
 #: src/ui/CreateContainer.qml:678
 msgid "Volume name"
 msgstr "数据卷名称"
 
-#: src/ui/MainPage.qml:997
+#: src/ui/MainPage.qml:1022
 msgid "The volume is created with the local driver."
 msgstr "数据卷使用 local 驱动创建。"
 
-#: src/ui/MainPage.qml:1018
+#: src/ui/MainPage.qml:1043
 msgctxt "@info volumes about to be removed"
 msgid "One unused volume will be removed:"
 msgid_plural "%1 unused volumes will be removed:"
 msgstr[0] "将删除 1 个未使用的数据卷："
 
-#: src/ui/MainPage.qml:1037
+#: src/ui/MainPage.qml:1062
 msgid "Reclaimable space: %1"
 msgstr "可回收空间：%1"
 
-#: src/ui/MainPage.qml:1057
+#: src/ui/MainPage.qml:1082
 msgid "Only volumes that no container uses are removed."
 msgstr "只会删除没有任何容器使用的数据卷。"
 
-#: src/ui/MainPage.qml:1070
+#: src/ui/MainPage.qml:1095
 msgid "No volume matches the current search or filter."
 msgstr "没有数据卷符合当前的搜索或过滤条件。"
 
-#: src/ui/MainPage.qml:1071
+#: src/ui/MainPage.qml:1096
 msgid "No volumes found."
 msgstr "没有找到数据卷。"
 
-#: src/ui/MainPage.qml:1073
+#: src/ui/MainPage.qml:1098
 msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr "清空搜索框，或把过滤条件切回“所有数据卷”。"
 
-#: src/ui/MainPage.qml:1075
+#: src/ui/MainPage.qml:1100
 msgid ""
 "Volumes keep data across container restarts. Create one here or let Docker "
 "create it when a container declares it."
@@ -2311,25 +2319,25 @@ msgstr ""
 "数据卷用于在容器重启之间保留数据。可以在这里创建，也可以在容器声明时由 "
 "Docker 自动创建。"
 
-#: src/ui/MainPage.qml:1120
+#: src/ui/MainPage.qml:1145
 msgid "User configuration…"
 msgstr "用户级配置…"
 
-#: src/ui/MainPage.qml:1127
+#: src/ui/MainPage.qml:1152
 msgid "System configuration…"
 msgstr "系统级配置…"
 
-#: src/ui/MainPage.qml:1134
+#: src/ui/MainPage.qml:1159
 msgid ""
 "Registry mirrors and other daemon settings. The system configuration needs "
 "administrator rights."
 msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
 
-#: src/ui/MainPage.qml:1165
+#: src/ui/MainPage.qml:1190
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:1170
+#: src/ui/MainPage.qml:1195
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."

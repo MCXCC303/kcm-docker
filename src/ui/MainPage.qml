@@ -104,6 +104,29 @@ Kirigami.Page {
     /*! 写操作控制器（ARCH_V4 §2.2.4）：卡片按钮与结果提示都从这里读。 */
     readonly property var operations: root.controller.operations
 
+    /*
+     * 连接状态文案（B1）：不能只看引擎数据——docker.service 停掉时 socket 仍在，
+     * 旧实现照样显示"已连接"，用户点任何操作却都会失败。
+     * 因此这里读 controller.connectionKey（服务状态 + 最近一次刷新结果都纳入判定）。
+     */
+    function connectionText(key: string): string {
+        switch (key) {
+        case "connected":
+            return i18n("Connected");
+        case "connectedServicesDown":
+            return i18n("Connected, but a service is not running");
+        case "disconnectedServicesDown":
+            return i18n("Not connected: a service is not running");
+        default:
+            return i18n("Not connected");
+        }
+    }
+
+    /*! 连接状态是否应当用警示色（服务未运行、或未连接）。 */
+    function connectionNeedsAttention(key: string): bool {
+        return key !== "connected";
+    }
+
     function engineStateText(stateKey: string): string {
         switch (stateKey) {
         case "loading":
@@ -216,7 +239,9 @@ Kirigami.Page {
             Components.StatusChip {
                 semanticKey: root.controller.engineStateSemanticKey
                 iconName: root.controller.engineStateIconName
-                text: root.engineStateText(root.controller.engineStateKey)
+                text: root.controller.engineStateKey === "loading"
+                    ? root.engineStateText(root.controller.engineStateKey)
+                    : root.connectionText(root.controller.connectionKey)
             }
             QQC2.Label {
                 text: "•"

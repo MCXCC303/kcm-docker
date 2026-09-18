@@ -13,6 +13,7 @@
 #include "model/image_detail_controller.h"
 #include "model/image_filter_model.h"
 #include "backend/host_path_service.h"
+#include "backend/service_status.h"
 #include "backend/credential_store.h"
 #include "backend/directory_picker.h"
 #include "model/daemon_config_controller.h"
@@ -113,6 +114,16 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::MountPresetStore *mountPresets READ mountPresets CONSTANT)
     /*! 目录选择（挂载预设的宿主路径用；测试与渲染注入替身）。 */
     Q_PROPERTY(Kontainer::DirectoryPicker *directoryPicker READ directoryPicker CONSTANT)
+    /*! 三个 systemd unit 的状态（B1）：连接状态与"服务未运行"提示都取自这里。 */
+    Q_PROPERTY(Kontainer::ServiceStatusBackend *services READ services CONSTANT)
+    /*!
+     * 连接状态的**细化** key（B1）：
+     * `connected` / `connectedServicesDown` / `disconnected` / `disconnectedServicesDown`。
+     *
+     * 为什么不能只看 socket：docker.service 停掉时 `docker.socket` 仍在（socket 激活），
+     * 于是旧实现照样显示"已连接"——用户角度这是误导（实测反馈 B1）。
+     */
+    Q_PROPERTY(QString connectionKey READ connectionKey NOTIFY serviceStatesChanged)
     /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
     Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
@@ -189,7 +200,8 @@ public:
                               QObject *parent = nullptr,
                               CredentialBackend *credentialBackend = nullptr,
                               MountPresetStore *mountPresetStore = nullptr,
-                              DirectoryPicker *directoryPicker = nullptr);
+                              DirectoryPicker *directoryPicker = nullptr,
+                              ServiceStatusBackend *serviceStatus = nullptr);
     ~StatusController() override;
 
     State state() const
@@ -338,6 +350,14 @@ public:
     {
         return m_directoryPicker;
     }
+    ServiceStatusBackend *services() const
+    {
+        return m_services;
+    }
+    /*! 细化的连接状态（见 connectionKey 的说明）。 */
+    QString connectionKey() const;
+    /*! 服务状态变化（连接 key 随之可能变化）。 */
+    Q_SIGNAL void serviceStatesChanged();
     ContainerDetailController *containerDetail() const
     {
         return m_containerDetail;
@@ -496,6 +516,8 @@ private:
      * 在途看门狗：busy 持续过久时放弃在途请求（用户实测 B3/B4：永久"正在加载/backend busy"）。
      */
     QTimer *m_busyWatchdog = nullptr;
+    /*! 服务状态来源（默认 systemd D-Bus 只读查询；测试注入替身）。 */
+    ServiceStatusBackend *m_services = nullptr;
     HostPathService *m_hostPaths = nullptr;
     DaemonConfigController *m_daemonConfigUser = nullptr;
     DaemonConfigController *m_daemonConfigSystem = nullptr;

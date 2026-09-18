@@ -6,12 +6,64 @@
 #pragma once
 
 #include "backend/docker_backend_interface.h"
+#include "backend/service_status.h"
 
 #include <QHash>
 #include <QSet>
 
 namespace Kontainer
 {
+
+/*!
+ * 可控的服务状态来源（测试用）：默认"三个 unit 都在运行"，用例可以逐项设置。
+ */
+class FakeServiceStatus : public ServiceStatusBackend
+{
+    Q_OBJECT
+
+public:
+    explicit FakeServiceStatus(QObject *parent = nullptr)
+        : ServiceStatusBackend(parent)
+    {
+        for (const QString &unit : managedServiceUnits()) {
+            ServiceState state;
+            state.unit = unit;
+            state.activeState = QStringLiteral("active");
+            state.unitFileState = QStringLiteral("enabled");
+            state.subState = QStringLiteral("running");
+            m_services.append(state);
+        }
+    }
+
+    void query() override
+    {
+        ++queryCount;
+        Q_EMIT servicesChanged();
+    }
+
+    QList<ServiceState> services() const override
+    {
+        return m_services;
+    }
+
+    /*! 设置某个 unit 的状态（`activeState` 传空表示"systemd 查不到"）。 */
+    void setUnitState(const QString &unit, const QString &activeState, const QString &unitFileState = QStringLiteral("enabled"))
+    {
+        for (ServiceState &state : m_services) {
+            if (state.unit == unit) {
+                state.activeState = activeState;
+                state.unitFileState = unitFileState;
+                state.subState = activeState == QLatin1String("active") ? QStringLiteral("running") : QStringLiteral("dead");
+            }
+        }
+        Q_EMIT servicesChanged();
+    }
+
+    int queryCount = 0;
+
+private:
+    QList<ServiceState> m_services;
+};
 
 /*!
  * 测试用的 backend（ARCH_V1 §30）。

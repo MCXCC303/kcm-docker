@@ -32,7 +32,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
                                    QObject *parent,
                                    CredentialBackend *credentialBackend,
                                    MountPresetStore *mountPresetStore,
-                                   DirectoryPicker *directoryPicker)
+                                   DirectoryPicker *directoryPicker,
+                                   ServiceStatusBackend *serviceStatus)
     : QObject(parent)
     , m_backend(backend)
     , m_scheduler(new RefreshScheduler(backend, this))
@@ -58,6 +59,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     // 目录选择：注入时用注入的（测试与离屏渲染不弹真实对话框）
     , m_directoryPicker(directoryPicker ? directoryPicker : new SystemDirectoryPicker(this))
     , m_busyWatchdog(new QTimer(this))
+    , m_services(serviceStatus ? serviceStatus : new SystemdServiceStatus(this))
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))
@@ -73,6 +75,12 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_busyWatchdog->setSingleShot(true);
     m_busyWatchdog->setInterval(int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kInFlightWatchdog).count()));
     connect(m_busyWatchdog, &QTimer::timeout, this, &StatusController::onBusyWatchdogTimeout);
+
+    // 服务状态：查询回来后连接 key 可能变化（"已连接"要能因为服务停了而变成"服务未运行"）
+    connect(m_services, &ServiceStatusBackend::servicesChanged, this, [this] {
+        Q_EMIT serviceStatesChanged();
+        updateStates();
+    });
 
     // 代理模型：搜索/过滤/排序状态由代理自己持有，因此后台刷新不会重置用户条件（§32）
     m_containerFilter->setSourceModel(m_containerModel);
@@ -186,6 +194,7 @@ void StatusController::refresh()
     // 用户主动刷新后，"上一次操作成功"这类提示已经过时（A7）：
     // 失败类信息保留，因为它往往是用户唯一能看到的"为什么"（dismissResultIfObsolete 里判断）
     m_operations->dismissResultIfObsolete();
+    m_services->query();
     m_refreshRequested = true;
     m_scheduler->requestRefresh(RefreshScheduler::Reason::Manual);
     m_backend->refreshStorageUsage();
@@ -262,6 +271,32 @@ QString StatusController::stateKey() const
 QString StatusController::engineStateKey() const
 {
     return engineStateKeyFor(m_engineState);
+}
+
+QString StatusController::connectionKey() const
+{
+    /*
+     * 连接状态的细化（用户实测 B1）：
+     *
+     * `docker.service` 停掉时 `docker.socket` 还在（socket 激活的语义），只看 socket 会显示
+     * "已连接"——但守护进程已经停了，用户点任何操作都不会成功。因此把服务状态一并纳入：
+     * 服务未全部运行时，连接状态明确带上"服务未运行"，界面据此给不同的提示与颜色。
+     * `containerd.service` 不参与"已连接"的判定（它不提供 Docker API），只用于提示部分能力可用。
+     */
+    const bool dockerSocket = m_services->isActive(QStringLiteral("docker.socket"));
+    const bool dockerService = m_services->isActive(QStringLiteral("docker.service"));
+    const bool servicesDown = !dockerSocket || !dockerService;
+    /*
+     * "已连接"要求**最近一次刷新是成功的**：只看缓存的引擎数据会误导——
+     * 守护进程停掉之后我们仍留着上一次读到的数据，用户看到"已连接"却点什么都失败。
+     */
+    const bool engineDataUsable = m_engineState == EngineState::Ready || m_engineState == EngineState::Refreshing
+        || m_engineState == EngineState::Partial;
+    const bool connected = engineDataUsable && !updateFailed();
+    if (connected) {
+        return servicesDown ? QStringLiteral("connectedServicesDown") : QStringLiteral("connected");
+    }
+    return servicesDown ? QStringLiteral("disconnectedServicesDown") : QStringLiteral("disconnected");
 }
 
 QString StatusController::engineStateSemanticKey() const

@@ -37,6 +37,7 @@ private Q_SLOTS:
     void failedRefreshDoesNotStayInLoading();
     void manualRefreshClearsTheStickyFailureFlag();
     void watchdogAbandonsStuckRequests();
+    void serviceStatesShapeTheConnectionKey();
     void retryStorageOnlyRefreshesStorage();
 };
 
@@ -437,6 +438,79 @@ void StatusControllerTest::watchdogAbandonsStuckRequests()
     controller.refresh();
     backend.completeRefresh();
     QVERIFY2(!controller.busy(), "a later refresh must work again");
+}
+
+/*!
+ * B1：服务状态决定"已连接"的说法——socket 在、服务停了时不能只说"已连接"。
+ */
+void StatusControllerTest::serviceStatesShapeTheConnectionKey()
+{
+    MockDockerBackend backend;
+    EngineInfo info;
+    info.available = true;
+    info.countsAvailable = true;
+    info.serverVersion = QStringLiteral("29.8.0");
+    backend.setEngineInfo(info);
+    FakeServiceStatus services;
+    StatusController controller(&backend, nullptr, nullptr, nullptr, nullptr, nullptr, &services);
+
+    // 三个 unit 都在运行 + 刷新成功 → 已连接
+    controller.refresh();
+    backend.completeRefresh();
+    QCOMPARE(controller.connectionKey(), QStringLiteral("connected"));
+
+    // docker.service 停了（socket 还在：正是用户遇到的场景）→ 必须提示"服务未运行"
+    services.setUnitState(QStringLiteral("docker.service"), QStringLiteral("inactive"));
+    QCOMPARE(controller.connectionKey(), QStringLiteral("connectedServicesDown"));
+
+    // 服务全部停掉：即使还留着上一次读到的引擎数据，也只能说"服务未运行"
+    services.setUnitState(QStringLiteral("docker.socket"), QStringLiteral("inactive"));
+    QCOMPARE(controller.connectionKey(), QStringLiteral("connectedServicesDown"));
+
+    /*
+     * 从未连上过（引擎数据不可用）+ 服务未运行 → "未连接 + 服务未运行"。
+     *
+     * 注意：控制器会**保留**上一次读到的引擎数据（错误隔离），所以这里必须用一个
+     * 全新的控制器，而不是把老控制器的引擎数据清掉——后者不会发生（也不该发生）。
+     */
+    {
+        MockDockerBackend freshBackend;
+        FakeServiceStatus freshServices;
+        freshServices.setUnitState(QStringLiteral("docker.socket"), QStringLiteral("inactive"));
+        freshServices.setUnitState(QStringLiteral("docker.service"), QStringLiteral("inactive"));
+        StatusController fresh(&freshBackend, nullptr, nullptr, nullptr, nullptr, nullptr, &freshServices);
+        fresh.refresh();
+        freshBackend.completeRefresh();
+        QCOMPARE(fresh.connectionKey(), QStringLiteral("disconnectedServicesDown"));
+    }
+
+    // 服务恢复：手里还有上一次读到的引擎数据，可以如实说"已连接"（刷新正在进行）
+    services.setUnitState(QStringLiteral("docker.socket"), QStringLiteral("active"));
+    services.setUnitState(QStringLiteral("docker.service"), QStringLiteral("active"));
+    QCOMPARE(controller.connectionKey(), QStringLiteral("connected"));
+
+    // 刷新失败之后不能再自称"已连接"（缓存的数据还在，但用户点什么都失败）
+    backend.setNextFailure(DockerBackendInterface::Section::Containers,
+                           DockerError(DockerError::Kind::DockerUnavailable, QStringLiteral("daemon went away")));
+    controller.requestAutomaticRefreshForTesting();
+    backend.completeRefresh();
+    QVERIFY(controller.updateFailed());
+    QCOMPARE(controller.connectionKey(), QStringLiteral("disconnected"));
+
+    // 手动刷新（重新开始）成功后：回到已连接
+    controller.refresh();
+    backend.completeRefresh();
+    QVERIFY(!controller.updateFailed());
+    QCOMPARE(controller.connectionKey(), QStringLiteral("connected"));
+
+    // 状态 key 的映射（systemd 的 ActiveState → 稳定 key）
+    QCOMPARE(services.stateKeyFor(QStringLiteral("docker.service")), QStringLiteral("running"));
+    services.setUnitState(QStringLiteral("docker.service"), QStringLiteral("failed"));
+    QCOMPARE(services.stateKeyFor(QStringLiteral("docker.service")), QStringLiteral("failed"));
+    services.setUnitState(QStringLiteral("docker.service"), QString());
+    QCOMPARE(services.stateKeyFor(QStringLiteral("docker.service")), QStringLiteral("unknown"));
+    // 白名单之外的 unit 一律 unknown（不接受任意名字）
+    QCOMPARE(services.stateKeyFor(QStringLiteral("sshd.service")), QStringLiteral("unknown"));
 }
 
 QTEST_GUILESS_MAIN(StatusControllerTest)

@@ -11,6 +11,7 @@
 #include "backend/directory_picker.h"
 #include "model/mount_preset_store.h"
 #include "model/status_controller.h"
+#include "support/mock_docker_backend.h"
 
 #include <QObject>
 #include <QTemporaryDir>
@@ -69,6 +70,12 @@ public:
         return m_directoryPicker;
     }
 
+    /*! 服务状态替身：默认三个 unit 都在运行（测试可以改成"服务未运行"）。 */
+    FakeServiceStatus *serviceStatus() const
+    {
+        return m_serviceStatus;
+    }
+
     /*!
      * 挂载预设存储（指向临时目录）。
      *
@@ -105,6 +112,7 @@ private:
     QTemporaryDir *m_configDir = nullptr;
     MountPresetStore *m_mountPresets = nullptr;
     FakeDirectoryPicker *m_directoryPicker = nullptr;
+    FakeServiceStatus *m_serviceStatus = nullptr;
     StatusController *m_controller = nullptr;
 };
 

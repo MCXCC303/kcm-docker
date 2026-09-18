@@ -18,12 +18,20 @@ QmlStubKcm::QmlStubKcm(DockerBackendInterface *backend, QObject *parent)
     // 凭据后端注入内存替身、预设存储指向临时目录：测试与离屏渲染都不该碰用户的真实数据
     , m_mountPresets(new MountPresetStore(m_configDir->filePath(QStringLiteral("kontainerrc"))))
     , m_directoryPicker(new FakeDirectoryPicker())
-    , m_controller(new StatusController(backend, m_hostPaths, this, m_credentialBackend, m_mountPresets, m_directoryPicker))
+    , m_serviceStatus(new FakeServiceStatus())
+    , m_controller(new StatusController(backend,
+                                        m_hostPaths,
+                                        this,
+                                        m_credentialBackend,
+                                        m_mountPresets,
+                                        m_directoryPicker,
+                                        m_serviceStatus))
 {
 }
 
 QmlStubKcm::~QmlStubKcm()
 {
+    delete m_serviceStatus;
     delete m_directoryPicker;
     delete m_mountPresets;
     delete m_configDir;
