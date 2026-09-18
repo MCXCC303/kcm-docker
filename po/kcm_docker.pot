@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-18 15:24+0800\n"
+"POT-Creation-Date: 2026-09-19 03:58+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,7 +18,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: src/backend/docker_backend.cpp:1252 src/model/operation_controller.cpp:1040
+#: src/backend/docker_backend.cpp:1252 src/model/operation_controller.cpp:1055
 msgid "Uploading the build context…"
 msgstr ""
 
@@ -93,7 +93,7 @@ msgstr ""
 msgid "Could not open the file manager: %1"
 msgstr ""
 
-#: src/model/status_controller.cpp:618
+#: src/model/status_controller.cpp:621
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
@@ -168,7 +168,7 @@ msgid "Unknown Docker error."
 msgstr ""
 
 #: src/model/operation_controller.cpp:99
-#: src/model/operation_controller.cpp:1401
+#: src/model/operation_controller.cpp:1416
 #: src/ui/components/BuildImagePanel.qml:476
 msgid "Image built."
 msgstr ""
@@ -209,294 +209,294 @@ msgid ""
 msgstr ""
 
 #: src/model/operation_controller.cpp:301
-#: src/model/operation_controller.cpp:386
-#: src/model/operation_controller.cpp:399
-#: src/model/operation_controller.cpp:430
-#: src/model/operation_controller.cpp:534
-#: src/model/operation_controller.cpp:576
-#: src/model/operation_controller.cpp:713
-#: src/model/operation_controller.cpp:824
-#: src/model/operation_controller.cpp:860
-#: src/model/operation_controller.cpp:882
-#: src/model/operation_controller.cpp:913
-#: src/model/operation_controller.cpp:952
-#: src/model/operation_controller.cpp:984
-#: src/model/operation_controller.cpp:1052
+#: src/model/operation_controller.cpp:401
+#: src/model/operation_controller.cpp:414
+#: src/model/operation_controller.cpp:445
+#: src/model/operation_controller.cpp:549
+#: src/model/operation_controller.cpp:591
+#: src/model/operation_controller.cpp:728
+#: src/model/operation_controller.cpp:839
+#: src/model/operation_controller.cpp:875
+#: src/model/operation_controller.cpp:897
+#: src/model/operation_controller.cpp:928
+#: src/model/operation_controller.cpp:967
+#: src/model/operation_controller.cpp:999
+#: src/model/operation_controller.cpp:1067
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr ""
 
 #: src/model/operation_controller.cpp:306
-#: src/model/operation_controller.cpp:558
-#: src/model/operation_controller.cpp:584
-#: src/model/operation_controller.cpp:722
-#: src/model/operation_controller.cpp:833
-#: src/model/operation_controller.cpp:868
-#: src/model/operation_controller.cpp:890
-#: src/model/operation_controller.cpp:931
-#: src/model/operation_controller.cpp:961
+#: src/model/operation_controller.cpp:573
+#: src/model/operation_controller.cpp:599
+#: src/model/operation_controller.cpp:737
+#: src/model/operation_controller.cpp:848
+#: src/model/operation_controller.cpp:883
+#: src/model/operation_controller.cpp:905
+#: src/model/operation_controller.cpp:946
+#: src/model/operation_controller.cpp:976
 msgid "Another operation on this object is still running."
 msgstr ""
 
-#: src/model/operation_controller.cpp:355
+#: src/model/operation_controller.cpp:370
 msgid "starting the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:365
+#: src/model/operation_controller.cpp:380
 msgid "stopping the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:375
+#: src/model/operation_controller.cpp:390
 msgid "restarting the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:386
+#: src/model/operation_controller.cpp:401
 msgid "pausing the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:399
+#: src/model/operation_controller.cpp:414
 msgid "resuming the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:411
+#: src/model/operation_controller.cpp:426
 msgid "removing the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:422
+#: src/model/operation_controller.cpp:437
 msgid "“%1” is not a valid image reference."
 msgstr ""
 
-#: src/model/operation_controller.cpp:430
+#: src/model/operation_controller.cpp:445
 msgid "pulling the image"
 msgstr ""
 
-#: src/model/operation_controller.cpp:437
+#: src/model/operation_controller.cpp:452
 msgid "This image is already being pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:508
+#: src/model/operation_controller.cpp:523
 msgid "The network was not created because the name is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:513
+#: src/model/operation_controller.cpp:528
 msgid "The network was not created because the subnet is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:518
+#: src/model/operation_controller.cpp:533
 msgid "The network was not created because the gateway is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:526
+#: src/model/operation_controller.cpp:541
 msgid "The network was not created because the name is already in use."
 msgstr ""
 
-#: src/model/operation_controller.cpp:534
+#: src/model/operation_controller.cpp:549
 msgid "creating the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:576
+#: src/model/operation_controller.cpp:591
 msgid "removing the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:661
+#: src/model/operation_controller.cpp:676
 msgid "The container was not created because the name is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:666
+#: src/model/operation_controller.cpp:681
 msgid "The container was not created because the name is already in use."
 msgstr ""
 
-#: src/model/operation_controller.cpp:672
+#: src/model/operation_controller.cpp:687
 msgid "The container was not created because no image was chosen."
 msgstr ""
 
-#: src/model/operation_controller.cpp:678
+#: src/model/operation_controller.cpp:693
 msgid ""
 "The container was not created because the image is not available locally."
 msgstr ""
 
-#: src/model/operation_controller.cpp:691
+#: src/model/operation_controller.cpp:706
 msgid "The container was not created because host port %1 is already in use."
 msgstr ""
 
-#: src/model/operation_controller.cpp:705
+#: src/model/operation_controller.cpp:720
 msgid "The container was not created because a mount destination is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:713
+#: src/model/operation_controller.cpp:728
 msgid "creating the container"
 msgstr ""
 
-#: src/model/operation_controller.cpp:812
+#: src/model/operation_controller.cpp:827
 msgid "The volume was not created because the name is not valid."
 msgstr ""
 
-#: src/model/operation_controller.cpp:818
+#: src/model/operation_controller.cpp:833
 msgid "The volume was not created because the name is already in use."
 msgstr ""
 
-#: src/model/operation_controller.cpp:824
+#: src/model/operation_controller.cpp:839
 msgid "creating the volume"
 msgstr ""
 
-#: src/model/operation_controller.cpp:860
+#: src/model/operation_controller.cpp:875
 msgid "removing the volume"
 msgstr ""
 
-#: src/model/operation_controller.cpp:882
+#: src/model/operation_controller.cpp:897
 msgid "cleaning up the volumes"
 msgstr ""
 
-#: src/model/operation_controller.cpp:907
+#: src/model/operation_controller.cpp:922
 msgid ""
 "The container was not connected because a network or container was missing."
 msgstr ""
 
-#: src/model/operation_controller.cpp:913
+#: src/model/operation_controller.cpp:928
 msgid "connecting the container to the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:946
+#: src/model/operation_controller.cpp:961
 msgid ""
 "The container was not disconnected because a network or container was "
 "missing."
 msgstr ""
 
-#: src/model/operation_controller.cpp:952
+#: src/model/operation_controller.cpp:967
 msgid "disconnecting the container from the network"
 msgstr ""
 
-#: src/model/operation_controller.cpp:984
+#: src/model/operation_controller.cpp:999
 msgid "building the image"
 msgstr ""
 
-#: src/model/operation_controller.cpp:990
+#: src/model/operation_controller.cpp:1005
 msgid "The image was not built because no tag was given."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1001
+#: src/model/operation_controller.cpp:1016
 msgid "The build context could not be packaged."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1052
+#: src/model/operation_controller.cpp:1067
 msgid "cleaning the build cache"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1169
+#: src/model/operation_controller.cpp:1184
 msgid "removing the image"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1244
+#: src/model/operation_controller.cpp:1259
 msgid "Container created and started: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1262
+#: src/model/operation_controller.cpp:1277
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1262
+#: src/model/operation_controller.cpp:1277
 msgid "Operation cancelled."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1269
+#: src/model/operation_controller.cpp:1284
 msgid "The container was created but could not be started: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1367
+#: src/model/operation_controller.cpp:1382
 msgid "Container started."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1369
+#: src/model/operation_controller.cpp:1384
 msgid "Container stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1371
+#: src/model/operation_controller.cpp:1386
 msgid "Container restarted."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1373
+#: src/model/operation_controller.cpp:1388
 msgid "Container paused."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1375
+#: src/model/operation_controller.cpp:1390
 msgid "Container resumed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1377
+#: src/model/operation_controller.cpp:1392
 msgid "Container removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1380
+#: src/model/operation_controller.cpp:1395
 msgid "Image pulled: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1383
+#: src/model/operation_controller.cpp:1398
 msgid "Image removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1386
+#: src/model/operation_controller.cpp:1401
 msgid "Network created: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1389
+#: src/model/operation_controller.cpp:1404
 msgid "Network removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1391
+#: src/model/operation_controller.cpp:1406
 msgid "Container connected to the network."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1393
+#: src/model/operation_controller.cpp:1408
 msgid "Container disconnected from the network."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1397
+#: src/model/operation_controller.cpp:1412
 msgid "Container created: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1405
+#: src/model/operation_controller.cpp:1420
 msgid "No build cache to clean up."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1407
+#: src/model/operation_controller.cpp:1422
 msgid "Build cache cleaned up, %1 reclaimed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1410
+#: src/model/operation_controller.cpp:1425
 msgid "Volume created: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1413
+#: src/model/operation_controller.cpp:1428
 msgid "Volume removed."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1416
+#: src/model/operation_controller.cpp:1431
 msgid "Unused volumes cleaned up."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1418
+#: src/model/operation_controller.cpp:1433
 msgid "Done."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1426
+#: src/model/operation_controller.cpp:1441
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1431
+#: src/model/operation_controller.cpp:1446
 msgid "The image could not be built: %1"
 msgstr ""
 
-#: src/model/operation_controller.cpp:1440
+#: src/model/operation_controller.cpp:1455
 msgid "The container is already running."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1442
+#: src/model/operation_controller.cpp:1457
 msgid "The container is already stopped."
 msgstr ""
 
-#: src/model/operation_controller.cpp:1444
+#: src/model/operation_controller.cpp:1459
 msgid "Nothing to do: the object is already in the requested state."
 msgstr ""
 
@@ -537,7 +537,7 @@ msgid "less than a minute"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:876 src/ui/ImageDetail.qml:112
-#: src/ui/CreateContainer.qml:87
+#: src/ui/CreateContainer.qml:106
 msgid "Image"
 msgstr ""
 
@@ -546,19 +546,19 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:880 src/ui/CreateContainer.qml:411
+#: src/model/create_container_controller.cpp:880 src/ui/CreateContainer.qml:444
 msgid "Command"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:883 src/ui/CreateContainer.qml:422
+#: src/model/create_container_controller.cpp:883 src/ui/CreateContainer.qml:455
 msgid "Entry point"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:886 src/ui/CreateContainer.qml:435
+#: src/model/create_container_controller.cpp:886 src/ui/CreateContainer.qml:468
 msgid "Working directory"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:889 src/ui/CreateContainer.qml:443
+#: src/model/create_container_controller.cpp:889 src/ui/CreateContainer.qml:476
 msgid "User"
 msgstr ""
 
@@ -575,22 +575,22 @@ msgstr ""
 msgid "random"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:907 src/ui/CreateContainer.qml:91
+#: src/model/create_container_controller.cpp:907 src/ui/CreateContainer.qml:110
 msgid "Ports"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:918 src/ui/CreateContainer.qml:95
-#: src/ui/CreateContainer.qml:534
+#: src/model/create_container_controller.cpp:918 src/ui/CreateContainer.qml:114
+#: src/ui/CreateContainer.qml:557
 msgid "Mounts"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:930 src/ui/CreateContainer.qml:496
+#: src/model/create_container_controller.cpp:930 src/ui/CreateContainer.qml:519
 msgid "Environment variables"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:933
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:513
+#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:536
 msgid "Labels"
 msgstr ""
 
@@ -683,23 +683,27 @@ msgstr ""
 msgid "Storage usage is not available."
 msgstr ""
 
-#: src/ui/components/ConfirmDialog.qml:46
+#: src/ui/components/ConfirmDialog.qml:48
 msgid "Continue"
 msgstr ""
 
-#: src/ui/components/ConfirmDialog.qml:69
+#: src/ui/components/ConfirmDialog.qml:59
+msgid "Type “%1” to confirm"
+msgstr ""
+
+#: src/ui/components/ConfirmDialog.qml:107
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
 #: src/ui/components/BuildImagePanel.qml:437 src/ui/ContainerDetail.qml:615
-#: src/ui/CreateContainer.qml:917
+#: src/ui/CreateContainer.qml:951
 msgid "Cancel"
 msgstr ""
 
-#: src/ui/components/OperationMessage.qml:55 src/ui/main.qml:31
+#: src/ui/components/OperationMessage.qml:77 src/ui/main.qml:31
 msgid "Refresh"
 msgstr ""
 
-#: src/ui/components/OperationMessage.qml:64
+#: src/ui/components/OperationMessage.qml:86
 msgid "Dismiss"
 msgstr ""
 
@@ -792,7 +796,7 @@ msgstr ""
 msgid "This image is already being pulled."
 msgstr ""
 
-#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:249
+#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:282
 msgid "Image reference"
 msgstr ""
 
@@ -987,7 +991,7 @@ msgstr ""
 msgid "Enter a name for the network."
 msgstr ""
 
-#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:113
+#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:132
 msgid ""
 "Use letters, digits, underscore, dot or dash, and do not start with a "
 "separator."
@@ -1045,7 +1049,7 @@ msgid "Allow containers to be attached at runtime"
 msgstr ""
 
 #: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:984
-#: src/ui/CreateContainer.qml:905
+#: src/ui/CreateContainer.qml:939
 msgid "Create"
 msgstr ""
 
@@ -1265,8 +1269,8 @@ msgid "Preset source"
 msgstr ""
 
 #: src/ui/components/MountPresetManager.qml:111
-#: src/ui/components/MountPresetManager.qml:185 src/ui/CreateContainer.qml:630
-#: src/ui/CreateContainer.qml:631
+#: src/ui/components/MountPresetManager.qml:185 src/ui/CreateContainer.qml:653
+#: src/ui/CreateContainer.qml:654
 msgid "Container path"
 msgstr ""
 
@@ -1274,7 +1278,7 @@ msgstr ""
 msgid "Preset destination"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:119 src/ui/CreateContainer.qml:637
+#: src/ui/components/MountPresetManager.qml:119 src/ui/CreateContainer.qml:660
 msgid "Read-only"
 msgstr ""
 
@@ -1286,7 +1290,7 @@ msgstr ""
 msgid "Remove this preset"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:156 src/ui/CreateContainer.qml:612
+#: src/ui/components/MountPresetManager.qml:156 src/ui/CreateContainer.qml:635
 msgid "Named volume"
 msgstr ""
 
@@ -1308,7 +1312,7 @@ msgid ""
 "volume)."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:220 src/ui/CreateContainer.qml:129
+#: src/ui/components/MountPresetManager.qml:220 src/ui/CreateContainer.qml:148
 msgid "The container path must be absolute."
 msgstr ""
 
@@ -1386,7 +1390,7 @@ msgstr ""
 #: src/ui/ImageDetail.qml:159 src/ui/ContainerDetail.qml:331 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:887
+#: src/ui/CreateContainer.qml:921
 msgid "Back"
 msgstr ""
 
@@ -1877,7 +1881,7 @@ msgctxt "@info data rate per second"
 msgid "%1/s"
 msgstr ""
 
-#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:97
+#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:116
 msgid "Resources"
 msgstr ""
 
@@ -2243,7 +2247,7 @@ msgid "Clean up unused…"
 msgstr ""
 
 #: src/ui/MainPage.qml:978 src/ui/MainPage.qml:979
-#: src/ui/CreateContainer.qml:622
+#: src/ui/CreateContainer.qml:645
 msgid "Volume name"
 msgstr ""
 
@@ -2956,154 +2960,154 @@ msgstr ""
 msgid "The volume and the data inside it are deleted. This cannot be undone."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:89
+#: src/ui/CreateContainer.qml:108
 msgid "Basics"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:93
+#: src/ui/CreateContainer.qml:112
 msgid "Environment & labels"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:99
+#: src/ui/CreateContainer.qml:118
 msgid "Review"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:107
+#: src/ui/CreateContainer.qml:126
 msgid "Choose an image."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:109
+#: src/ui/CreateContainer.qml:128
 msgid ""
 "This image is not available locally. Pull it first, or tick “Pull it first”."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:111
+#: src/ui/CreateContainer.qml:130
 msgid "Enter a name for the container."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:115
+#: src/ui/CreateContainer.qml:134
 msgid "A container with this name already exists."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:117
+#: src/ui/CreateContainer.qml:136
 msgid "Every port row needs a container port."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:119
+#: src/ui/CreateContainer.qml:138
 msgid "Host ports must be between 1 and 65535 (leave empty for a random port)."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:121
+#: src/ui/CreateContainer.qml:140
 msgid "This host port is already published by another container."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:123
+#: src/ui/CreateContainer.qml:142
 msgid "Every environment or label row needs a key."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:125
+#: src/ui/CreateContainer.qml:144
 msgid ""
 "Keys may contain letters, digits and underscore, and must not start with a "
 "digit."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:127
+#: src/ui/CreateContainer.qml:146
 msgid "Every mount needs a container path."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:131
+#: src/ui/CreateContainer.qml:150
 msgid "The same container path is used twice."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:133
+#: src/ui/CreateContainer.qml:152
 msgid "Every mount needs a source (host path or volume name)."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:135
+#: src/ui/CreateContainer.qml:154
 msgid "Bind mounts need an absolute host path."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:137
+#: src/ui/CreateContainer.qml:156
 msgid "Volume names may contain letters, digits, underscore, dot or dash."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:139
+#: src/ui/CreateContainer.qml:158
 msgid "The memory limit must be at least 6 MiB (or empty for no limit)."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:141
+#: src/ui/CreateContainer.qml:160
 msgid "The memory limit cannot be negative."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:143
+#: src/ui/CreateContainer.qml:162
 msgid "The CPU limit cannot be negative."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:240
+#: src/ui/CreateContainer.qml:273
 msgid "Which image should the container use?"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:248
+#: src/ui/CreateContainer.qml:281
 msgid "Image reference, for example alpine:3.19"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:257
+#: src/ui/CreateContainer.qml:290
 msgid "Pull it first if it is missing locally"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:263
+#: src/ui/CreateContainer.qml:296
 msgid "Local images:"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:289
+#: src/ui/CreateContainer.qml:322
 msgid "No local images. Pull one from the Images tab first."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:302
+#: src/ui/CreateContainer.qml:335
 msgid "Name, network and restart policy"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:314 src/ui/CreateContainer.qml:315
+#: src/ui/CreateContainer.qml:347 src/ui/CreateContainer.qml:348
 msgid "Container name"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:322
+#: src/ui/CreateContainer.qml:355
 msgid "Suggest"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:366
+#: src/ui/CreateContainer.qml:399
 msgid "Network aliases (optional, comma separated)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:367
+#: src/ui/CreateContainer.qml:400
 msgid "Network aliases"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:380
+#: src/ui/CreateContainer.qml:413
 msgid "Do not restart automatically"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:381
+#: src/ui/CreateContainer.qml:414
 msgid "Always"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:382
+#: src/ui/CreateContainer.qml:415
 msgid "Unless stopped"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:383
+#: src/ui/CreateContainer.qml:416
 msgid "On failure"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:392
+#: src/ui/CreateContainer.qml:425
 msgid "Start the container after creating it"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:402
+#: src/ui/CreateContainer.qml:435
 msgid "Command and entry point (optional)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:410
+#: src/ui/CreateContainer.qml:443
 msgid ""
 "One argument per line, for example:\n"
 "sh\n"
@@ -3111,129 +3115,122 @@ msgid ""
 "sleep 3600"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:421
+#: src/ui/CreateContainer.qml:454
 msgid "Entry point (optional, one argument per line)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:434
+#: src/ui/CreateContainer.qml:467
 msgid "Working directory (optional)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:442
+#: src/ui/CreateContainer.qml:475
 msgid "User (optional, name or uid:gid)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:457
-msgid ""
-"Without a command the image's default runs. Images like alpine default to an "
-"interactive shell, which exits immediately when no terminal is attached — "
-"give a command such as “sleep infinity” if the container should keep running."
-msgstr ""
-
-#: src/ui/CreateContainer.qml:470
+#: src/ui/CreateContainer.qml:493
 msgid "Published ports"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:475
+#: src/ui/CreateContainer.qml:498
 msgid "Leave the host port empty to let Docker pick a free one."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:544
+#: src/ui/CreateContainer.qml:567
 msgid "Quick add from your presets:"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:549
+#: src/ui/CreateContainer.qml:572
 msgid "Manage them in the “Mount presets” tab."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:582
+#: src/ui/CreateContainer.qml:605
 msgid ""
 "No presets yet — add some in the “Mount presets” tab to get one-click mounts "
 "here."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:611 src/ui/CreateContainer.qml:622
+#: src/ui/CreateContainer.qml:634 src/ui/CreateContainer.qml:645
 msgid "Host path"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:613
+#: src/ui/CreateContainer.qml:636
 msgid "tmpfs"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:623
+#: src/ui/CreateContainer.qml:646
 msgid "Mount source"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:645
+#: src/ui/CreateContainer.qml:668
 msgid "Remove this mount"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:653
+#: src/ui/CreateContainer.qml:676
 msgid "Add mount"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:660
+#: src/ui/CreateContainer.qml:683
 msgid ""
 "A host path that does not exist yet is fine: Docker creates the directory."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:675
+#: src/ui/CreateContainer.qml:698
 msgid "Resources and privileges"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:683
+#: src/ui/CreateContainer.qml:706
 msgid "Memory limit (MiB):"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:694 src/ui/CreateContainer.qml:718
+#: src/ui/CreateContainer.qml:717 src/ui/CreateContainer.qml:741
 msgid "No limit"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:705
+#: src/ui/CreateContainer.qml:728
 msgid "CPU limit (cores):"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:729
+#: src/ui/CreateContainer.qml:761
 msgid "Run with extended privileges (--privileged)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:746
+#: src/ui/CreateContainer.qml:778
 msgid ""
 "This container runs with the same access as root on the host. Only use it "
 "when you know why."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:759
+#: src/ui/CreateContainer.qml:791
 msgid "Review and create"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:792
+#: src/ui/CreateContainer.qml:824
 msgid ""
 "Environment variable values are not shown here on purpose; only their names."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:873
+#: src/ui/CreateContainer.qml:905
 msgid "Run with extended privileges"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:874
+#: src/ui/CreateContainer.qml:906
 msgid "Give this container the same access as root on the host?"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:875
+#: src/ui/CreateContainer.qml:907
 msgid ""
 "The container can access all devices and host files. Only continue if you "
-"trust the image."
+"trust the image. Type the container name to confirm."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:876
+#: src/ui/CreateContainer.qml:908
 msgid "Yes, run privileged"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:896
+#: src/ui/CreateContainer.qml:930
 msgid "Next"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:905
+#: src/ui/CreateContainer.qml:939
 msgid "Create and start"
 msgstr ""

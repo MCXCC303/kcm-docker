@@ -170,6 +170,8 @@ private Q_SLOTS:
     void pauseAndResumeButtonsFollowTheState();
     void openingTheWizardRefreshesNetworks();
     void commandFieldAndExitHint();
+    void stepButtonsNeverLookMultiSelected();
+    void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -1812,20 +1814,11 @@ void QmlLoadTest::commandFieldAndExitHint()
     wizard->setName(QStringLiteral("hint-demo"));
     QVERIFY(wizard->goToStep(QStringLiteral("basics")));
 
-    // 提示：没填命令时可见（说明默认命令会立刻退出）
-    QQuickItem *hint = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT([&] {
-        hint = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandHint"));
-        return hint != nullptr;
-    }(), 5000);
-    QVERIFY2(hint->property("visible").toBool(), "the exit hint must be visible while no command is set");
-
-    // 填命令：写回控制器，提示随之消失
+    // 命令写回控制器（⑨ 的提示已按用户要求移除：P2 会默认开 -i/-t，容器因此不会立刻退出）
     QQuickItem *commandField = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandField"));
     QVERIFY(commandField);
     commandField->setProperty("text", QStringLiteral("sleep infinity"));
     QTRY_COMPARE(wizard->commandText(), QStringLiteral("sleep infinity"));
-    QTRY_VERIFY(!hint->property("visible").toBool());
 
     // 入口点/工作目录/用户也能写回
     auto *entrypointField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardEntrypointField")));
@@ -1838,6 +1831,142 @@ void QmlLoadTest::commandFieldAndExitHint()
     QTRY_COMPARE(wizard->entrypointText(), QStringLiteral("/usr/bin/env sh"));
     QTRY_COMPARE(wizard->workingDirectory(), QStringLiteral("/app"));
     QTRY_COMPARE(wizard->user(), QStringLiteral("1000:1000"));
+}
+
+
+/*!
+ * 步骤按钮不会出现"多选"假象（用户实测 A3）。
+ *
+ * 根因：按钮是 checkable，点击时 Qt 先自行翻转 checked；校验不通过导致跳转被拒绝后，
+ * 那个翻转不会被纠正——看起来就像同时选中了好几步，页面却还停在第一步。
+ */
+void QmlLoadTest::stepButtonsNeverLookMultiSelected()
+{
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1100, 800);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1100);
+    page->setHeight(800);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    // 收集所有步骤按钮（第一个是容器标题栏里的按钮，按对象名筛）
+    QList<QQuickItem *> buttons;
+    std::function<void(QQuickItem *)> collect = [&](QQuickItem *node) {
+        if (!node) {
+            return;
+        }
+        if (node->objectName() == QLatin1String("wizardStepButton")) {
+            buttons.append(node);
+        }
+        for (QQuickItem *child : node->childItems()) {
+            collect(child);
+        }
+    };
+    collect(window.contentItem());
+    QTRY_VERIFY_WITH_TIMEOUT(buttons.size() >= 7, 5000);
+
+    const auto checkedCount = [&buttons] {
+        int count = 0;
+        for (QQuickItem *button : buttons) {
+            if (button->property("checked").toBool()) {
+                ++count;
+            }
+        }
+        return count;
+    };
+    QCOMPARE(checkedCount(), 1); // 初始：只有第一步
+
+    // 点第二个步骤按钮：校验不通过（镜像还没选），必须**仍然只有第一步高亮**。
+    // 用 click() 而不是 emit clicked()：只有前者会走"可勾选按钮自行翻转 checked"那条真实路径
+    QQuickItem *second = buttons.at(1);
+    QVERIFY(QMetaObject::invokeMethod(second, "click"));
+    QTest::qWait(20);
+    QVERIFY2(second->property("checked").toBool() == false, "a refused jump must not leave the button checked");
+    QCOMPARE(checkedCount(), 1);
+    // 而且要说清为什么跳不过去
+    QQuickItem *stepError = findItemDeep(window.contentItem(), QStringLiteral("wizardStepError"));
+    QVERIFY(stepError);
+    QTRY_VERIFY(stepError->property("visible").toBool());
+    QVERIFY2(!stepError->property("text").toString().isEmpty(), "the refusal needs a reason");
+}
+
+/*!
+ * `--privileged` 需要"输入容器名"强确认，且确认后勾选框要真的勾上（用户实测 F4）。
+ */
+void QmlLoadTest::privilegedNeedsTypedConfirmation()
+{
+    Image localImage;
+    localImage.id = QStringLiteral("sha256:1b1b1b1b");
+    localImage.repoTags = {QStringLiteral("alpine:3.19")};
+    m_backend->setImages({localImage});
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1100, 900);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1100);
+    page->setHeight(900);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    auto *wizard = m_stubKcm->controller()->createContainer();
+    wizard->setImage(QStringLiteral("alpine:3.19"));
+    wizard->setName(QStringLiteral("root-demo"));
+    QVERIFY(wizard->goToStep(QStringLiteral("resources")));
+
+    QQuickItem *privilegedCheck = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        privilegedCheck = findItemDeep(window.contentItem(), QStringLiteral("wizardPrivilegedCheck"));
+        return privilegedCheck != nullptr;
+    }(), 5000);
+
+    // 勾选：被拦下来（还没确认）
+    QVERIFY(QMetaObject::invokeMethod(privilegedCheck, "click"));
+    QTest::qWait(20);
+    QVERIFY2(!wizard->privileged(), "privileged must not be enabled before confirmation");
+    QVERIFY2(!privilegedCheck->property("checked").toBool(), "the checkbox must fall back until confirmed");
+
+    // 确认框要求输入容器名：没输入对之前确认按钮不可用
+    QObject *privilegedDialog = page->findChild<QObject *>(QStringLiteral("wizardPrivilegedDialog"));
+    QVERIFY2(privilegedDialog, "the privileged confirmation must exist");
+    QCOMPARE(privilegedDialog->property("requireText").toString(), QStringLiteral("root-demo"));
+    QVERIFY2(!privilegedDialog->property("requireTextSatisfied").toBool(), "an empty confirmation must not be accepted");
+
+    QQuickItem *confirmField = qobject_cast<QQuickItem *>(page->findChild<QObject *>(QStringLiteral("confirmDialogTextField")));
+    QVERIFY(confirmField);
+    confirmField->setProperty("text", QStringLiteral("root-demo"));
+    QTRY_VERIFY(privilegedDialog->property("requireTextSatisfied").toBool());
+
+    // 确认：控制器生效，并且**勾选框真的勾上**（F4 的回归点）
+    QVERIFY(QMetaObject::invokeMethod(privilegedDialog, "confirmed"));
+    QTRY_VERIFY(wizard->privileged());
+    QTRY_VERIFY_WITH_TIMEOUT(privilegedCheck->property("checked").toBool(), 5000);
+    // 真实流程里确认按钮会关闭对话框；这里直接发信号，所以要自己关掉——
+    // 模态对话框还在时，后面的点击会落在它身上（用例里吃过这个亏）
+    QVERIFY(QMetaObject::invokeMethod(privilegedDialog, "close"));
+    QTRY_VERIFY(!privilegedDialog->property("visible").toBool());
+
+    // 再点一次取消：两边都回到未启用
+    QVERIFY(QMetaObject::invokeMethod(privilegedCheck, "click"));
+    QTest::qWait(20);
+    QTRY_VERIFY(!wizard->privileged());
+    QTRY_VERIFY(!privilegedCheck->property("checked").toBool());
 }
 
 

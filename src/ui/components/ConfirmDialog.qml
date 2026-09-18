@@ -27,6 +27,8 @@
 */
 
 import QtQuick
+import QtQuick.Controls as QQC2
+import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
 
@@ -46,6 +48,18 @@ Kirigami.PromptDialog {
     property string acceptText: i18n("Continue")
     /*! 破坏性操作：使用警告样式与删除图标。 */
     property bool destructive: false
+    /*!
+     * 强确认：非空时要求用户在对话框里把这段文字**原样输入**才能确认。
+     *
+     * 用途是那些"一旦打开就没有回头路"的开关（例如 `--privileged` 等同宿主 root）。
+     * 用容器名而不是"我了解风险"勾选：输入的代价更高，且会让人再看一眼自己要动的是哪个对象。
+     */
+    property string requireText: ""
+    /*! 强确认输入框的提示文案。 */
+    property string requireTextHint: i18n("Type “%1” to confirm", dialog.requireText)
+    /*! 输入是否匹配（requireText 为空时永远为真）。 */
+    readonly property bool requireTextSatisfied: dialog.requireText.length === 0
+        || confirmField.text.trim() === dialog.requireText.trim()
 
     signal confirmed
 
@@ -56,10 +70,34 @@ Kirigami.PromptDialog {
     // 用 customFooterActions 而不是 standardButtons：按钮上必须写清楚动作
     // （「删除」而不是「OK」），这本身也是防误操作的一部分。
     standardButtons: Kirigami.Dialog.NoButton
+
+    // 强确认的输入框（只有 requireText 非空时出现）。
+    // Kirigami.Dialog 把默认子对象放进 contentData，因此这里直接声明即可。
+    QQC2.TextField {
+        id: confirmField
+
+        objectName: "confirmDialogTextField"
+        Layout.fillWidth: true
+        visible: dialog.requireText.length > 0
+        placeholderText: dialog.requireText.length > 0 ? dialog.requireTextHint : ""
+        Accessible.name: dialog.requireTextHint
+        onAccepted: {
+            if (dialog.requireTextSatisfied) {
+                dialog.close();
+                dialog.confirmed();
+            }
+        }
+    }
+
+    onOpened: confirmField.text = ""
+
     customFooterActions: [
         Kirigami.Action {
+            objectName: "confirmDialogAcceptAction"
             text: dialog.acceptText
             icon.name: dialog.destructive ? "edit-delete" : "dialog-ok"
+            // 强确认没输入对之前，确认按钮点不动
+            enabled: dialog.requireTextSatisfied
             onTriggered: {
                 dialog.close();
                 dialog.confirmed();

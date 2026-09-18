@@ -41,6 +41,25 @@ Kirigami.Page {
     /*! 预设管理面板是否展开（挂载步骤里）。 */
     property bool presetPanelOpen: bool = false
 
+    /*! 点击步骤按钮被拒绝时的原因 key（空 = 没有）。 */
+    property string stepJumpErrorKey: ""
+
+    /*!
+     * 特权勾选框的**视图**状态。
+     *
+     * 不能把 `checked` 直接绑到控制器再在处理器里赋值：那样会把绑定破坏掉，
+     * 之后控制器变成 true 也不会再同步（用户实测 F4：确认后框还是空的）。
+     */
+    property bool privilegedVisual: false
+
+    Connections {
+        target: page.controller
+        // 控制器是唯一事实来源：它变了就把视图对齐
+        function onChanged() {
+            page.privilegedVisual = page.controller.privileged;
+        }
+    }
+
     /*!
      * delegate 用的中转对象（八期后的修正）。
      *
@@ -184,10 +203,23 @@ Kirigami.Page {
 
                     objectName: "wizardStepButton"
                     flat: true
+                    /*
+                     * 只读地跟随当前步骤：**不要** checkable。
+                     *
+                     * checkable 的按钮在点击时 Qt 会先自行翻转 checked；如果 goToStep() 因为
+                     * 校验不通过而拒绝跳转，这个翻转不会被纠正——用户看到的就是"点了几下像多选了
+                     * 好几步，但页面还停在第一步"（实测反馈 A3）。
+                     */
                     checked: page.controller.stepIndex === stepButton.index
-                    checkable: true
                     text: (stepButton.index + 1) + ". " + page.stepTitle(stepButton.modelData)
-                    onClicked: page.controller.goToStep(stepButton.modelData)
+                    onClicked: {
+                        // 被拒绝时要说清为什么：原来只是"没反应"，用户会以为界面坏了
+                        if (!page.controller.goToStep(stepButton.modelData)) {
+                            page.stepJumpErrorKey = page.controller.stepErrorKey;
+                        } else {
+                            page.stepJumpErrorKey = "";
+                        }
+                    }
                 }
             }
 
@@ -204,9 +236,10 @@ Kirigami.Page {
         Kirigami.InlineMessage {
             objectName: "wizardStepError"
             Layout.fillWidth: true
-            visible: page.controller.stepErrorKey.length > 0
+            // 当前步骤的问题，以及"点了别的步骤但没跳过去"的原因，都走这一条提示
+            visible: page.controller.stepErrorKey.length > 0 || page.stepJumpErrorKey.length > 0
             type: Kirigami.MessageType.Error
-            text: page.errorText(page.controller.stepErrorKey)
+            text: page.errorText(page.stepJumpErrorKey.length > 0 ? page.stepJumpErrorKey : page.controller.stepErrorKey)
         }
 
         Kirigami.InlineMessage {
@@ -446,16 +479,6 @@ Kirigami.Page {
                         }
                     }
 
-                    // ⑨ 用户实测："基于 alpine:latest 创建的容器启动后立刻退出"
-                    //    ——这是 Docker 的正常行为（默认命令 /bin/sh 没有交互终端就结束），
-                    //    但界面必须说清楚，否则看起来像 bug
-                    Kirigami.InlineMessage {
-                        objectName: "wizardCommandHint"
-                        Layout.fillWidth: true
-                        type: Kirigami.MessageType.Information
-                        visible: page.controller.commandText.trim().length === 0
-                        text: i18n("Without a command the image's default runs. Images like alpine default to an interactive shell, which exits immediately when no terminal is attached — give a command such as “sleep infinity” if the container should keep running.")
-                    }
                 }
 
                 /* ---------------------------- ③ 端口 ---------------------------- */
@@ -725,15 +748,24 @@ Kirigami.Page {
                         id: privilegedCheck
 
                         objectName: "wizardPrivilegedCheck"
-                        checked: page.controller.privileged
+                        /*
+                         * 这里**刻意不用 CheckBox 自己的勾选机制**（checkable: false）。
+                         *
+                         * 用户实测反馈 F4：确认通过后勾选框仍是空的。根因是 CheckBox 点击时会直接给
+                         * `checked` 赋值，这会破坏 `checked: …` 这条绑定，之后数据变了也不再同步。
+                         * 关掉 checkable 后，点击只是"切换意图"，勾选态完全由 `privilegedVisual`
+                         * （进而由控制器）决定，绑定永远不会被破坏。
+                         */
+                        checkable: false
+                        checked: page.privilegedVisual
                         text: i18n("Run with extended privileges (--privileged)")
-                        // 勾选时必须二次确认：这是整套表单里唯一能直接拿到宿主 root 的开关
-                        onToggled: {
-                            if (checked) {
-                                privilegedCheck.checked = false;
-                                privilegedDialog.open();
-                            } else {
+                        onClicked: {
+                            if (page.controller.privileged) {
+                                // 已启用：直接关掉（可逆，不需要确认）
                                 page.controller.privileged = false;
+                            } else {
+                                // 未启用：强确认（要把容器名原样输入一遍）
+                                privilegedDialog.open();
                             }
                         }
                     }
@@ -872,9 +904,11 @@ Kirigami.Page {
         objectName: "wizardPrivilegedDialog"
         headingText: i18n("Run with extended privileges")
         questionText: i18n("Give this container the same access as root on the host?")
-        consequenceText: i18n("The container can access all devices and host files. Only continue if you trust the image.")
+        consequenceText: i18n("The container can access all devices and host files. Only continue if you trust the image. Type the container name to confirm.")
         acceptText: i18n("Yes, run privileged")
         destructive: true
+        // 强确认：把容器名原样输入一遍（用户确认过的方案；--privileged 不需要也不能靠 polkit 提权）
+        requireText: page.controller.name
         onConfirmed: page.controller.privileged = true
     }
 

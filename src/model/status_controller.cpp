@@ -174,6 +174,9 @@ void StatusController::refreshVolumes(bool includeUsage)
 void StatusController::refresh()
 {
     qCDebug(kontainerModel) << "refresh requested";
+    // 用户主动刷新后，"上一次操作成功"这类提示已经过时（A7）：
+    // 失败类信息保留，因为它往往是用户唯一能看到的"为什么"（dismissResultIfObsolete 里判断）
+    m_operations->dismissResultIfObsolete();
     m_refreshRequested = true;
     m_scheduler->requestRefresh(RefreshScheduler::Reason::Manual);
     m_backend->refreshStorageUsage();

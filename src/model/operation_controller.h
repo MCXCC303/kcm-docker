@@ -223,6 +223,12 @@ public:
 
     /*! 关掉结果提示（用户已读）。 */
     Q_INVOKABLE void dismissResult();
+    /*!
+     * 清掉**已经过时**的结果（刷新/跳转时用）：失败类保留，成功/取消/无变化清掉。
+     *
+     * 用户实测反馈 A7：notice 横幅在触发一次刷新或跳转后就该消失；但失败信息不能自动清。
+     */
+    Q_INVOKABLE void dismissResultIfObsolete();
 
     /*!
      * 网络字段校验（六期 §3.3）：返回稳定的错误 key，空字符串 = 通过。

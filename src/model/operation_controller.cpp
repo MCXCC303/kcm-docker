@@ -339,6 +339,21 @@ void OperationController::dismissResult()
     setResult(Result::None, QString());
 }
 
+void OperationController::dismissResultIfObsolete()
+{
+    switch (m_result) {
+    case Result::None:
+        return;
+    case Result::Success:
+    case Result::Unchanged:
+    case Result::Cancelled:
+        setResult(Result::None, QString());
+        return;
+    case Result::Error:
+        return; // 失败留着：用户还要看原因
+    }
+}
+
 bool OperationController::isValidImageReference(const QString &reference) const
 {
     return ImageReference::isValid(reference);

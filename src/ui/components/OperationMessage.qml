@@ -38,7 +38,29 @@ Kirigami.InlineMessage {
 
     objectName: "operationMessage"
 
+    /*!
+     * 成功/取消类横幅的存活时间（毫秒）；0 = 不自动消失。
+     *
+     * 规则（用户实测反馈 A7）：**成功信息**在刷新/跳转后没有价值，也不该一直占着页面；
+     * **失败信息必须留着**——它往往是用户唯一能看到的"为什么"，只能手动关闭。
+     */
+    property int autoDismissMs: 8000
+
     visible: operations.resultKey !== "none" && message.composedText.length > 0
+    onVisibleChanged: {
+        if (visible && !message.isFailure && message.autoDismissMs > 0) {
+            autoDismissTimer.restart();
+        } else if (!visible) {
+            autoDismissTimer.stop();
+        }
+    }
+
+    Timer {
+        id: autoDismissTimer
+        interval: message.autoDismissMs
+        repeat: false
+        onTriggered: message.operations.dismissResult()
+    }
     type: {
         if (message.isFailure) {
             return operations.resultCategoryKey === "userActionable" ? Kirigami.MessageType.Warning : Kirigami.MessageType.Error;
