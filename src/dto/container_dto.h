@@ -6,6 +6,7 @@
 #pragma once
 
 #include "domain/container.h"
+#include "dto/container_network_dto.h"
 
 #include <QJsonObject>
 #include <QList>
@@ -40,6 +41,8 @@ struct DockerContainerDTO {
     QString healthStatus; /*!< Docker 29+ 的 Health.Status；老引擎缺失时为空 */
     qint64 createdUnix = 0;
     QList<DockerPortDTO> ports;
+    /*! `NetworkSettings.Networks`（网络成员列表的唯一可靠来源，见 domain/container.h 的说明）。 */
+    QList<ContainerNetworkDTO> networks;
 
     /*! 解析单条记录；缺少必需字段时返回 nullopt 并写入 error。 */
     static std::optional<DockerContainerDTO> fromJson(const QJsonObject &object, QString *error = nullptr);

@@ -8,6 +8,7 @@
 #include "backend/docker_error.h"
 #include "domain/container_detail.h"
 #include "dto/container_dto.h"
+#include "dto/container_network_dto.h"
 
 #include <QJsonObject>
 #include <QList>
@@ -18,21 +19,6 @@
 
 namespace Kontainer
 {
-
-/*!
- * inspect → `NetworkSettings.Networks.<name>`。
- *
- * 注意与 `dto/network_dto.h` 的 `DockerNetworkDTO`（`GET /networks` 的**网络对象**）
- * 区分：这个是"某个容器接在哪个网络上"的片段，字段完全不同。
- */
-struct ContainerNetworkDTO {
-    QString name;
-    QString networkId;
-    QString ipAddress;
-    QString ipv6Address;
-    QString macAddress;
-    QString gateway;
-};
 
 /*! inspect → Mounts[]。 */
 struct DockerMountDTO {

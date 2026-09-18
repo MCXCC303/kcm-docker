@@ -408,6 +408,8 @@ void DockerBackend::startContainersRequest()
         }
 
         m_containers = containersFromDto(dtos);
+        // 容器列表是网络成员的来源：它更新后网络页的"连接数"也要跟着对（幂等重算）
+        refreshNetworkMembership();
         m_containersInFlight = false;
         updateLoading();
         Q_EMIT containersUpdated();
@@ -506,6 +508,8 @@ void DockerBackend::startNetworksRequest()
         m_networks = networksFromDto(dtos);
         m_networksInFlight = false;
         updateLoading();
+        // 网络接口自己的 `Containers` 在列表端点里是空的（实测）：成员必须从容器侧汇总
+        refreshNetworkMembership();
         Q_EMIT networksUpdated();
     });
 }
@@ -1322,6 +1326,48 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
             finishBuild(id, MutationOutcome::Succeeded, DockerError());
         });
     });
+}
+
+void DockerBackend::refreshNetworkMembership()
+{
+    if (m_networks.isEmpty()) {
+        return;
+    }
+    bool changed = false;
+    for (Network &network : m_networks) {
+        QList<NetworkMember> members;
+        for (const Container &container : m_containers) {
+            for (const ContainerNetwork &attachment : container.networks) {
+                if (attachment.id != network.id && attachment.name != network.name) {
+                    continue;
+                }
+                NetworkMember member;
+                member.containerId = container.id;
+                member.name = container.name;
+                member.ipv4Address = attachment.ipAddress;
+                member.ipv6Address = attachment.ipv6Address;
+                member.macAddress = attachment.macAddress;
+                members.append(member);
+                break;
+            }
+        }
+        // 网络接口自己给的成员（有些引擎/版本会填）也要保留：按容器 id 去重后合并
+        for (const NetworkMember &existing : std::as_const(network.members)) {
+            const bool known = std::any_of(members.cbegin(), members.cend(), [&existing](const NetworkMember &member) {
+                return member.containerId == existing.containerId;
+            });
+            if (!known) {
+                members.append(existing);
+            }
+        }
+        if (members != network.members) {
+            network.members = members;
+            changed = true;
+        }
+    }
+    if (changed) {
+        Q_EMIT networksUpdated();
+    }
 }
 
 void DockerBackend::abandonInFlightRequests(const DockerError &error)

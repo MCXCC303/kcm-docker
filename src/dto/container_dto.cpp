@@ -5,6 +5,8 @@
 
 #include "dto/container_dto.h"
 
+#include "dto/container_network_dto.h"
+
 #include "dto/json_helpers.h"
 
 #include <QJsonArray>
@@ -58,6 +60,10 @@ std::optional<DockerContainerDTO> DockerContainerDTO::fromJson(const QJsonObject
     if (health.isObject()) {
         dto.healthStatus = stringValue(health.toObject(), QStringLiteral("Status"));
     }
+
+    // 网络成员：容器列表里就有 `NetworkSettings.Networks`，与 inspect 的载荷形状一致，
+    // 因此复用同一个解析器（不要写第二份）
+    dto.networks = parseNetworks(object.value(QStringLiteral("NetworkSettings")).toObject());
 
     const QJsonValue ports = object.value(QStringLiteral("Ports"));
     if (ports.isArray()) {
@@ -140,6 +146,18 @@ Container containerFromDto(const DockerContainerDTO &dto)
         port.type = portDto.type;
         container.ports.append(port);
     }
+
+    container.networks.reserve(dto.networks.size());
+    for (const ContainerNetworkDTO &networkDto : dto.networks) {
+        ContainerNetwork network;
+        network.name = networkDto.name;
+        network.id = networkDto.networkId;
+        network.ipAddress = networkDto.ipAddress;
+        network.ipv6Address = networkDto.ipv6Address;
+        network.macAddress = networkDto.macAddress;
+        network.gateway = networkDto.gateway;
+        container.networks.append(network);
+    }
     return container;
 }
 
@@ -151,6 +169,27 @@ QList<Container> containersFromDto(const QList<DockerContainerDTO> &dtos)
         containers.append(containerFromDto(dto));
     }
     return containers;
+}
+
+QList<ContainerNetworkDTO> parseNetworks(const QJsonObject &networkSettings)
+{
+    QList<ContainerNetworkDTO> networks;
+    const QJsonObject map = networkSettings.value(QStringLiteral("Networks")).toObject();
+    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+        if (!it.value().isObject()) {
+            continue;
+        }
+        const QJsonObject entry = it.value().toObject();
+        ContainerNetworkDTO network;
+        network.name = it.key();
+        network.networkId = stringValue(entry, QStringLiteral("NetworkID"));
+        network.ipAddress = stringValue(entry, QStringLiteral("IPAddress"));
+        network.ipv6Address = stringValue(entry, QStringLiteral("GlobalIPv6Address"));
+        network.macAddress = stringValue(entry, QStringLiteral("MacAddress"));
+        network.gateway = stringValue(entry, QStringLiteral("Gateway"));
+        networks.append(network);
+    }
+    return networks;
 }
 
 } // namespace Kontainer

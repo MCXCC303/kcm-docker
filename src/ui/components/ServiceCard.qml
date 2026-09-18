@@ -141,14 +141,6 @@ Kirigami.AbstractCard {
             text: i18n("Services")
         }
 
-        QQC2.Label {
-            Layout.fillWidth: true
-            text: i18n("Managing these units needs administrator rights; Kontainer asks for them when you use a button.")
-            font: Kirigami.Theme.smallFont
-            opacity: 0.75
-            wrapMode: Text.WordWrap
-        }
-
         Kirigami.InlineMessage {
             objectName: "serviceResultMessage"
             Layout.fillWidth: true

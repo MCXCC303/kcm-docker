@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "domain/container_network.h"
+
 #include <QDateTime>
 #include <QList>
 #include <QMetaType>
@@ -70,6 +72,13 @@ public:
     HealthState health = HealthState::Unknown;
     QDateTime created; /*!< UTC */
     QList<Port> ports;
+    /*!
+     * 该容器连接的网络（来自 `GET /containers/json` 的 `NetworkSettings.Networks`）。
+     *
+     * **网络成员列表的唯一可靠来源**：实测 `GET /networks` 返回的 `Containers` 是空的
+     * （只有 `GET /networks/{id}` 才填），因此"哪些容器连了这个网络"必须从容器侧汇总。
+     */
+    QList<ContainerNetwork> networks;
 
     bool isValid() const
     {

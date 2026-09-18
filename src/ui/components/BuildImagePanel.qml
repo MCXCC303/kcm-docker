@@ -264,13 +264,6 @@ ColumnLayout {
                 }
             }
 
-            QQC2.Label {
-                Layout.fillWidth: true
-                text: i18n("The context is packed locally; .dockerignore is respected, and links pointing outside the directory are skipped.")
-                font: Kirigami.Theme.smallFont
-                opacity: 0.7
-                wrapMode: Text.WordWrap
-            }
         }
     }
 

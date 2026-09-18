@@ -460,13 +460,6 @@ Kirigami.Page {
                         }
                     }
 
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Without standard input and a terminal, a container whose command is a shell exits immediately.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.75
-                        wrapMode: Text.WordWrap
-                    }
 
                     QQC2.Label {
                         Layout.fillWidth: true
@@ -615,11 +608,6 @@ Kirigami.Page {
                             font.bold: true
                         }
 
-                        QQC2.Label {
-                            text: i18n("Manage them in the “Mount presets” tab.")
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.7
-                        }
                     }
 
                     Flow {
@@ -725,12 +713,6 @@ Kirigami.Page {
                         onClicked: wizard.addMount()
                     }
 
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("A host path that does not exist yet is fine: Docker creates the directory.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.75
-                    }
                 }
 
                 /* ---------------------------- ⑥ 资源 ---------------------------- */
@@ -866,12 +848,6 @@ Kirigami.Page {
                         }
                     }
 
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Environment variable values are not shown here on purpose; only their names.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.7
-                    }
                 }
 
                 Item {

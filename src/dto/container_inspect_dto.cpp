@@ -5,6 +5,8 @@
 
 #include "dto/container_inspect_dto.h"
 
+#include "dto/container_network_dto.h"
+
 #include "dto/json_helpers.h"
 
 #include <QJsonArray>
@@ -51,26 +53,6 @@ QList<DockerPortDTO> parsePorts(const QJsonObject &networkSettings)
     return ports;
 }
 
-QList<ContainerNetworkDTO> parseNetworks(const QJsonObject &networkSettings)
-{
-    QList<ContainerNetworkDTO> networks;
-    const QJsonObject map = networkSettings.value(QStringLiteral("Networks")).toObject();
-    for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
-        if (!it.value().isObject()) {
-            continue;
-        }
-        const QJsonObject entry = it.value().toObject();
-        ContainerNetworkDTO network;
-        network.name = it.key();
-        network.networkId = stringValue(entry, QStringLiteral("NetworkID"));
-        network.ipAddress = stringValue(entry, QStringLiteral("IPAddress"));
-        network.ipv6Address = stringValue(entry, QStringLiteral("GlobalIPv6Address"));
-        network.macAddress = stringValue(entry, QStringLiteral("MacAddress"));
-        network.gateway = stringValue(entry, QStringLiteral("Gateway"));
-        networks.append(network);
-    }
-    return networks;
-}
 
 QList<DockerMountDTO> parseMounts(const QJsonObject &object)
 {

@@ -6,6 +6,7 @@
 #pragma once
 
 #include "domain/container.h"
+#include "domain/container_network.h"
 
 #include <QDateTime>
 #include <QList>
@@ -18,15 +19,6 @@ namespace Kontainer
 {
 
 /*! 容器接入的网络（inspect → NetworkSettings.Networks）。 */
-struct ContainerNetwork {
-    QString name;
-    QString id;
-    QString ipAddress;
-    QString ipv6Address;
-    QString macAddress;
-    QString gateway;
-};
-
 /*! 容器挂载（inspect → Mounts）。 */
 struct ContainerMount {
     QString type; /*!< bind / volume / tmpfs */

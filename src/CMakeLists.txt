@@ -55,6 +55,7 @@ add_library(kontainer_core STATIC
     backend/privileged_config_client.h
 
     dto/container_dto.cpp
+    dto/container_network_dto.h
     dto/container_dto.h
     dto/container_inspect_dto.cpp
     dto/container_inspect_dto.h

@@ -454,6 +454,7 @@ private Q_SLOTS:
     void authCheckClassifiesFailures();
     void pullSendsCredentialsOnlyWhenPresent();
     void networksAreListedFromTheEngine();
+    void networkMembersComeFromTheContainerList();
     void networkCreateSendsJsonBodyAndRemoveUsesDelete();
     void volumesAreListedFromTheEngine();
     void createsAContainerWithNameInTheQuery();
@@ -1348,6 +1349,83 @@ void DockerBackendFakeEngineTest::concurrentPullsAreIndependent()
  * 创建是四期以来**第一个带请求体的写操作**（之前都靠 query 参数），因此这里同时钉住
  * "体真的发出去了"与"键名与 Docker API 一致"。
  */
+/*!
+ * 网络成员只能从**容器列表**汇总（用户实测：网络页所有网桥都显示 0 个容器）。
+ *
+ * 实测依据（对真实 daemon 只读核对）：
+ *   - `GET /networks` 的 `Containers` **是空的**（列表端点不填）
+ *   - `GET /networks/{id}` 才填（bridge 6 个）
+ *   - `GET /containers/json` 里每个容器都有 `NetworkSettings.Networks`（含 IP/MAC）
+ * 因此"哪些容器连了这个网络"必须由容器侧汇总；这里用假引擎把这条形状钉死：
+ * 网络端点给空 Containers，容器端点给归属关系，最后网络成员必须是容器侧的结果。
+ */
+void DockerBackendFakeEngineTest::networkMembersComeFromTheContainerList()
+{
+    m_engine->setPathStatus(QStringLiteral("/networks"), 200, QByteArrayLiteral(R"([
+        {"Name": "bridge", "Id": "bridge-id-00000000000000000000000000000000000000000000000000000000",
+         "Driver": "bridge", "Scope": "local", "IPAM": {"Config": []}, "Labels": {}, "Containers": {}},
+        {"Name": "app_default", "Id": "app-id-0000000000000000000000000000000000000000000000000000000000",
+         "Driver": "bridge", "Scope": "local", "IPAM": {"Config": []}, "Labels": {}, "Containers": {}}
+    ])"));
+    m_engine->setPathStatus(QStringLiteral("/containers/json"), 200, QByteArrayLiteral(R"([
+        {"Id": "cid-1", "Names": ["/web"], "Image": "alpine:latest", "ImageID": "sha256:a", "State": "running",
+         "Status": "Up 5 minutes", "Created": 1700000000, "Ports": [],
+         "NetworkSettings": {"Networks": {"app_default": {"NetworkID": "app-id-0000000000000000000000000000000000000000000000000000000000",
+             "IPAddress": "172.18.0.2", "MacAddress": "02:42:ac:12:00:02", "GlobalIPv6Address": ""}}}},
+        {"Id": "cid-2", "Names": ["/db"], "Image": "postgres:17", "ImageID": "sha256:b", "State": "running",
+         "Status": "Up 4 minutes", "Created": 1700000001, "Ports": [],
+         "NetworkSettings": {"Networks": {"bridge": {"NetworkID": "bridge-id-00000000000000000000000000000000000000000000000000000000",
+             "IPAddress": "172.17.0.3", "MacAddress": "02:42:ac:11:00:03", "GlobalIPv6Address": ""}}}},
+        {"Id": "cid-3", "Names": ["/worker"], "Image": "alpine:latest", "ImageID": "sha256:a", "State": "running",
+         "Status": "Up 3 minutes", "Created": 1700000002, "Ports": [],
+         "NetworkSettings": {"Networks": {"app_default": {"NetworkID": "app-id-0000000000000000000000000000000000000000000000000000000000",
+             "IPAddress": "172.18.0.3", "MacAddress": "02:42:ac:12:00:03", "GlobalIPv6Address": ""}}}}
+    ])"));
+
+    DockerBackend backend;
+    backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+
+    // 先取容器（成员来源），再取网络
+    QSignalSpy containersSpy(&backend, &DockerBackend::containersUpdated);
+    backend.refreshContainers();
+    QTRY_COMPARE_WITH_TIMEOUT(containersSpy.count(), 1, 10000);
+
+    QSignalSpy networksSpy(&backend, &DockerBackend::networksUpdated);
+    backend.refreshNetworks();
+    QTRY_VERIFY_WITH_TIMEOUT(networksSpy.count() >= 1, 10000);
+
+    const QList<Network> networks = backend.networks();
+    QCOMPARE(networks.size(), 2);
+    for (const Network &network : networks) {
+        const QList<NetworkMember> members = network.members;
+        QStringList names;
+        for (const NetworkMember &member : members) {
+            names.append(member.name);
+        }
+        names.sort();
+        if (network.name == QLatin1String("app_default")) {
+            QCOMPARE(names, QStringList({QStringLiteral("web"), QStringLiteral("worker")}));
+            // 地址与 MAC 也要带过来（详情页要显示）
+            QVERIFY(!members.first().ipv4Address.isEmpty());
+            QVERIFY(!members.first().macAddress.isEmpty());
+        } else {
+            QCOMPARE(names, QStringList {QStringLiteral("db")});
+        }
+    }
+
+    // 反方向：容器列表后来才到，网络成员也要补上（幂等重算）
+    DockerBackend lateBackend;
+    lateBackend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
+    QSignalSpy lateNetworksSpy(&lateBackend, &DockerBackend::networksUpdated);
+    lateBackend.refreshNetworks();
+    QTRY_VERIFY_WITH_TIMEOUT(lateNetworksSpy.count() >= 1, 10000);
+    QCOMPARE(lateBackend.networks().at(1).members.size(), 0); // 此时还没有容器数据
+    QSignalSpy lateContainersSpy(&lateBackend, &DockerBackend::containersUpdated);
+    lateBackend.refreshContainers();
+    QTRY_COMPARE_WITH_TIMEOUT(lateContainersSpy.count(), 1, 10000);
+    QTRY_COMPARE_WITH_TIMEOUT(lateBackend.networks().at(1).members.size(), 2, 10000);
+}
+
 void DockerBackendFakeEngineTest::networkCreateSendsJsonBodyAndRemoveUsesDelete()
 {
     DockerBackend backend;

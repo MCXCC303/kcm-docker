@@ -67,28 +67,6 @@ ColumnLayout {
             : ""
     }
 
-    /* 两侧标注（用户实测 A1：预设行要标明宿主机/容器）：整页一次即可，避免每行重复 */
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: Kirigami.Units.smallSpacing
-
-        QQC2.Label {
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 13
-            text: i18n("Host")
-            font.bold: true
-            opacity: 0.8
-        }
-        Item {
-            Layout.fillWidth: true
-        }
-        QQC2.Label {
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 10
-            text: i18n("Container")
-            font.bold: true
-            opacity: 0.8
-        }
-    }
-
     /* ------------------------------ 新建（置顶） ------------------------------ */
     /* 用户实测：新建入口应该在**顶端**，浏览按钮放在宿主路径/卷名的**前面**，添加后列表新增一项 */
     RowLayout {

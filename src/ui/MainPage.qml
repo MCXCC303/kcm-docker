@@ -393,14 +393,7 @@ Kirigami.Page {
                     }
                 }
 
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    visible: root.controller.engineStateKey === "partial"
-                    text: i18n("Container and image counts are unavailable because the engine summary could not be read.")
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.7
-                    wrapMode: Text.WordWrap
-                }
+                
 
                 StorageView {
                     Layout.fillWidth: true

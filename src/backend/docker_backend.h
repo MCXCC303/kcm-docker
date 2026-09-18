@@ -198,6 +198,15 @@ private:
     void runMutation(Mutation mutation, const QString &targetKey, ReadyCallback run);
     /*! start / stop / restart / remove 共用的实现。 */
     void runContainerMutation(Mutation mutation, const QString &id, const QString &apiPath, const QUrlQuery &query);
+    /*!
+     * 用容器列表里的 `NetworkSettings.Networks` 汇总出每个网络的成员。
+     *
+     * 为什么必须这么做：实测 `GET /networks` 的 `Containers` 字段是**空的**
+     * （只有 `GET /networks/{id}` 才填），因此"哪些容器连了这个网络"只能从容器侧汇总。
+     * 容器列表与网络列表任一先到都要重算一次（幂等，代价很小）。
+     */
+    void refreshNetworkMembership();
+
     /*! 处理构建流的一行（聚合进度、记录失败原因）。 */
     void handleBuildLine(ImageBuildState &state, const QJsonObject &object);
     /*! 结束一路构建：删临时 tar、清理状态、发信号。 */
