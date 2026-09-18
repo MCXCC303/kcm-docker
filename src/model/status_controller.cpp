@@ -57,6 +57,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, this))
     // 目录选择：注入时用注入的（测试与离屏渲染不弹真实对话框）
     , m_directoryPicker(directoryPicker ? directoryPicker : new SystemDirectoryPicker(this))
+    , m_busyWatchdog(new QTimer(this))
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))
@@ -67,6 +68,11 @@ StatusController::StatusController(DockerBackendInterface *backend,
 {
     Q_ASSERT(m_backend);
     // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
+
+    // 在途看门狗：单次触发，busy 期间由 onLoadingChanged 启动/停止
+    m_busyWatchdog->setSingleShot(true);
+    m_busyWatchdog->setInterval(int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kInFlightWatchdog).count()));
+    connect(m_busyWatchdog, &QTimer::timeout, this, &StatusController::onBusyWatchdogTimeout);
 
     // 代理模型：搜索/过滤/排序状态由代理自己持有，因此后台刷新不会重置用户条件（§32）
     m_containerFilter->setSourceModel(m_containerModel);
@@ -403,8 +409,44 @@ void StatusController::onLoadingChanged()
     const bool busy = m_backend->isLoading();
     if (busy != m_busy) {
         m_busy = busy;
+        if (busy) {
+            // 在途请求开始：起看门狗（超时后放弃在途请求，界面回到"可以重试"）
+            m_busyWatchdog->start();
+        } else {
+            m_busyWatchdog->stop();
+        }
         Q_EMIT busyChanged();
     }
+    updateStates();
+}
+
+void StatusController::requestAutomaticRefreshForTesting()
+{
+    m_scheduler->requestRefresh(RefreshScheduler::Reason::Automatic);
+}
+
+void StatusController::setInFlightWatchdogMs(int milliseconds)
+{
+    m_busyWatchdog->setInterval(milliseconds > 0 ? milliseconds : 1);
+}
+
+int StatusController::inFlightWatchdogMs() const
+{
+    return m_busyWatchdog->interval();
+}
+
+void StatusController::onBusyWatchdogTimeout()
+{
+    if (!m_busy) {
+        m_busyWatchdog->stop();
+        return;
+    }
+    // 兜底：请求卡在"永远不回来"的状态（daemon 半死不活、socket 接了不回数据）。
+    // 放弃在途请求并如实报告超时——否则界面会永久停在"正在加载 / backend busy"（B3/B4）。
+    m_timeoutReason = i18n("Docker stopped responding; the pending request was given up. Retry when the service is available again.");
+    m_backend->abandonInFlightRequests(
+        DockerError(DockerError::Kind::Timeout, QStringLiteral("no response within the watchdog window")));
+    m_busyWatchdog->stop();
     updateStates();
 }
 
@@ -518,7 +560,20 @@ StatusController::EngineState StatusController::computeEngineState() const
         }
         return m_busy ? EngineState::Refreshing : EngineState::Ready;
     }
-    return (m_busy || !m_refreshRequested) ? EngineState::Loading : EngineState::Unavailable;
+    /*
+     * 还没连上时的三种情况要分清（用户实测 B3：服务没起来时界面永远停在"正在加载"）：
+     *  - 还没请求过刷新 → Loading
+     *  - 请求过、仍在途     → Loading
+     *  - 请求过、已经失败过 → Unavailable（带错误原因，并且可以"重试"）
+     * 原来的判定只看"请求过没有"，于是 daemon 不可用时永远显示正在加载。
+     */
+    if (!m_refreshRequested) {
+        return EngineState::Loading;
+    }
+    if (m_busy) {
+        return EngineState::Loading;
+    }
+    return EngineState::Unavailable;
 }
 
 StatusController::ListState StatusController::computeListState(bool ok, bool failed, int count) const

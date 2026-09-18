@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.8.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:23+0800\n"
+"POT-Creation-Date: 2026-09-19 04:35+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -16,7 +16,7 @@ msgstr ""
 msgid "Uploading the build context…"
 msgstr "正在上传构建上下文…"
 
-#: src/backend/docker_backend.cpp:1374
+#: src/backend/docker_backend.cpp:1394
 msgid "Step %1/%2 (%3) failed: %4"
 msgstr "第 %1/%2 步（%3）失败：%4"
 
@@ -74,20 +74,26 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:106 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:112 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:109
+#: src/model/status_controller.cpp:115
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:112
+#: src/model/status_controller.cpp:118
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:624
+#: src/model/status_controller.cpp:446
+msgid ""
+"Docker stopped responding; the pending request was given up. Retry when the "
+"service is available again."
+msgstr "Docker 一直没有响应，已放弃这次请求。等服务恢复后再重试。"
+
+#: src/model/status_controller.cpp:679
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 

@@ -28,9 +28,11 @@
 #include "model/volume_filter_model.h"
 #include "model/volume_model.h"
 #include "model/refresh_scheduler.h"
+#include "refresh_policy.h"
 #include "model/storage_status.h"
 
 #include <QDateTime>
+#include <QTimer>
 #include <QObject>
 #include <QString>
 
@@ -399,6 +401,20 @@ public Q_SLOTS:
     void retryStorage();
     /*! 网络列表是低频数据：只在进入网络页面时刷新（六期 §3.2）。 */
     /*! 刷新网络列表（创建容器等场景会主动调用）。 */
+    /*!
+     * 看门狗间隔（毫秒）。给测试用：默认取 `RefreshPolicy::kInFlightWatchdog`。
+     * 必须是可调的，否则用例只能等 20 秒。
+     */
+    Q_INVOKABLE void setInFlightWatchdogMs(int milliseconds);
+    /*!
+     * 触发一次**自动**刷新（与定时器走的路径相同）。
+     *
+     * 给用例用：手动刷新会重置失败计数（B2），因此"连续失败 → stale"这类断言
+     * 必须走自动路径才能被测到。
+     */
+    Q_INVOKABLE void requestAutomaticRefreshForTesting();
+    Q_INVOKABLE int inFlightWatchdogMs() const;
+
     Q_INVOKABLE void refreshNetworks();
     /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
     void refreshVolumes(bool includeUsage = true);
@@ -433,6 +449,8 @@ private:
     void onVolumesUpdated();
     void onStorageUpdated();
     void onLoadingChanged();
+    /*! 看门狗到点：放弃在途请求并报告超时（B3/B4 的兜底）。 */
+    void onBusyWatchdogTimeout();
     void onSectionFailed(DockerBackendInterface::Section section, const DockerError &error);
     void updateStates();
     void setSectionError(DockerBackendInterface::Section section, const QString &text);
@@ -474,6 +492,10 @@ private:
     CreateContainerController *m_createContainer = nullptr;
     /*! 目录选择：默认用系统原生对话框；测试/渲染注入替身。 */
     DirectoryPicker *m_directoryPicker = nullptr;
+    /*!
+     * 在途看门狗：busy 持续过久时放弃在途请求（用户实测 B3/B4：永久"正在加载/backend busy"）。
+     */
+    QTimer *m_busyWatchdog = nullptr;
     HostPathService *m_hostPaths = nullptr;
     DaemonConfigController *m_daemonConfigUser = nullptr;
     DaemonConfigController *m_daemonConfigSystem = nullptr;
@@ -489,6 +511,9 @@ private:
     ListState m_imagesState = ListState::Idle;
     ListState m_storageState = ListState::Idle;
     bool m_busy = false;
+    /*! 看门狗放弃在途请求时给出的原因（展示用；下一次成功刷新时清掉）。 */
+    QString m_timeoutReason;
+
 
     QString m_engineError;
     QString m_containersError;

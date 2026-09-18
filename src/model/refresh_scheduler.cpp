@@ -86,6 +86,16 @@ void RefreshScheduler::requestRefresh(Reason reason)
     m_lastAttempt = QDateTime::currentDateTimeUtc();
     m_cycleInProgress = true;
     m_cycleHadFailure = false;
+    if (reason == Reason::Manual) {
+        /*
+         * 手动刷新是"重新开始"：清掉上一轮的失败计数。
+         *
+         * 用户实测 B2：把服务停下来再启动、数据其实已经更新了，界面却一直显示"更新失败"——
+         * 因为失败计数只在"整周期无失败"时才清零，而恢复后的第一次自动刷新可能又被
+         * 别的东西打断。手动刷新路径必须显式清一次，让状态跟上真实情况。
+         */
+        m_consecutiveFailures = 0;
+    }
     Q_EMIT stateChanged();
     m_backend->refreshAll();
 }

@@ -267,6 +267,14 @@ public:
         return m_lastPullCredential;
     }
     bool isLoading() const override;
+    /*! 看门狗兜底：把挂起的请求全部按失败送出（与真实后端的语义一致）。 */
+    void abandonInFlightRequests(const Kontainer::DockerError &error) override;
+
+    /*! 让请求"永远不完成"：用于验证看门狗（默认立即完成）。 */
+    void setStallRequests(bool stall)
+    {
+        m_stallRequests = stall;
+    }
     bool isRefreshingFastData() const override;
     QString endpointDisplayName() const override;
     EngineInfo engineInfo() const override;
@@ -329,6 +337,7 @@ private:
     QHash<QString, int> m_stoppedLogStreams;
 
     bool m_loading = false;
+    bool m_stallRequests = false;
     QHash<int, bool> m_pending;
     QHash<int, DockerError> m_failures;
     QHash<int, int> m_refreshCounts;

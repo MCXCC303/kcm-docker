@@ -1324,6 +1324,26 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
     });
 }
 
+void DockerBackend::abandonInFlightRequests(const DockerError &error)
+{
+    qCWarning(kontainerBackend) << "abandoning in-flight requests:" << error.detail();
+
+    // 在途的回复对象由各自的 finished 处理器负责收尾；这里先把"标志"复位，
+    // 再把排队的回调统一按失败送出——否则 isLoading() 会一直是 true。
+    m_engineInFlight = false;
+    m_containersInFlight = false;
+    m_imagesInFlight = false;
+    m_networksInFlight = false;
+    m_volumesInFlight = false;
+    m_handshakeInFlight = false;
+    m_client.clearApiVersion();
+    m_inFlightRequests.clear();
+    updateLoading();
+
+    flushReadyCallbacks(error);
+    Q_EMIT sectionFailed(Section::Engine, error);
+}
+
 void DockerBackend::pruneBuildCache()
 {
     // 构建缓存是全局的：目标键用 `buildCache:` 前缀，避免与某个构建的取消混淆

@@ -34,6 +34,9 @@ private Q_SLOTS:
     void emptyListShowsEmptyStateNotError();
     void reportsPartialEngineStateWhenSummaryIsMissing();
     void tracksLastSuccessfulUpdate();
+    void failedRefreshDoesNotStayInLoading();
+    void manualRefreshClearsTheStickyFailureFlag();
+    void watchdogAbandonsStuckRequests();
     void retryStorageOnlyRefreshesStorage();
 };
 
@@ -329,11 +332,17 @@ void StatusControllerTest::tracksLastSuccessfulUpdate()
     QVERIFY(controller.lastUpdated().isValid());
     QVERIFY(!controller.updateFailed());
 
-    // 连续失败达到阈值 → stale（§16）
+    /*
+     * 连续失败达到阈值 → stale（§16）。
+     *
+     * 注意：这里必须走**自动**刷新路径。手动刷新会清零失败计数（B2 的修复：
+     * 服务恢复后手动刷新不该继续显示"更新失败"），所以用 refresh() 累加失败是测不到 stale 的——
+     * 这一点本身也是那条修复的断言（见 manualRefreshClearsTheStickyFailureFlag）。
+     */
     const DockerError failure(DockerError::Kind::EngineError, QStringLiteral("boom"));
     for (int i = 0; i < RefreshPolicy::kStaleAfterFailedCycles; ++i) {
         backend.setNextFailure(DockerBackendInterface::Section::Containers, failure);
-        controller.refresh();
+        controller.requestAutomaticRefreshForTesting();
         backend.completeRefresh();
     }
     QVERIFY(controller.updateFailed());
@@ -358,6 +367,76 @@ void StatusControllerTest::retryStorageOnlyRefreshesStorage()
     QCOMPARE(backend.refreshCount(DockerBackendInterface::Section::Storage), 1);
     QCOMPARE(backend.refreshCount(DockerBackendInterface::Section::Containers), containersBefore);
     QCOMPARE(backend.refreshCount(DockerBackendInterface::Section::Engine), engineBefore);
+}
+
+/*!
+ * B3：一次都没成功过、但已经尝试过并失败时，引擎状态必须是"不可用"而不是永远"正在加载"。
+ */
+void StatusControllerTest::failedRefreshDoesNotStayInLoading()
+{
+    MockDockerBackend backend;
+    const DockerError error(DockerError::Kind::DockerUnavailable, QStringLiteral("Cannot connect to the Docker daemon"));
+    backend.setNextFailure(DockerBackendInterface::Section::Engine, error);
+    backend.setNextFailure(DockerBackendInterface::Section::Containers, error);
+    backend.setNextFailure(DockerBackendInterface::Section::Images, error);
+
+    StatusController controller(&backend);
+    QCOMPARE(controller.engineStateKey(), QStringLiteral("loading")); // 还没请求过：加载中是合理的
+
+    controller.refresh();
+    backend.completeRefresh();
+
+    QVERIFY2(!controller.busy(), "a finished (failed) refresh must not keep the busy flag");
+    QCOMPARE(controller.engineStateKey(), QStringLiteral("unavailable"));
+    QVERIFY2(!controller.engineError().isEmpty(), "the reason must reach the UI");
+}
+
+/*!
+ * B2：手动刷新是一次"重新开始"——上一次的失败标记不能粘住。
+ */
+void StatusControllerTest::manualRefreshClearsTheStickyFailureFlag()
+{
+    MockDockerBackend backend;
+    const DockerError error(DockerError::Kind::DockerUnavailable, QStringLiteral("service stopped"));
+    backend.setNextFailure(DockerBackendInterface::Section::Engine, error);
+    backend.setNextFailure(DockerBackendInterface::Section::Containers, error);
+    backend.setNextFailure(DockerBackendInterface::Section::Images, error);
+
+    StatusController controller(&backend);
+    controller.refresh();
+    backend.completeRefresh();
+    QVERIFY2(controller.updateFailed(), "the first cycle failed, so the flag must be set");
+
+    // 服务恢复后用户点"刷新"：标记先清掉，再按本轮结果重算
+    controller.refresh();
+    QVERIFY2(!controller.updateFailed(), "a manual refresh restarts the failure accounting");
+    backend.completeRefresh();
+}
+
+/*!
+ * B4：请求卡住（永远不回来）时，看门狗必须放弃在途请求，让界面回到可重试的状态。
+ */
+void StatusControllerTest::watchdogAbandonsStuckRequests()
+{
+    MockDockerBackend backend;
+    StatusController controller(&backend);
+    // 用例里把看门狗压到 50ms（默认 20 秒，测试不能等）
+    controller.setInFlightWatchdogMs(50);
+    QCOMPARE(controller.inFlightWatchdogMs(), 50);
+
+    backend.setStallRequests(true); // daemon 半死不活：socket 接了但不回数据
+    controller.refresh();
+    QVERIFY2(controller.busy(), "the refresh is in flight");
+
+    QTRY_VERIFY_WITH_TIMEOUT(!controller.busy(), 3000);
+    QCOMPARE(controller.engineStateKey(), QStringLiteral("unavailable"));
+    QVERIFY2(!controller.engineError().isEmpty(), "the timeout must be reported as a reason");
+
+    // 服务恢复后可以重新刷新（不会因为上一次被放弃而卡住）
+    backend.setStallRequests(false);
+    controller.refresh();
+    backend.completeRefresh();
+    QVERIFY2(!controller.busy(), "a later refresh must work again");
 }
 
 QTEST_GUILESS_MAIN(StatusControllerTest)

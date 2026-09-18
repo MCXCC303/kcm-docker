@@ -61,6 +61,14 @@ inline constexpr std::chrono::seconds kBuildIdleTimeout{300};
 /*! 资源采样连续失败多少次后停止轮询（容器可能已经停止）。 */
 inline constexpr int kMaxConsecutiveStatsFailures{3};
 
+/*!
+ * 在途请求的看门狗上限：超过它仍在 loading 就放弃并报告超时（用户实测 B3/B4）。
+ *
+ * 取值比最慢的正常请求（拉取/构建之外的读写都是十几秒级）宽一些，
+ * 目的是"兜底"，不是"超时策略"——正常超时由每个请求自己的 idle/headers 超时负责。
+ */
+inline constexpr std::chrono::seconds kInFlightWatchdog{20};
+
 /*! 每个详情页保留的短期采样点数：60 × 5s ≈ 5 分钟（内存中，离开页面即释放）。 */
 inline constexpr int kMetricsHistorySamples{60};
 

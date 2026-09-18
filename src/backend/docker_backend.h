@@ -62,6 +62,7 @@ public:
     void buildImage(const Kontainer::ImageBuildRequest &request) override;
     void cancelImageBuild(const QString &buildId) override;
     void pruneBuildCache() override;
+    void abandonInFlightRequests(const Kontainer::DockerError &error) override;
     void createContainer(const Kontainer::ContainerCreateRequest &request) override;
     void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) override;
     void removeVolume(const QString &name) override;

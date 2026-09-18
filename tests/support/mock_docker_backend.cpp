@@ -480,6 +480,29 @@ bool MockDockerBackend::isLoading() const
     return m_loading;
 }
 
+void MockDockerBackend::abandonInFlightRequests(const DockerError &error)
+{
+    // 与真实后端一致：把排队的请求按失败送出，并释放 loading
+    const QList<Section> sections = {Section::Engine,
+                                     Section::Containers,
+                                     Section::Images,
+                                     Section::Storage,
+                                     Section::Networks,
+                                     Section::Volumes,
+                                     Section::ContainerDetail,
+                                     Section::ImageDetail,
+                                     Section::Stats};
+    for (Section section : sections) {
+        if (!m_pending.value(int(section))) {
+            continue;
+        }
+        m_pending.insert(int(section), false);
+        Q_EMIT sectionFailed(section, error);
+    }
+    m_loading = false;
+    Q_EMIT loadingChanged();
+}
+
 bool MockDockerBackend::isRefreshingFastData() const
 {
     return m_pending.value(int(Section::Engine)) || m_pending.value(int(Section::Containers)) || m_pending.value(int(Section::Images));

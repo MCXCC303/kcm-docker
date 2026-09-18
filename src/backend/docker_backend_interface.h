@@ -210,6 +210,15 @@ public:
     virtual void cancelImagePull(const QString &reference) = 0;
     /*! 取消全部在途拉取（关闭 KCM / 退出时的兜底）。 */
     virtual void cancelAllImagePulls() = 0;
+    /*!
+     * 放弃所有在途请求（兜底用）。
+     *
+     * 用途：请求卡在"永远不会回来"的状态时（daemon 半死不活、socket 接了但不回数据），
+     * 界面不能永久显示"正在加载 / backend busy"。控制器用看门狗计时调用它，
+     * 把在途状态、排队回调统一按超时失败处理，让界面回到"可以重试"。
+     */
+    virtual void abandonInFlightRequests(const Kontainer::DockerError &error) = 0;
+
     /*! 取消一路构建（八期 §5.3）：中断上传/响应，临时上下文由后端清理。 */
     virtual void cancelImageBuild(const QString &buildId) = 0;
     /*! `force=true` 用于多标签镜像的强制删除（引擎在 409 时要求）。 */

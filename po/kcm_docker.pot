@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:23+0800\n"
+"POT-Creation-Date: 2026-09-19 04:35+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -22,7 +22,7 @@ msgstr ""
 msgid "Uploading the build context…"
 msgstr ""
 
-#: src/backend/docker_backend.cpp:1374
+#: src/backend/docker_backend.cpp:1394
 msgid "Step %1/%2 (%3) failed: %4"
 msgstr ""
 
@@ -80,20 +80,26 @@ msgstr ""
 msgid "Unhealthy"
 msgstr ""
 
-#: src/model/status_controller.cpp:106 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:112 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr ""
 
-#: src/model/status_controller.cpp:109
+#: src/model/status_controller.cpp:115
 msgid "The host path is not a directory."
 msgstr ""
 
-#: src/model/status_controller.cpp:112
+#: src/model/status_controller.cpp:118
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr ""
 
-#: src/model/status_controller.cpp:624
+#: src/model/status_controller.cpp:446
+msgid ""
+"Docker stopped responding; the pending request was given up. Retry when the "
+"service is available again."
+msgstr ""
+
+#: src/model/status_controller.cpp:679
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
