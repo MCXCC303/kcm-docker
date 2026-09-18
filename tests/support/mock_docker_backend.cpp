@@ -48,6 +48,11 @@ void MockDockerBackend::setContainerDetail(const ContainerDetail &detail)
     m_containerDetail = detail;
 }
 
+void MockDockerBackend::setContainerDetailForId(const QString &id, const ContainerDetail &detail)
+{
+    m_containerDetailsById.insert(id, detail);
+}
+
 void MockDockerBackend::setImageDetail(const ImageDetail &detail)
 {
     m_imageDetail = detail;
@@ -106,6 +111,7 @@ void MockDockerBackend::refreshImages()
 
 void MockDockerBackend::refreshNetworks()
 {
+    ++m_networkRefreshCount;
     beginRefresh(Section::Networks);
 }
 
@@ -202,7 +208,12 @@ void MockDockerBackend::refreshStorageUsage()
 
 void MockDockerBackend::inspectContainer(const QString &id)
 {
-    m_containerDetail.id = id;
+    // 按 id 取准备好的详情（渲染工具会同时准备多份）；没有就沿用最后设置的那份
+    if (m_containerDetailsById.contains(id)) {
+        m_containerDetail = m_containerDetailsById.value(id);
+    } else {
+        m_containerDetail.id = id;
+    }
     beginRefresh(Section::ContainerDetail);
 }
 

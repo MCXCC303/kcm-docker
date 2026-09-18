@@ -6,6 +6,7 @@
 #include "i18n.h"
 #include "model/image_pull_model.h"
 #include "model/mount_preset_store.h"
+#include "domain/container_detail.h"
 #include "domain/image_build.h"
 #include "model/presentation.h"
 #include "model/qml_registration.h"
@@ -166,6 +167,9 @@ private Q_SLOTS:
     void buildPanelSubmitsAndShowsFailureStep();
     void portAndKeyValueRowsCanBeRemoved();
     void wizardAddsPresetsAndExtraMounts();
+    void pauseAndResumeButtonsFollowTheState();
+    void openingTheWizardRefreshesNetworks();
+    void commandFieldAndExitHint();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -1673,6 +1677,167 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
     }(), 5000);
     QVERIFY(QMetaObject::invokeMethod(removeMount, "clicked"));
     QTRY_COMPARE(wizard->mountRows().size(), 2);
+}
+
+
+/*!
+ * 暂停 / 继续按钮（用户实测反馈 ①）：运行中给「暂停」，已暂停给「继续」。
+ */
+void QmlLoadTest::pauseAndResumeButtonsFollowTheState()
+{
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    Container running;
+    running.id = QStringLiteral("running-one");
+    running.name = QStringLiteral("running-one");
+    running.image = QStringLiteral("alpine:3.19");
+    running.state = ContainerState::Running;
+    m_backend->setContainers({running});
+
+    ContainerDetail runningDetail;
+    runningDetail.id = QStringLiteral("running-one");
+    runningDetail.name = QStringLiteral("running-one");
+    runningDetail.image = QStringLiteral("alpine:3.19");
+    runningDetail.state = ContainerState::Running;
+    m_backend->setContainerDetail(runningDetail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    initial.insert(QStringLiteral("controller"), QVariant::fromValue(m_stubKcm->controller()->containerDetail()));
+    initial.insert(QStringLiteral("containerId"), QStringLiteral("running-one"));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1000, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1000);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+    m_backend->completeRefresh(); // inspect 是异步的：喂完数据再让详情落地
+
+    // 运行中：暂停可见，继续不可见
+    QQuickItem *pauseButton = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        pauseButton = findItemDeep(window.contentItem(), QStringLiteral("detailPauseButton"));
+        return pauseButton != nullptr && pauseButton->property("visible").toBool();
+    }(), 5000);
+    QQuickItem *resumeButton = findItemDeep(window.contentItem(), QStringLiteral("detailUnpauseButton"));
+    QVERIFY(resumeButton);
+    QVERIFY2(!resumeButton->property("visible").toBool(), "a running container must not offer Resume");
+
+    // 点「暂停」真的发出请求
+    QVERIFY(QMetaObject::invokeMethod(pauseButton, "clicked"));
+    QTRY_VERIFY(!m_backend->mutationCalls().isEmpty());
+    QCOMPARE(m_backend->mutationCalls().first().mutation, DockerBackendInterface::Mutation::PauseContainer);
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("running-one")),
+                               DockerBackendInterface::MutationOutcome::Succeeded);
+
+    // 状态变成 paused：按钮反过来（继续可见，暂停不可见）
+    Container paused = running;
+    paused.state = ContainerState::Paused;
+    m_backend->setContainers({paused});
+    ContainerDetail pausedDetail = runningDetail;
+    pausedDetail.state = ContainerState::Paused;
+    m_backend->setContainerDetail(pausedDetail);
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+    QTRY_VERIFY_WITH_TIMEOUT(!pauseButton->property("visible").toBool(), 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(resumeButton->property("visible").toBool(), 5000);
+
+    QVERIFY(QMetaObject::invokeMethod(resumeButton, "clicked"));
+    QTRY_COMPARE(m_backend->mutationCalls().size(), 1);
+    QCOMPARE(m_backend->mutationCalls().first().mutation, DockerBackendInterface::Mutation::UnpauseContainer);
+}
+
+/*!
+ * 创建容器入口会主动刷新网络（用户实测反馈 ②）：不用先点一次「网络」标签页。
+ */
+void QmlLoadTest::openingTheWizardRefreshesNetworks()
+{
+    auto *controller = m_stubKcm->controller();
+    const int before = m_backend->networkRefreshCount();
+
+    // 模拟"点创建容器入口"：主页面里那一步就是先刷新再发信号
+    controller->refreshNetworks();
+    QTRY_VERIFY(m_backend->networkRefreshCount() > before);
+    m_backend->completeRefresh();
+
+    // 向导自己也会保一次险（打开时若列表仍为空就再刷）
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    const int beforeWizard = m_backend->networkRefreshCount();
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    QTRY_VERIFY(m_backend->networkRefreshCount() >= beforeWizard);
+}
+
+/*!
+ * 命令字段与"默认命令会立刻退出"的提示（用户实测反馈 ⑧⑨）。
+ */
+void QmlLoadTest::commandFieldAndExitHint()
+{
+    Image localImage;
+    localImage.id = QStringLiteral("sha256:deadbeef");
+    localImage.repoTags = {QStringLiteral("alpine:latest")};
+    m_backend->setImages({localImage});
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1100, 900);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1100);
+    page->setHeight(900);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    auto *wizard = m_stubKcm->controller()->createContainer();
+    wizard->setImage(QStringLiteral("alpine:latest"));
+    wizard->setName(QStringLiteral("hint-demo"));
+    QVERIFY(wizard->goToStep(QStringLiteral("basics")));
+
+    // 提示：没填命令时可见（说明默认命令会立刻退出）
+    QQuickItem *hint = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        hint = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandHint"));
+        return hint != nullptr;
+    }(), 5000);
+    QVERIFY2(hint->property("visible").toBool(), "the exit hint must be visible while no command is set");
+
+    // 填命令：写回控制器，提示随之消失
+    QQuickItem *commandField = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandField"));
+    QVERIFY(commandField);
+    commandField->setProperty("text", QStringLiteral("sleep infinity"));
+    QTRY_COMPARE(wizard->commandText(), QStringLiteral("sleep infinity"));
+    QTRY_VERIFY(!hint->property("visible").toBool());
+
+    // 入口点/工作目录/用户也能写回
+    auto *entrypointField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardEntrypointField")));
+    auto *workingDirField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardWorkingDirField")));
+    auto *userField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardUserField")));
+    QVERIFY(entrypointField && workingDirField && userField);
+    entrypointField->setProperty("text", QStringLiteral("/usr/bin/env sh"));
+    workingDirField->setProperty("text", QStringLiteral("/app"));
+    userField->setProperty("text", QStringLiteral("1000:1000"));
+    QTRY_COMPARE(wizard->entrypointText(), QStringLiteral("/usr/bin/env sh"));
+    QTRY_COMPARE(wizard->workingDirectory(), QStringLiteral("/app"));
+    QTRY_COMPARE(wizard->user(), QStringLiteral("1000:1000"));
 }
 
 

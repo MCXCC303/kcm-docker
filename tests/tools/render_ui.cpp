@@ -279,7 +279,13 @@ void fillFixture(MockDockerBackend &backend)
     detail.hostname = QStringLiteral("a1b2c3d4e5f6");
     detail.labels = {{QStringLiteral("com.example.stack"), QStringLiteral("frontend")},
                      {QStringLiteral("com.example.version"), QStringLiteral("2.4.1")}};
+    // 另备一份"已暂停"的详情：复核「继续」按钮（container-detail-paused 页面用）
+    ContainerDetail pausedDetail = detail;
+    pausedDetail.id = QStringLiteral("3333333333333333333333333333333333333333333333333333333333333333");
+    pausedDetail.name = QStringLiteral("worker-paused");
+    pausedDetail.state = ContainerState::Paused;
     backend.setContainerDetail(detail);
+    backend.setContainerDetailForId(pausedDetail.id, pausedDetail);
 
     ContainerStats stats;
     stats.containerId = detail.id;
@@ -599,9 +605,13 @@ int main(int argc, char **argv)
     QVariantMap initialProperties;
     if (page == QLatin1String("main") || page == QLatin1String("engine")) {
         qmlFile = QStringLiteral("MainPage.qml");
-    } else if (page == QLatin1String("container-detail")) {
+    } else if (page == QLatin1String("container-detail") || page == QLatin1String("container-detail-paused")) {
         qmlFile = QStringLiteral("ContainerDetail.qml");
-        initialProperties.insert(QStringLiteral("containerId"), QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"));
+        // container-detail-paused：用 fixture 里那个"已暂停"的容器，复核「继续」按钮
+        initialProperties.insert(QStringLiteral("containerId"),
+                                 page == QLatin1String("container-detail-paused")
+                                     ? QStringLiteral("3333333333333333333333333333333333333333333333333333333333333333")
+                                     : QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"));
     } else if (page == QLatin1String("image-detail")) {
         qmlFile = QStringLiteral("ImageDetail.qml");
         initialProperties.insert(QStringLiteral("imageId"), QStringLiteral("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));

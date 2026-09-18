@@ -50,6 +50,8 @@ public:
     }
     void setStorageUsage(const StorageUsage &usage);
     void setContainerDetail(const ContainerDetail &detail);
+    /*! 按 id 存一份详情（渲染工具会同时准备"运行中"与"已暂停"两个页面）。 */
+    void setContainerDetailForId(const QString &id, const ContainerDetail &detail);
     void setImageDetail(const ImageDetail &detail);
     void setContainerStats(const ContainerStats &stats);
     void setEndpointName(const QString &name);
@@ -105,6 +107,12 @@ public:
     void refreshContainers() override;
     void refreshImages() override;
     void refreshNetworks() override;
+
+    /*! 网络列表被主动刷新过几次（创建容器入口/向导应当触发一次）。 */
+    int networkRefreshCount() const
+    {
+        return m_networkRefreshCount;
+    }
     void refreshVolumes(bool includeUsage = true) override;
     void pauseContainer(const QString &id) override;
     void unpauseContainer(const QString &id) override;
@@ -295,11 +303,13 @@ private:
     ContainerCreateRequest m_lastContainerCreate;
     ImageBuildRequest m_lastBuildRequest;
     QStringList m_cancelledBuilds;
+    int m_networkRefreshCount = 0;
     QPair<QString, QString> m_lastNetworkConnect;
     QStringList m_lastNetworkConnectAliases;
     QPair<QString, QString> m_lastNetworkDisconnect;
     StorageUsage m_storageUsage;
     ContainerDetail m_containerDetail;
+    QHash<QString, ContainerDetail> m_containerDetailsById;
     ImageDetail m_imageDetail;
     ContainerStats m_containerStats;
     QString m_endpointName = QStringLiteral("unix:///mock/docker.sock");

@@ -62,6 +62,7 @@ private Q_SLOTS:
     void createNetworkRefreshesAndReports();
     void removeNetworkIsGatedAndTracked();
     void connectAndDisconnectContainerToNetwork();
+    void pauseAndResumeContainer();
     void createContainerValidatesAgainstExistingState();
     void createContainerCanStartAfterwards();
     void createVolumeValidatesAndRefreshes();
@@ -591,6 +592,40 @@ void OperationControllerTest::removeAndPruneVolumes()
 /*!
  * 创建容器的校验（ARCH_V5_V8 §4.3/§4.6）：依赖后端数据的检查也在 C++ 侧，失败给稳定 key。
  */
+/*!
+ * 暂停 / 继续（用户实测反馈 ①）：请求打到正确的端点，结果文案说清楚做了什么。
+ */
+void OperationControllerTest::pauseAndResumeContainer()
+{
+    QVERIFY(m_operations->writeAllowed());
+
+    m_operations->pauseContainer(QStringLiteral("cid-1"));
+    QCOMPARE(m_backend->mutationCalls().size(), 1);
+    QCOMPARE(m_backend->mutationCalls().first().mutation, DockerBackendInterface::Mutation::PauseContainer);
+    QCOMPARE(m_backend->mutationCalls().first().targetKey, OperationTarget::container(QStringLiteral("cid-1")));
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("cid-1")),
+                                DockerBackendInterface::MutationOutcome::Succeeded);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("paused")), qPrintable(m_operations->resultText()));
+
+    m_operations->unpauseContainer(QStringLiteral("cid-1"));
+    QCOMPARE(m_backend->mutationCalls().size(), 1);
+    QCOMPARE(m_backend->mutationCalls().first().mutation, DockerBackendInterface::Mutation::UnpauseContainer);
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("cid-1")),
+                                DockerBackendInterface::MutationOutcome::Succeeded);
+    QVERIFY2(m_operations->resultText().contains(QStringLiteral("resumed")), qPrintable(m_operations->resultText()));
+
+    // 只读时：一个请求都不发，并且明确说明是只读
+    // （用另建的 backend 指向不存在的 socket：写权限门就会判定为不可写）
+    MockDockerBackend readOnlyBackend;
+    readOnlyBackend.setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/kontainer-does-not-exist.sock")));
+    OperationController readOnly(&readOnlyBackend);
+    readOnly.refreshWriteAccess();
+    QVERIFY(!readOnly.writeAllowed());
+    readOnly.pauseContainer(QStringLiteral("cid-1"));
+    QVERIFY2(readOnly.resultText().contains(QStringLiteral("read-only")), qPrintable(readOnly.resultText()));
+    QVERIFY2(readOnlyBackend.mutationCalls().isEmpty(), "a read-only controller must not send anything");
+}
+
 void OperationControllerTest::createContainerValidatesAgainstExistingState()
 {
     Container existing;
