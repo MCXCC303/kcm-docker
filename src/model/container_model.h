@@ -7,7 +7,7 @@
 
 #include "domain/container.h"
 
-#include <QAbstractListModel>
+#include "model/keyed_list_model.h"
 #include <QList>
 
 namespace Kontainer
@@ -19,7 +19,7 @@ namespace Kontainer
  * role 名称固定，不为了 QML 的临时需求随意变更。
  * 只做“域数据 → QML 可消费数据”的转换，不做任何 Docker 访问。
  */
-class ContainerModel : public QAbstractListModel
+class ContainerModel : public KeyedListModel<ContainerModel, Container>
 {
     Q_OBJECT
 

@@ -5,11 +5,14 @@
 
 #include "model/image_model.h"
 
+#include "model/keyed_list_model.h"
+
 namespace Kontainer
 {
 
+
 ImageModel::ImageModel(QObject *parent)
-    : QAbstractListModel(parent)
+    : KeyedListModel<ImageModel, Image>(parent)
 {
 }
 
@@ -75,14 +78,23 @@ QHash<int, QByteArray> ImageModel::roleNames() const
 
 void ImageModel::setImages(const QList<Image> &images)
 {
-    if (m_images == images) {
-        return; // 数据没有变化：不发信号
+    /*
+     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
+     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
+     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     */
+    const bool touched = syncRows(
+        m_images,
+        images,
+        [](const Image &entry) {
+            return entry.id;
+        },
+        [](const Image &lhs, const Image &rhs) {
+            return !(lhs == rhs);
+        });
+    if (touched) {
+        Q_EMIT countChanged();
     }
-
-    beginResetModel();
-    m_images = images;
-    endResetModel();
-    Q_EMIT countChanged();
 }
 
 } // namespace Kontainer

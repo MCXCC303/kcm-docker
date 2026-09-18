@@ -5,13 +5,16 @@
 
 #include "model/volume_model.h"
 
+#include "model/keyed_list_model.h"
+
 #include <QVariantMap>
 
 namespace Kontainer
 {
 
+
 VolumeModel::VolumeModel(QObject *parent)
-    : QAbstractListModel(parent)
+    : KeyedListModel<VolumeModel, Volume>(parent)
 {
 }
 
@@ -98,13 +101,23 @@ const QList<Volume> &VolumeModel::volumes() const
 
 void VolumeModel::setVolumes(const QList<Volume> &volumes)
 {
-    if (volumes == m_volumes) {
-        return; // 内容未变：不动模型（后台刷新不重建 delegate）
+    /*
+     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
+     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
+     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     */
+    const bool touched = syncRows(
+        m_volumes,
+        volumes,
+        [](const Volume &entry) {
+            return entry.name;
+        },
+        [](const Volume &lhs, const Volume &rhs) {
+            return !(lhs == rhs);
+        });
+    if (touched) {
+        Q_EMIT countChanged();
     }
-    beginResetModel();
-    m_volumes = volumes;
-    endResetModel();
-    Q_EMIT countChanged();
 }
 
 void VolumeModel::clear()
@@ -112,10 +125,18 @@ void VolumeModel::clear()
     if (m_volumes.isEmpty()) {
         return;
     }
-    beginResetModel();
-    m_volumes.clear();
-    endResetModel();
-    Q_EMIT countChanged();
+    // 走增量路径（逐行删除）：清空时也不整表重置，视图位置因此不会被拉回顶部
+    const bool touched = syncRows(m_volumes,
+                                  QList<Volume>(),
+                                  [](const Volume &entry) {
+                                      return entry.name;
+                                  },
+                                  [](const Volume &lhs, const Volume &rhs) {
+                                      return !(lhs == rhs);
+                                  });
+    if (touched) {
+        Q_EMIT countChanged();
+    }
 }
 
 int VolumeModel::rowForName(const QString &name) const

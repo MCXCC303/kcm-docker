@@ -190,14 +190,17 @@ void VolumeModelTest::unchangedVolumesDoNotResetTheModel()
     model.setVolumes(sampleVolumes());
     QCOMPARE(resetSpy.count(), 0); // 内容未变：不重建 delegate
 
+    // 值变化（引用数）：只发 dataChanged，不重置模型（同容器列表的体验修复）
     QList<Volume> changed = sampleVolumes();
     changed[1].refCount = 3;
+    QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
     model.setVolumes(changed);
-    QCOMPARE(resetSpy.count(), 1);
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(dataSpy.count(), 1);
 
     model.clear();
     QVERIFY(model.empty());
-    QCOMPARE(resetSpy.count(), 2);
+    QCOMPARE(resetSpy.count(), 0); // 清空是"逐行删除"，不是整表重置
 }
 
 void VolumeModelTest::filtersUnusedAndInUseSeparately()

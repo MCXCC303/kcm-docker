@@ -7,14 +7,14 @@
 
 #include "domain/image.h"
 
-#include <QAbstractListModel>
+#include "model/keyed_list_model.h"
 #include <QList>
 
 namespace Kontainer
 {
 
 /*! 镜像列表的 presentation model（只读；一期不含任何写操作）。 */
-class ImageModel : public QAbstractListModel
+class ImageModel : public KeyedListModel<ImageModel, Image>
 {
     Q_OBJECT
 

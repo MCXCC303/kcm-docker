@@ -5,13 +5,16 @@
 
 #include "model/network_model.h"
 
+#include "model/keyed_list_model.h"
+
 #include <QVariantMap>
 
 namespace Kontainer
 {
 
+
 NetworkModel::NetworkModel(QObject *parent)
-    : QAbstractListModel(parent)
+    : KeyedListModel<NetworkModel, Network>(parent)
 {
 }
 
@@ -107,13 +110,23 @@ const QList<Network> &NetworkModel::networks() const
 
 void NetworkModel::setNetworks(const QList<Network> &networks)
 {
-    if (networks == m_networks) {
-        return; // 内容未变：不动模型（后台刷新不重建 delegate）
+    /*
+     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
+     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
+     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     */
+    const bool touched = syncRows(
+        m_networks,
+        networks,
+        [](const Network &entry) {
+            return entry.id;
+        },
+        [](const Network &lhs, const Network &rhs) {
+            return !(lhs == rhs);
+        });
+    if (touched) {
+        Q_EMIT countChanged();
     }
-    beginResetModel();
-    m_networks = networks;
-    endResetModel();
-    Q_EMIT countChanged();
 }
 
 void NetworkModel::clear()
@@ -121,10 +134,18 @@ void NetworkModel::clear()
     if (m_networks.isEmpty()) {
         return;
     }
-    beginResetModel();
-    m_networks.clear();
-    endResetModel();
-    Q_EMIT countChanged();
+    // 走增量路径（逐行删除）：清空时也不整表重置，视图位置因此不会被拉回顶部
+    const bool touched = syncRows(m_networks,
+                                  QList<Network>(),
+                                  [](const Network &entry) {
+                                      return entry.id;
+                                  },
+                                  [](const Network &lhs, const Network &rhs) {
+                                      return !(lhs == rhs);
+                                  });
+    if (touched) {
+        Q_EMIT countChanged();
+    }
 }
 
 QVariantList NetworkModel::summaries() const

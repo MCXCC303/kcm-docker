@@ -5,12 +5,15 @@
 
 #include "model/container_model.h"
 
+#include "model/keyed_list_model.h"
+
 #include "model/state_text.h"
 
 #include <QStringList>
 
 namespace Kontainer
 {
+
 
 namespace
 {
@@ -36,7 +39,7 @@ QString portsSummary(const Container &container)
 } // namespace
 
 ContainerModel::ContainerModel(QObject *parent)
-    : QAbstractListModel(parent)
+    : KeyedListModel<ContainerModel, Container>(parent)
 {
 }
 
@@ -114,14 +117,23 @@ QHash<int, QByteArray> ContainerModel::roleNames() const
 
 void ContainerModel::setContainers(const QList<Container> &containers)
 {
-    if (m_containers == containers) {
-        return; // 数据没有变化：不发信号，列表与滚动位置保持不动
+    /*
+     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
+     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
+     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     */
+    const bool touched = syncRows(
+        m_containers,
+        containers,
+        [](const Container &entry) {
+            return entry.id;
+        },
+        [](const Container &lhs, const Container &rhs) {
+            return !(lhs == rhs);
+        });
+    if (touched) {
+        Q_EMIT countChanged();
     }
-
-    beginResetModel();
-    m_containers = containers;
-    endResetModel();
-    Q_EMIT countChanged();
 }
 
 } // namespace Kontainer

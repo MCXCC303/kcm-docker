@@ -199,6 +199,12 @@ void ContainerModelTest::emptyModelsHaveZeroCount()
  * §32/§34：后台刷新如果数据没有变化，就不应该重置模型
  * （否则每 5 秒列表都会重建、滚动位置丢失）。
  */
+/*!
+ * 值变化不重置模型（用户实测：点启动/停止或从详情页返回后列表被拉回最上方）。
+ *
+ * 旧实现是"任何变化都 beginResetModel()"，而**模型重置必然让 ListView 跳回顶部**。
+ * 现在：键序列不变 → 只发 `dataChanged`；行数/顺序变了才动视图位置。
+ */
 void ContainerModelTest::identicalDataDoesNotResetModel()
 {
     Container first;
@@ -214,10 +220,44 @@ void ContainerModelTest::identicalDataDoesNotResetModel()
     model.setContainers({first});
     QCOMPARE(resetSpy.count(), 0); // 数据相同 → 不发信号
 
+    QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
     first.status = QStringLiteral("Up 2 hours");
     model.setContainers({first});
-    QCOMPARE(resetSpy.count(), 1); // 数据变化 → 正常重置
+    QVERIFY2(resetSpy.count() == 0, "a value change must NOT reset the model (that scrolls the list to the top)");
+    QCOMPARE(dataSpy.count(), 1);
     QCOMPARE(model.data(model.index(0, 0), ContainerModel::StatusRole).toString(), QStringLiteral("Up 2 hours"));
+
+    // 新增一行：只发 rowsInserted（视图不会跳回顶部）
+    Container second;
+    second.id = QStringLiteral("bbb");
+    second.name = QStringLiteral("second");
+    QSignalSpy insertSpy(&model, &QAbstractItemModel::rowsInserted);
+    model.setContainers({first, second});
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(insertSpy.count(), 1);
+    QCOMPARE(model.count(), 2);
+
+    // 删除一行：只发 rowsRemoved
+    QSignalSpy removeSpy(&model, &QAbstractItemModel::rowsRemoved);
+    model.setContainers({second});
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(removeSpy.count(), 1);
+    QCOMPARE(model.count(), 1);
+    QCOMPARE(model.data(model.index(0, 0), ContainerModel::IdRole).toString(), QStringLiteral("bbb"));
+
+    // 把 aaa 加回来（这是"插入"，不是"移动"）
+    QSignalSpy insertAgainSpy(&model, &QAbstractItemModel::rowsInserted);
+    model.setContainers({first, second});
+    QCOMPARE(insertAgainSpy.count(), 1);
+    QCOMPARE(resetSpy.count(), 0);
+
+    // 两行交换顺序：发 rowsMoved，且数据顺序正确
+    QSignalSpy moveSpy(&model, &QAbstractItemModel::rowsMoved);
+    model.setContainers({second, first});
+    QCOMPARE(moveSpy.count(), 1);
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(model.data(model.index(0, 0), ContainerModel::IdRole).toString(), QStringLiteral("bbb"));
+    QCOMPARE(model.data(model.index(1, 0), ContainerModel::IdRole).toString(), QStringLiteral("aaa"));
 }
 
 QTEST_GUILESS_MAIN(ContainerModelTest)

@@ -682,7 +682,14 @@ Kirigami.Page {
 
                     QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
 
-                    // 数据确实发生变化时模型会重置：把滚动位置恢复回去
+                    /*
+                     * 兜底：模型**真的**重置时把滚动位置恢复回去。
+                     *
+                     * 注意这不是主要手段：模型已经不因"值变化"重置了（见 model/keyed_list_model.h，
+                     * 那正是"刷新被拉回顶部"的根因），而且重置后立刻恢复 contentY 会被夹到新的
+                     * 内容高度上——新 delegate 还没布局完时它就是 0，所以兜底救不回来。
+                     * 这里保留它只是为了万一有别的来源触发重置时不至于毫无保护。
+                     */
                     Connections {
                         target: containerView.model
 

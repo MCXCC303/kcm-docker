@@ -61,6 +61,7 @@ private Q_SLOTS:
     void silentRefreshesDoNotRecreateDetailEntries();
     void statsSamplesDoNotRecreateTrendBars();
     void statsSamplesDoNotDestroyAnyItem();
+    void listKeepsScrollPositionOnValueRefresh();
 
 private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
@@ -73,6 +74,8 @@ private:
      * 用来断言「同一结构下的数值刷新不得重建条目」。
      */
     void fillDataStableStructure(int iteration);
+    /*! 固定 30 个容器，只让"运行时长"这种**值**变化（列表可滚动、结构不变）。 */
+    void fillManyContainersWithChangingStatus(int iteration);
 
     std::unique_ptr<MockDockerBackend> m_backend;
     std::unique_ptr<QmlStubKcm> m_stubKcm;
@@ -321,6 +324,97 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
  * 只要有人再次把 JS 数组直接当作 Repeater 的 model（数组每次刷新都会重新求值），
  * 条目实例就会变，测试立刻失败——比「跑到用户那里崩溃」早得多。
  */
+/*!
+ * 刷新时列表不能被拉回最上方（用户实测）。
+ *
+ * 场景：容器很多（这里 30 个，可滚动），用户滚到中间；后台刷新只改了
+ * "运行时长/状态文本"这类**值**。旧实现每次刷新都 `beginResetModel()`，
+ * 而模型重置必然让 ListView 回到顶部——用户来不及翻到目标。
+ *
+ * 断言两件事：① 这次刷新**没有**发生 modelReset（根因）；② contentY 原地不动（用户可见结果）。
+ * 只看 contentY 是不够的：页面上还有一段"重置后恢复 contentY"的兜底代码，
+ * 它在新内容尚未布局完时会被夹到 0，正是线上表现。
+ */
+void KcmWidgetChurnTest::listKeepsScrollPositionOnValueRefresh()
+{
+    fillManyContainersWithChangingStatus(0);
+    StatusController *controller = m_stubKcm->controller();
+    controller->refresh();
+    m_backend->completeRefresh();
+
+    QQuickWidget widget;
+    widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
+    widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
+                                            "function i18nc(context, text) { return text; }\n"
+                                            "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
+                                            "function i18ncp(context, singular, plural, count) { return count === 1 ? singular : plural; }\n"));
+    widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
+    widget.resize(900, 700);
+    widget.show();
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QTest::qWait(50);
+
+    QQuickItem *page = widget.rootObject();
+    QVERIFY(page);
+    QTRY_VERIFY_WITH_TIMEOUT(page->width() > 0 && page->height() > 0, 5000);
+
+    QQuickItem *view = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((view = TestSupport::findItemByObjectName(page, QStringLiteral("containerView"))) != nullptr, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(view->property("count").toInt(), 30, 5000);
+
+    // 模型重置是"被拉回顶部"的根因：这一路刷新里一次都不该出现
+    QSignalSpy resetSpy(view->property("model").value<QObject *>(), SIGNAL(modelReset()));
+    QVERIFY(resetSpy.isValid());
+
+    // 滚到中间（内容够高才滚得动）
+    QTRY_VERIFY_WITH_TIMEOUT(view->property("contentHeight").toReal() > view->height(), 5000);
+    view->setProperty("contentY", 400.0);
+    QTRY_VERIFY_WITH_TIMEOUT(qAbs(view->property("contentY").toReal() - 400.0) < 1.0, 3000);
+
+    for (int iteration = 1; iteration <= 3; ++iteration) {
+        fillManyContainersWithChangingStatus(iteration);
+        controller->refresh();
+        m_backend->completeRefresh();
+        QTest::qWait(40);
+
+        QCOMPARE(resetSpy.count(), 0);
+        QVERIFY2(qAbs(view->property("contentY").toReal() - 400.0) < 1.0,
+                 qPrintable(QStringLiteral("iteration %1: the list jumped to %2 (must stay at 400)")
+                                .arg(iteration)
+                                .arg(view->property("contentY").toReal())));
+    }
+}
+
+void KcmWidgetChurnTest::fillManyContainersWithChangingStatus(int iteration)
+{
+    EngineInfo engine;
+    engine.available = true;
+    engine.countsAvailable = true;
+    engine.serverVersion = QStringLiteral("29.8.0");
+    engine.apiVersion = QStringLiteral("1.56");
+    engine.containerTotal = 30;
+    engine.containersRunning = 30;
+    m_backend->setEngineInfo(engine);
+
+    QList<Container> containers;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    for (int i = 0; i < 30; ++i) {
+        Container container;
+        container.id = QStringLiteral("cid-%1").arg(i);
+        container.name = QStringLiteral("container-%1").arg(i, 2, 10, QLatin1Char('0'));
+        container.image = QStringLiteral("alpine:latest");
+        container.imageId = QStringLiteral("sha256:aaaa");
+        // 只有这里在变：运行时长/状态文本
+        container.status = QStringLiteral("Up %1 minutes").arg(i + iteration);
+        container.state = ContainerState::Running;
+        container.health = HealthState::Healthy;
+        container.created = now.addSecs(-60ll * (i + 1));
+        containers.append(container);
+    }
+    m_backend->setContainers(containers);
+}
+
+
 void KcmWidgetChurnTest::delegatesSurviveDataChanges_data()
 {
     QTest::addColumn<QString>("objectName");

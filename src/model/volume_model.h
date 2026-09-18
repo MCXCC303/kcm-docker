@@ -7,7 +7,7 @@
 
 #include "domain/volume.h"
 
-#include <QAbstractListModel>
+#include "model/keyed_list_model.h"
 #include <QList>
 
 namespace Kontainer
@@ -20,7 +20,7 @@ namespace Kontainer
  * 列表页要的字段（名称、驱动、挂载点、大小、引用数、是否在用）与详情页要的
  * （标签、选项、状态）都在 role 里——`/volumes` 返回的就是完整对象。
  */
-class VolumeModel : public QAbstractListModel
+class VolumeModel : public KeyedListModel<VolumeModel, Volume>
 {
     Q_OBJECT
 

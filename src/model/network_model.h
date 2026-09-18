@@ -7,7 +7,7 @@
 
 #include "domain/network.h"
 
-#include <QAbstractListModel>
+#include "model/keyed_list_model.h"
 #include <QList>
 
 namespace Kontainer
@@ -23,7 +23,7 @@ namespace Kontainer
  * 详情页需要的成员/标签/选项也在——`/networks` 返回的就是完整对象（§3.2 实测），
  * 因此详情页直接用同一份数据，不再单独发请求。
  */
-class NetworkModel : public QAbstractListModel
+class NetworkModel : public KeyedListModel<NetworkModel, Network>
 {
     Q_OBJECT
 

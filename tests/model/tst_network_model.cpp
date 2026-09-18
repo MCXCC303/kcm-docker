@@ -123,14 +123,18 @@ void NetworkModelTest::unchangedNetworksDoNotResetTheModel()
     model.setNetworks(sampleNetworks());
     QCOMPARE(resetSpy.count(), 0); // 内容未变：delegate 不该被销毁重建
 
+    // 值变化（成员列表清了）：只发 dataChanged，**不重置模型**——
+    // 重置会让 ListView 跳回顶部（用户实测的体验问题）
     QList<Network> changed = sampleNetworks();
     changed[3].members.clear();
+    QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
     model.setNetworks(changed);
-    QCOMPARE(resetSpy.count(), 1);
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(dataSpy.count(), 1);
 
     model.clear();
     QVERIFY(model.empty());
-    QCOMPARE(resetSpy.count(), 2);
+    QCOMPARE(resetSpy.count(), 0); // 清空是"逐行删除"，不是整表重置
 }
 
 void NetworkModelTest::searchesAcrossNameIdDriverAndSubnet()
