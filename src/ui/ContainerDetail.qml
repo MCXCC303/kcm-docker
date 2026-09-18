@@ -516,21 +516,46 @@ KCM.AbstractKCM {
                     Kirigami.FormLayout {
                         Layout.fillWidth: true
 
-                        QQC2.Label {
+                        // 入口点与命令：可以一键复制（用户实测反馈 A2：命令经常要拿去别处复用）
+                        RowLayout {
                             Kirigami.FormData.label: i18n("Entrypoint:")
-                            visible: text.length > 0
-                            text: page.controller.entrypoint.join(" ")
-                            font.family: "monospace"
-                            wrapMode: Text.WrapAnywhere
-                            Layout.maximumWidth: Kirigami.Units.gridUnit * 28
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            QQC2.Label {
+                                objectName: "detailEntrypointLabel"
+                                Layout.fillWidth: true
+                                visible: text.length > 0
+                                text: page.controller.entrypoint.join(" ")
+                                font.family: "monospace"
+                                wrapMode: Text.WrapAnywhere
+                            }
+                            Components.CopyButton {
+                                objectName: "detailEntrypointCopyButton"
+                                visible: page.controller.entrypoint.length > 0
+                                value: page.controller.entrypoint.join(" ")
+                                fieldLabel: i18n("entry point")
+                            }
                         }
-                        QQC2.Label {
+                        RowLayout {
                             Kirigami.FormData.label: i18n("Command:")
-                            visible: text.length > 0
-                            text: page.controller.command.join(" ")
-                            font.family: "monospace"
-                            wrapMode: Text.WrapAnywhere
-                            Layout.maximumWidth: Kirigami.Units.gridUnit * 28
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            QQC2.Label {
+                                objectName: "detailCommandLabel"
+                                Layout.fillWidth: true
+                                visible: text.length > 0
+                                text: page.controller.command.join(" ")
+                                font.family: "monospace"
+                                wrapMode: Text.WrapAnywhere
+                            }
+                            Components.CopyButton {
+                                objectName: "detailCommandCopyButton"
+                                visible: page.controller.command.length > 0
+                                value: page.controller.command.join(" ")
+                                fieldLabel: i18n("command")
+                            }
                         }
                         QQC2.Label {
                             Kirigami.FormData.label: i18n("Working directory:")

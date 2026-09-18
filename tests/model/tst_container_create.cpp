@@ -35,6 +35,7 @@ private Q_SLOTS:
     void initTestCase();
 
     void mapsFormFieldsToTheCreatePayload();
+    void interactiveFlagsDefaultOnAndReachThePayload();
     void omitsEmptyFieldsAndKeepsDockerDefaults();
     void nameGoesIntoTheQueryNotTheBody();
     void tmpfsGoesToTmpfsNotBinds();
@@ -118,6 +119,52 @@ void ContainerCreateTest::mapsFormFieldsToTheCreatePayload()
     QVERIFY(endpoints.contains(QStringLiteral("app_default")));
     QCOMPARE(endpoints.value(QStringLiteral("app_default")).toObject().value(QStringLiteral("Aliases")).toArray().at(0).toString(),
              QStringLiteral("web"));
+}
+
+/*!
+ * 交互能力（用户实测 F1）：向导默认开 `-i -t`，并且真的写进请求体。
+ *
+ * 用户反馈的"容器启动后立刻退出"根因就是缺这两项：alpine 的默认命令 `/bin/sh`
+ * 在既没有 stdin 也没有 TTY 时读到 EOF 就正常退出（已用只读 inspect 核对过）。
+ */
+void ContainerCreateTest::interactiveFlagsDefaultOnAndReachThePayload()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MockDockerBackend backend;
+    OperationController operations(&backend);
+    CreateContainerController wizard(&operations, &presets, &backend);
+
+    // 默认值：-i 与 -t 都开，stdin-once 关
+    QVERIFY2(wizard.openStdin(), "standard input must be enabled by default");
+    QVERIFY2(wizard.tty(), "a TTY must be allocated by default");
+    QVERIFY(!wizard.stdinOnce());
+
+    // 默认值进请求体（JSON 快照）
+    ContainerCreateRequest request;
+    request.name = QStringLiteral("interactive");
+    request.image = QStringLiteral("alpine:latest");
+    request.openStdin = wizard.openStdin();
+    request.tty = wizard.tty();
+    request.stdinOnce = wizard.stdinOnce();
+    QJsonObject payload = QJsonDocument::fromJson(request.toJson()).object();
+    QCOMPARE(payload.value(QStringLiteral("OpenStdin")).toBool(), true);
+    QCOMPARE(payload.value(QStringLiteral("Tty")).toBool(), true);
+    QVERIFY2(!payload.contains(QStringLiteral("StdinOnce")), "stdin-once is off by default and must not be sent");
+
+    // 关掉时不写进 JSON（让引擎用它自己的默认值）
+    request.openStdin = false;
+    request.tty = false;
+    payload = QJsonDocument::fromJson(request.toJson()).object();
+    QVERIFY(!payload.contains(QStringLiteral("OpenStdin")));
+    QVERIFY(!payload.contains(QStringLiteral("Tty")));
+
+    // 打开 stdin-once 时会写进去
+    request.openStdin = true;
+    request.stdinOnce = true;
+    payload = QJsonDocument::fromJson(request.toJson()).object();
+    QCOMPARE(payload.value(QStringLiteral("StdinOnce")).toBool(), true);
 }
 
 void ContainerCreateTest::omitsEmptyFieldsAndKeepsDockerDefaults()

@@ -60,6 +60,11 @@ class CreateContainerController : public QObject
     Q_PROPERTY(qint64 memoryLimitBytes READ memoryLimitBytes WRITE setMemoryLimitBytes NOTIFY changed)
     Q_PROPERTY(double cpus READ cpus WRITE setCpus NOTIFY changed)
     Q_PROPERTY(bool privileged READ privileged WRITE setPrivileged NOTIFY changed)
+    /*! 交互式标准输入（`-i`）：**默认开**，否则 alpine 这类镜像的命令会立刻读到 EOF 退出。 */
+    Q_PROPERTY(bool openStdin READ openStdin WRITE setOpenStdin NOTIFY changed)
+    /*! 分配伪终端（`-t`）：默认开（与 `-i` 一起才是常见的手动调试组合）。 */
+    Q_PROPERTY(bool tty READ tty WRITE setTty NOTIFY changed)
+    Q_PROPERTY(bool stdinOnce READ stdinOnce WRITE setStdinOnce NOTIFY changed)
     Q_PROPERTY(bool startAfterCreate READ startAfterCreate WRITE setStartAfterCreate NOTIFY changed)
     /*! 镜像不在本地时是否允许继续（界面上的「先拉取」）。 */
     Q_PROPERTY(bool pullIfMissing READ pullIfMissing WRITE setPullIfMissing NOTIFY changed)
@@ -117,6 +122,9 @@ public:
     qint64 memoryLimitBytes() const;
     double cpus() const;
     bool privileged() const;
+    bool openStdin() const;
+    bool tty() const;
+    bool stdinOnce() const;
     bool startAfterCreate() const;
     bool pullIfMissing() const;
 
@@ -141,6 +149,9 @@ public:
     void setMemoryLimitBytes(qint64 value);
     void setCpus(double value);
     void setPrivileged(bool value);
+    void setOpenStdin(bool value);
+    void setTty(bool value);
+    void setStdinOnce(bool value);
     void setStartAfterCreate(bool value);
     void setPullIfMissing(bool value);
     void setPortRows(const QVariantList &rows);
@@ -239,6 +250,10 @@ private:
     qint64 m_memoryLimitBytes = 0;
     double m_cpus = 0.0;
     bool m_privileged = false;
+    /* 交互能力：默认开（见请求结构里的说明） */
+    bool m_openStdin = true;
+    bool m_tty = true;
+    bool m_stdinOnce = false;
     bool m_startAfterCreate = true;
     bool m_pullIfMissing = false;
 

@@ -348,6 +348,42 @@ void CreateContainerController::setStartAfterCreate(bool value)
     }
 }
 
+bool CreateContainerController::openStdin() const
+{
+    return m_openStdin;
+}
+
+bool CreateContainerController::tty() const
+{
+    return m_tty;
+}
+
+bool CreateContainerController::stdinOnce() const
+{
+    return m_stdinOnce;
+}
+
+void CreateContainerController::setOpenStdin(bool value)
+{
+    if (assignIfDifferent(m_openStdin, value)) {
+        touch();
+    }
+}
+
+void CreateContainerController::setTty(bool value)
+{
+    if (assignIfDifferent(m_tty, value)) {
+        touch();
+    }
+}
+
+void CreateContainerController::setStdinOnce(bool value)
+{
+    if (assignIfDifferent(m_stdinOnce, value)) {
+        touch();
+    }
+}
+
 void CreateContainerController::setPullIfMissing(bool value)
 {
     if (assignIfDifferent(m_pullIfMissing, value)) {
@@ -400,6 +436,10 @@ void CreateContainerController::reset(const QString &presetImage)
     m_memoryLimitBytes = 0;
     m_cpus = 0.0;
     m_privileged = false;
+    // 交互能力默认开：容器因此能保持运行（用户实测：默认参数下 alpine 会立刻退出）
+    m_openStdin = true;
+    m_tty = true;
+    m_stdinOnce = false;
     m_startAfterCreate = true;
     m_pullIfMissing = false;
     m_portRows.clear();
@@ -941,6 +981,17 @@ QVariantList CreateContainerController::summary() const
     if (m_privileged) {
         add(i18n("Privileged"), i18n("Yes (equivalent to root on the host)"));
     }
+    // 交互能力：两项都开才写一行，单项也如实写出（用户要能核对）
+    if (m_openStdin || m_tty) {
+        QStringList interactive;
+        if (m_openStdin) {
+            interactive.append(i18n("Standard input (-i)"));
+        }
+        if (m_tty) {
+            interactive.append(i18n("Terminal (-t)"));
+        }
+        add(i18n("Interactive"), interactive.join(QStringLiteral(", ")));
+    }
     add(i18n("After creating"), m_startAfterCreate ? i18n("Start the container") : i18n("Leave it stopped"));
     return rows;
 }
@@ -978,6 +1029,9 @@ QVariantMap CreateContainerController::requestMap() const
     request.insert(QStringLiteral("memoryLimitBytes"), m_memoryLimitBytes);
     request.insert(QStringLiteral("cpus"), m_cpus);
     request.insert(QStringLiteral("privileged"), m_privileged);
+    request.insert(QStringLiteral("openStdin"), m_openStdin);
+    request.insert(QStringLiteral("tty"), m_tty);
+    request.insert(QStringLiteral("stdinOnce"), m_stdinOnce);
     request.insert(QStringLiteral("startAfterCreate"), m_startAfterCreate);
 
     // 环境变量：`KEY=value` 形式（与 Docker API 一致）

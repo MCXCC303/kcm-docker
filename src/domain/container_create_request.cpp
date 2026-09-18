@@ -159,6 +159,16 @@ QByteArray ContainerCreateRequest::toJson() const
     if (privileged) {
         hostConfig.insert(QStringLiteral("Privileged"), true);
     }
+    // 交互能力在**顶层**（不属于 HostConfig）
+    if (openStdin) {
+        root.insert(QStringLiteral("OpenStdin"), true);
+    }
+    if (tty) {
+        root.insert(QStringLiteral("Tty"), true);
+    }
+    if (stdinOnce) {
+        root.insert(QStringLiteral("StdinOnce"), true);
+    }
     if (!hostConfig.isEmpty()) {
         root.insert(QStringLiteral("HostConfig"), hostConfig);
     }

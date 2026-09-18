@@ -432,6 +432,45 @@ Kirigami.Page {
 
                     QQC2.Label {
                         Layout.fillWidth: true
+                        text: i18n("Interactive")
+                        font.bold: true
+                    }
+
+                    // 用户实测：默认参数下 alpine 的 /bin/sh 读到 EOF 就退出；-i -t 才是常见预期
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.CheckBox {
+                            objectName: "wizardOpenStdinCheck"
+                            text: i18n("Keep standard input open (-i)")
+                            checked: page.controller.openStdin
+                            onToggled: page.controller.openStdin = checked
+                        }
+                        QQC2.CheckBox {
+                            objectName: "wizardTtyCheck"
+                            text: i18n("Allocate a terminal (-t)")
+                            checked: page.controller.tty
+                            onToggled: page.controller.tty = checked
+                        }
+                        QQC2.CheckBox {
+                            objectName: "wizardStdinOnceCheck"
+                            text: i18n("Close stdin after the first client disconnects")
+                            checked: page.controller.stdinOnce
+                            onToggled: page.controller.stdinOnce = checked
+                        }
+                    }
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Without standard input and a terminal, a container whose command is a shell exits immediately.")
+                        font: Kirigami.Theme.smallFont
+                        opacity: 0.75
+                        wrapMode: Text.WordWrap
+                    }
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
                         text: i18n("Command and entry point (optional)")
                         font.bold: true
                     }

@@ -757,6 +757,9 @@ bool OperationController::createContainer(const QVariantMap &request, bool allow
     create.memoryLimitBytes = request.value(QStringLiteral("memoryLimitBytes")).toLongLong();
     create.cpus = request.value(QStringLiteral("cpus")).toDouble();
     create.privileged = request.value(QStringLiteral("privileged")).toBool();
+    create.openStdin = request.value(QStringLiteral("openStdin")).toBool();
+    create.tty = request.value(QStringLiteral("tty")).toBool();
+    create.stdinOnce = request.value(QStringLiteral("stdinOnce")).toBool();
     create.startAfterCreate = request.value(QStringLiteral("startAfterCreate")).toBool();
     for (const QVariant &entry : request.value(QStringLiteral("labels")).toList()) {
         const QVariantMap label = entry.toMap();

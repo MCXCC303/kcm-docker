@@ -83,6 +83,18 @@ struct ContainerCreateRequest {
      * 表单里必须二次确认——这是整个创建流程里唯一能直接拿到宿主 root 的开关。
      */
     bool privileged = false;
+    /*!
+     * 交互能力（对应 `docker run -i -t`）。
+     *
+     * 用户实测：只用默认参数创建的 alpine 容器"启动后立刻退出"——因为镜像的默认命令
+     * （`/bin/sh`）在没有 stdin、没有 TTY 时读到 EOF 就退出。默认开 `-i -t` 才是
+     * "手动调试容器"的常见预期（也是 docker CLI 常用的组合）。
+     */
+    bool openStdin = false;
+    bool tty = false;
+    /*! `--stdin-once`：stdin 只保持到第一个客户端断开（配合 `-i` 用）。 */
+    bool stdinOnce = false;
+
     /*! 创建后立即启动（界面上的「创建并启动」）。 */
     bool startAfterCreate = false;
 

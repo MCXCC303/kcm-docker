@@ -171,6 +171,7 @@ private Q_SLOTS:
     void openingTheWizardRefreshesNetworks();
     void commandFieldAndExitHint();
     void stepButtonsNeverLookMultiSelected();
+    void detailOffersCopyForCommandAndEntrypoint();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -1967,6 +1968,53 @@ void QmlLoadTest::privilegedNeedsTypedConfirmation()
     QTest::qWait(20);
     QTRY_VERIFY(!wizard->privileged());
     QTRY_VERIFY(!privilegedCheck->property("checked").toBool());
+}
+
+
+/*!
+ * 容器详情可复制命令与入口点（用户实测反馈 A2）。
+ */
+void QmlLoadTest::detailOffersCopyForCommandAndEntrypoint()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("copy-demo");
+    detail.name = QStringLiteral("copy-demo");
+    detail.state = ContainerState::Running;
+    detail.command = {QStringLiteral("sh"), QStringLiteral("-c"), QStringLiteral("sleep infinity")};
+    detail.entrypoint = {QStringLiteral("/usr/bin/env"), QStringLiteral("sh")};
+    m_backend->setContainerDetail(detail);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
+    initial.insert(QStringLiteral("controller"), QVariant::fromValue(m_stubKcm->controller()->containerDetail()));
+    initial.insert(QStringLiteral("containerId"), QStringLiteral("copy-demo"));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1000, 800);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1000);
+    page->setHeight(800);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+    m_backend->completeRefresh();
+
+    QQuickItem *commandCopy = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        commandCopy = findItemDeep(window.contentItem(), QStringLiteral("detailCommandCopyButton"));
+        return commandCopy != nullptr && commandCopy->property("visible").toBool();
+    }(), 5000);
+    QCOMPARE(commandCopy->property("value").toString(), QStringLiteral("sh -c sleep infinity"));
+
+    QQuickItem *entrypointCopy = findItemDeep(window.contentItem(), QStringLiteral("detailEntrypointCopyButton"));
+    QVERIFY(entrypointCopy);
+    QCOMPARE(entrypointCopy->property("value").toString(), QStringLiteral("/usr/bin/env sh"));
 }
 
 
