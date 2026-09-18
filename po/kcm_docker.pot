@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 05:26+0800\n"
+"POT-Creation-Date: 2026-09-19 06:14+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -544,107 +544,107 @@ msgctxt "@info elapsed time less than one minute"
 msgid "less than a minute"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:919 src/ui/ImageDetail.qml:112
+#: src/model/create_container_controller.cpp:921 src/ui/ImageDetail.qml:112
 #: src/ui/CreateContainer.qml:106
 msgid "Image"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:920 src/ui/MainPage.qml:844
-#: src/ui/MainPage.qml:947
+#: src/model/create_container_controller.cpp:922 src/ui/MainPage.qml:851
+#: src/ui/MainPage.qml:954
 msgid "Name"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:923 src/ui/CreateContainer.qml:497
+#: src/model/create_container_controller.cpp:925 src/ui/CreateContainer.qml:497
 msgid "Command"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:926 src/ui/CreateContainer.qml:508
+#: src/model/create_container_controller.cpp:928 src/ui/CreateContainer.qml:508
 msgid "Entry point"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:929 src/ui/CreateContainer.qml:521
+#: src/model/create_container_controller.cpp:931 src/ui/CreateContainer.qml:521
 msgid "Working directory"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:932 src/ui/CreateContainer.qml:529
+#: src/model/create_container_controller.cpp:934 src/ui/CreateContainer.qml:529
 msgid "User"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:935 src/ui/NetworkDetail.qml:92
+#: src/model/create_container_controller.cpp:937 src/ui/NetworkDetail.qml:92
 msgid "Network"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:938
+#: src/model/create_container_controller.cpp:940
 msgid "Restart policy"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:948
+#: src/model/create_container_controller.cpp:950
 #: src/ui/components/PortMappingEditor.qml:163
 msgid "random"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:950 src/ui/CreateContainer.qml:110
+#: src/model/create_container_controller.cpp:952 src/ui/CreateContainer.qml:110
 msgid "Ports"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:961 src/ui/CreateContainer.qml:114
+#: src/model/create_container_controller.cpp:963 src/ui/CreateContainer.qml:114
 #: src/ui/CreateContainer.qml:604
 msgid "Mounts"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:973 src/ui/CreateContainer.qml:566
+#: src/model/create_container_controller.cpp:975 src/ui/CreateContainer.qml:566
 msgid "Environment variables"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:976
+#: src/model/create_container_controller.cpp:978
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
 #: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:583
 msgid "Labels"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:976
+#: src/model/create_container_controller.cpp:978
 msgid "%1 label"
 msgid_plural "%1 labels"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/model/create_container_controller.cpp:979
+#: src/model/create_container_controller.cpp:981
 msgid "Memory limit"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:982
+#: src/model/create_container_controller.cpp:984
 msgid "CPU limit"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:985
+#: src/model/create_container_controller.cpp:987
 msgid "Privileged"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:985
+#: src/model/create_container_controller.cpp:987
 msgid "Yes (equivalent to root on the host)"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:991
+#: src/model/create_container_controller.cpp:993
 msgid "Standard input (-i)"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:994
+#: src/model/create_container_controller.cpp:996
 msgid "Terminal (-t)"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:996 src/ui/CreateContainer.qml:434
+#: src/model/create_container_controller.cpp:998 src/ui/CreateContainer.qml:434
 msgid "Interactive"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:998
+#: src/model/create_container_controller.cpp:1000
 msgid "After creating"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:998
+#: src/model/create_container_controller.cpp:1000
 msgid "Start the container"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:998
+#: src/model/create_container_controller.cpp:1000
 msgid "Leave it stopped"
 msgstr ""
 
@@ -677,7 +677,7 @@ msgstr ""
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:367
 #: src/ui/ContainerDetail.qml:284 src/ui/MainPage.qml:71
-#: src/ui/MainPage.qml:847 src/ui/MainPage.qml:950
+#: src/ui/MainPage.qml:854 src/ui/MainPage.qml:957
 msgid "Containers"
 msgstr ""
 
@@ -844,7 +844,7 @@ msgstr ""
 
 #: src/ui/components/KeyValueListEditor.qml:205
 #: src/ui/components/StringListEditor.qml:45
-#: src/ui/components/MountPresetManager.qml:231
+#: src/ui/components/MountPresetManager.qml:137
 msgid "Add"
 msgstr ""
 
@@ -857,12 +857,12 @@ msgid "Paste .env content"
 msgstr ""
 
 #: src/ui/components/StringListEditor.qml:148
-#: src/ui/components/MountPresetManager.qml:174
+#: src/ui/components/MountPresetManager.qml:212
 msgid "Move up"
 msgstr ""
 
 #: src/ui/components/StringListEditor.qml:161
-#: src/ui/components/MountPresetManager.qml:181
+#: src/ui/components/MountPresetManager.qml:219
 msgid "Move down"
 msgstr ""
 
@@ -958,12 +958,12 @@ msgid "Follow"
 msgstr ""
 
 #: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:220
-#: src/ui/ContainerCard.qml:189 src/ui/ContainerCard.qml:193
+#: src/ui/ContainerCard.qml:177 src/ui/ContainerCard.qml:181
 msgid "Resume"
 msgstr ""
 
 #: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:212
-#: src/ui/ContainerCard.qml:176 src/ui/ContainerCard.qml:180
+#: src/ui/ContainerCard.qml:164 src/ui/ContainerCard.qml:168
 msgid "Pause"
 msgstr ""
 
@@ -1068,7 +1068,7 @@ msgstr ""
 msgid "Allow containers to be attached at runtime"
 msgstr ""
 
-#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:1009
+#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:1016
 #: src/ui/CreateContainer.qml:986
 msgid "Create"
 msgstr ""
@@ -1197,7 +1197,7 @@ msgid ""
 "affected; only intermediate layers and cache records are removed."
 msgstr ""
 
-#: src/ui/components/BuildImagePanel.qml:351 src/ui/MainPage.qml:1072
+#: src/ui/components/BuildImagePanel.qml:351 src/ui/MainPage.qml:1079
 msgid "Clean up"
 msgstr ""
 
@@ -1236,12 +1236,12 @@ msgid ""
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:112
-#: src/ui/components/MountPresetManager.qml:99 src/ui/ContainerDetail.qml:55
+#: src/ui/components/MountPresetManager.qml:77 src/ui/ContainerDetail.qml:55
 msgid "Host"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:124
-#: src/ui/components/MountPresetManager.qml:108 src/ui/ContainerDetail.qml:292
+#: src/ui/components/MountPresetManager.qml:86 src/ui/ContainerDetail.qml:292
 #: src/ui/ContainerDetail.qml:843
 msgid "Container"
 msgstr ""
@@ -1275,61 +1275,57 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:65
+#: src/ui/components/MountPresetManager.qml:66
 msgid ""
 "No presets yet. Add one below, or save a mount as a preset from a "
 "container's details."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:121
-#: src/ui/components/MountPresetManager.qml:216
-msgid "Host path or volume name"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:122
-msgid "Preset source"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:132
+#: src/ui/components/MountPresetManager.qml:102
 msgid "Browse…"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:151
-#: src/ui/components/MountPresetManager.qml:225 src/ui/CreateContainer.qml:700
+#: src/ui/components/MountPresetManager.qml:117
+#: src/ui/components/MountPresetManager.qml:180
+msgid "Host path or volume name"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:118
+msgid "New preset source"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:131
+#: src/ui/components/MountPresetManager.qml:194 src/ui/CreateContainer.qml:700
 #: src/ui/CreateContainer.qml:701
 msgid "Container path"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:152
+#: src/ui/components/MountPresetManager.qml:132
+msgid "New preset destination"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:181
+msgid "Preset source"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:195
 msgid "Preset destination"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:159 src/ui/CreateContainer.qml:707
-msgid "Read-only"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:166
+#: src/ui/components/MountPresetManager.qml:204
 msgid "Favourite"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:188
+#: src/ui/components/MountPresetManager.qml:226
 msgid "Remove this preset"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:196 src/ui/CreateContainer.qml:682
+#: src/ui/components/MountPresetManager.qml:234 src/ui/CreateContainer.qml:682
 msgid "Named volume"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:202
+#: src/ui/components/MountPresetManager.qml:240
 msgid "%1 to %2"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:217
-msgid "New preset source"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:226
-msgid "New preset destination"
 msgstr ""
 
 #: src/ui/components/MountPresetManager.qml:256
@@ -1372,12 +1368,12 @@ msgid "Stopping…"
 msgstr ""
 
 #: src/ui/components/ServiceCard.qml:91 src/ui/ContainerDetail.qml:196
-#: src/ui/ContainerCard.qml:163 src/ui/ContainerCard.qml:167
+#: src/ui/ContainerCard.qml:151 src/ui/ContainerCard.qml:155
 msgid "Start"
 msgstr ""
 
 #: src/ui/components/ServiceCard.qml:93 src/ui/ContainerDetail.qml:204
-#: src/ui/ContainerCard.qml:202 src/ui/ContainerCard.qml:206
+#: src/ui/ContainerCard.qml:190 src/ui/ContainerCard.qml:194
 msgid "Stop"
 msgstr ""
 
@@ -1757,7 +1753,7 @@ msgstr ""
 msgid "Container ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:442 src/ui/ContainerCard.qml:215
+#: src/ui/ContainerDetail.qml:442 src/ui/ContainerCard.qml:203
 msgid "container ID"
 msgstr ""
 
@@ -2073,29 +2069,24 @@ msgstr ""
 msgid "Container %1, %2"
 msgstr ""
 
-#: src/ui/ContainerCard.qml:132
-msgctxt "@info container status line"
-msgid "%1 · created %2 ago · ID %3"
+#: src/ui/ContainerCard.qml:94
+msgctxt "@info container name with short id"
+msgid "%1 (%2)"
 msgstr ""
 
-#: src/ui/ContainerCard.qml:141
-msgctxt "@info published container ports"
-msgid "Ports: %1"
-msgstr ""
-
-#: src/ui/ContainerCard.qml:166
+#: src/ui/ContainerCard.qml:154
 msgid "Start container %1"
 msgstr ""
 
-#: src/ui/ContainerCard.qml:179
+#: src/ui/ContainerCard.qml:167
 msgid "Pause container %1"
 msgstr ""
 
-#: src/ui/ContainerCard.qml:192
+#: src/ui/ContainerCard.qml:180
 msgid "Resume container %1"
 msgstr ""
 
-#: src/ui/ContainerCard.qml:205
+#: src/ui/ContainerCard.qml:193
 msgid "Stop container %1"
 msgstr ""
 
@@ -2257,7 +2248,7 @@ msgstr ""
 msgid "All images"
 msgstr ""
 
-#: src/ui/MainPage.qml:521 src/ui/MainPage.qml:934
+#: src/ui/MainPage.qml:521 src/ui/MainPage.qml:941
 msgid "In use"
 msgstr ""
 
@@ -2297,152 +2288,152 @@ msgstr ""
 msgid "Unable to retrieve the container list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:712
+#: src/ui/MainPage.qml:719
 msgid "Unable to retrieve the image list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:794
+#: src/ui/MainPage.qml:801
 msgid "Unable to retrieve the network list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:805
+#: src/ui/MainPage.qml:812
 msgid "Search by name, ID, driver or subnet…"
 msgstr ""
 
-#: src/ui/MainPage.qml:814
+#: src/ui/MainPage.qml:821
 msgid "Create network…"
 msgstr ""
 
-#: src/ui/MainPage.qml:829
+#: src/ui/MainPage.qml:836
 msgid "All networks"
 msgstr ""
 
-#: src/ui/MainPage.qml:830
+#: src/ui/MainPage.qml:837
 msgid "Built-in"
 msgstr ""
 
-#: src/ui/MainPage.qml:831
+#: src/ui/MainPage.qml:838
 msgid "User-defined"
 msgstr ""
 
-#: src/ui/MainPage.qml:845 src/ui/MainPage.qml:948
+#: src/ui/MainPage.qml:852 src/ui/MainPage.qml:955
 msgid "Driver"
 msgstr ""
 
-#: src/ui/MainPage.qml:846
+#: src/ui/MainPage.qml:853
 msgid "Scope"
 msgstr ""
 
-#: src/ui/MainPage.qml:859
+#: src/ui/MainPage.qml:866
 msgid "No network matches the current search or filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:860
+#: src/ui/MainPage.qml:867
 msgid "No networks found."
 msgstr ""
 
-#: src/ui/MainPage.qml:862
+#: src/ui/MainPage.qml:869
 msgid "Clear the search field or switch the filter back to “All networks”."
 msgstr ""
 
-#: src/ui/MainPage.qml:864
+#: src/ui/MainPage.qml:871
 msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr ""
 
-#: src/ui/MainPage.qml:866 src/ui/MainPage.qml:1102
+#: src/ui/MainPage.qml:873 src/ui/MainPage.qml:1109
 msgid "Clear filters"
 msgstr ""
 
-#: src/ui/MainPage.qml:910
+#: src/ui/MainPage.qml:917
 msgid "Unable to retrieve the volume list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:920
+#: src/ui/MainPage.qml:927
 msgid "Search by name, driver or mount point…"
 msgstr ""
 
-#: src/ui/MainPage.qml:932
+#: src/ui/MainPage.qml:939
 msgid "All volumes"
 msgstr ""
 
-#: src/ui/MainPage.qml:933
+#: src/ui/MainPage.qml:940
 msgid "Unused"
 msgstr ""
 
-#: src/ui/MainPage.qml:949
+#: src/ui/MainPage.qml:956
 msgid "Size"
 msgstr ""
 
-#: src/ui/MainPage.qml:960
+#: src/ui/MainPage.qml:967
 msgid "Create volume…"
 msgstr ""
 
-#: src/ui/MainPage.qml:969
+#: src/ui/MainPage.qml:976
 msgid "Clean up unused…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1003 src/ui/MainPage.qml:1004
+#: src/ui/MainPage.qml:1010 src/ui/MainPage.qml:1011
 #: src/ui/CreateContainer.qml:692
 msgid "Volume name"
 msgstr ""
 
-#: src/ui/MainPage.qml:1022
+#: src/ui/MainPage.qml:1029
 msgid "The volume is created with the local driver."
 msgstr ""
 
-#: src/ui/MainPage.qml:1043
+#: src/ui/MainPage.qml:1050
 msgctxt "@info volumes about to be removed"
 msgid "One unused volume will be removed:"
 msgid_plural "%1 unused volumes will be removed:"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:1062
+#: src/ui/MainPage.qml:1069
 msgid "Reclaimable space: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:1082
+#: src/ui/MainPage.qml:1089
 msgid "Only volumes that no container uses are removed."
 msgstr ""
 
-#: src/ui/MainPage.qml:1095
+#: src/ui/MainPage.qml:1102
 msgid "No volume matches the current search or filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:1096
+#: src/ui/MainPage.qml:1103
 msgid "No volumes found."
 msgstr ""
 
-#: src/ui/MainPage.qml:1098
+#: src/ui/MainPage.qml:1105
 msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr ""
 
-#: src/ui/MainPage.qml:1100
+#: src/ui/MainPage.qml:1107
 msgid ""
 "Volumes keep data across container restarts. Create one here or let Docker "
 "create it when a container declares it."
 msgstr ""
 
-#: src/ui/MainPage.qml:1145
+#: src/ui/MainPage.qml:1152
 msgid "User configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1152
+#: src/ui/MainPage.qml:1159
 msgid "System configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1159
+#: src/ui/MainPage.qml:1166
 msgid ""
 "Registry mirrors and other daemon settings. The system configuration needs "
 "administrator rights."
 msgstr ""
 
-#: src/ui/MainPage.qml:1196
+#: src/ui/MainPage.qml:1203
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:1201
+#: src/ui/MainPage.qml:1208
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."
@@ -3321,6 +3312,10 @@ msgstr ""
 
 #: src/ui/CreateContainer.qml:693
 msgid "Mount source"
+msgstr ""
+
+#: src/ui/CreateContainer.qml:707
+msgid "Read-only"
 msgstr ""
 
 #: src/ui/CreateContainer.qml:715

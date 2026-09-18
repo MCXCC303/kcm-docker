@@ -51,6 +51,7 @@ ColumnLayout {
             manager.store.update(presetId, source, destination, readOnly, note);
         }
         function add(source, destination) {
+            // 只读在挂载时设置，因此预设一律按"可写"保存（字段保留以兼容旧配置）
             return manager.store.add(source, destination, "bind", false, "");
         }
     }
@@ -64,6 +65,86 @@ ColumnLayout {
         message: root.store.empty
             ? i18n("No presets yet. Add one below, or save a mount as a preset from a container's details.")
             : ""
+    }
+
+    /* 两侧标注（用户实测 A1：预设行要标明宿主机/容器）：整页一次即可，避免每行重复 */
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+
+        QQC2.Label {
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 13
+            text: i18n("Host")
+            font.bold: true
+            opacity: 0.8
+        }
+        Item {
+            Layout.fillWidth: true
+        }
+        QQC2.Label {
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 10
+            text: i18n("Container")
+            font.bold: true
+            opacity: 0.8
+        }
+    }
+
+    /* ------------------------------ 新建（置顶） ------------------------------ */
+    /* 用户实测：新建入口应该在**顶端**，浏览按钮放在宿主路径/卷名的**前面**，添加后列表新增一项 */
+    RowLayout {
+        objectName: "presetManagerNewRow"
+        Layout.fillWidth: true
+        spacing: Kirigami.Units.smallSpacing
+
+        QQC2.Button {
+            objectName: "presetManagerNewBrowse"
+            icon.name: "folder-open"
+            text: i18n("Browse…")
+            onClicked: {
+                const chosen = root.directoryPicker.chooseDirectory(newSource.text);
+                if (chosen.length > 0) {
+                    // 取消（空串）时保持原值：不要把手打的路径清掉
+                    newSource.text = chosen;
+                }
+            }
+        }
+
+        QQC2.TextField {
+            id: newSource
+
+            objectName: "presetManagerNewSource"
+            Layout.fillWidth: true
+            placeholderText: i18n("Host path or volume name")
+            Accessible.name: i18n("New preset source")
+        }
+
+        QQC2.Label {
+            text: "→"
+            opacity: 0.6
+        }
+
+        QQC2.TextField {
+            id: newDestination
+
+            objectName: "presetManagerNewDestination"
+            Layout.fillWidth: true
+            placeholderText: i18n("Container path")
+            Accessible.name: i18n("New preset destination")
+        }
+
+        QQC2.Button {
+            objectName: "presetManagerAdd"
+            text: i18n("Add")
+            icon.name: "list-add"
+            enabled: newSource.text.trim().length > 0 && newDestination.text.trim().length > 0
+            onClicked: {
+                const created = manager.add(newSource.text, newDestination.text);
+                if (created.length > 0) {
+                    newSource.text = "";
+                    newDestination.text = "";
+                }
+            }
+        }
     }
 
     Repeater {
@@ -89,28 +170,6 @@ ColumnLayout {
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing / 2
 
-                // 两侧标注（用户实测反馈 A1）：与端口编辑器的措辞保持一致
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
-
-                    QQC2.Label {
-                        Layout.preferredWidth: Kirigami.Units.gridUnit * 13
-                        text: i18n("Host")
-                        font.bold: true
-                        opacity: 0.8
-                    }
-                    Item {
-                        Layout.fillWidth: true
-                    }
-                    QQC2.Label {
-                        Layout.preferredWidth: Kirigami.Units.gridUnit * 10
-                        text: i18n("Container")
-                        font.bold: true
-                        opacity: 0.8
-                    }
-                }
-
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -122,22 +181,6 @@ ColumnLayout {
                         Accessible.name: i18n("Preset source")
                         text: presetCard.source
                         onEditingFinished: manager.update(presetCard.id, text, presetCard.destination, presetCard.readOnly, presetCard.note)
-                    }
-
-                    // 宿主路径可以直接用系统文件对话框挑（命名卷不需要）
-                    QQC2.Button {
-                        objectName: "presetManagerBrowse"
-                        visible: presetCard.type !== "volume" && presetCard.type !== "tmpfs"
-                        icon.name: "folder-open"
-                        text: i18n("Browse…")
-                        onClicked: {
-                            const chosen = root.directoryPicker.chooseDirectory(presetCard.source);
-                            if (chosen.length > 0) {
-                                // 取消（空串）时保持原值：不要把手打的路径清掉
-                                manager.update(presetCard.id, chosen, presetCard.destination, presetCard.readOnly,
-                                               presetCard.note);
-                            }
-                        }
                     }
 
                     QQC2.Label {
@@ -154,13 +197,8 @@ ColumnLayout {
                         onEditingFinished: manager.update(presetCard.id, presetCard.source, text, presetCard.readOnly, presetCard.note)
                     }
 
-                    QQC2.CheckBox {
-                        objectName: "presetManagerReadOnly"
-                        text: i18n("Read-only")
-                        checked: presetCard.readOnly
-                        onToggled: manager.update(presetCard.id, presetCard.source, presetCard.destination, checked, presetCard.note)
-                    }
-
+                    // 只读与否在**挂载时**（创建容器页的挂载行）设置，不在这里：
+                    // 同一条预设在不同容器里可能一次只读、一次可写（用户实测）
                     QQC2.CheckBox {
                         objectName: "presetManagerFavorite"
                         text: i18n("Favourite")
@@ -200,44 +238,6 @@ ColumnLayout {
             }
 
             Accessible.name: i18n("%1 to %2", presetCard.source, presetCard.destination)
-        }
-    }
-
-    /* ------------------------------ 新增 ------------------------------ */
-    RowLayout {
-        Layout.fillWidth: true
-        spacing: Kirigami.Units.smallSpacing
-
-        QQC2.TextField {
-            id: newSource
-
-            objectName: "presetManagerNewSource"
-            Layout.fillWidth: true
-            placeholderText: i18n("Host path or volume name")
-            Accessible.name: i18n("New preset source")
-        }
-
-        QQC2.TextField {
-            id: newDestination
-
-            objectName: "presetManagerNewDestination"
-            Layout.fillWidth: true
-            placeholderText: i18n("Container path")
-            Accessible.name: i18n("New preset destination")
-        }
-
-        QQC2.Button {
-            objectName: "presetManagerAdd"
-            text: i18n("Add")
-            icon.name: "list-add"
-            enabled: newSource.text.trim().length > 0 && newDestination.text.trim().length > 0
-            onClicked: {
-                const created = manager.add(newSource.text, newDestination.text);
-                if (created.length > 0) {
-                    newSource.text = "";
-                    newDestination.text = "";
-                }
-            }
         }
     }
 

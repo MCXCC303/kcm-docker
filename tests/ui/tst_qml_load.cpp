@@ -1409,22 +1409,27 @@ void QmlLoadTest::presetPanelManagesPresets()
     QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
     QTRY_COMPARE(store->count(), 2);
 
-    // 「浏览…」：走注入的替身（真实实现会弹系统文件对话框，测试里不能弹）
+    // 「浏览…」在**新建行**里（用户实测：新建入口置顶、浏览按钮放在宿主路径前面）
     QQuickItem *browseButton = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
-        browseButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerBrowse"));
+        browseButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerNewBrowse"));
         return browseButton != nullptr && browseButton->property("visible").toBool();
     }(), 5000);
-    // 取消（返回空串）：保持原值不变
+    auto *newSourceField = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerNewSource")));
+    QVERIFY(newSourceField);
+    QVERIFY2(manager->findChild<QObject *>(QStringLiteral("presetManagerNewRow")) != nullptr
+                 || browseButton != nullptr,
+             "the create row must exist");
+    // 取消（返回空串）：保持输入框里的内容不变
+    newSourceField->setProperty("text", QStringLiteral("/srv/hand-typed"));
     m_stubKcm->directoryPicker()->nextResult = QString();
     QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
     QTest::qWait(20);
-    QVERIFY2(!store->presets().isEmpty() && !store->presets().first().source.isEmpty(),
-             "cancelling the picker must not clear the path");
-    // 选中一个目录：写回该行
+    QCOMPARE(newSourceField->property("text").toString(), QStringLiteral("/srv/hand-typed"));
+    // 选中一个目录：填进新建行的宿主路径
     m_stubKcm->directoryPicker()->nextResult = QStringLiteral("/srv/picked");
     QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
-    QTRY_COMPARE(store->presets().first().source, QStringLiteral("/srv/picked"));
+    QTRY_COMPARE(newSourceField->property("text").toString(), QStringLiteral("/srv/picked"));
 
     // 删除：**重新找一次**按钮——新增预设会让 Repeater 重铺，之前那个指针已经失效了
     QQuickItem *freshRemoveButton = nullptr;

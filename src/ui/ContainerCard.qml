@@ -88,7 +88,10 @@ QQC2.ItemDelegate {
                 spacing: Kirigami.Units.smallSpacing
 
                 QQC2.Label {
-                    text: card.name
+                    objectName: "containerTitleLabel"
+                    // 名称后面用括号带短 ID（用户实测：原来的"运行时长 · 创建于 … · ID …"一行太挤，
+                    // 而 ID 又是复制/排查时最常要的，所以只保留它并挪到名字后面）
+                    text: i18nc("@info container name with short id", "%1 (%2)", card.name, card.shortId)
                     font.bold: true
                     elide: Text.ElideRight
                     Layout.fillWidth: true
@@ -126,23 +129,8 @@ QQC2.ItemDelegate {
                 opacity: 0.8
             }
 
-            QQC2.Label {
-                Layout.fillWidth: true
-                visible: text.length > 0
-                text: i18nc("@info container status line", "%1 · created %2 ago · ID %3", card.status, Kontainer.Format.elapsed(card.created), card.shortId)
-                elide: Text.ElideRight
-                font: Kirigami.Theme.smallFont
-                opacity: 0.6
-            }
-
-            QQC2.Label {
-                Layout.fillWidth: true
-                visible: card.portsSummary.length > 0
-                text: i18nc("@info published container ports", "Ports: %1", card.portsSummary)
-                elide: Text.ElideRight
-                font: Kirigami.Theme.smallFont
-                opacity: 0.6
-            }
+            // 运行时长 / 创建时间 / 端口映射都不在这里显示了（用户实测：列表信息密度太大）。
+            // 这些信息在容器详情页里都有，而且更完整。
         }
 
         // 行内生命周期操作（ARCH_V4 §2.3）：可逆操作放列表，破坏性操作放详情页。

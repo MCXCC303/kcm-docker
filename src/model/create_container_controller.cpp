@@ -755,11 +755,13 @@ bool CreateContainerController::addMountFromPreset(const QString &presetId)
             return false; // already added
         }
     }
+    // 只读**不**从预设带过来：同一条预设在不同容器里可能一次只读、一次可写，
+    // 因此挂载行默认可写，由用户在该行的「只读」开关上决定（用户实测反馈）
     m_mountRows.append(QVariantMap {
         {QStringLiteral("type"), it->type},
         {QStringLiteral("source"), it->source},
         {QStringLiteral("destination"), it->destination},
-        {QStringLiteral("readOnly"), it->readOnly},
+        {QStringLiteral("readOnly"), false},
     });
     touch();
     return true;
