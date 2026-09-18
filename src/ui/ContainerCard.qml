@@ -66,6 +66,8 @@ QQC2.ItemDelegate {
         && (card.stateKey === "exited" || card.stateKey === "created" || card.stateKey === "dead")
     readonly property bool canStop: card.operations.writeAllowed && !card.targetBusy
         && (card.stateKey === "running" || card.stateKey === "paused" || card.stateKey === "restarting")
+    readonly property bool canPause: card.operations.writeAllowed && !card.targetBusy && card.stateKey === "running"
+    readonly property bool canUnpause: card.operations.writeAllowed && !card.targetBusy && card.stateKey === "paused"
 
     contentItem: RowLayout {
         spacing: Kirigami.Units.smallSpacing
@@ -165,6 +167,32 @@ QQC2.ItemDelegate {
             QQC2.ToolTip.text: i18n("Start")
             QQC2.ToolTip.visible: hovered
             onClicked: card.operations.startContainer(card.containerId)
+        }
+
+        QQC2.ToolButton {
+            objectName: "containerPauseButton"
+            visible: card.canPause
+            icon.name: "media-playback-pause"
+            text: i18n("Pause")
+            display: QQC2.AbstractButton.IconOnly
+            Layout.alignment: Qt.AlignVCenter
+            Accessible.name: i18n("Pause container %1", card.name)
+            QQC2.ToolTip.text: i18n("Pause")
+            QQC2.ToolTip.visible: hovered
+            onClicked: card.operations.pauseContainer(card.containerId)
+        }
+
+        QQC2.ToolButton {
+            objectName: "containerUnpauseButton"
+            visible: card.canUnpause
+            icon.name: "media-playback-start"
+            text: i18n("Resume")
+            display: QQC2.AbstractButton.IconOnly
+            Layout.alignment: Qt.AlignVCenter
+            Accessible.name: i18n("Resume container %1", card.name)
+            QQC2.ToolTip.text: i18n("Resume")
+            QQC2.ToolTip.visible: hovered
+            onClicked: card.operations.unpauseContainer(card.containerId)
         }
 
         QQC2.ToolButton {

@@ -93,6 +93,18 @@ inline QString networks()
     return QStringLiteral("/networks");
 }
 
+/*! 暂停容器（`POST /containers/{id}/pause`）。 */
+inline QString containerPause(const QString &id)
+{
+    return QStringLiteral("/containers/%1/pause").arg(id);
+}
+
+/*! 继续容器（`POST /containers/{id}/unpause`）。 */
+inline QString containerUnpause(const QString &id)
+{
+    return QStringLiteral("/containers/%1/unpause").arg(id);
+}
+
 /*!
  * 构建镜像（`POST /build`，ARCH_V5_V8 §5.3）。
  *

@@ -11,6 +11,8 @@
 
 #include <KLocalizedString>
 
+#include <QDateTime>
+
 namespace Kontainer
 {
 
@@ -449,9 +451,38 @@ QString CreateContainerController::suggestedName() const
 {
     const QString base = m_name.trimmed();
     if (base.isEmpty()) {
-        return {};
+        // 还没有名字：按镜像给一个 docker 风格的候选（`alpine:3.19` → `alpine-3-19-4f2a`）。
+        // 之前这里直接返回空，界面上「用建议名称」因此永远没反应（用户实测反馈的 ③）。
+        QString stem = m_image.trimmed();
+        const int slash = stem.lastIndexOf(QLatin1Char('/'));
+        if (slash >= 0) {
+            stem = stem.mid(slash + 1); // 去掉仓库前缀，留 `alpine:3.19`
+        }
+        const int colon = stem.indexOf(QLatin1Char(':'));
+        if (colon > 0) {
+            stem = stem.left(colon);
+        }
+        stem = stem.toLower();
+        QString sanitized;
+        for (const QChar &character : std::as_const(stem)) {
+            sanitized += (character.isLetterOrNumber() || character == QLatin1Char('_') || character == QLatin1Char('.'))
+                ? character
+                : QLatin1Char('-');
+        }
+        if (sanitized.isEmpty()) {
+            sanitized = QStringLiteral("container");
+        }
+        // 后缀用镜像标签/时间的短哈希，避免两次点击拿到同一个名字
+        const uint suffix = qHash(m_image + QString::number(QDateTime::currentMSecsSinceEpoch())) & 0xffff;
+        QString candidate = QStringLiteral("%1-%2").arg(sanitized, QString::number(suffix, 16).rightJustified(4, QLatin1Char('0')));
+        int counter = 2;
+        while (m_operations->containerNameTaken(candidate)) {
+            candidate = QStringLiteral("%1-%2-%3").arg(sanitized, QString::number(suffix, 16)).arg(counter);
+            ++counter;
+        }
+        return candidate;
     }
-    // 默认候选名：原名 + "-copy"，已被占用就继续加序号（克隆时用，§4.5）
+    // 已有名字（克隆进来的）：原名 + `-copy`，被占用就继续加序号（§4.5）
     QString candidate = base + QStringLiteral("-copy");
     int counter = 2;
     while (m_operations->containerNameTaken(candidate)) {
@@ -588,6 +619,83 @@ bool CreateContainerController::goToStep(const QString &key)
     return true;
 }
 
+void CreateContainerController::addPortRow(int containerPort, int hostPort, const QString &hostIp, const QString &protocol)
+{
+    m_portRows.append(QVariantMap {
+        {QStringLiteral("containerPort"), containerPort},
+        {QStringLiteral("hostPort"), hostPort},
+        {QStringLiteral("hostIp"), hostIp},
+        {QStringLiteral("protocol"), protocol},
+    });
+    touch();
+}
+
+void CreateContainerController::setPortRow(int row, const QString &field, const QVariant &value)
+{
+    if (row < 0 || row >= m_portRows.size()) {
+        return;
+    }
+    QVariantMap entry = m_portRows.at(row).toMap();
+    if (entry.value(field) == value) {
+        return;
+    }
+    entry.insert(field, value);
+    m_portRows[row] = entry;
+    touch();
+}
+
+void CreateContainerController::removePortRow(int row)
+{
+    if (row < 0 || row >= m_portRows.size()) {
+        return;
+    }
+    m_portRows.removeAt(row);
+    touch();
+}
+
+void CreateContainerController::clearPortRows()
+{
+    if (m_portRows.isEmpty()) {
+        return;
+    }
+    m_portRows.clear();
+    touch();
+}
+
+void CreateContainerController::addMountRow(const QString &type, const QString &source, const QString &destination, bool readOnly)
+{
+    m_mountRows.append(QVariantMap {
+        {QStringLiteral("type"), type},
+        {QStringLiteral("source"), source},
+        {QStringLiteral("destination"), destination},
+        {QStringLiteral("readOnly"), readOnly},
+    });
+    touch();
+}
+
+void CreateContainerController::setMountRow(int row, const QString &field, const QVariant &value)
+{
+    if (row < 0 || row >= m_mountRows.size()) {
+        return;
+    }
+    QVariantMap entry = m_mountRows.at(row).toMap();
+    if (entry.value(field) == value) {
+        return;
+    }
+    entry.insert(field, value);
+    m_mountRows[row] = entry;
+    touch();
+}
+
+void CreateContainerController::removeMountRow(int row)
+{
+    if (row < 0 || row >= m_mountRows.size()) {
+        return;
+    }
+    m_mountRows.removeAt(row);
+    touch();
+}
+
 bool CreateContainerController::addMountFromPreset(const QString &presetId)
 {
     const QList<MountPreset> list = m_presets->presets();
@@ -616,13 +724,7 @@ bool CreateContainerController::addMountFromPreset(const QString &presetId)
 
 void CreateContainerController::addEmptyMount()
 {
-    m_mountRows.append(QVariantMap {
-        {QStringLiteral("type"), QStringLiteral("bind")},
-        {QStringLiteral("source"), QString()},
-        {QStringLiteral("destination"), QString()},
-        {QStringLiteral("readOnly"), false},
-    });
-    touch();
+    addMountRow();
 }
 
 void CreateContainerController::removeMountAt(int row)
@@ -773,6 +875,19 @@ QVariantList CreateContainerController::summary() const
 
     add(i18n("Image"), m_image);
     add(i18n("Name"), m_name);
+    // 命令与入口点：填了就要能在总览里核对（用户实测反馈 ⑧）
+    if (!m_commandText.trimmed().isEmpty()) {
+        add(i18n("Command"), splitLines(m_commandText).join(QLatin1Char(' ')));
+    }
+    if (!m_entrypointText.trimmed().isEmpty()) {
+        add(i18n("Entry point"), splitLines(m_entrypointText).join(QLatin1Char(' ')));
+    }
+    if (!m_workingDirectory.trimmed().isEmpty()) {
+        add(i18n("Working directory"), m_workingDirectory.trimmed());
+    }
+    if (!m_user.trimmed().isEmpty()) {
+        add(i18n("User"), m_user.trimmed());
+    }
     if (!m_network.isEmpty()) {
         add(i18n("Network"), m_network);
     }

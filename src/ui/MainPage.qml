@@ -573,7 +573,12 @@ Kirigami.Page {
                 visible: tabBar.currentIndex === 0 && root.operations.writeAllowed
                 text: i18n("Create container…")
                 icon.name: "list-add"
-                onClicked: root.createContainerRequested("")
+                onClicked: {
+                    // 创建容器要用网络列表：低频数据是"进页才刷新"的，
+                    // 因此这里主动刷一次，否则用户不点"网络"标签页就选不到网络（实测反馈 ②）
+                    root.controller.refreshNetworks();
+                    root.createContainerRequested("");
+                }
             }
 
             // 仓库登录（ARCH_V5_V8 §2.7）：私有仓库拉取前先登录

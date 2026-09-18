@@ -105,6 +105,9 @@ public:
         RemoveNetwork,
         ConnectNetwork,
         DisconnectNetwork,
+        /*! 暂停 / 继续运行中的容器（用户实测反馈 ①）。 */
+        PauseContainer,
+        UnpauseContainer,
         /*! 七期：创建容器（§4.6）。 */
         CreateContainer,
         /*! 八期：从 Dockerfile 构建镜像（§5.3）。 */
@@ -226,6 +229,11 @@ public:
      * 真正的回收字节数在 `buildCachePruned()` 里回来。
      */
     virtual void pruneBuildCache() = 0;
+
+    /*! 暂停一个运行中的容器（`POST /containers/{id}/pause`）。 */
+    virtual void pauseContainer(const QString &id) = 0;
+    /*! 继续一个已暂停的容器（`POST /containers/{id}/unpause`）。 */
+    virtual void unpauseContainer(const QString &id) = 0;
 
     /*!
      * 构建镜像（`POST /build`，§5.3）。

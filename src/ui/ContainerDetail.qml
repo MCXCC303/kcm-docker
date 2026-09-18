@@ -63,6 +63,11 @@ KCM.AbstractKCM {
         && (controller.stateKey === "exited" || controller.stateKey === "created" || controller.stateKey === "dead")
     readonly property bool canStop: page.ready && !page.targetBusy && page.operations.writeAllowed
         && (controller.stateKey === "running" || controller.stateKey === "paused" || controller.stateKey === "restarting")
+    /*! 暂停只对**运行中**有意义；已暂停的容器给"继续"（用户实测反馈 ①）。 */
+    readonly property bool canPause: page.ready && !page.targetBusy && page.operations.writeAllowed
+        && controller.stateKey === "running"
+    readonly property bool canUnpause: page.ready && !page.targetBusy && page.operations.writeAllowed
+        && controller.stateKey === "paused"
     readonly property bool canRestart: page.ready && !page.targetBusy && page.operations.writeAllowed
         && (controller.stateKey === "running" || controller.stateKey === "paused")
     readonly property bool canRemove: page.ready && !page.targetBusy && page.operations.writeAllowed
@@ -199,6 +204,22 @@ KCM.AbstractKCM {
                 text: i18n("Stop")
                 icon.name: "media-playback-stop"
                 onClicked: page.operations.stopContainer(page.containerId)
+            }
+
+            QQC2.Button {
+                objectName: "detailPauseButton"
+                visible: page.canPause
+                text: i18n("Pause")
+                icon.name: "media-playback-pause"
+                onClicked: page.operations.pauseContainer(page.containerId)
+            }
+
+            QQC2.Button {
+                objectName: "detailUnpauseButton"
+                visible: page.canUnpause
+                text: i18n("Resume")
+                icon.name: "media-playback-start"
+                onClicked: page.operations.unpauseContainer(page.containerId)
             }
 
             QQC2.Button {

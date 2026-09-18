@@ -43,6 +43,7 @@ private Q_SLOTS:
     void wizardGatesSteps();
     void wizardBuildsTheRequestAndSubmits();
     void cloneCopiesTheFullConfiguration();
+    void suggestsNamesFromTheImageAndOccupancy();
     void presetStoreDeduplicatesAndTrimsRecents();
 };
 
@@ -511,6 +512,69 @@ void ContainerCreateTest::cloneCopiesTheFullConfiguration()
     const QString previousName = wizard.name();
     QVERIFY(!wizard.prefillFromContainer(QStringLiteral("does-not-exist")));
     QCOMPARE(wizard.name(), previousName);
+}
+
+/*!
+ * 「用建议名称」（用户实测 ③）：名称为空时按镜像生成候选，并且**避开已占用的名字**。
+ */
+void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MockDockerBackend backend;
+    Container taken;
+    taken.id = QStringLiteral("taken");
+    taken.name = QStringLiteral("alpine-1111");
+    backend.setContainers({taken});
+    OperationController operations(&backend);
+    backend.setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
+    operations.refreshWriteAccess();
+
+    CreateContainerController wizard(&operations, &presets, &backend);
+
+    // 还没有镜像：也会给一个可用的候选（`container-xxxx`）——按钮因此始终可用，
+    // 但真正要创建时镜像仍是必填项
+    const QString fallback = wizard.suggestedName();
+    QVERIFY2(!fallback.isEmpty(), "a suggestion must always be available");
+    QVERIFY(validateContainerName(fallback).isEmpty());
+
+    // 有镜像但没有名字：给 docker 风格的候选（去掉仓库前缀与 tag，非法字符换成 -）
+    wizard.setImage(QStringLiteral("registry.example.com/team/My App:1.0"));
+    const QString first = wizard.suggestedName();
+    QVERIFY2(!first.isEmpty(), "a suggestion must be available as soon as an image is chosen");
+    QVERIFY2(first.startsWith(QStringLiteral("my-app-")), qPrintable(first));
+    QVERIFY2(!first.contains(QLatin1Char(':')), qPrintable(first));
+    QVERIFY2(!first.contains(QLatin1Char('/')), qPrintable(first));
+    QVERIFY(validateContainerName(first).isEmpty());
+
+    // 已经有名字（克隆场景）：给 `<名字>-copy`
+    wizard.setName(QStringLiteral("web"));
+    QCOMPARE(wizard.suggestedName(), QStringLiteral("web-copy"));
+    // 被占用时继续加序号
+    Container occupied;
+    occupied.id = QStringLiteral("occupied");
+    occupied.name = QStringLiteral("web-copy");
+    backend.setContainers({taken, occupied});
+    QCOMPARE(wizard.suggestedName(), QStringLiteral("web-copy2"));
+
+    // ⑧ 命令与入口点要能写进请求（原来只有控制器字段、界面没有入口）
+    wizard.setCommandText(QStringLiteral("sh\n-c\nsleep infinity"));
+    wizard.setEntrypointText(QStringLiteral("/usr/bin/env sh"));
+    wizard.setWorkingDirectory(QStringLiteral("/app"));
+    wizard.setUser(QStringLiteral("1000:1000"));
+    // 总览里能看到命令/入口点/工作目录/用户（用户要能核对自己填了什么）
+    const QVariantList summary = wizard.summary();
+    QStringList summaryText;
+    for (const QVariant &entry : summary) {
+        const QVariantMap row = entry.toMap();
+        summaryText.append(row.value(QStringLiteral("label")).toString() + QLatin1Char('=') + row.value(QStringLiteral("value")).toString());
+    }
+    const QString joined = summaryText.join(QStringLiteral(" | "));
+    QVERIFY2(joined.contains(QStringLiteral("sh -c sleep infinity")), qPrintable(joined));
+    QVERIFY2(joined.contains(QStringLiteral("/usr/bin/env sh")), qPrintable(joined));
+    QVERIFY2(joined.contains(QStringLiteral("/app")), qPrintable(joined));
+    QVERIFY2(joined.contains(QStringLiteral("1000:1000")), qPrintable(joined));
 }
 
 QTEST_MAIN(ContainerCreateTest)

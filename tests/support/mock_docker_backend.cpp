@@ -115,6 +115,16 @@ void MockDockerBackend::refreshVolumes(bool includeUsage)
     beginRefresh(Section::Volumes);
 }
 
+void MockDockerBackend::pauseContainer(const QString &id)
+{
+    m_mutationCalls.append({Mutation::PauseContainer, OperationTarget::container(id), false});
+}
+
+void MockDockerBackend::unpauseContainer(const QString &id)
+{
+    m_mutationCalls.append({Mutation::UnpauseContainer, OperationTarget::container(id), false});
+}
+
 void MockDockerBackend::buildImage(const ImageBuildRequest &request)
 {
     m_lastBuildRequest = request;

@@ -39,7 +39,46 @@ Kirigami.Page {
     objectName: "createContainerPage"
 
     /*! 预设管理面板是否展开（挂载步骤里）。 */
-    property bool presetPanelOpen: false
+    property bool presetPanelOpen: bool = false
+
+    /*!
+     * delegate 用的中转对象（八期后的修正）。
+     *
+     * `Repeater` 的 delegate 里引用**根对象的 id**（page）会抛
+     * `ReferenceError: page is not defined`——用户实测的"删不掉端口映射 / 加不了挂载"就是这个：
+     * delegate 里的处理器调用 `page.pushPorts()` 直接抛错，改动没写回控制器。
+     * 同一文件里**非根**对象的 id 在 delegate 里是可用的，因此这里把 delegate 需要的能力
+     * （控制器 + 行同步）集中转发一次。
+     */
+    QtObject {
+        id: wizard
+
+        readonly property var controller: page.controller
+        readonly property var operations: page.operations
+
+        /*! 端口/挂载行的编辑一律交给控制器（规则在 C++ 里，delegate 只报"第几行、哪个字段"）。 */
+        function addPort() {
+            wizard.controller.addPortRow(80, 0, "", "tcp");
+        }
+        function setPort(row, field, value) {
+            wizard.controller.setPortRow(row, field, value);
+        }
+        function removePort(row) {
+            wizard.controller.removePortRow(row);
+        }
+        function addMount() {
+            wizard.controller.addMountRow("bind", "", "", false);
+        }
+        function setMount(row, field, value) {
+            wizard.controller.setMountRow(row, field, value);
+        }
+        function removeMount(row) {
+            wizard.controller.removeMountRow(row);
+        }
+        function addPreset(presetId) {
+            wizard.controller.addMountFromPreset(presetId);
+        }
+    }
 
     /*! 步骤 key → 标题（顺序由控制器给出，界面不另抄一份）。 */
     function stepTitle(key: string): string {
@@ -108,6 +147,11 @@ Kirigami.Page {
     }
 
     Component.onCompleted: {
+        // 网络选择列表是低频数据（进网络页才刷新）：向导自己再保一次险，
+        // 否则"没点过网络标签页就选不到网络"（实测反馈 ②）
+        if (page.controller.availableNetworks.length === 0) {
+            kcm.controller.refreshNetworks();
+        }
         if (page.cloneFromContainerId.length > 0) {
             page.controller.prefillFromContainer(page.cloneFromContainerId);
         } else {
@@ -276,8 +320,14 @@ Kirigami.Page {
                         QQC2.Button {
                             objectName: "wizardSuggestNameButton"
                             text: i18n("Suggest")
+                            // 名称为空时按镜像生成（见控制器里的说明），因此只要有镜像就能点
                             enabled: page.controller.suggestedName().length > 0
-                            onClicked: page.controller.name = page.controller.suggestedName()
+                            onClicked: {
+                                const suggestion = page.controller.suggestedName();
+                                if (suggestion.length > 0) {
+                                    page.controller.name = suggestion;
+                                }
+                            }
                         }
                     }
 
@@ -342,6 +392,70 @@ Kirigami.Page {
                         text: i18n("Start the container after creating it")
                         onToggled: page.controller.startAfterCreate = checked
                     }
+
+                    Kirigami.Separator {
+                        Layout.fillWidth: true
+                    }
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Command and entry point (optional)")
+                        font.bold: true
+                    }
+
+                    QQC2.TextArea {
+                        objectName: "wizardCommandField"
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 3
+                        placeholderText: i18n("One argument per line, for example:\nsh\n-c\nsleep 3600")
+                        Accessible.name: i18n("Command")
+                        font.family: "monospace"
+                        wrapMode: TextEdit.NoWrap
+                        text: page.controller.commandText
+                        onTextChanged: page.controller.commandText = text
+                    }
+
+                    QQC2.TextField {
+                        objectName: "wizardEntrypointField"
+                        Layout.fillWidth: true
+                        placeholderText: i18n("Entry point (optional, one argument per line)")
+                        Accessible.name: i18n("Entry point")
+                        text: page.controller.entrypointText.split("\n").join(" ")
+                        onTextChanged: page.controller.entrypointText = text
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        QQC2.TextField {
+                            objectName: "wizardWorkingDirField"
+                            Layout.fillWidth: true
+                            placeholderText: i18n("Working directory (optional)")
+                            Accessible.name: i18n("Working directory")
+                            text: page.controller.workingDirectory
+                            onTextChanged: page.controller.workingDirectory = text
+                        }
+                        QQC2.TextField {
+                            objectName: "wizardUserField"
+                            Layout.fillWidth: true
+                            placeholderText: i18n("User (optional, name or uid:gid)")
+                            Accessible.name: i18n("User")
+                            text: page.controller.user
+                            onTextChanged: page.controller.user = text
+                        }
+                    }
+
+                    // ⑨ 用户实测："基于 alpine:latest 创建的容器启动后立刻退出"
+                    //    ——这是 Docker 的正常行为（默认命令 /bin/sh 没有交互终端就结束），
+                    //    但界面必须说清楚，否则看起来像 bug
+                    Kirigami.InlineMessage {
+                        objectName: "wizardCommandHint"
+                        Layout.fillWidth: true
+                        type: Kirigami.MessageType.Information
+                        visible: page.controller.commandText.trim().length === 0
+                        text: i18n("Without a command the image's default runs. Images like alpine default to an interactive shell, which exits immediately when no terminal is attached — give a command such as “sleep infinity” if the container should keep running.")
+                    }
                 }
 
                 /* ---------------------------- ③ 端口 ---------------------------- */
@@ -386,10 +500,7 @@ Kirigami.Page {
                                 from: 1
                                 to: 65535
                                 value: portRow.containerPort
-                                onValueModified: {
-                                    portRowsModel.setProperty(portRow.index, "containerPort", value);
-                                    page.pushPorts();
-                                }
+                                onValueModified: wizard.setPort(portRow.index, "containerPort", value)
                             }
                             QQC2.Label {
                                 text: "→"
@@ -399,10 +510,7 @@ Kirigami.Page {
                                 from: 0
                                 to: 65535
                                 value: portRow.hostPort
-                                onValueModified: {
-                                    portRowsModel.setProperty(portRow.index, "hostPort", value);
-                                    page.pushPorts();
-                                }
+                                onValueModified: wizard.setPort(portRow.index, "hostPort", value)
                             }
                             QQC2.ComboBox {
                                 objectName: "wizardPortProtocol"
@@ -413,20 +521,14 @@ Kirigami.Page {
                                     {text: i18n("UDP"), value: "udp"}
                                 ]
                                 Component.onCompleted: currentIndex = indexOfValue(portRow.protocol)
-                                onActivated: {
-                                    portRowsModel.setProperty(portRow.index, "protocol", currentValue);
-                                    page.pushPorts();
-                                }
+                                onActivated: wizard.setPort(portRow.index, "protocol", currentValue)
                             }
                             QQC2.Button {
                                 objectName: "wizardRemovePort"
                                 icon.name: "list-remove"
                                 flat: true
                                 Accessible.name: i18n("Remove this port")
-                                onClicked: {
-                                    portRowsModel.remove(portRow.index);
-                                    page.pushPorts();
-                                }
+                                onClicked: wizard.removePort(portRow.index)
                             }
                         }
                     }
@@ -435,11 +537,7 @@ Kirigami.Page {
                         objectName: "wizardAddPort"
                         text: i18n("Add port")
                         icon.name: "list-add"
-                        onClicked: {
-                            const rows = page.controller.portRows.slice();
-                            rows.push({containerPort: 80, hostPort: 0, hostIp: "", protocol: "tcp"});
-                            page.controller.portRows = rows;
-                        }
+                        onClicked: wizard.addPort()
                     }
 
                     Components.EmptyPlaceholder {
@@ -535,7 +633,7 @@ Kirigami.Page {
                                 objectName: "wizardPresetButton"
                                 text: (presetButton.modelData.favorite ? "★ " : "") + presetButton.modelData.source
                                     + " → " + presetButton.modelData.destination
-                                onClicked: page.controller.addMountFromPreset(presetButton.modelData.id)
+                                onClicked: wizard.addPreset(presetButton.modelData.id)
                             }
                         }
                     }
@@ -688,10 +786,7 @@ Kirigami.Page {
                                     {text: i18n("tmpfs"), value: "tmpfs"}
                                 ]
                                 Component.onCompleted: currentIndex = indexOfValue(mountRow.type)
-                                onActivated: {
-                                    mountRowsModel.setProperty(mountRow.index, "type", currentValue);
-                                    page.pushMounts();
-                                }
+                                onActivated: wizard.setMount(mountRow.index, "type", currentValue)
                             }
                             QQC2.TextField {
                                 objectName: "wizardMountSource"
@@ -700,10 +795,7 @@ Kirigami.Page {
                                 placeholderText: mountRow.type === "volume" ? i18n("Volume name") : i18n("Host path")
                                 Accessible.name: i18n("Mount source")
                                 text: mountRow.source
-                                onTextChanged: {
-                                    mountRowsModel.setProperty(mountRow.index, "source", text);
-                                    page.pushMounts();
-                                }
+                                onTextChanged: wizard.setMount(mountRow.index, "source", text)
                             }
                             QQC2.TextField {
                                 objectName: "wizardMountDestination"
@@ -711,26 +803,20 @@ Kirigami.Page {
                                 placeholderText: i18n("Container path")
                                 Accessible.name: i18n("Container path")
                                 text: mountRow.destination
-                                onTextChanged: {
-                                    mountRowsModel.setProperty(mountRow.index, "destination", text);
-                                    page.pushMounts();
-                                }
+                                onTextChanged: wizard.setMount(mountRow.index, "destination", text)
                             }
                             QQC2.CheckBox {
                                 objectName: "wizardMountReadOnly"
                                 text: i18n("Read-only")
                                 checked: mountRow.readOnly
-                                onToggled: {
-                                    mountRowsModel.setProperty(mountRow.index, "readOnly", checked);
-                                    page.pushMounts();
-                                }
+                                onToggled: wizard.setMount(mountRow.index, "readOnly", checked)
                             }
                             QQC2.Button {
                                 objectName: "wizardRemoveMount"
                                 icon.name: "list-remove"
                                 flat: true
                                 Accessible.name: i18n("Remove this mount")
-                                onClicked: page.controller.removeMountAt(mountRow.index)
+                                onClicked: wizard.removeMount(mountRow.index)
                             }
                         }
                     }
@@ -739,7 +825,7 @@ Kirigami.Page {
                         objectName: "wizardAddMount"
                         text: i18n("Add mount")
                         icon.name: "list-add"
-                        onClicked: page.controller.addEmptyMount()
+                        onClicked: wizard.addMount()
                     }
 
                     QQC2.Label {
@@ -933,35 +1019,7 @@ Kirigami.Page {
         }
     }
 
-    /*! 把端口编辑缓冲回写成控制器的行数据（控制器持有真正的状态）。 */
-    function pushPorts(): void {
-        const rows = [];
-        for (let i = 0; i < portRowsModel.count; ++i) {
-            const item = portRowsModel.get(i);
-            rows.push({
-                containerPort: item.containerPort,
-                hostPort: item.hostPort,
-                hostIp: item.hostIp,
-                protocol: item.protocol
-            });
-        }
-        page.controller.portRows = rows;
-    }
-
-    function pushMounts(): void {
-        const rows = [];
-        for (let i = 0; i < mountRowsModel.count; ++i) {
-            const item = mountRowsModel.get(i);
-            rows.push({
-                type: item.type,
-                source: item.source,
-                destination: item.destination,
-                readOnly: item.readOnly
-            });
-        }
-        page.controller.mountRows = rows;
-    }
-
+    /*! 编辑缓冲与控制器是否一致（不一致才重建，避免打断正在输入的那一行）。 */
     function rowsEqual(model, rows): bool {
         if (model.count !== rows.length) {
             return false;
@@ -969,11 +1027,13 @@ Kirigami.Page {
         for (let i = 0; i < model.count; ++i) {
             const item = model.get(i);
             const row = rows[i];
-            if (String(item.containerPort ?? "") !== String(row.containerPort ?? "")
-                || String(item.hostPort ?? "") !== String(row.hostPort ?? "")
-                || String(item.source ?? "") !== String(row.source ?? "")
-                || String(item.destination ?? "") !== String(row.destination ?? "")) {
-                return false;
+            for (const field of ["containerPort", "hostPort", "hostIp", "protocol",
+                                 "type", "source", "destination", "readOnly"]) {
+                const left = item[field] ?? "";
+                const right = row[field] ?? "";
+                if (String(left) !== String(right)) {
+                    return false;
+                }
             }
         }
         return true;

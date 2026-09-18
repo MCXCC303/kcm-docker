@@ -55,6 +55,41 @@ ColumnLayout {
     /*! 条目发生变化。 */
     signal changed
 
+    /*!
+     * delegate 用的中转对象。
+     *
+     * `pragma ComponentBehavior: Unbound` 下，delegate 里引用**根对象的 id**（root）
+     * 会抛 `ReferenceError: root is not defined`——用户实测的报错就出在这里。
+     * 同一文件里**非根**对象的 id 是可用的，因此把 delegate 需要的能力集中放在这里，
+     * 转发到根对象上。这样不必改成 Bound（那个 pragma 是修崩溃时加的，不能随便去掉）。
+     */
+    QtObject {
+        id: editor
+
+        /* delegate 需要的只读配置：也必须走这里，delegate 里读 root.* 同样会抛错 */
+        readonly property string keyPlaceholder: root.keyPlaceholderText
+        readonly property string valuePlaceholder: root.valuePlaceholderText
+        readonly property bool secretValues: root.secretValues
+        readonly property var model: rows
+        readonly property var presentation: Kontainer.Presentation
+
+        /*! 删除一行（delegate 调用）。 */
+        function removeRow(row) {
+            rows.remove(row);
+            root.changed();
+        }
+        /*! 键/值被编辑（delegate 调用）。 */
+        function setEntry(row, key, value) {
+            if (key !== undefined) {
+                rows.setProperty(row, "entryKey", key);
+            }
+            if (value !== undefined) {
+                rows.setProperty(row, "entryValue", value);
+            }
+            root.changed();
+        }
+    }
+
     spacing: Kirigami.Units.smallSpacing
 
     ListModel {
@@ -92,11 +127,8 @@ ColumnLayout {
                     objectName: "keyValueKeyField"
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 10
                     text: entryKey
-                    placeholderText: root.keyPlaceholderText
-                    onTextEdited: {
-                        root.changed();
-                        rows.setProperty(index, "entryKey", text);
-                    }
+                    placeholderText: editor.keyPlaceholder
+                    onTextEdited: editor.setEntry(index, text, undefined)
                 }
 
                 QQC2.TextField {
@@ -105,18 +137,15 @@ ColumnLayout {
                     objectName: "keyValueValueField"
                     Layout.fillWidth: true
                     text: entryValue
-                    placeholderText: root.valuePlaceholderText
-                    echoMode: revealSecret.checked || !root.secretValues ? TextInput.Normal : TextInput.Password
-                    onTextEdited: {
-                        root.changed();
-                        rows.setProperty(index, "entryValue", text);
-                    }
+                    placeholderText: editor.valuePlaceholder
+                    echoMode: revealSecret.checked || !editor.secretValues ? TextInput.Normal : TextInput.Password
+                    onTextEdited: editor.setEntry(index, undefined, text)
                 }
 
                 // 只有"值可能是密钥"的场景才需要显隐切换
                 QQC2.ToolButton {
                     objectName: "keyValueRevealButton"
-                    visible: root.secretValues
+                    visible: editor.secretValues
                     checkable: true
                     id: revealSecret
                     icon.name: checked ? "password-show-off" : "password-show-on"
@@ -129,10 +158,7 @@ ColumnLayout {
                     objectName: "keyValueRemoveButton"
                     icon.name: "list-remove"
                     Accessible.name: i18n("Remove")
-                    onClicked: {
-                        rows.remove(index);
-                        root.changed();
-                    }
+                    onClicked: editor.removeRow(index)
                 }
             }
 
@@ -140,7 +166,7 @@ ColumnLayout {
                 objectName: "keyValueKeyError"
                 Layout.fillWidth: true
                 visible: text.length > 0
-                text: keyField.text.length === 0 || Kontainer.Presentation.isValidEnvKey(keyField.text)
+                text: keyField.text.length === 0 || editor.presentation.isValidEnvKey(keyField.text)
                     ? ""
                     : i18n("Invalid name: use letters, digits and underscore, and do not start with a digit.")
                 color: Local.StatusPalette.color("negative")
@@ -156,8 +182,8 @@ ColumnLayout {
                     if (keyField.text.length === 0) {
                         return "";
                     }
-                    for (let i = 0; i < rows.count; ++i) {
-                        if (i !== index && String(rows.get(i).entryKey) === keyField.text) {
+                    for (let i = 0; i < editor.model.count; ++i) {
+                        if (i !== index && String(editor.model.get(i).entryKey) === keyField.text) {
                             return i18n("Duplicate name.");
                         }
                     }

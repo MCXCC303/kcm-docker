@@ -167,6 +167,26 @@ public:
     QVariantList availableImages() const;
     QVariantList availableNetworks() const;
 
+    /*!
+     * 端口行的增删改（八期后的修正：行编辑放在 C++）。
+     *
+     * 为什么不让 QML 直接改列表：`Repeater` 的 delegate 在
+     * `pragma ComponentBehavior: Unbound` 下**拿不到根对象的 id**，delegate 里
+     * 写 `page.xxx` 会抛 `ReferenceError`，用户实测表现为"删不掉端口/加不了挂载"。
+     * 把行的增删改收进控制器后，delegate 只需要一个非根 id 就能调用，规则也更好测。
+     */
+    Q_INVOKABLE void addPortRow(int containerPort = 80, int hostPort = 0, const QString &hostIp = {}, const QString &protocol = QStringLiteral("tcp"));
+    Q_INVOKABLE void setPortRow(int row, const QString &field, const QVariant &value);
+    Q_INVOKABLE void removePortRow(int row);
+    Q_INVOKABLE void clearPortRows();
+
+    Q_INVOKABLE void addMountRow(const QString &type = QStringLiteral("bind"),
+                                 const QString &source = {},
+                                 const QString &destination = {},
+                                 bool readOnly = false);
+    Q_INVOKABLE void setMountRow(int row, const QString &field, const QVariant &value);
+    Q_INVOKABLE void removeMountRow(int row);
+
     /*! 从预设添加一条挂载（已存在则忽略）。 */
     Q_INVOKABLE bool addMountFromPreset(const QString &presetId);
     /*! 追加一条空挂载行（bind）。 */

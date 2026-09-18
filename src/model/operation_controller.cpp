@@ -379,6 +379,32 @@ void OperationController::restartContainer(const QString &id)
     m_backend->restartContainer(id);
 }
 
+void OperationController::pauseContainer(const QString &id)
+{
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("pausing the container")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return;
+    }
+    beginOperation(Mutation::PauseContainer, OperationTarget::container(id));
+    m_backend->pauseContainer(id);
+}
+
+void OperationController::unpauseContainer(const QString &id)
+{
+    if (!writeAllowed()) {
+        setResult(Result::Error,
+                  i18n("Kontainer is in read-only mode, so %1 was not performed.", i18n("resuming the container")),
+                  QString(),
+                  DockerError(DockerError::Kind::PermissionDenied));
+        return;
+    }
+    beginOperation(Mutation::UnpauseContainer, OperationTarget::container(id));
+    m_backend->unpauseContainer(id);
+}
+
 void OperationController::removeContainer(const QString &id)
 {
     const QString targetKey = OperationTarget::container(id);
@@ -1259,6 +1285,8 @@ void OperationController::onMutationFinished(Mutation mutation,
 void OperationController::refreshAfter(Mutation mutation, const QString &targetKey)
 {
     switch (mutation) {
+    case Mutation::PauseContainer:
+    case Mutation::UnpauseContainer:
     case Mutation::StartContainer:
     case Mutation::StopContainer:
     case Mutation::RestartContainer: {
@@ -1341,6 +1369,10 @@ QString OperationController::successText(Mutation mutation, const QString &targe
         return i18n("Container stopped.");
     case Mutation::RestartContainer:
         return i18n("Container restarted.");
+    case Mutation::PauseContainer:
+        return i18n("Container paused.");
+    case Mutation::UnpauseContainer:
+        return i18n("Container resumed.");
     case Mutation::RemoveContainer:
         return i18n("Container removed.");
     case Mutation::PullImage: {

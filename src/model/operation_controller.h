@@ -113,6 +113,10 @@ public:
     Q_INVOKABLE void startContainer(const QString &id);
     Q_INVOKABLE void stopContainer(const QString &id);
     Q_INVOKABLE void restartContainer(const QString &id);
+    /*! 暂停运行中的容器（用户实测反馈 ①）。 */
+    Q_INVOKABLE void pauseContainer(const QString &id);
+    /*! 继续已暂停的容器。 */
+    Q_INVOKABLE void unpauseContainer(const QString &id);
     Q_INVOKABLE void removeContainer(const QString &id);
     Q_INVOKABLE void pullImage(const QString &reference);
 

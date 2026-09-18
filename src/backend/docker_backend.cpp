@@ -788,6 +788,10 @@ const char *mutationName(DockerBackendInterface::Mutation mutation)
         return "stop-container";
     case DockerBackendInterface::Mutation::RestartContainer:
         return "restart-container";
+    case DockerBackendInterface::Mutation::PauseContainer:
+        return "pause-container";
+    case DockerBackendInterface::Mutation::UnpauseContainer:
+        return "unpause-container";
     case DockerBackendInterface::Mutation::RemoveContainer:
         return "remove-container";
     case DockerBackendInterface::Mutation::PullImage:
@@ -913,6 +917,16 @@ void DockerBackend::restartContainer(const QString &id)
     query.addQueryItem(QStringLiteral("t"), QString::number(RefreshPolicy::kStopTimeoutSeconds));
     // restart 对已停止的容器会直接启动，因此没有 304 语义
     runContainerMutation(Mutation::RestartContainer, id, ApiPaths::containerRestart(id), query);
+}
+
+void DockerBackend::pauseContainer(const QString &id)
+{
+    runContainerMutation(Mutation::PauseContainer, id, ApiPaths::containerPause(id), QUrlQuery());
+}
+
+void DockerBackend::unpauseContainer(const QString &id)
+{
+    runContainerMutation(Mutation::UnpauseContainer, id, ApiPaths::containerUnpause(id), QUrlQuery());
 }
 
 void DockerBackend::removeContainer(const QString &id)

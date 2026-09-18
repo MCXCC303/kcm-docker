@@ -106,6 +106,28 @@ QQuickItem *findItemByName(QObject *root, const QString &objectName)
     }
     return nullptr;
 }
+
+/*!
+ * 沿 `childItems()` 递归查找（**delegate 条目只能用这个**）。
+ *
+ * `findChildren<QQuickItem *>()` 走的是 QObject 树：Repeater 建出来的 delegate 不在这棵树里，
+ * 因此按对象名找不到它们（八期在这里吃过一次亏）。视觉树里是找得到的。
+ */
+QQuickItem *findItemDeep(QQuickItem *root, const QString &objectName)
+{
+    if (!root) {
+        return nullptr;
+    }
+    for (QQuickItem *child : root->childItems()) {
+        if (child->objectName() == objectName) {
+            return child;
+        }
+        if (QQuickItem *found = findItemDeep(child, objectName)) {
+            return found;
+        }
+    }
+    return nullptr;
+}
 } // namespace
 
 /*!
@@ -142,6 +164,7 @@ private Q_SLOTS:
     void createContainerWizardGatesStepsAndHidesSecrets();
     void presetPanelManagesPresets();
     void buildPanelSubmitsAndShowsFailureStep();
+    void portAndKeyValueRowsCanBeRemoved();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
     void sensitiveSectionsAreCollapsedByDefault();
@@ -1467,6 +1490,110 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     QVERIFY2(entry.detailText.contains(QStringLiteral("Step 2/3")), qPrintable(entry.detailText));
     QVERIFY2(entry.detailText.contains(QStringLiteral("RUN exit 1")), qPrintable(entry.detailText));
     QVERIFY2(!entry.active, "a failed build must not stay active");
+}
+
+/*!
+ * 行删除（回归：用户实测"端口映射删不掉、标签能删"）。
+ *
+ * delegate 在 `pragma ComponentBehavior: Unbound` 下拿不到根对象 id，原来的处理器写
+ * `page.pushPorts()` / `root.changed()` 会抛 ReferenceError，改动没写回控制器——
+ * 于是端口行"删了又回来"。现在 delegate 只调用中转对象，行编辑收在 C++ 控制器里。
+ */
+void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
+{
+    // ① 创建向导的端口行
+    {
+        // 镜像步骤要求镜像在本地，先给一个（不是本用例的重点，但向导规则如此）
+        Image localImage;
+        localImage.id = QStringLiteral("sha256:feedface");
+        localImage.repoTags = {QStringLiteral("alpine:3.19")};
+        m_backend->setImages({localImage});
+
+        const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+        QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+        QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+        QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+        QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+        auto *page = qobject_cast<QQuickItem *>(object.data());
+        QVERIFY(page);
+
+        QQuickWindow window;
+        window.resize(1100, 800);
+        page->setParentItem(window.contentItem());
+        page->setWidth(1100);
+        page->setHeight(800);
+        window.show();
+        QTRY_VERIFY(page->width() > 0);
+
+        auto *wizard = m_stubKcm->controller()->createContainer();
+        // 页面创建时会 reset 控制器，因此行要在创建之后再放
+        wizard->addPortRow(80, 0, QString(), QStringLiteral("tcp"));
+        wizard->addPortRow(443, 8443, QString(), QStringLiteral("tcp"));
+        // 步骤 0/1 要先合法，否则 goToStep 会拒绝往前跳（向导的规则，不该为了测试放宽）
+        wizard->setImage(QStringLiteral("alpine:3.19"));
+        wizard->setName(QStringLiteral("port-rows"));
+        QVERIFY2(wizard->goToStep(QStringLiteral("ports")), qPrintable(wizard->stepKey()));
+
+        QQuickItem *removeButton = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT([&] {
+            removeButton = findItemDeep(window.contentItem(), QStringLiteral("wizardRemovePort"));
+            return removeButton != nullptr;
+        }(), 5000);
+        QCOMPARE(wizard->portRows().size(), 2);
+        QVERIFY(QMetaObject::invokeMethod(removeButton, "clicked"));
+        QTRY_COMPARE(wizard->portRows().size(), 1);
+        // 删掉的是第一行（80/0），留下的那行要还是它自己
+        QCOMPARE(wizard->portRows().first().toMap().value(QStringLiteral("containerPort")).toInt(), 443);
+
+        // 编辑宿主端口也要写回控制器（同一类 delegate 错误）
+        QQuickItem *hostPortSpin = findItemDeep(window.contentItem(), QStringLiteral("wizardHostPort"));
+        QVERIFY(hostPortSpin);
+        hostPortSpin->setProperty("value", 9443);
+        QMetaObject::invokeMethod(hostPortSpin, "valueModified");
+        QTRY_COMPARE(wizard->portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), 9443);
+    }
+
+    // ② 键值对编辑器的"删除"按钮
+    {
+        const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
+        QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+        QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+        QVariantList entries;
+        entries.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("A")}, {QStringLiteral("value"), QStringLiteral("1")}});
+        entries.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("B")}, {QStringLiteral("value"), QStringLiteral("2")}});
+        QVariantMap initial;
+        initial.insert(QStringLiteral("initialEntries"), entries);
+        initial.insert(QStringLiteral("secretValues"), true);
+        QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+        QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+        auto *editor = qobject_cast<QQuickItem *>(object.data());
+        QVERIFY(editor);
+
+        QQuickWindow window;
+        window.resize(700, 400);
+        editor->setParentItem(window.contentItem());
+        editor->setWidth(700);
+        editor->setHeight(400);
+        window.show();
+        QTRY_VERIFY(editor->width() > 0);
+
+        QQuickItem *removeButton = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT([&] {
+            removeButton = findItemDeep(window.contentItem(), QStringLiteral("keyValueRemoveButton"));
+            return removeButton != nullptr;
+        }(), 5000);
+        // 值的显隐切换、以及删除后条目真的少了一条（回调不再抛 ReferenceError）
+        QQuickItem *reveal = findItemDeep(window.contentItem(), QStringLiteral("keyValueRevealButton"));
+        QVERIFY2(reveal, "secret values must offer a reveal toggle");
+        QVERIFY(reveal->property("visible").toBool());
+        QVERIFY(QMetaObject::invokeMethod(removeButton, "clicked"));
+        QTest::qWait(50);
+        QVariant remaining;
+        QVERIFY(QMetaObject::invokeMethod(editor, "entries", Q_RETURN_ARG(QVariant, remaining)));
+        const QVariantList rows = remaining.toList();
+        QCOMPARE(rows.size(), 1);
+        QCOMPARE(rows.first().toMap().value(QStringLiteral("key")).toString(), QStringLiteral("B"));
+    }
 }
 
 void QmlLoadTest::loadsAllQmlFiles_data()

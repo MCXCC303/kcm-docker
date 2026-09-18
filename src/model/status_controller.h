@@ -390,7 +390,8 @@ public Q_SLOTS:
      */
     void retryStorage();
     /*! 网络列表是低频数据：只在进入网络页面时刷新（六期 §3.2）。 */
-    void refreshNetworks();
+    /*! 刷新网络列表（创建容器等场景会主动调用）。 */
+    Q_INVOKABLE void refreshNetworks();
     /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
     void refreshVolumes(bool includeUsage = true);
 
