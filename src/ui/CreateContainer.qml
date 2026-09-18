@@ -532,12 +532,6 @@ Kirigami.Page {
                         text: i18n("Published ports")
                     }
 
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Leave the host port empty to let Docker pick a free one.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.75
-                    }
 
                     Components.PortMappingEditor {
                         objectName: "wizardPortEditor"

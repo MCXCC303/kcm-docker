@@ -107,6 +107,7 @@ ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
         QQC2.Label {
+            objectName: "portEditorHostLabel"
             Layout.preferredWidth: Kirigami.Units.gridUnit * 12
             text: i18n("Host")
             font.bold: true
@@ -118,6 +119,7 @@ ColumnLayout {
         }
 
         QQC2.Label {
+            objectName: "portEditorContainerLabel"
             Layout.preferredWidth: Kirigami.Units.gridUnit * 7
             text: i18n("Container")
             font.bold: true
@@ -163,30 +165,59 @@ ColumnLayout {
                 onValueModified: editor.setField(portRowItem.index, "hostPort", value)
             }
 
-            /* ---- 中间的连线（与端口拓扑同一视觉语言：带圆点的线） ---- */
+            /* ---- 中间的连线：与端口拓扑同一视觉语言（两端插座圆点） ----
+               用户要求"复用容器信息里网络图的节点图样式，颜色可以任意指定，
+               编辑时不需要做特征标注"：因此这里只画线 + 两端的插座圆点，没有文字；
+               颜色按**行内容**取（同一个映射永远同色，不同映射彼此可区分），
+               不表达任何语义（纯装饰，Accessible.ignored）。 */
             Canvas {
                 objectName: "wizardPortLink"
                 Layout.fillWidth: true
                 Layout.minimumWidth: Kirigami.Units.gridUnit * 2
                 Layout.preferredHeight: Kirigami.Units.gridUnit
+                Accessible.ignored: true
+
+                /*! 该行的连线颜色（可被用例读取，用来断言"每行一种颜色"）。 */
+                readonly property color linkColor: Local.ChartPalette.connectionColor(
+                    "editor|" + portRowItem.containerPort + "/" + portRowItem.protocol
+                    + "|" + portRowItem.hostIp + ":" + portRowItem.hostPort)
+
+                readonly property real lineWidth: Math.max(2, Math.round(Kirigami.Units.gridUnit * 0.28))
+                readonly property real dotRadius: lineWidth * 1.15
+
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                Component.onCompleted: requestPaint()
+
                 onPaint: {
-                    const context = getContext("2d");
-                    context.reset();
+                    const ctx = getContext("2d");
+                    ctx.reset();
                     const middle = height / 2;
-                    context.strokeStyle = Kirigami.Theme.textColor;
-                    context.globalAlpha = 0.45;
-                    context.lineWidth = Math.max(1, Kirigami.Units.smallSpacing / 4);
-                    context.beginPath();
-                    context.moveTo(0, middle);
-                    context.lineTo(width, middle);
-                    context.stroke();
-                    context.globalAlpha = 0.9;
-                    context.fillStyle = portRowItem.protocol === "udp"
-                        ? Local.StatusPalette.color("warning")
-                        : Local.StatusPalette.color("positive");
-                    context.beginPath();
-                    context.arc(width / 2, middle, Math.max(2, Kirigami.Units.smallSpacing / 3), 0, Math.PI * 2);
-                    context.fill();
+                    const left = dotRadius;
+                    const right = width - dotRadius;
+                    if (right <= left) {
+                        return;
+                    }
+
+                    ctx.lineWidth = lineWidth;
+                    ctx.lineCap = "round";
+                    ctx.strokeStyle = linkColor;
+                    ctx.beginPath();
+                    ctx.moveTo(left, middle);
+                    ctx.lineTo(right, middle);
+                    ctx.stroke();
+
+                    // 两端都画成"插座"：外圈连线色、中心掏空成背景色（与拓扑一致）
+                    for (const x of [left, right]) {
+                        ctx.fillStyle = linkColor;
+                        ctx.beginPath();
+                        ctx.arc(x, middle, dotRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = Kirigami.Theme.backgroundColor;
+                        ctx.beginPath();
+                        ctx.arc(x, middle, dotRadius * 0.42, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                 }
             }
 

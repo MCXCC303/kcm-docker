@@ -24,6 +24,8 @@ ColumnLayout {
 
     /*! 预设存储（`kcm.controller.mountPresets`）。 */
     required property var store
+    /*! 目录选择（`kcm.controller.directoryPicker`）：宿主路径用它挑。 */
+    required property var directoryPicker
 
     /*!
      * delegate 用的中转对象（Unbound 下 delegate 拿不到根对象 id，见 CreateContainer.qml）。
@@ -87,6 +89,28 @@ ColumnLayout {
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing / 2
 
+                // 两侧标注（用户实测反馈 A1）：与端口编辑器的措辞保持一致
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 13
+                        text: i18n("Host")
+                        font.bold: true
+                        opacity: 0.8
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                    QQC2.Label {
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 10
+                        text: i18n("Container")
+                        font.bold: true
+                        opacity: 0.8
+                    }
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -98,6 +122,22 @@ ColumnLayout {
                         Accessible.name: i18n("Preset source")
                         text: presetCard.source
                         onEditingFinished: manager.update(presetCard.id, text, presetCard.destination, presetCard.readOnly, presetCard.note)
+                    }
+
+                    // 宿主路径可以直接用系统文件对话框挑（命名卷不需要）
+                    QQC2.Button {
+                        objectName: "presetManagerBrowse"
+                        visible: presetCard.type !== "volume" && presetCard.type !== "tmpfs"
+                        icon.name: "folder-open"
+                        text: i18n("Browse…")
+                        onClicked: {
+                            const chosen = root.directoryPicker.chooseDirectory(presetCard.source);
+                            if (chosen.length > 0) {
+                                // 取消（空串）时保持原值：不要把手打的路径清掉
+                                manager.update(presetCard.id, chosen, presetCard.destination, presetCard.readOnly,
+                                               presetCard.note);
+                            }
+                        }
                     }
 
                     QQC2.Label {

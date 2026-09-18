@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.8.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:01+0800\n"
+"POT-Creation-Date: 2026-09-19 04:23+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -74,20 +74,20 @@ msgstr "健康"
 msgid "Unhealthy"
 msgstr "不健康"
 
-#: src/model/status_controller.cpp:103 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:106 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:106
+#: src/model/status_controller.cpp:109
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:109
+#: src/model/status_controller.cpp:112
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
-#: src/model/status_controller.cpp:621
+#: src/model/status_controller.cpp:624
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -569,7 +569,7 @@ msgid "Restart policy"
 msgstr "重启策略"
 
 #: src/model/create_container_controller.cpp:945
-#: src/ui/components/PortMappingEditor.qml:161
+#: src/ui/components/PortMappingEditor.qml:163
 msgid "random"
 msgstr "随机"
 
@@ -578,17 +578,17 @@ msgid "Ports"
 msgstr "端口"
 
 #: src/model/create_container_controller.cpp:958 src/ui/CreateContainer.qml:114
-#: src/ui/CreateContainer.qml:596
+#: src/ui/CreateContainer.qml:590
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/model/create_container_controller.cpp:970 src/ui/CreateContainer.qml:558
+#: src/model/create_container_controller.cpp:970 src/ui/CreateContainer.qml:552
 msgid "Environment variables"
 msgstr "环境变量"
 
 #: src/model/create_container_controller.cpp:973
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:575
+#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:569
 msgid "Labels"
 msgstr "标签"
 
@@ -704,7 +704,7 @@ msgstr "输入“%1”以确认"
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
 #: src/ui/components/BuildImagePanel.qml:437 src/ui/ContainerDetail.qml:640
-#: src/ui/CreateContainer.qml:990
+#: src/ui/CreateContainer.qml:984
 msgid "Cancel"
 msgstr "取消"
 
@@ -833,7 +833,7 @@ msgstr "名称重复。"
 
 #: src/ui/components/KeyValueListEditor.qml:205
 #: src/ui/components/StringListEditor.qml:45
-#: src/ui/components/MountPresetManager.qml:191
+#: src/ui/components/MountPresetManager.qml:231
 msgid "Add"
 msgstr "添加"
 
@@ -846,12 +846,12 @@ msgid "Paste .env content"
 msgstr "粘贴 .env 内容"
 
 #: src/ui/components/StringListEditor.qml:148
-#: src/ui/components/MountPresetManager.qml:134
+#: src/ui/components/MountPresetManager.qml:174
 msgid "Move up"
 msgstr "上移"
 
 #: src/ui/components/StringListEditor.qml:161
-#: src/ui/components/MountPresetManager.qml:141
+#: src/ui/components/MountPresetManager.qml:181
 msgid "Move down"
 msgstr "下移"
 
@@ -1060,7 +1060,7 @@ msgid "Allow containers to be attached at runtime"
 msgstr "允许容器在运行时加入"
 
 #: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:984
-#: src/ui/CreateContainer.qml:978
+#: src/ui/CreateContainer.qml:972
 msgid "Create"
 msgstr "创建"
 
@@ -1228,104 +1228,110 @@ msgid ""
 "Builds you start stay in this list, so you can keep working while one runs."
 msgstr "开始过的构建会留在这个列表里，构建期间可以继续做别的事。"
 
-#: src/ui/components/PortMappingEditor.qml:111 src/ui/ContainerDetail.qml:55
+#: src/ui/components/PortMappingEditor.qml:112
+#: src/ui/components/MountPresetManager.qml:99 src/ui/ContainerDetail.qml:55
 msgid "Host"
 msgstr "宿主机"
 
-#: src/ui/components/PortMappingEditor.qml:122 src/ui/ContainerDetail.qml:292
+#: src/ui/components/PortMappingEditor.qml:124
+#: src/ui/components/MountPresetManager.qml:108 src/ui/ContainerDetail.qml:292
 #: src/ui/ContainerDetail.qml:843
 msgid "Container"
 msgstr "容器"
 
-#: src/ui/components/PortMappingEditor.qml:150
+#: src/ui/components/PortMappingEditor.qml:152
 msgid "Host address"
 msgstr "宿主机地址"
 
-#: src/ui/components/PortMappingEditor.qml:208
+#: src/ui/components/PortMappingEditor.qml:239
 msgid "TCP"
 msgstr "TCP"
 
-#: src/ui/components/PortMappingEditor.qml:209
+#: src/ui/components/PortMappingEditor.qml:240
 msgid "UDP"
 msgstr "UDP"
 
-#: src/ui/components/PortMappingEditor.qml:219
+#: src/ui/components/PortMappingEditor.qml:250
 msgid "Remove this port"
 msgstr "移除这一行端口"
 
-#: src/ui/components/PortMappingEditor.qml:227
+#: src/ui/components/PortMappingEditor.qml:258
 msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
 msgstr "宿主端口填 0（显示为“随机”）则由 Docker 挑一个空闲端口。"
 
-#: src/ui/components/PortMappingEditor.qml:235
+#: src/ui/components/PortMappingEditor.qml:266
 msgid "Add port"
 msgstr "添加端口"
 
-#: src/ui/components/PortMappingEditor.qml:244
+#: src/ui/components/PortMappingEditor.qml:275
 msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr "没有发布端口。容器只能通过它所在的网络访问。"
 
-#: src/ui/components/MountPresetManager.qml:63
+#: src/ui/components/MountPresetManager.qml:65
 msgid ""
 "No presets yet. Add one below, or save a mount as a preset from a "
 "container's details."
 msgstr "还没有预设。可以在下面添加，或在容器详情里把某条挂载保存为预设。"
 
-#: src/ui/components/MountPresetManager.qml:97
-#: src/ui/components/MountPresetManager.qml:176
+#: src/ui/components/MountPresetManager.qml:121
+#: src/ui/components/MountPresetManager.qml:216
 msgid "Host path or volume name"
 msgstr "宿主路径或卷名"
 
-#: src/ui/components/MountPresetManager.qml:98
+#: src/ui/components/MountPresetManager.qml:122
 msgid "Preset source"
 msgstr "预设来源"
 
-#: src/ui/components/MountPresetManager.qml:111
-#: src/ui/components/MountPresetManager.qml:185 src/ui/CreateContainer.qml:692
-#: src/ui/CreateContainer.qml:693
+#: src/ui/components/MountPresetManager.qml:132
+msgid "Browse…"
+msgstr "浏览…"
+
+#: src/ui/components/MountPresetManager.qml:151
+#: src/ui/components/MountPresetManager.qml:225 src/ui/CreateContainer.qml:686
+#: src/ui/CreateContainer.qml:687
 msgid "Container path"
 msgstr "容器路径"
 
-#: src/ui/components/MountPresetManager.qml:112
+#: src/ui/components/MountPresetManager.qml:152
 msgid "Preset destination"
 msgstr "预设的容器路径"
 
-#: src/ui/components/MountPresetManager.qml:119 src/ui/CreateContainer.qml:699
+#: src/ui/components/MountPresetManager.qml:159 src/ui/CreateContainer.qml:693
 msgid "Read-only"
 msgstr "只读"
 
-#: src/ui/components/MountPresetManager.qml:126
+#: src/ui/components/MountPresetManager.qml:166
 msgid "Favourite"
 msgstr "收藏"
 
-#: src/ui/components/MountPresetManager.qml:148
+#: src/ui/components/MountPresetManager.qml:188
 msgid "Remove this preset"
 msgstr "删除这个预设"
 
-#: src/ui/components/MountPresetManager.qml:156 src/ui/CreateContainer.qml:674
+#: src/ui/components/MountPresetManager.qml:196 src/ui/CreateContainer.qml:668
 msgid "Named volume"
 msgstr "命名卷"
 
-#: src/ui/components/MountPresetManager.qml:162
+#: src/ui/components/MountPresetManager.qml:202
 msgid "%1 to %2"
 msgstr "%1 → %2"
 
-#: src/ui/components/MountPresetManager.qml:177
+#: src/ui/components/MountPresetManager.qml:217
 msgid "New preset source"
 msgstr "新预设的来源"
 
-#: src/ui/components/MountPresetManager.qml:186
+#: src/ui/components/MountPresetManager.qml:226
 msgid "New preset destination"
 msgstr "新预设的容器路径"
 
-#: src/ui/components/MountPresetManager.qml:216
+#: src/ui/components/MountPresetManager.qml:256
 msgid ""
 "Bind mounts need an absolute host path (use a volume name for a named "
 "volume)."
 msgstr "bind 挂载需要绝对宿主路径（命名卷请直接填卷名）。"
 
-#: src/ui/components/MountPresetManager.qml:220 src/ui/CreateContainer.qml:148
+#: src/ui/components/MountPresetManager.qml:260 src/ui/CreateContainer.qml:148
 msgid "The container path must be absolute."
 msgstr "容器路径必须是绝对路径。"
 
@@ -1402,7 +1408,7 @@ msgstr "仓库登录…"
 #: src/ui/ImageDetail.qml:159 src/ui/ContainerDetail.qml:331 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:960
+#: src/ui/CreateContainer.qml:954
 msgid "Back"
 msgstr "返回"
 
@@ -2257,7 +2263,7 @@ msgid "Clean up unused…"
 msgstr "清理未使用…"
 
 #: src/ui/MainPage.qml:978 src/ui/MainPage.qml:979
-#: src/ui/CreateContainer.qml:684
+#: src/ui/CreateContainer.qml:678
 msgid "Volume name"
 msgstr "数据卷名称"
 
@@ -3176,93 +3182,89 @@ msgstr "用户（可选，名称或 uid:gid）"
 msgid "Published ports"
 msgstr "端口映射"
 
-#: src/ui/CreateContainer.qml:537
-msgid "Leave the host port empty to let Docker pick a free one."
-msgstr "宿主端口留空则由 Docker 挑一个空闲端口。"
-
-#: src/ui/CreateContainer.qml:606
+#: src/ui/CreateContainer.qml:600
 msgid "Quick add from your presets:"
 msgstr "从预设快速添加："
 
-#: src/ui/CreateContainer.qml:611
+#: src/ui/CreateContainer.qml:605
 msgid "Manage them in the “Mount presets” tab."
 msgstr "在「挂载预设」标签页里管理。"
 
-#: src/ui/CreateContainer.qml:644
+#: src/ui/CreateContainer.qml:638
 msgid ""
 "No presets yet — add some in the “Mount presets” tab to get one-click mounts "
 "here."
 msgstr "还没有预设——在「挂载预设」标签页里添加后，这里就会有一键添加的按钮。"
 
-#: src/ui/CreateContainer.qml:673 src/ui/CreateContainer.qml:684
+#: src/ui/CreateContainer.qml:667 src/ui/CreateContainer.qml:678
 msgid "Host path"
 msgstr "宿主路径"
 
-#: src/ui/CreateContainer.qml:675
+#: src/ui/CreateContainer.qml:669
 msgid "tmpfs"
 msgstr "tmpfs"
 
-#: src/ui/CreateContainer.qml:685
+#: src/ui/CreateContainer.qml:679
 msgid "Mount source"
 msgstr "挂载来源"
 
-#: src/ui/CreateContainer.qml:707
+#: src/ui/CreateContainer.qml:701
 msgid "Remove this mount"
 msgstr "移除这个挂载"
 
-#: src/ui/CreateContainer.qml:715
+#: src/ui/CreateContainer.qml:709
 msgid "Add mount"
 msgstr "添加挂载"
 
-#: src/ui/CreateContainer.qml:722
+#: src/ui/CreateContainer.qml:716
 msgid ""
 "A host path that does not exist yet is fine: Docker creates the directory."
 msgstr "宿主路径还不存在也没关系：Docker 会创建目录。"
 
-#: src/ui/CreateContainer.qml:737
+#: src/ui/CreateContainer.qml:731
 msgid "Resources and privileges"
 msgstr "资源与特权"
 
-#: src/ui/CreateContainer.qml:745
+#: src/ui/CreateContainer.qml:739
 msgid "Memory limit (MiB):"
 msgstr "内存上限（MiB）："
 
-#: src/ui/CreateContainer.qml:756 src/ui/CreateContainer.qml:780
+#: src/ui/CreateContainer.qml:750 src/ui/CreateContainer.qml:774
 msgid "No limit"
 msgstr "不限制"
 
-#: src/ui/CreateContainer.qml:767
+#: src/ui/CreateContainer.qml:761
 msgid "CPU limit (cores):"
 msgstr "CPU 上限（核）："
 
-#: src/ui/CreateContainer.qml:800
+#: src/ui/CreateContainer.qml:794
 msgid "Run with extended privileges (--privileged)"
 msgstr "以扩展特权运行（--privileged）"
 
-#: src/ui/CreateContainer.qml:817
+#: src/ui/CreateContainer.qml:811
 msgid ""
 "This container runs with the same access as root on the host. Only use it "
 "when you know why."
 msgstr "这个容器拥有与宿主 root 相同的访问权限。请只在明确知道原因时使用。"
 
-#: src/ui/CreateContainer.qml:830
+#: src/ui/CreateContainer.qml:824
 msgid "Review and create"
 msgstr "确认并创建"
 
-#: src/ui/CreateContainer.qml:863
+#: src/ui/CreateContainer.qml:857
 msgid ""
 "Environment variable values are not shown here on purpose; only their names."
 msgstr "这里有意不显示环境变量的值，只列键名。"
 
-#: src/ui/CreateContainer.qml:944
+#: src/ui/CreateContainer.qml:938
 msgid "Run with extended privileges"
 msgstr "以扩展特权运行"
 
-#: src/ui/CreateContainer.qml:945
+#: src/ui/CreateContainer.qml:939
 msgid "Give this container the same access as root on the host?"
 msgstr "要让这个容器拥有与宿主 root 相同的访问权限吗？"
 
-#: src/ui/CreateContainer.qml:946
+#: src/ui/CreateContainer.qml:940
 msgid ""
 "The container can access all devices and host files. Only continue if you "
 "trust the image. Type the container name to confirm."
@@ -3270,17 +3272,20 @@ msgstr ""
 "容器可以访问所有设备与宿主文件。只有在信任该镜像时才继续。请把容器名原样输入"
 "以确认。"
 
-#: src/ui/CreateContainer.qml:947
+#: src/ui/CreateContainer.qml:941
 msgid "Yes, run privileged"
 msgstr "是，以特权运行"
 
-#: src/ui/CreateContainer.qml:969
+#: src/ui/CreateContainer.qml:963
 msgid "Next"
 msgstr "下一步"
 
-#: src/ui/CreateContainer.qml:978
+#: src/ui/CreateContainer.qml:972
 msgid "Create and start"
 msgstr "创建并启动"
+
+#~ msgid "Leave the host port empty to let Docker pick a free one."
+#~ msgstr "宿主端口留空则由 Docker 挑一个空闲端口。"
 
 #~ msgid ""
 #~ "Without a command the image's default runs. Images like alpine default to "

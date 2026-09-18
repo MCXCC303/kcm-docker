@@ -31,7 +31,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
                                    HostPathService *hostPaths,
                                    QObject *parent,
                                    CredentialBackend *credentialBackend,
-                                   MountPresetStore *mountPresetStore)
+                                   MountPresetStore *mountPresetStore,
+                                   DirectoryPicker *directoryPicker)
     : QObject(parent)
     , m_backend(backend)
     , m_scheduler(new RefreshScheduler(backend, this))
@@ -54,6 +55,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
     // 挂载预设：注入时用注入的（测试/渲染用临时文件，绝不写用户真实配置）
     , m_mountPresets(mountPresetStore ? mountPresetStore : new MountPresetStore({}, this))
     , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, this))
+    // 目录选择：注入时用注入的（测试与离屏渲染不弹真实对话框）
+    , m_directoryPicker(directoryPicker ? directoryPicker : new SystemDirectoryPicker(this))
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))

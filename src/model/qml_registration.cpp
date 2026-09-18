@@ -45,6 +45,7 @@ void registerKontainerQmlTypes()
     qmlRegisterUncreatableType<NetworkFilterModel>("org.kde.kontainer", 1, 0, "NetworkFilterModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<VolumeModel>("org.kde.kontainer", 1, 0, "VolumeModel", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<CreateContainerController>("org.kde.kontainer", 1, 0, "CreateContainerController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<DirectoryPicker>("org.kde.kontainer", 1, 0, "DirectoryPicker", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<MountPresetStore>("org.kde.kontainer", 1, 0, "MountPresetStore", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<VolumeDetailController>("org.kde.kontainer", 1, 0, "VolumeDetailController", QStringLiteral("Provided by the KCM"));
     qmlRegisterUncreatableType<VolumeFilterModel>("org.kde.kontainer", 1, 0, "VolumeFilterModel", QStringLiteral("Provided by the KCM"));

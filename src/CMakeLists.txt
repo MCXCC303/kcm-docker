@@ -9,6 +9,8 @@ add_library(kontainer_core STATIC
 
     backend/build_context.cpp
     backend/build_context.h
+    backend/directory_picker.cpp
+    backend/directory_picker.h
     backend/docker_api_version.cpp
     backend/docker_api_version.h
     backend/daemon_config.cpp
@@ -192,6 +194,8 @@ target_link_libraries(kontainer_core
         KF6::ConfigCore
         # 构建上下文打包（八期 §5.2）
         KF6::Archive
+        # 目录选择：QFileDialog（原生对话框由平台提供）
+        Qt6::Widgets
         KF6::CoreAddons
         KF6::I18n
 )

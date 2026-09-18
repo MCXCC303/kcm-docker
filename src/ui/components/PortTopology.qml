@@ -162,8 +162,9 @@ Item {
     /* ------------------------------------------------------------------ */
     /* 分组行：一行 = 一个容器端口 + 它的全部宿主绑定                       */
     /*                                                                     */
-    /* 左列只有一枚芯片（垂直居中于整组），右侧每条绑定各占一行；           */
-    /* 连线从左侧同一个起点分支到每个绑定的终点（§2.1 拓扑形态修订）。       */
+    /* 左列只有一枚芯片，**对齐该组的第一条宿主绑定**（用户反馈 A5：参考      */
+    /* network-example.svg，第一条连线是水平的；居中会让它斜着穿过去）；     */
+    /* 右侧每条绑定各占一行，连线从左侧同一个起点分支到每个绑定的终点。      */
     /* ------------------------------------------------------------------ */
     Column {
         id: rowsColumn
@@ -199,6 +200,13 @@ Item {
 
                     /*! 画了几条分支（= 该容器端口的绑定数）；用例据此断言"合并"确实发生。 */
                     readonly property int branchCount: group.hostChipTexts.length
+                    /*!
+                     * 起点的 y（相对本组）：对齐**第一条**绑定的中心。
+                     *
+                     * 暴露成属性是为了让用例能断言"第一条连线是水平的"（§A5），
+                     * 而不是只能看芯片位置——两者由不同的代码决定，得分别守住。
+                     */
+                    readonly property real originY: topology.bindingRowHeight * 0.5
                     /*! 起点圆环的颜色（= 最下方分支的颜色）。 */
                     readonly property color originColor: link.branchColor(group.hostChipTexts[group.hostChipTexts.length - 1])
                     /*! 每条分支的颜色（顺序与右侧芯片一致）：同一个容器 + 同一条映射永远同色。 */
@@ -245,9 +253,10 @@ Item {
                         }
 
                         const count = group.hostChipTexts.length;
-                        const originY = link.height / 2;
                         // 分支的纵向间距 = 右侧绑定的行高：终点因此正好落在芯片中心
                         const step = topology.bindingRowHeight;
+                        // 起点高度见 originY 属性：对齐第一条绑定的中心（§A5）
+                        const originY = link.originY;
 
                         ctx.lineWidth = link.lineWidth;
                         ctx.lineCap = "round";
@@ -290,15 +299,25 @@ Item {
                     }
                 }
 
-                Local.FieldChip {
-                    objectName: "portContainerChip"
-                    // 靠**右**（靠近中间的节点列）：两侧芯片都朝节点收拢，图才紧凑
+                /* 容器芯片包一层：高度 = 一条绑定的行高，芯片在其中垂直居中 ——
+                   这样它的中心正好落在第一条宿主绑定的中心（起点高度）上 */
+                Item {
+                    objectName: "portContainerChipSlot"
                     anchors.right: parent.right
                     anchors.rightMargin: Math.max(0, parent.width - topology.chipColumnWidth)
-                    anchors.verticalCenter: parent.verticalCenter
-                    // 端口文本是数据，等宽字体更易比对（§1.5）
-                    font.family: "monospace"
-                    text: group.containerChipText
+                    anchors.top: parent.top
+                    width: containerChip.width
+                    height: topology.bindingRowHeight
+
+                    Local.FieldChip {
+                        id: containerChip
+
+                        objectName: "portContainerChip"
+                        anchors.verticalCenter: parent.verticalCenter
+                        // 端口文本是数据，等宽字体更易比对（§1.5）
+                        font.family: "monospace"
+                        text: group.containerChipText
+                    }
                 }
 
                 Column {

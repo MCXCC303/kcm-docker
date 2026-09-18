@@ -14,6 +14,7 @@
 #include "model/image_filter_model.h"
 #include "backend/host_path_service.h"
 #include "backend/credential_store.h"
+#include "backend/directory_picker.h"
 #include "model/daemon_config_controller.h"
 #include "model/operation_controller.h"
 #include "model/registry_auth_controller.h"
@@ -108,6 +109,8 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::CreateContainerController *createContainer READ createContainer CONSTANT)
     /*! 挂载预设（七期 §4.1）：界面上可增删改与"从容器保存"。 */
     Q_PROPERTY(Kontainer::MountPresetStore *mountPresets READ mountPresets CONSTANT)
+    /*! 目录选择（挂载预设的宿主路径用；测试与渲染注入替身）。 */
+    Q_PROPERTY(Kontainer::DirectoryPicker *directoryPicker READ directoryPicker CONSTANT)
     /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
     Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
@@ -183,7 +186,8 @@ public:
                               HostPathService *hostPaths = nullptr,
                               QObject *parent = nullptr,
                               CredentialBackend *credentialBackend = nullptr,
-                              MountPresetStore *mountPresetStore = nullptr);
+                              MountPresetStore *mountPresetStore = nullptr,
+                              DirectoryPicker *directoryPicker = nullptr);
     ~StatusController() override;
 
     State state() const
@@ -328,6 +332,10 @@ public:
     {
         return m_mountPresets;
     }
+    DirectoryPicker *directoryPicker() const
+    {
+        return m_directoryPicker;
+    }
     ContainerDetailController *containerDetail() const
     {
         return m_containerDetail;
@@ -464,6 +472,8 @@ private:
        成员初始化顺序按声明顺序走，放在前面会让向导拿到还没构造的 OperationController。 */
     MountPresetStore *m_mountPresets = nullptr;
     CreateContainerController *m_createContainer = nullptr;
+    /*! 目录选择：默认用系统原生对话框；测试/渲染注入替身。 */
+    DirectoryPicker *m_directoryPicker = nullptr;
     HostPathService *m_hostPaths = nullptr;
     DaemonConfigController *m_daemonConfigUser = nullptr;
     DaemonConfigController *m_daemonConfigSystem = nullptr;

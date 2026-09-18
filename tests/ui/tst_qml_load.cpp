@@ -172,6 +172,8 @@ private Q_SLOTS:
     void commandFieldAndExitHint();
     void stepButtonsNeverLookMultiSelected();
     void detailOffersCopyForCommandAndEntrypoint();
+    void topologyAlignsTheContainerChipWithTheFirstBinding();
+    void portEditorColoursEachRowDifferently();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -1360,6 +1362,7 @@ void QmlLoadTest::presetPanelManagesPresets()
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
     initial.insert(QStringLiteral("store"), QVariant::fromValue(store));
+    initial.insert(QStringLiteral("directoryPicker"), QVariant::fromValue(m_stubKcm->directoryPicker()));
     QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
     QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
     auto *manager = qobject_cast<QQuickItem *>(object.data());
@@ -1403,6 +1406,23 @@ void QmlLoadTest::presetPanelManagesPresets()
     QCOMPARE(store->count(), 1);
     QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
     QTRY_COMPARE(store->count(), 2);
+
+    // 「浏览…」：走注入的替身（真实实现会弹系统文件对话框，测试里不能弹）
+    QQuickItem *browseButton = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        browseButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerBrowse"));
+        return browseButton != nullptr && browseButton->property("visible").toBool();
+    }(), 5000);
+    // 取消（返回空串）：保持原值不变
+    m_stubKcm->directoryPicker()->nextResult = QString();
+    QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
+    QTest::qWait(20);
+    QVERIFY2(!store->presets().isEmpty() && !store->presets().first().source.isEmpty(),
+             "cancelling the picker must not clear the path");
+    // 选中一个目录：写回该行
+    m_stubKcm->directoryPicker()->nextResult = QStringLiteral("/srv/picked");
+    QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
+    QTRY_COMPARE(store->presets().first().source, QStringLiteral("/srv/picked"));
 
     // 删除：**重新找一次**按钮——新增预设会让 Repeater 重铺，之前那个指针已经失效了
     QQuickItem *freshRemoveButton = nullptr;
@@ -2015,6 +2035,163 @@ void QmlLoadTest::detailOffersCopyForCommandAndEntrypoint()
     QQuickItem *entrypointCopy = findItemDeep(window.contentItem(), QStringLiteral("detailEntrypointCopyButton"));
     QVERIFY(entrypointCopy);
     QCOMPARE(entrypointCopy->property("value").toString(), QStringLiteral("/usr/bin/env sh"));
+}
+
+
+/*!
+ * 拓扑对齐（用户实测反馈 A5）：容器芯片与**第一条**宿主绑定同高，第一条连线因此是水平的。
+ */
+void QmlLoadTest::topologyAlignsTheContainerChipWithTheFirstBinding()
+{
+    // 一个容器端口映射到两个宿主地址（第二条应当向下分支）
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-align");
+    detail.name = QStringLiteral("align-demo");
+    detail.state = ContainerState::Running;
+    detail.ports = {{QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
+                    {QStringLiteral("127.0.0.1"), 8888, 20204, QStringLiteral("tcp")}};
+    m_backend->setContainerDetail(detail);
+
+    QQmlComponent component(m_engine.get(),
+                            QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(
+        {
+            {QStringLiteral("containerId"), QStringLiteral("cid-align")},
+        },
+        m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+    m_backend->completeRefresh();
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 2)); // 网络分区（端口拓扑在这里）
+
+    QQuickItem *topology = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        topology = childByObjectName(page, QStringLiteral("portTopology"));
+        return topology != nullptr;
+    }(), 5000);
+
+    QList<QQuickItem *> hostChips;
+    QQuickItem *containerChip = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        hostChips.clear();
+        containerChip = nullptr;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("portHostChip")) {
+                hostChips.append(node);
+            } else if (node->objectName() == QLatin1String("portContainerChip")) {
+                containerChip = node;
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(topology);
+        return hostChips.size() == 2 && containerChip != nullptr;
+    }(), 5000);
+
+    const auto centerY = [](QQuickItem *item) {
+        const QPointF topLeft = item->mapToItem(nullptr, QPointF(0, 0));
+        return topLeft.y() + item->height() / 2.0;
+    };
+    QVERIFY2(qAbs(centerY(hostChips.at(0)) - centerY(containerChip)) <= 1.0,
+             qPrintable(QStringLiteral("container chip y=%1, first binding y=%2")
+                            .arg(centerY(containerChip))
+                            .arg(centerY(hostChips.at(0)))));
+    QVERIFY2(centerY(hostChips.at(1)) > centerY(containerChip) + 4.0, "the second binding must branch downwards");
+
+    // 连线的起点也必须落在第一条绑定的中心（第一条线因此是水平的）：
+    // 这与"芯片位置"由不同的代码决定，所以单独断言（负例：把起点改回整组中心就会失败）
+    QQuickItem *link = nullptr;
+    std::function<void(QQuickItem *)> findLink = [&](QQuickItem *node) {
+        if (!node) {
+            return;
+        }
+        if (node->objectName() == QLatin1String("portMappingLink")) {
+            link = node;
+        }
+        for (QQuickItem *child : node->childItems()) {
+            findLink(child);
+        }
+    };
+    findLink(topology);
+    QVERIFY(link);
+    const qreal bindingRowHeight = topology->property("bindingRowHeight").toReal();
+    QCOMPARE(link->property("originY").toReal(), bindingRowHeight / 2.0);
+    QVERIFY2(link->property("originY").toReal() < link->height() / 2.0,
+             "the origin must NOT sit at the middle of the group (that would make the first line diagonal)");
+}
+
+/*!
+ * 端口编辑器的连线（用户实测反馈 A4）：每行一种颜色、且不写特征标注。
+ */
+void QmlLoadTest::portEditorColoursEachRowDifferently()
+{
+    auto *wizard = m_stubKcm->controller()->createContainer();
+    wizard->clearPortRows();
+    wizard->addPortRow(80, 8080, QStringLiteral("0.0.0.0"), QStringLiteral("tcp"));
+    wizard->addPortRow(443, 0, QStringLiteral("127.0.0.1"), QStringLiteral("tcp"));
+    wizard->addPortRow(53, 5353, QString(), QStringLiteral("udp"));
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PortMappingEditor.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("controller"), QVariant::fromValue(wizard));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *editor = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(editor);
+
+    QQuickWindow window;
+    window.resize(1000, 400);
+    editor->setParentItem(window.contentItem());
+    editor->setWidth(1000);
+    editor->setHeight(400);
+    window.show();
+    QTRY_VERIFY(editor->width() > 0);
+
+    QList<QQuickItem *> links;
+    QList<QQuickItem *> containerChips;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        links.clear();
+        containerChips.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("wizardPortLink")) {
+                links.append(node);
+            } else if (node->objectName() == QLatin1String("wizardContainerPort")) {
+                containerChips.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return links.size() == 3 && containerChips.size() == 3;
+    }(), 5000);
+
+    // 三行的连线颜色互不相同（"每行一种颜色"）
+    QSet<QString> colors;
+    for (QQuickItem *link : links) {
+        colors.insert(link->property("linkColor").value<QColor>().name());
+    }
+    QCOMPARE(colors.size(), 3);
+    // 两侧标注存在（"宿主机" / "容器"）：断言用的是文案来源，而不是硬编码字符串
+    // 两侧标注：按 objectName 断言（不依赖语言，用例可能在英文环境跑）
+    QQuickItem *hostLabel = findItemDeep(window.contentItem(), QStringLiteral("portEditorHostLabel"));
+    QQuickItem *containerLabel = findItemDeep(window.contentItem(), QStringLiteral("portEditorContainerLabel"));
+    QVERIFY2(hostLabel && containerLabel, "the editor must label both sides (host / container)");
+    QVERIFY2(!hostLabel->property("text").toString().isEmpty(), "the host label must not be empty");
 }
 
 

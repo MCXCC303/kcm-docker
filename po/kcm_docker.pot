@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 04:01+0800\n"
+"POT-Creation-Date: 2026-09-19 04:23+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -80,20 +80,20 @@ msgstr ""
 msgid "Unhealthy"
 msgstr ""
 
-#: src/model/status_controller.cpp:103 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:106 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr ""
 
-#: src/model/status_controller.cpp:106
+#: src/model/status_controller.cpp:109
 msgid "The host path is not a directory."
 msgstr ""
 
-#: src/model/status_controller.cpp:109
+#: src/model/status_controller.cpp:112
 #: src/model/container_detail_controller.cpp:54
 msgid "Could not open the file manager: %1"
 msgstr ""
 
-#: src/model/status_controller.cpp:621
+#: src/model/status_controller.cpp:624
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
@@ -571,7 +571,7 @@ msgid "Restart policy"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:945
-#: src/ui/components/PortMappingEditor.qml:161
+#: src/ui/components/PortMappingEditor.qml:163
 msgid "random"
 msgstr ""
 
@@ -580,17 +580,17 @@ msgid "Ports"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:958 src/ui/CreateContainer.qml:114
-#: src/ui/CreateContainer.qml:596
+#: src/ui/CreateContainer.qml:590
 msgid "Mounts"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:970 src/ui/CreateContainer.qml:558
+#: src/model/create_container_controller.cpp:970 src/ui/CreateContainer.qml:552
 msgid "Environment variables"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:973
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:575
+#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:569
 msgid "Labels"
 msgstr ""
 
@@ -707,7 +707,7 @@ msgstr ""
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
 #: src/ui/components/BuildImagePanel.qml:437 src/ui/ContainerDetail.qml:640
-#: src/ui/CreateContainer.qml:990
+#: src/ui/CreateContainer.qml:984
 msgid "Cancel"
 msgstr ""
 
@@ -836,7 +836,7 @@ msgstr ""
 
 #: src/ui/components/KeyValueListEditor.qml:205
 #: src/ui/components/StringListEditor.qml:45
-#: src/ui/components/MountPresetManager.qml:191
+#: src/ui/components/MountPresetManager.qml:231
 msgid "Add"
 msgstr ""
 
@@ -849,12 +849,12 @@ msgid "Paste .env content"
 msgstr ""
 
 #: src/ui/components/StringListEditor.qml:148
-#: src/ui/components/MountPresetManager.qml:134
+#: src/ui/components/MountPresetManager.qml:174
 msgid "Move up"
 msgstr ""
 
 #: src/ui/components/StringListEditor.qml:161
-#: src/ui/components/MountPresetManager.qml:141
+#: src/ui/components/MountPresetManager.qml:181
 msgid "Move down"
 msgstr ""
 
@@ -1061,7 +1061,7 @@ msgid "Allow containers to be attached at runtime"
 msgstr ""
 
 #: src/ui/components/CreateNetworkDialog.qml:205 src/ui/MainPage.qml:984
-#: src/ui/CreateContainer.qml:978
+#: src/ui/CreateContainer.qml:972
 msgid "Create"
 msgstr ""
 
@@ -1227,104 +1227,110 @@ msgid ""
 "Builds you start stay in this list, so you can keep working while one runs."
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:111 src/ui/ContainerDetail.qml:55
+#: src/ui/components/PortMappingEditor.qml:112
+#: src/ui/components/MountPresetManager.qml:99 src/ui/ContainerDetail.qml:55
 msgid "Host"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:122 src/ui/ContainerDetail.qml:292
+#: src/ui/components/PortMappingEditor.qml:124
+#: src/ui/components/MountPresetManager.qml:108 src/ui/ContainerDetail.qml:292
 #: src/ui/ContainerDetail.qml:843
 msgid "Container"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:150
+#: src/ui/components/PortMappingEditor.qml:152
 msgid "Host address"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:208
+#: src/ui/components/PortMappingEditor.qml:239
 msgid "TCP"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:209
+#: src/ui/components/PortMappingEditor.qml:240
 msgid "UDP"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:219
+#: src/ui/components/PortMappingEditor.qml:250
 msgid "Remove this port"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:227
+#: src/ui/components/PortMappingEditor.qml:258
 msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:235
+#: src/ui/components/PortMappingEditor.qml:266
 msgid "Add port"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:244
+#: src/ui/components/PortMappingEditor.qml:275
 msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:63
+#: src/ui/components/MountPresetManager.qml:65
 msgid ""
 "No presets yet. Add one below, or save a mount as a preset from a "
 "container's details."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:97
-#: src/ui/components/MountPresetManager.qml:176
+#: src/ui/components/MountPresetManager.qml:121
+#: src/ui/components/MountPresetManager.qml:216
 msgid "Host path or volume name"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:98
+#: src/ui/components/MountPresetManager.qml:122
 msgid "Preset source"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:111
-#: src/ui/components/MountPresetManager.qml:185 src/ui/CreateContainer.qml:692
-#: src/ui/CreateContainer.qml:693
+#: src/ui/components/MountPresetManager.qml:132
+msgid "Browse…"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:151
+#: src/ui/components/MountPresetManager.qml:225 src/ui/CreateContainer.qml:686
+#: src/ui/CreateContainer.qml:687
 msgid "Container path"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:112
+#: src/ui/components/MountPresetManager.qml:152
 msgid "Preset destination"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:119 src/ui/CreateContainer.qml:699
+#: src/ui/components/MountPresetManager.qml:159 src/ui/CreateContainer.qml:693
 msgid "Read-only"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:126
+#: src/ui/components/MountPresetManager.qml:166
 msgid "Favourite"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:148
+#: src/ui/components/MountPresetManager.qml:188
 msgid "Remove this preset"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:156 src/ui/CreateContainer.qml:674
+#: src/ui/components/MountPresetManager.qml:196 src/ui/CreateContainer.qml:668
 msgid "Named volume"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:162
+#: src/ui/components/MountPresetManager.qml:202
 msgid "%1 to %2"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:177
+#: src/ui/components/MountPresetManager.qml:217
 msgid "New preset source"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:186
+#: src/ui/components/MountPresetManager.qml:226
 msgid "New preset destination"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:216
+#: src/ui/components/MountPresetManager.qml:256
 msgid ""
 "Bind mounts need an absolute host path (use a volume name for a named "
 "volume)."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:220 src/ui/CreateContainer.qml:148
+#: src/ui/components/MountPresetManager.qml:260 src/ui/CreateContainer.qml:148
 msgid "The container path must be absolute."
 msgstr ""
 
@@ -1402,7 +1408,7 @@ msgstr ""
 #: src/ui/ImageDetail.qml:159 src/ui/ContainerDetail.qml:331 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:960
+#: src/ui/CreateContainer.qml:954
 msgid "Back"
 msgstr ""
 
@@ -2267,7 +2273,7 @@ msgid "Clean up unused…"
 msgstr ""
 
 #: src/ui/MainPage.qml:978 src/ui/MainPage.qml:979
-#: src/ui/CreateContainer.qml:684
+#: src/ui/CreateContainer.qml:678
 msgid "Volume name"
 msgstr ""
 
@@ -3169,106 +3175,102 @@ msgstr ""
 msgid "Published ports"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:537
-msgid "Leave the host port empty to let Docker pick a free one."
-msgstr ""
-
-#: src/ui/CreateContainer.qml:606
+#: src/ui/CreateContainer.qml:600
 msgid "Quick add from your presets:"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:611
+#: src/ui/CreateContainer.qml:605
 msgid "Manage them in the “Mount presets” tab."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:644
+#: src/ui/CreateContainer.qml:638
 msgid ""
 "No presets yet — add some in the “Mount presets” tab to get one-click mounts "
 "here."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:673 src/ui/CreateContainer.qml:684
+#: src/ui/CreateContainer.qml:667 src/ui/CreateContainer.qml:678
 msgid "Host path"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:675
+#: src/ui/CreateContainer.qml:669
 msgid "tmpfs"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:685
+#: src/ui/CreateContainer.qml:679
 msgid "Mount source"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:707
+#: src/ui/CreateContainer.qml:701
 msgid "Remove this mount"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:715
+#: src/ui/CreateContainer.qml:709
 msgid "Add mount"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:722
+#: src/ui/CreateContainer.qml:716
 msgid ""
 "A host path that does not exist yet is fine: Docker creates the directory."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:737
+#: src/ui/CreateContainer.qml:731
 msgid "Resources and privileges"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:745
+#: src/ui/CreateContainer.qml:739
 msgid "Memory limit (MiB):"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:756 src/ui/CreateContainer.qml:780
+#: src/ui/CreateContainer.qml:750 src/ui/CreateContainer.qml:774
 msgid "No limit"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:767
+#: src/ui/CreateContainer.qml:761
 msgid "CPU limit (cores):"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:800
+#: src/ui/CreateContainer.qml:794
 msgid "Run with extended privileges (--privileged)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:817
+#: src/ui/CreateContainer.qml:811
 msgid ""
 "This container runs with the same access as root on the host. Only use it "
 "when you know why."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:830
+#: src/ui/CreateContainer.qml:824
 msgid "Review and create"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:863
+#: src/ui/CreateContainer.qml:857
 msgid ""
 "Environment variable values are not shown here on purpose; only their names."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:944
+#: src/ui/CreateContainer.qml:938
 msgid "Run with extended privileges"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:945
+#: src/ui/CreateContainer.qml:939
 msgid "Give this container the same access as root on the host?"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:946
+#: src/ui/CreateContainer.qml:940
 msgid ""
 "The container can access all devices and host files. Only continue if you "
 "trust the image. Type the container name to confirm."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:947
+#: src/ui/CreateContainer.qml:941
 msgid "Yes, run privileged"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:969
+#: src/ui/CreateContainer.qml:963
 msgid "Next"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:978
+#: src/ui/CreateContainer.qml:972
 msgid "Create and start"
 msgstr ""

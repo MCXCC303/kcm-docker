@@ -1177,6 +1177,7 @@ Kirigami.Page {
                     objectName: "mountPresetManager"
                     Layout.fillWidth: true
                     store: root.controller.mountPresets
+                    directoryPicker: root.controller.directoryPicker
                 }
             }
         }
