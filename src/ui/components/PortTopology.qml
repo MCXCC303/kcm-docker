@@ -185,6 +185,8 @@ Item {
                 required property string containerChipText
                 /*! 右侧每一枚芯片的文本（一个容器端口可能有多条绑定）。 */
                 required property var hostChipTexts
+                /*! 与 `hostChipTexts` 同序：该绑定是否代表 IPv4 + IPv6（画双环）。 */
+                required property var dualStackFlags
 
                 objectName: "portMappingRow"
                 width: topology.width
@@ -278,6 +280,23 @@ Item {
                             ctx.beginPath();
                             ctx.arc(targetX, targetY, link.dotRadius, 0, Math.PI * 2);
                             ctx.fill();
+                            /*
+                             * 双栈（IPv4 + IPv6 通配）：外面再套一圈**另一种颜色**的环。
+                             *
+                             * Docker 对"没指定宿主地址"的映射会同时建 `0.0.0.0:<port>` 与
+                             * `[::]:<port>`；控制器已把它们合并成一条，这里用双环表示"两种协议栈"，
+                             * 免得看起来像只映射了一次。
+                             */
+                            const dualStack = group.dualStackFlags.length > i && group.dualStackFlags[i] === true;
+                            if (dualStack) {
+                                ctx.strokeStyle = Local.ChartPalette.connectionColor(topology.colorSeed + "|"
+                                                                                    + group.containerChipText + "|ipv6");
+                                ctx.lineWidth = Math.max(1, link.lineWidth * 0.5);
+                                ctx.beginPath();
+                                ctx.arc(targetX, targetY, link.dotRadius * 1.32, 0, Math.PI * 2);
+                                ctx.stroke();
+                                ctx.lineWidth = link.lineWidth;
+                            }
                             ctx.fillStyle = Kirigami.Theme.backgroundColor;
                             ctx.beginPath();
                             ctx.arc(targetX, targetY, link.dotRadius * 0.42, 0, Math.PI * 2);

@@ -35,6 +35,7 @@ private Q_SLOTS:
     void groupsBindingsOfTheSameContainerPort();
     void groupingKeepsProtocolsApartAndIgnoresUnpublished();
     void groupsDoNotResetWhenUnchanged();
+    void dualStackMergeIsPicky();
 
 private:
     ContainerDetail detailWithPorts(const QList<Port> &ports);
@@ -195,7 +196,8 @@ void PortMappingModelTest::groupsBindingsOfTheSameContainerPort()
     PortMappingGroupModel *groups = controller.portGroups();
     QVERIFY(groups);
     QCOMPARE(groups->count(), 2);
-    QCOMPARE(groups->bindingCount(), 4);
+    // 4 条原始映射里，`0.0.0.0:20004` 与 `::20004` 是同一份映射的 IPv4/IPv6 两条 → 合并
+    QCOMPARE(groups->bindingCount(), 3);
 
     const QModelIndex first = groups->index(0, 0);
     QCOMPARE(first.data(PortMappingGroupModel::ContainerChipTextRole).toString(), QStringLiteral("4800/tcp"));
@@ -203,10 +205,13 @@ void PortMappingModelTest::groupsBindingsOfTheSameContainerPort()
 
     const QModelIndex second = groups->index(1, 0);
     QCOMPARE(second.data(PortMappingGroupModel::ContainerChipTextRole).toString(), QStringLiteral("8888/tcp"));
-    QCOMPARE(second.data(PortMappingGroupModel::BindingCountRole).toInt(), 3);
+    QCOMPARE(second.data(PortMappingGroupModel::BindingCountRole).toInt(), 2);
     // 组内顺序确定：按宿主端口、宿主地址（刷新时行不会跳）
     QCOMPARE(second.data(PortMappingGroupModel::HostChipTextsRole).toStringList(),
-             QStringList({QStringLiteral("0.0.0.0:20004"), QStringLiteral(":::20004"), QStringLiteral("127.0.0.1:20204")}));
+             QStringList({QStringLiteral("20004"), QStringLiteral("127.0.0.1:20204")}));
+    // 合并后的那条标记为双栈（界面据此画双环）
+    QCOMPARE(second.data(PortMappingGroupModel::DualStackFlagsRole).toList(),
+             QVariantList({true, false}));
 }
 
 void PortMappingModelTest::groupingKeepsProtocolsApartAndIgnoresUnpublished()
@@ -257,6 +262,53 @@ void PortMappingModelTest::groupsDoNotResetWhenUnchanged()
     QCOMPARE(controller.portGroups()->count(), 1);
     QCOMPARE(controller.portGroups()->bindingCount(), 2);
 }
+
+/*!
+ * IPv4/IPv6 通配合并必须"挑剔"：只有**同一容器端口 + 同一宿主端口 + 两种通配**才合并。
+ *
+ * 否则会把"真的映射了两次"（例如两个不同的宿主端口、或通配 + 具体地址）
+ * 错并成一条，用户就看不到自己实际有两条映射了。
+ */
+void PortMappingModelTest::dualStackMergeIsPicky()
+{
+    MockDockerBackend backend;
+    ContainerDetailController controller(&backend);
+
+    backend.setContainerDetail(detailWithPorts({
+        // 同一个容器端口 → 两个**不同**的宿主端口：不合
+        Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
+        Port {QStringLiteral("::"), 80, 8081, QStringLiteral("tcp")},
+        // 两种通配但宿主端口不同：不合
+        Port {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
+        Port {QStringLiteral("::"), 443, 9443, QStringLiteral("tcp")},
+        // 通配 + 具体地址（同一端口）：不合——用户确实绑了两个地址
+        Port {QStringLiteral("0.0.0.0"), 53, 5353, QStringLiteral("udp")},
+        Port {QStringLiteral("127.0.0.1"), 53, 5353, QStringLiteral("udp")},
+        // 真正的一对：唯一会被合并的
+        Port {QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
+        Port {QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")},
+    }));
+
+    controller.setContainerId(QStringLiteral("cid-1"));
+    controller.start();
+    backend.completeRefresh();
+
+    PortMappingGroupModel *groups = controller.portGroups();
+    QVERIFY(groups);
+    // 8 条原始映射 - 1 次合并 = 7
+    QCOMPARE(groups->bindingCount(), 7);
+    int dualStackCount = 0;
+    for (int row = 0; row < groups->count(); ++row) {
+        const QVariantList flags = groups->index(row, 0).data(PortMappingGroupModel::DualStackFlagsRole).toList();
+        for (const QVariant &flag : flags) {
+            if (flag.toBool()) {
+                ++dualStackCount;
+            }
+        }
+    }
+    QCOMPARE(dualStackCount, 1);
+}
+
 
 QTEST_MAIN(PortMappingModelTest)
 

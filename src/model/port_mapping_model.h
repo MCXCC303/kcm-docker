@@ -26,6 +26,14 @@ struct PortMappingEntry {
     QString hostIp;
     /*! 宿主端口；0 表示没有发布。 */
     quint16 hostPort = 0;
+    /*!
+     * 这一条同时代表 IPv4 与 IPv6 的通配绑定。
+     *
+     * Docker 对"没有指定宿主地址"的映射会同时建 `0.0.0.0:<port>` 与 `[::]:<port>` 两条；
+     * 拓扑图把它们画成两个节点只会让人以为映射了两份，因此控制器合并成一条并打上这个标记，
+     * 界面用"双环"表示"IPv4 + IPv6"。
+     */
+    bool dualStack = false;
 
     bool isPublished() const
     {
@@ -38,7 +46,8 @@ struct PortMappingEntry {
 
     friend bool operator==(const PortMappingEntry &lhs, const PortMappingEntry &rhs)
     {
-        return lhs.containerPort == rhs.containerPort && lhs.protocol == rhs.protocol && lhs.hostIp == rhs.hostIp && lhs.hostPort == rhs.hostPort;
+        return lhs.containerPort == rhs.containerPort && lhs.protocol == rhs.protocol && lhs.hostIp == rhs.hostIp && lhs.hostPort == rhs.hostPort
+            && lhs.dualStack == rhs.dualStack;
     }
 };
 

@@ -53,6 +53,14 @@ QVariant PortMappingGroupModel::data(const QModelIndex &index, int role) const
         return group.containerChipText();
     case HostChipTextsRole:
         return group.hostChipTexts();
+    case DualStackFlagsRole: {
+        QVariantList flags;
+        flags.reserve(group.bindings.size());
+        for (const PortMappingEntry &binding : group.bindings) {
+            flags.append(binding.dualStack);
+        }
+        return flags;
+    }
     case BindingCountRole:
         return int(group.bindings.size());
     default:
@@ -68,6 +76,7 @@ QHash<int, QByteArray> PortMappingGroupModel::roleNames() const
         {ProtocolRole, QByteArrayLiteral("protocol")},
         {ContainerChipTextRole, QByteArrayLiteral("containerChipText")},
         {HostChipTextsRole, QByteArrayLiteral("hostChipTexts")},
+        {DualStackFlagsRole, QByteArrayLiteral("dualStackFlags")},
         {BindingCountRole, QByteArrayLiteral("bindingCount")},
     };
 }

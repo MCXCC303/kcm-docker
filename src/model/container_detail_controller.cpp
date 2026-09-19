@@ -276,6 +276,27 @@ void ContainerDetailController::rebuildLists()
     m_environment->setEntries(environment);
 }
 
+namespace
+{
+/*! 通配地址（IPv4 的 0.0.0.0 / IPv6 的 :: 或 [::]）。 */
+bool isWildcardAddress(const QString &hostIp)
+{
+    return hostIp.isEmpty() || hostIp == QLatin1String("0.0.0.0") || hostIp == QLatin1String("::") || hostIp == QLatin1String("[::]");
+}
+
+/*! 通配地址属于哪一族：4 / 6（非通配返回 0）。 */
+int wildcardFamily(const QString &hostIp)
+{
+    if (hostIp.isEmpty() || hostIp == QLatin1String("0.0.0.0")) {
+        return 4;
+    }
+    if (hostIp == QLatin1String("::") || hostIp == QLatin1String("[::]")) {
+        return 6;
+    }
+    return 0;
+}
+} // namespace
+
 void ContainerDetailController::rebuildPorts()
 {
     QList<PortMappingEntry> published;
@@ -287,7 +308,25 @@ void ContainerDetailController::rebuildPorts()
         entry.hostIp = port.ip;
         entry.hostPort = port.publicPort;
         if (entry.isPublished()) {
-            published.append(entry);
+            /*
+             * IPv4/IPv6 通配合并（实测需求）：没指定宿主地址时 Docker 会同时建
+             * `0.0.0.0:<port>` 与 `[::]:<port>` 两条，画成两个节点会被误读成"映射了两份"。
+             * 同一个容器端口 + 同一个宿主端口 + 分别是两种通配 → 合成一条并标记 dualStack。
+             */
+            bool merged = false;
+            for (PortMappingEntry &existing : published) {
+                if (existing.containerPort == entry.containerPort && existing.protocol == entry.protocol
+                    && existing.hostPort == entry.hostPort && !existing.dualStack
+                    && isWildcardAddress(existing.hostIp) && isWildcardAddress(entry.hostIp)
+                    && wildcardFamily(existing.hostIp) != wildcardFamily(entry.hostIp)) {
+                    existing.dualStack = true;
+                    merged = true;
+                    break;
+                }
+            }
+            if (!merged) {
+                published.append(entry);
+            }
         } else {
             unpublished.append(entry);
         }

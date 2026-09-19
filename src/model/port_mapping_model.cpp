@@ -18,6 +18,10 @@ QString PortMappingEntry::hostChipText() const
     if (!isPublished()) {
         return {};
     }
+    if (dualStack) {
+        // 合并后的"所有接口（IPv4+IPv6）"：地址由拓扑图的双环表达，文字只留端口
+        return QString::number(hostPort);
+    }
     return QStringLiteral("%1:%2").arg(hostIp.isEmpty() ? QStringLiteral("0.0.0.0") : hostIp).arg(hostPort);
 }
 

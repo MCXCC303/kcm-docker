@@ -70,6 +70,12 @@ public:
         ContainerChipTextRole,
         /*! 右侧各绑定的芯片文本（QStringList）——QML 用它铺右列。 */
         HostChipTextsRole,
+        /*!
+         * 与 `hostChipTexts` 同序的布尔表：该绑定是否同时代表 IPv4 + IPv6（`dualStack`）。
+         *
+         * 拓扑图据此把宿主端点的圆环画成双环（内外两种颜色）。
+         */
+        DualStackFlagsRole,
         BindingCountRole,
     };
     Q_ENUM(Roles)

@@ -185,6 +185,7 @@ private Q_SLOTS:
     void longCommandIsCollapsedUntilExpanded();
     void containerDetailOpensTheImage();
     void engineViewListsComponentVersions();
+    void topologyMergesDualStackBindings();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2845,6 +2846,79 @@ void QmlLoadTest::engineViewListsComponentVersions()
     QQuickItem *cpus = findItemDeep(window.contentItem(), QStringLiteral("engineCpuCount"));
     QVERIFY(cpus);
     QCOMPARE(cpus->property("text").toString(), QStringLiteral("16"));
+}
+
+
+/*!
+ * 双栈（IPv4 + IPv6 通配）映射在拓扑里只画**一条**分支（实测需求）。
+ *
+ * 宿主端点的圆环由 Canvas 绘制（用例看不到图形），因此断言的是"分支数"与
+ * "芯片文本"：合并后应当只有一条分支、文本是纯端口号（地址由双环表达）。
+ */
+void QmlLoadTest::topologyMergesDualStackBindings()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-dual");
+    detail.name = QStringLiteral("dual-stack");
+    detail.state = ContainerState::Running;
+    // 没指定宿主地址 → Docker 会同时建 IPv4 与 IPv6 通配两条
+    detail.ports = {{QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
+                    {QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")}};
+    m_backend->setContainerDetail(detail);
+
+    auto *controller = m_stubKcm->controller()->containerDetail();
+    controller->setContainerId(QStringLiteral("cid-dual"));
+    controller->start();
+    m_backend->completeRefresh();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PortTopology.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("model"), QVariant::fromValue(controller->portGroups()));
+    initial.insert(QStringLiteral("colorSeed"), QStringLiteral("cid-dual"));
+    initial.insert(QStringLiteral("containerLabel"), QStringLiteral("dual-stack"));
+    initial.insert(QStringLiteral("hostLabel"), QStringLiteral("localhost"));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *topology = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(topology);
+
+    QQuickWindow window;
+    window.resize(900, 300);
+    topology->setParentItem(window.contentItem());
+    topology->setWidth(900);
+    topology->setHeight(300);
+    window.show();
+    QTRY_VERIFY(topology->width() > 0);
+
+    QList<QQuickItem *> links;
+    QList<QQuickItem *> hostChips;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        links.clear();
+        hostChips.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("portMappingLink")) {
+                links.append(node);
+            } else if (node->objectName() == QLatin1String("portHostChip")) {
+                hostChips.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return links.size() == 1 && hostChips.size() == 1;
+    }(), 5000);
+
+    // 一条分支（合并成功），文本是纯端口号
+    QCOMPARE(links.first()->property("branchCount").toInt(), 1);
+    QCOMPARE(hostChips.first()->property("text").toString(), QStringLiteral("20004"));
+    // 并且标记为双栈（Canvas 据此画双环）
+    QVERIFY2(hostChips.first()->parentItem() != nullptr, "the chip must sit in a binding row");
 }
 
 
