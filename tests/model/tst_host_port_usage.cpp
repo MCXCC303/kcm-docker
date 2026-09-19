@@ -43,6 +43,8 @@ private Q_SLOTS:
     void rangeClusteringCapsVeryLongRanges();
     void stoppedContainersKeepTheirDeclaredPortsAsReserved();
     void rangeUsedCountCountsPortsNotDeclarations();
+    void reservedPortThatIsTakenByAnotherContainerIsMarked();
+    void sortingByContainerReallyReordersRows();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -546,6 +548,98 @@ void HostPortUsageTest::rangeUsedCountCountsPortsNotDeclarations()
     QCOMPARE(ranges.first().first, quint16(47268));
     QCOMPARE(ranges.first().last, quint16(47309));
     QCOMPARE(ranges.first().usedCount, 42);
+}
+
+
+/*!
+ * 未运行容器的声明端口如果**已被别的容器占着**，要单独标出来（用户要求红色的"被占用"）。
+ *
+ * 语义差别很实在：`reserved` 只是"现在是空的，它一起来会要回去"；
+ * `reservedTaken` 是"它一起来就会端口冲突、直接启动失败"。
+ */
+void HostPortUsageTest::reservedPortThatIsTakenByAnotherContainerIsMarked()
+{
+    Container running;
+    running.id = QStringLiteral("run-id");
+    running.name = QStringLiteral("noreva-medai");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 8888, 20002, QStringLiteral("tcp")}};
+
+    Container stopped;
+    stopped.id = QStringLiteral("stop-id");
+    stopped.name = QStringLiteral("ml-medai");
+    stopped.state = ContainerState::Exited;
+
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    // 同一台机器上：一个未运行的容器声明了**已经被别人占着**的 20002，另一个声明的是空闲的 20003
+    declared.insert(stopped.id, {DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20002, 20002},
+                                 DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20003, 20003}});
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running, stopped}, declared);
+    QCOMPARE(entries.size(), 3);
+
+    // 同一端口上会有两条（占着的那个 + 声明它的那个），顺序是"端口 → 容器名"
+    const auto stateOf = [&entries](const QString &containerName, quint16 port) {
+        for (const HostPortEntry &entry : entries) {
+            if (entry.containerName == containerName && entry.hostPort == port) {
+                return entry.stateKey;
+            }
+        }
+        return QString();
+    };
+    QCOMPARE(stateOf(QStringLiteral("noreva-medai"), 20002), QStringLiteral("inUse"));
+    QCOMPARE(stateOf(QStringLiteral("ml-medai"), 20002), QStringLiteral("reservedTaken")); // 未运行 + 端口被占
+    QCOMPARE(stateOf(QStringLiteral("ml-medai"), 20003), QStringLiteral("reserved")); // 未运行 + 端口空着
+
+    // "未启动"这个过滤项要把两种都选进来
+    HostPortModel model;
+    model.setEntries(entries);
+    HostPortFilterModel filter;
+    filter.setSourceModel(&model);
+    filter.setStateFilter(QStringLiteral("reserved"));
+    QCOMPARE(filter.count(), 2);
+    filter.setStateFilter(QStringLiteral("inUse"));
+    QCOMPARE(filter.count(), 1);
+}
+
+/*!
+ * 排序必须真的生效（用户实测"排序功能失效"）。
+ *
+ * 之前 `updateSorting()` 只调 `sort(0, AscendingOrder)`：列与方向都没变时
+ * Qt 认为无事可做，换了排序键也不重排。这里用**两种顺序不一致**的数据守住它：
+ * 端口最小的那个容器名反而排在后面。
+ */
+void HostPortUsageTest::sortingByContainerReallyReordersRows()
+{
+    Container alpha;
+    alpha.id = QStringLiteral("alpha-id");
+    alpha.name = QStringLiteral("alpha");
+    alpha.state = ContainerState::Running;
+    alpha.ports = {{QStringLiteral("0.0.0.0"), 80, 9000, QStringLiteral("tcp")}};
+
+    Container zulu;
+    zulu.id = QStringLiteral("zulu-id");
+    zulu.name = QStringLiteral("zulu");
+    zulu.state = ContainerState::Running;
+    zulu.ports = {{QStringLiteral("0.0.0.0"), 80, 8000, QStringLiteral("tcp")}};
+
+    HostPortModel model;
+    model.setEntries(HostPortUsage::entriesFor({alpha, zulu}));
+    HostPortFilterModel filter;
+    filter.setSourceModel(&model);
+
+    // 默认按端口：8000（zulu）在前
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 8000);
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("zulu"));
+
+    // 换成按容器名：alpha（端口 9000）必须排到前面——只调 sort() 是不够的
+    filter.setSortKey(QStringLiteral("container"));
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("alpha"));
+    QCOMPARE(filter.index(1, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("zulu"));
+
+    // 换回端口排序也要立即生效
+    filter.setSortKey(QStringLiteral("port"));
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 8000);
 }
 
 

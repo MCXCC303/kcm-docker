@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 23:05+0800\n"
+"POT-Creation-Date: 2026-09-19 23:21+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -33,7 +33,7 @@ msgid "Restarting"
 msgstr "重启中"
 
 #: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
-#: src/ui/components/HostPortList.qml:74 src/ui/MainPage.qml:88
+#: src/ui/components/HostPortList.qml:76 src/ui/MainPage.qml:88
 #: src/ui/MainPage.qml:530
 msgid "Running"
 msgstr "运行中"
@@ -189,7 +189,7 @@ msgid "less than a minute"
 msgstr "不到一分钟"
 
 #: src/model/create_container_controller.cpp:1004
-#: src/ui/components/HostPortList.qml:164 src/ui/ImageDetail.qml:114
+#: src/ui/components/HostPortList.qml:171 src/ui/ImageDetail.qml:114
 #: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr "镜像"
@@ -1440,7 +1440,7 @@ msgid "Host"
 msgstr "宿主机"
 
 #: src/ui/components/PortMappingEditor.qml:155
-#: src/ui/components/HostPortList.qml:155 src/ui/ContainerDetail.qml:310
+#: src/ui/components/HostPortList.qml:162 src/ui/ContainerDetail.qml:310
 #: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr "容器"
@@ -1450,12 +1450,12 @@ msgid "Host address"
 msgstr "宿主机地址"
 
 #: src/ui/components/PortMappingEditor.qml:221
-#: src/ui/components/HostPortList.qml:119
+#: src/ui/components/HostPortList.qml:126
 msgid "Host port"
 msgstr "宿主端口"
 
 #: src/ui/components/PortMappingEditor.qml:292
-#: src/ui/components/HostPortList.qml:137
+#: src/ui/components/HostPortList.qml:144
 msgid "Container port"
 msgstr "容器端口"
 
@@ -1522,39 +1522,48 @@ msgstr "端口 %1：%2"
 msgid "Port %1: free"
 msgstr "端口 %1：空闲"
 
-#: src/ui/components/HostPortList.qml:76
+#: src/ui/components/HostPortList.qml:78
 msgid "Not bound"
 msgstr "未占用"
 
-#: src/ui/components/HostPortList.qml:78
+#: src/ui/components/HostPortList.qml:81
+msgid "Taken"
+msgstr "被占用"
+
+#: src/ui/components/HostPortList.qml:83
 msgid "Not started"
 msgstr "未启动"
 
-#: src/ui/components/HostPortList.qml:84
+#: src/ui/components/HostPortList.qml:89
 msgid "A running container publishes this port."
 msgstr "运行中的容器正在发布这个端口。"
 
-#: src/ui/components/HostPortList.qml:86
+#: src/ui/components/HostPortList.qml:91
 msgid ""
 "The container is running, but this declared mapping is not actually bound on "
 "the host."
 msgstr "容器在运行，但这条声明的映射并没有真正绑到宿主机上（映射没生效）。"
 
-#: src/ui/components/HostPortList.qml:88
+#: src/ui/components/HostPortList.qml:93
 msgid ""
-"The container is not running and does not hold this port now, but will take "
-"it back when started."
-msgstr "容器没在运行，现在不占用这个端口；但它一启动就会把端口要回去。"
+"This port is currently used by another container, so this container will "
+"fail to start with a port conflict."
+msgstr "这个端口现在被另一个容器占用，该容器启动时会因为端口冲突失败。"
 
-#: src/ui/components/HostPortList.qml:128
+#: src/ui/components/HostPortList.qml:95
+#, fuzzy
+msgid "This container needs to publish this port when it starts."
+msgstr "该容器在启动时需要发布这个端口。"
+
+#: src/ui/components/HostPortList.qml:135
 msgid "Bind address"
 msgstr "绑定地址"
 
-#: src/ui/components/HostPortList.qml:146
+#: src/ui/components/HostPortList.qml:153
 msgid "State"
 msgstr "状态"
 
-#: src/ui/components/HostPortList.qml:222
+#: src/ui/components/HostPortList.qml:229
 msgid "All interfaces"
 msgstr "所有接口"
 
@@ -3383,6 +3392,11 @@ msgstr "移除为“%1”保存的凭据吗？"
 #: src/ui/RegistryAuthPage.qml:314
 msgid "Pulling private images from this registry will need a new login."
 msgstr "之后拉取该仓库的私有镜像需要重新登录。"
+
+#~ msgid ""
+#~ "The container is not running and does not hold this port now, but will "
+#~ "take it back when started."
+#~ msgstr "容器没在运行，现在不占用这个端口；但它一启动就会把端口要回去。"
 
 #~ msgid "hidden by default"
 #~ msgstr "默认隐藏"

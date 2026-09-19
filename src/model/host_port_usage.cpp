@@ -135,8 +135,24 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
             entry.ipv6 = wildcardFamily(binding.hostIp) == 6;
             entry.containerPort = binding.containerPort;
             entry.protocol = binding.protocol;
-            entry.stateKey = holdsHostPorts(container.state) ? QStringLiteral("declaredNotPublished")
-                                                            : QStringLiteral("reserved");
+            if (holdsHostPorts(container.state)) {
+                entry.stateKey = QStringLiteral("declaredNotPublished");
+            } else {
+                /*
+                 * 没在运行的容器：端口声明还在，但**这个端口现在被别的容器占着**时
+                 * 它一起来就会因为端口冲突失败（用户要求标红"被占用"）。
+                 */
+                const bool taken = std::any_of(entries.cbegin(), entries.cend(), [&](const HostPortEntry &other) {
+                    if (other.stateKey != QLatin1String("inUse") || other.containerId == container.id) {
+                        return false;
+                    }
+                    const quint16 otherLast = other.hostPortEnd != 0 ? other.hostPortEnd : other.hostPort;
+                    const quint16 declaredLast = binding.hostPortEnd != 0 ? binding.hostPortEnd : binding.hostPort;
+                    return other.hostPort <= declaredLast && otherLast >= binding.hostPort
+                        && hostBindingsOverlap(other.hostIp, binding.hostIp);
+                });
+                entry.stateKey = taken ? QStringLiteral("reservedTaken") : QStringLiteral("reserved");
+            }
             entry.containerId = container.id;
             entry.containerName = container.name;
             entry.containerImage = container.image;

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 23:05+0800\n"
+"POT-Creation-Date: 2026-09-19 23:21+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -39,7 +39,7 @@ msgid "Restarting"
 msgstr ""
 
 #: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
-#: src/ui/components/HostPortList.qml:74 src/ui/MainPage.qml:88
+#: src/ui/components/HostPortList.qml:76 src/ui/MainPage.qml:88
 #: src/ui/MainPage.qml:530
 msgid "Running"
 msgstr ""
@@ -195,7 +195,7 @@ msgid "less than a minute"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:1004
-#: src/ui/components/HostPortList.qml:164 src/ui/ImageDetail.qml:114
+#: src/ui/components/HostPortList.qml:171 src/ui/ImageDetail.qml:114
 #: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr ""
@@ -1433,7 +1433,7 @@ msgid "Host"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:155
-#: src/ui/components/HostPortList.qml:155 src/ui/ContainerDetail.qml:310
+#: src/ui/components/HostPortList.qml:162 src/ui/ContainerDetail.qml:310
 #: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr ""
@@ -1443,12 +1443,12 @@ msgid "Host address"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:221
-#: src/ui/components/HostPortList.qml:119
+#: src/ui/components/HostPortList.qml:126
 msgid "Host port"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:292
-#: src/ui/components/HostPortList.qml:137
+#: src/ui/components/HostPortList.qml:144
 msgid "Container port"
 msgstr ""
 
@@ -1516,39 +1516,47 @@ msgstr ""
 msgid "Port %1: free"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:76
+#: src/ui/components/HostPortList.qml:78
 msgid "Not bound"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:78
+#: src/ui/components/HostPortList.qml:81
+msgid "Taken"
+msgstr ""
+
+#: src/ui/components/HostPortList.qml:83
 msgid "Not started"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:84
+#: src/ui/components/HostPortList.qml:89
 msgid "A running container publishes this port."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:86
+#: src/ui/components/HostPortList.qml:91
 msgid ""
 "The container is running, but this declared mapping is not actually bound on "
 "the host."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:88
+#: src/ui/components/HostPortList.qml:93
 msgid ""
-"The container is not running and does not hold this port now, but will take "
-"it back when started."
+"This port is currently used by another container, so this container will "
+"fail to start with a port conflict."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:128
+#: src/ui/components/HostPortList.qml:95
+msgid "This container needs to publish this port when it starts."
+msgstr ""
+
+#: src/ui/components/HostPortList.qml:135
 msgid "Bind address"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:146
+#: src/ui/components/HostPortList.qml:153
 msgid "State"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:222
+#: src/ui/components/HostPortList.qml:229
 msgid "All interfaces"
 msgstr ""
 

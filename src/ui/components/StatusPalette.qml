@@ -59,6 +59,7 @@ QtObject {
         case "declaredNotPublished":
             return Kirigami.Theme.negativeBackgroundColor;
         case "reserved":
+        case "reservedTaken":
             return Kirigami.Theme.neutralBackgroundColor;
         default:
             return Kirigami.Theme.backgroundColor;

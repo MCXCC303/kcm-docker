@@ -270,7 +270,7 @@ int StatusController::reservedPortCount() const
 {
     int count = 0;
     for (const HostPortEntry &entry : m_hostPortModel->entries()) {
-        if (entry.stateKey == QLatin1String("reserved")) {
+        if (entry.stateKey == QLatin1String("reserved") || entry.stateKey == QLatin1String("reservedTaken")) {
             ++count;
         }
     }

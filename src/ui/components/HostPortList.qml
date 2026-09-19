@@ -52,6 +52,7 @@ ColumnLayout {
         case "inUse":
             return "positive";
         case "declaredNotPublished":
+        case "reservedTaken":
             return "negative";
         default:
             return "neutral";
@@ -62,6 +63,7 @@ ColumnLayout {
         case "inUse":
             return "media-playback-start";
         case "declaredNotPublished":
+        case "reservedTaken":
             return "dialog-warning";
         default:
             return "dialog-information";
@@ -74,6 +76,9 @@ ColumnLayout {
             return i18n("Running");
         case "declaredNotPublished":
             return i18n("Not bound");
+        case "reservedTaken":
+            // 端口已经被别人占着：这个容器一起来就会端口冲突
+            return i18n("Taken");
         default:
             return i18n("Not started");
         }
@@ -84,8 +89,10 @@ ColumnLayout {
             return i18n("A running container publishes this port.");
         case "declaredNotPublished":
             return i18n("The container is running, but this declared mapping is not actually bound on the host.");
+        case "reservedTaken":
+            return i18n("This port is currently used by another container, so this container will fail to start with a port conflict.");
         default:
-            return i18n("The container is not running and does not hold this port now, but will take it back when started.");
+            return i18n("This container needs to publish this port when it starts.");
         }
     }
 
@@ -233,16 +240,26 @@ ColumnLayout {
                         opacity: 0.85
                     }
 
-                    Local.StatusChip {
-                        objectName: "hostPortRowState"
+                    /*
+                     * 状态列：给列一个固定宽度保证与表头对齐，但**徽标本身按内容收缩**——
+                     * 直接把宽度给 StatusChip 会把它拉长，右侧留出一块空位（用户反馈）。
+                     */
+                    Item {
                         Layout.preferredWidth: root.stateWidth
-                        semanticKey: root.semanticKeyFor(row.stateKey)
-                        iconName: root.iconNameFor(row.stateKey)
-                        text: root.stateText(row.stateKey)
+                        Layout.fillHeight: true
 
-                        // 短文案 + 悬停看完整含义（用户要求状态要短，但含义不能丢）
-                        QQC2.ToolTip.text: root.stateHint(row.stateKey)
-                        QQC2.ToolTip.visible: hovered
+                        Local.StatusChip {
+                            objectName: "hostPortRowState"
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            semanticKey: root.semanticKeyFor(row.stateKey)
+                            iconName: root.iconNameFor(row.stateKey)
+                            text: root.stateText(row.stateKey)
+
+                            // 短文案 + 悬停看完整含义（用户要求状态要短，但含义不能丢）
+                            QQC2.ToolTip.text: root.stateHint(row.stateKey)
+                            QQC2.ToolTip.visible: hovered
+                        }
                     }
 
                     QQC2.Label {

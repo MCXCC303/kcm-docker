@@ -65,11 +65,13 @@ void HostPortFilterModel::setSortKey(const QString &key)
 
 void HostPortFilterModel::updateSorting()
 {
-    if (m_sortKey == QLatin1String("container")) {
-        sort(0, Qt::AscendingOrder);
-    } else {
-        sort(0, Qt::AscendingOrder); // 端口升序：proxy 的 lessThan 决定比较哪一列
-    }
+    /*
+     * 只有一列数据，因此"换排序键"对 QSortFilterProxyModel 来说看起来什么都没变
+     * （列与方向都一样）→ `sort()` 直接变成空操作，排序键换了也不重排（用户实测：排序失效）。
+     * 显式 invalidate() 强制按新的 lessThan 重排。
+     */
+    sort(0, Qt::AscendingOrder);
+    invalidate();
 }
 
 bool HostPortFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sourceParent) const
@@ -81,7 +83,11 @@ bool HostPortFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sou
 
     if (m_stateFilter != QLatin1String("all")) {
         const QString stateKey = index.data(HostPortModel::StateKeyRole).toString();
-        if (stateKey != m_stateFilter) {
+        // "未启动"这一类同时包含"端口还空着"和"端口已经被别人占了"两种
+        const bool matches = m_stateFilter == QLatin1String("reserved")
+            ? (stateKey == QLatin1String("reserved") || stateKey == QLatin1String("reservedTaken"))
+            : stateKey == m_stateFilter;
+        if (!matches) {
             return false;
         }
     }
