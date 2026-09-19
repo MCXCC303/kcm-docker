@@ -100,6 +100,47 @@ QString DirectoryPickerProtocol::chosenPathFromResponse(uint response, const QVa
 PortalDirectoryPicker::PortalDirectoryPicker(QObject *parent)
     : DirectoryPicker(parent)
 {
+    /*
+     * 门户服务掉线（进程崩溃/重启）时不会有 Response 回来，等待方会永远挂着。
+     * 实测本机的 xdg-desktop-portal-kde 会崩在 KIO 的文件控件里（ARCH §5.16），
+     * 因此这里必须自己兜住：服务主人变了 → 用 Qt 对话框把这次请求补完。
+     */
+    if (QDBusConnectionInterface *iface = QDBusConnection::sessionBus().interface()) {
+        connect(iface, &QDBusConnectionInterface::serviceOwnerChanged, this, [this](const QString &name, const QString &, const QString &newOwner) {
+            if (name != QLatin1String(kPortalService) || !newOwner.isEmpty() || m_pending.isEmpty()) {
+                return;
+            }
+            qCWarning(kontainerBackend) << "the desktop portal disappeared while a directory request was pending -"
+                                           " falling back to the Qt dialog";
+            const QList<QString> pending = m_pending.keys();
+            m_pending.clear();
+            m_subscriptions.clear();
+            for (const QString &requestId : pending) {
+                fallBackToQtDialog(requestId, QString());
+            }
+        });
+    }
+
+    // 宽松的安全网：用户挑目录本来就可能花几分钟，但"永远等不到"必须有个头
+    m_watchdog = new QTimer(this);
+    m_watchdog->setSingleShot(false);
+    m_watchdog->setInterval(60 * 1000);
+    connect(m_watchdog, &QTimer::timeout, this, [this] {
+        if (m_pending.isEmpty()) {
+            m_watchdog->stop();
+            return;
+        }
+        const QList<QString> pending = m_pending.keys();
+        m_pending.clear();
+        m_subscriptions.clear();
+        m_watchdog->stop();
+        qCWarning(kontainerBackend) << "no answer from the desktop portal for" << pending.size() << "request(s) - giving up";
+        for (const QString &requestId : pending) {
+            // 给界面一个明确的结束（空路径 = 没选），避免"点了没反应"的状态一直挂着
+            Q_EMIT directoryChosen(requestId, QString());
+        }
+    });
+    m_watchdog->setInterval(5 * 60 * 1000);
 }
 
 bool PortalDirectoryPicker::portalAvailable()
@@ -167,6 +208,9 @@ void PortalDirectoryPicker::chooseDirectory(const QString &requestId, const QStr
     if (!returned.isEmpty() && returned != handle) {
         m_pending.insert(requestId, returned);
         subscribe(returned);
+    }
+    if (!m_watchdog->isActive()) {
+        m_watchdog->start();
     }
 }
 

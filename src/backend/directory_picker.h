@@ -7,6 +7,7 @@
 
 #include <QHash>
 #include <QObject>
+#include <QTimer>
 #include <QString>
 #include <QVariantMap>
 
@@ -122,6 +123,12 @@ private:
     QHash<QString, QString> m_pending;
     /*! 已订阅的 Response 路径 → requestId（一个连接名对应一行）。 */
     QHash<QString, QString> m_subscriptions;
+    /*!
+     * 安全网：门户**自己崩掉**时不会有任何 Response（实测 `xdg-desktop-portal-kde` 会在
+     * KIO 的文件控件里段错误，见 ARCH §5.16），因此既监听门户服务的存活，
+     * 也给每个请求一个足够宽松的超时，避免界面永远停在"等结果"。
+     */
+    QTimer *m_watchdog = nullptr;
 };
 
 } // namespace Kontainer
