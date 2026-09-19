@@ -417,7 +417,7 @@ Kirigami.Page {
             Layout.fillWidth: true
 
             // 网络与数据卷都是低频数据：只在切到对应页面时刷新，不加入 5 秒轮询。
-            // 索引：0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 引擎
+            // 索引：0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 挂载预设 / 5 引擎
             onCurrentIndexChanged: {
                 if (tabBar.currentIndex === 2) {
                     root.controller.refreshNetworks();
@@ -439,10 +439,10 @@ Kirigami.Page {
                 text: i18ncp("@title:tab volume list", "Volumes (%1)", "Volumes (%1)", root.controller.volumeModel.count)
             }
             QQC2.TabButton {
-                text: i18nc("@title:tab engine information", "Engine")
+                text: i18nc("@title:tab mount presets", "Mount presets")
             }
             QQC2.TabButton {
-                text: i18nc("@title:tab mount presets", "Mount presets")
+                text: i18nc("@title:tab engine information", "Engine")
             }
         }
 
@@ -1129,6 +1129,29 @@ Kirigami.Page {
                 }
             }
 
+            /* ------------------------ 挂载预设（七期 §4.2） ------------------------ */
+            /* 用户实测反馈：在创建向导里管理预设不方便，因此独立成标签页 */
+            ColumnLayout {
+                id: presetsTab
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.Heading {
+                    Layout.fillWidth: true
+                    level: 3
+                    text: i18n("Mount presets")
+                }
+
+                Components.MountPresetManager {
+                    objectName: "mountPresetManager"
+                    Layout.fillWidth: true
+                    store: root.controller.mountPresets
+                    directoryPicker: root.controller.directoryPicker
+                }
+            }
+
             /* ---------------------------- Engine --------------------------- */
             ColumnLayout {
                 Layout.fillWidth: true
@@ -1170,29 +1193,6 @@ Kirigami.Page {
                         engine: root.controller.engine
                         buildStamp: root.controller.buildStamp
                     }
-                }
-            }
-
-            /* ------------------------ 挂载预设（七期 §4.2） ------------------------ */
-            /* 用户实测反馈：在创建向导里管理预设不方便，因此独立成标签页 */
-            ColumnLayout {
-                id: presetsTab
-
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: Kirigami.Units.smallSpacing
-
-                Kirigami.Heading {
-                    Layout.fillWidth: true
-                    level: 3
-                    text: i18n("Mount presets")
-                }
-
-                Components.MountPresetManager {
-                    objectName: "mountPresetManager"
-                    Layout.fillWidth: true
-                    store: root.controller.mountPresets
-                    directoryPicker: root.controller.directoryPicker
                 }
             }
         }
