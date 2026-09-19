@@ -116,6 +116,11 @@ KCM.AbstractKCM {
 
             ContainerDetail {
                 onCloseRequested: stack.pop()
+                onImageRequested: function (imageId) {
+                    stack.push(imageDetailComponent, {
+                        "imageId": imageId
+                    });
+                }
                 onCloneRequested: function (containerId) {
                     stack.push(createContainerComponent, {
                         "cloneFromContainerId": containerId

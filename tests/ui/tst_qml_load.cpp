@@ -181,6 +181,7 @@ private Q_SLOTS:
     void imageUsedByRowsShowStateAndNavigate();
     void keyValueRowsKeepLongKeysVisible();
     void longCommandIsCollapsedUntilExpanded();
+    void containerDetailOpensTheImage();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2713,6 +2714,64 @@ void QmlLoadTest::longCommandIsCollapsedUntilExpanded()
     QVERIFY(copy);
     QCOMPARE(copy->property("value").toString(), detail.command.join(QLatin1Char(' ')));
 }
+/*!
+ * 容器详情的「镜像」一行可以点进镜像详情（实测需求）。
+ *
+ * 与网络成员/关联容器同一种交互：整行可点 + 右箭头；发出的必须是**镜像 ID**
+ * （`sha256:…`，镜像详情按它打开），而不是显示用的引用名。
+ */
+void QmlLoadTest::containerDetailOpensTheImage()
+{
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-img");
+    detail.name = QStringLiteral("image-link");
+    detail.state = ContainerState::Running;
+    detail.image = QStringLiteral("demo:1.0");
+    detail.imageId = QStringLiteral("sha256:feedface");
+    m_backend->setContainerDetail(detail);
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("containerId"), QStringLiteral("cid-img")}},
+                                                                        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(900, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(900);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+    m_backend->completeRefresh();
+
+    // 这个 ItemDelegate 没有 objectName，用信号 + 内容树里的镜像标签定位
+    QQuickItem *label = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((label = findItemDeep(window.contentItem(), QStringLiteral("detailImageLabel"))) != nullptr, 5000);
+    QCOMPARE(label->property("text").toString(), QStringLiteral("demo:1.0"));
+
+    QQuickItem *row = label->parentItem() ? label->parentItem()->parentItem() : nullptr;
+    QVERIFY2(row, "the image row must be an ItemDelegate around the label");
+    QVERIFY2(row->property("enabled").toBool(), "a container with a known image id must be clickable");
+
+    QSignalSpy requestedSpy(page, SIGNAL(imageRequested(QString)));
+    QVERIFY(requestedSpy.isValid());
+    QVERIFY(QMetaObject::invokeMethod(row, "clicked"));
+    QCOMPARE(requestedSpy.count(), 1);
+    QCOMPARE(requestedSpy.at(0).at(0).toString(), QStringLiteral("sha256:feedface"));
+
+    // 引擎没给镜像 ID 时不可点（点了也没法打开详情）
+    ContainerDetail withoutId = detail;
+    withoutId.imageId.clear();
+    m_backend->setContainerDetail(withoutId);
+    m_stubKcm->controller()->containerDetail()->reload();
+    m_backend->completeRefresh();
+    QTRY_VERIFY_WITH_TIMEOUT(!row->property("enabled").toBool(), 5000);
+}
+
+
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");

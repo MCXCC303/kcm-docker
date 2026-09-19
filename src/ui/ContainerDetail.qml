@@ -89,6 +89,8 @@ KCM.AbstractKCM {
     signal closeRequested
     /*! 克隆这个容器的配置（七期 §4.5）：只复制配置，不复制运行时状态。 */
     signal cloneRequested(string containerId)
+    /*! 打开这个容器所用镜像的详情。 */
+    signal imageRequested(string imageId)
 
     /*! 「保存为预设」的结果提示（挂载行里的小反馈）。 */
     property string mountPresetMessage: ""
@@ -450,11 +452,34 @@ KCM.AbstractKCM {
                             text: page.controller.status.length > 0 ? page.controller.status : i18n("Unknown")
                         }
 
-                        QQC2.Label {
+                        QQC2.ItemDelegate {
+                            id: imageRow
+
                             Kirigami.FormData.label: i18n("Image:")
                             Layout.fillWidth: true
-                            text: page.controller.image
-                            elide: Text.ElideMiddle
+                            /*
+                             * 「镜像」可以点进镜像详情（与网络成员/关联容器同一种交互：
+                             * 箭头 + 整行可点）。镜像 ID 为空（引擎没给）时不可点。
+                             */
+                            enabled: page.controller.imageId.length > 0
+                            onClicked: page.imageRequested(page.controller.imageId)
+
+                            contentItem: RowLayout {
+                                spacing: Kirigami.Units.smallSpacing
+
+                                QQC2.Label {
+                                    objectName: "detailImageLabel"
+                                    Layout.fillWidth: true
+                                    text: page.controller.image
+                                    elide: Text.ElideMiddle
+                                }
+                                Kirigami.Icon {
+                                    source: "go-next-symbolic"
+                                    implicitWidth: Kirigami.Units.iconSizes.small
+                                    implicitHeight: Kirigami.Units.iconSizes.small
+                                    opacity: 0.6
+                                }
+                            }
                         }
 
                         Components.CopyableText {

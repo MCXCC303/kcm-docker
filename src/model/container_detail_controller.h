@@ -48,6 +48,13 @@ class ContainerDetailController : public QObject
     Q_PROPERTY(QString name READ name NOTIFY changed)
     Q_PROPERTY(QString shortId READ shortId NOTIFY changed)
     Q_PROPERTY(QString image READ image NOTIFY changed)
+    /*!
+     * 镜像的完整 ID（`sha256:…`）。
+     *
+     * 详情页的「镜像」一行可以点进镜像详情，用这个 ID 打开（为空说明引擎没给，
+     * 那一行就不可点）。
+     */
+    Q_PROPERTY(QString imageId READ imageId NOTIFY changed)
     Q_PROPERTY(QString stateKey READ stateKey NOTIFY changed)
     Q_PROPERTY(QString stateText READ stateText NOTIFY changed)
     Q_PROPERTY(QString status READ status NOTIFY changed)
@@ -147,6 +154,10 @@ public:
     QString image() const
     {
         return m_detail.image;
+    }
+    QString imageId() const
+    {
+        return m_detail.imageId;
     }
     QString stateKey() const;
     QString stateText() const;
