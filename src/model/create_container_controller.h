@@ -72,6 +72,14 @@ class CreateContainerController : public QObject
 
     /*! 端口 / 环境变量 / 标签 / 挂载：QML 的行编辑器写进来的纯数据。 */
     Q_PROPERTY(QVariantList portRows READ portRows WRITE setPortRows NOTIFY changed)
+    /*!
+     * 每一行端口的状态（与 `portRows` 同序）：`{errorKey, holder, suggestion}`。
+     *
+     * 做成**属性**而不是 `Q_INVOKABLE`：QML 里函数调用不建立依赖，容器列表一变提示就不会更新
+     * （本项目反复踩过；端口编辑器要在用户填端口时立刻给出"被谁占用 / 建议端口"）。
+     * 空闲时 `errorKey` 为空——界面据此**什么都不显示**（用户要求：减少冗余小字）。
+     */
+    Q_PROPERTY(QVariantList portRowStatuses READ portRowStatuses NOTIFY changed)
     Q_PROPERTY(QVariantList environmentRows READ environmentRows WRITE setEnvironmentRows NOTIFY changed)
     Q_PROPERTY(QVariantList labelRows READ labelRows WRITE setLabelRows NOTIFY changed)
     Q_PROPERTY(QVariantList mountRows READ mountRows WRITE setMountRows NOTIFY changed)
@@ -132,6 +140,9 @@ public:
     bool pullIfMissing() const;
 
     QVariantList portRows() const;
+    QVariantList portRowStatuses() const;
+    /*! 单行的状态（`portRowStatuses()` 与 `validatePorts()` 共用同一份判断）。 */
+    QVariantMap portRowStatus(int row) const;
     QVariantList environmentRows() const;
     QVariantList labelRows() const;
     QVariantList mountRows() const;

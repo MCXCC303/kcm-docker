@@ -34,6 +34,7 @@ class ContainerCreateTest : public QObject
 
 private Q_SLOTS:
     void initTestCase();
+    void portRowStatusesReportHoldersAndSuggestFreePorts();
     void duplicateHostPortsInOneRequestAreRejected();
 
     void mapsFormFieldsToTheCreatePayload();
@@ -760,6 +761,77 @@ void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 0}},
                         QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 0}}});
     QVERIFY2(wizard.stepErrorKey().isEmpty(), qPrintable(wizard.stepErrorKey()));
+}
+
+
+/*!
+ * 逐行端口状态（ARCH_next_ports.md §4.D，里程碑 M2）。
+ *
+ * 界面要能在用户**输入的那一刻**说清"这个端口不能用，被谁占着，建议用哪个"，
+ * 因此状态是**属性**（容器列表一变就更新），并且：空闲不产生任何提示、
+ * 已停止的容器不算占用、建议端口要避开同一张表单里已经填过的端口。
+ */
+void ContainerCreateTest::portRowStatusesReportHoldersAndSuggestFreePorts()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MockDockerBackend backend;
+    OperationController operations(&backend);
+
+    Container running;
+    running.id = QStringLiteral("running-id");
+    running.name = QStringLiteral("web");
+    running.image = QStringLiteral("alpine:3.19");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8100, QStringLiteral("tcp")}};
+
+    Container stopped;
+    stopped.id = QStringLiteral("stopped-id");
+    stopped.name = QStringLiteral("old");
+    stopped.image = QStringLiteral("alpine:3.19");
+    stopped.state = ContainerState::Exited;
+    stopped.ports = {{QStringLiteral("0.0.0.0"), 80, 8200, QStringLiteral("tcp")}};
+
+    backend.setContainers({running, stopped});
+    CreateContainerController wizard(&operations, &presets, &backend);
+
+    // 一行被运行中的容器占用、一行空闲、一行被已停止的容器声明过
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
+                        QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 9000}},
+                        QVariantMap {{QStringLiteral("containerPort"), 82}, {QStringLiteral("hostPort"), 8200}}});
+    const QVariantList statuses = wizard.portRowStatuses();
+    QCOMPARE(statuses.size(), 3);
+
+    const QVariantMap occupied = statuses.at(0).toMap();
+    QCOMPARE(occupied.value(QStringLiteral("errorKey")).toString(), QStringLiteral("portInUse"));
+    QCOMPARE(occupied.value(QStringLiteral("holder")).toString(), QStringLiteral("web"));
+    QCOMPARE(occupied.value(QStringLiteral("hostPort")).toInt(), 8100);
+    QVERIFY2(occupied.value(QStringLiteral("suggestion")).toInt() > 8100,
+             "the suggestion must skip the port that is already used");
+
+    // 空闲 → 不产生任何提示（界面据此什么都不显示）
+    QVERIFY2(statuses.at(1).toMap().value(QStringLiteral("errorKey")).toString().isEmpty(),
+             "a free port must not produce any hint");
+    QCOMPARE(statuses.at(1).toMap().value(QStringLiteral("suggestion")).toInt(), 0);
+
+    // 已停止容器声明过的端口：不算占用（没运行自然不占端口，用户已确认）
+    QVERIFY2(statuses.at(2).toMap().value(QStringLiteral("errorKey")).toString().isEmpty(),
+             "a stopped container must not block its declared port");
+
+    // 同一张表单里重复使用同一个宿主端口：报出来，且建议端口避开本表单已用的端口
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 9100}},
+                        QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 9100}}});
+    const QVariantList duplicates = wizard.portRowStatuses();
+    QCOMPARE(duplicates.at(0).toMap().value(QStringLiteral("errorKey")).toString(), QStringLiteral("portDuplicateInRequest"));
+    QCOMPARE(duplicates.at(1).toMap().value(QStringLiteral("errorKey")).toString(), QStringLiteral("portDuplicateInRequest"));
+    const int suggestion = duplicates.at(1).toMap().value(QStringLiteral("suggestion")).toInt();
+    QVERIFY2(suggestion != 9100, "the suggestion must not be one of the ports this form already uses");
+
+    // 随机端口（0）：既不冲突也不给建议
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 0}}});
+    QVERIFY(wizard.portRowStatuses().at(0).toMap().value(QStringLiteral("errorKey")).toString().isEmpty());
+    QCOMPARE(wizard.portRowStatuses().at(0).toMap().value(QStringLiteral("suggestion")).toInt(), 0);
 }
 
 

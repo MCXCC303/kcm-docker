@@ -133,15 +133,20 @@ QString HostPortUsage::holderFor(const QList<Container> &containers, const QStri
     return {};
 }
 
-int HostPortUsage::nextFreePort(const QList<Container> &containers, int afterPort)
+int HostPortUsage::nextFreePort(const QList<Container> &containers, int afterPort, const QList<int> &extraUsed)
 {
-    QStringList used;
+    QList<int> used;
     for (const HostPortEntry &entry : entriesFor(containers)) {
-        used.append(QString::number(entry.hostPort));
+        used.append(entry.hostPort);
+    }
+    for (const int port : extraUsed) {
+        if (port > 0) {
+            used.append(port);
+        }
     }
     const int start = afterPort > 0 ? afterPort + 1 : kFirstSuggestedPort;
     for (int candidate = std::max(start, kFirstSuggestedPort); candidate <= 65535; ++candidate) {
-        if (!used.contains(QString::number(candidate))) {
+        if (!used.contains(candidate)) {
             return candidate;
         }
     }

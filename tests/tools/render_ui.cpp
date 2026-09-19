@@ -739,10 +739,20 @@ int main(int argc, char **argv)
         const QString step = qEnvironmentVariable("KONTAINER_RENDER_WIZARD_STEP");
         controller->setImage(QStringLiteral("postgres:17-alpine"));
         controller->setName(QStringLiteral("demo-container"));
-        controller->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 5432},
-                                              {QStringLiteral("hostPort"), 15432},
-                                              {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")},
-                                              {QStringLiteral("protocol"), QStringLiteral("tcp")}}});
+        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_PORT_CONFLICT")) {
+            // 复核行内冲突提示：一行撞上运行中的容器（demo-app 占着 8080），一行空闲（不该有任何提示）
+            controller->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 5432},
+                                                  {QStringLiteral("hostPort"), 8080},
+                                                  {QStringLiteral("protocol"), QStringLiteral("tcp")}},
+                                     QVariantMap {{QStringLiteral("containerPort"), 8080},
+                                                  {QStringLiteral("hostPort"), 9000},
+                                                  {QStringLiteral("protocol"), QStringLiteral("tcp")}}});
+        } else {
+            controller->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 5432},
+                                                  {QStringLiteral("hostPort"), 15432},
+                                                  {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")},
+                                                  {QStringLiteral("protocol"), QStringLiteral("tcp")}}});
+        }
         controller->setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("POSTGRES_PASSWORD")},
                                                      {QStringLiteral("value"), QStringLiteral("not-a-real-secret")}}});
         controller->setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("volume")},

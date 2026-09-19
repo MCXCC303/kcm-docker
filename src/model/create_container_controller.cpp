@@ -5,6 +5,7 @@
 
 #include "model/create_container_controller.h"
 
+#include "model/host_port_usage.h"
 #include "model/port_binding_rules.h"
 #include "model/port_mapping_model.h"
 
@@ -793,46 +794,87 @@ void CreateContainerController::removeMountAt(int row)
     touch();
 }
 
+QVariantMap CreateContainerController::portRowStatus(int row) const
+{
+    QVariantMap status;
+    status.insert(QStringLiteral("errorKey"), QString());
+    status.insert(QStringLiteral("holder"), QString());
+    status.insert(QStringLiteral("suggestion"), 0);
+    status.insert(QStringLiteral("hostPort"), 0);
+    if (row < 0 || row >= m_portRows.size()) {
+        return status;
+    }
+
+    const QVariantMap entry = m_portRows.at(row).toMap();
+    const quint16 containerPort = quint16(entry.value(QStringLiteral("containerPort")).toUInt());
+    const int hostPort = entry.value(QStringLiteral("hostPort")).toInt();
+    const QString hostIp = entry.value(QStringLiteral("hostIp")).toString();
+
+    // 必填与范围先于"冲突"（它们是输入本身的问题，不是占用问题）
+    if (containerPort == 0) {
+        status.insert(QStringLiteral("errorKey"), QStringLiteral("portRequired"));
+        return status;
+    }
+    if (hostPort < 0 || hostPort > 65535) {
+        status.insert(QStringLiteral("errorKey"), QStringLiteral("portRange"));
+        return status;
+    }
+    status.insert(QStringLiteral("hostPort"), hostPort);
+    if (hostPort == 0) {
+        return status; // 随机分配：不冲突，也不给建议
+    }
+
+    // 本请求里**其它行**已经填了的宿主端口（含通配重叠）——建议端口也要避开它们
+    QList<int> otherPorts;
+    bool duplicate = false;
+    for (int other = 0; other < m_portRows.size(); ++other) {
+        if (other == row) {
+            continue;
+        }
+        const QVariantMap otherRow = m_portRows.at(other).toMap();
+        const int otherPort = otherRow.value(QStringLiteral("hostPort")).toInt();
+        if (otherPort <= 0) {
+            continue;
+        }
+        otherPorts.append(otherPort);
+        if (otherPort == hostPort && PortBindingRules::hostBindingsOverlap(otherRow.value(QStringLiteral("hostIp")).toString(), hostIp)) {
+            duplicate = true;
+        }
+    }
+    if (duplicate) {
+        status.insert(QStringLiteral("errorKey"), QStringLiteral("portDuplicateInRequest"));
+    } else {
+        const QString holder = HostPortUsage::holderFor(m_backend->containers(), hostIp, hostPort);
+        if (!holder.isEmpty()) {
+            status.insert(QStringLiteral("errorKey"), QStringLiteral("portInUse"));
+            status.insert(QStringLiteral("holder"), holder);
+        }
+    }
+
+    if (!status.value(QStringLiteral("errorKey")).toString().isEmpty()) {
+        status.insert(QStringLiteral("suggestion"), HostPortUsage::nextFreePort(m_backend->containers(), hostPort, otherPorts));
+    }
+    return status;
+}
+
+QVariantList CreateContainerController::portRowStatuses() const
+{
+    QVariantList statuses;
+    statuses.reserve(m_portRows.size());
+    for (int row = 0; row < m_portRows.size(); ++row) {
+        statuses.append(portRowStatus(row));
+    }
+    return statuses;
+}
+
 QString CreateContainerController::validatePorts() const
 {
-    /*
-     * 同一个请求里**自己跟自己**冲突也要拦（实测反馈）：
-     * 用户填了 8100→80 / 8100→81 / 8100→82，创建请求本身是合法的，
-     * 但启动时 Docker 会报 `Bind for 0.0.0.0:8100 failed: port is already allocated`
-     * ——同一个宿主端口在一个容器里只能绑一次。
-     */
-    QList<PortMappingEntry> accepted;
-    for (const QVariant &entry : m_portRows) {
-        const QVariantMap row = entry.toMap();
-        const quint16 containerPort = quint16(row.value(QStringLiteral("containerPort")).toUInt());
-        if (containerPort == 0) {
-            return QStringLiteral("portRequired");
+    // 逐行状态是唯一判断处（同一份逻辑也供界面的行内提示使用，见 portRowStatuses）
+    for (int row = 0; row < m_portRows.size(); ++row) {
+        const QString errorKey = portRowStatus(row).value(QStringLiteral("errorKey")).toString();
+        if (!errorKey.isEmpty()) {
+            return errorKey;
         }
-        const int hostPort = row.value(QStringLiteral("hostPort")).toInt();
-        if (hostPort < 0 || hostPort > 65535) {
-            return QStringLiteral("portRange");
-        }
-        const QString hostIp = row.value(QStringLiteral("hostIp")).toString();
-
-        // 与本次请求里已经接受的行比较（0 = 随机分配，不参与冲突判断）
-        if (hostPort != 0) {
-            for (const PortMappingEntry &other : accepted) {
-                if (other.hostPort == hostPort && PortBindingRules::hostBindingsOverlap(other.hostIp, hostIp)) {
-                    return QStringLiteral("portDuplicateInRequest");
-                }
-            }
-        }
-
-        if (m_operations->hostPortInUse(hostIp, hostPort)) {
-            return QStringLiteral("portInUse");
-        }
-
-        PortMappingEntry parsed;
-        parsed.containerPort = containerPort;
-        parsed.protocol = row.value(QStringLiteral("protocol")).toString();
-        parsed.hostIp = hostIp;
-        parsed.hostPort = quint16(hostPort);
-        accepted.append(parsed);
     }
     return {};
 }

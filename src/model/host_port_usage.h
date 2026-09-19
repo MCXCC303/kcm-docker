@@ -96,8 +96,11 @@ public:
      *
      * 只在**已知被占用**的端口之外找，且不超过 65535；`afterPort <= 0` 时从 8000 起找
      * （低于 1024 需要特权，不作为建议）。
+     *
+     * `extraUsed` 用于"正在编辑的这张表单"：同一请求里其它行已经填了的宿主端口也要避开，
+     * 否则建议出来的端口会在提交时因为"请求内重复"被自己拦下。
      */
-    static int nextFreePort(const QList<Container> &containers, int afterPort);
+    static int nextFreePort(const QList<Container> &containers, int afterPort, const QList<int> &extraUsed = {});
 };
 
 } // namespace Kontainer

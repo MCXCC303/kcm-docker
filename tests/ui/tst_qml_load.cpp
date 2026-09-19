@@ -184,6 +184,7 @@ private Q_SLOTS:
     void keyValueRowsKeepLongKeysVisible();
     void longCommandIsCollapsedUntilExpanded();
     void containerDetailOpensTheImage();
+    void portRowShowsConflictAndAdoptsTheSuggestion();
     void engineViewListsComponentVersions();
     void topologyMergesDualStackBindings();
     void privilegedNeedsTypedConfirmation();
@@ -2919,6 +2920,85 @@ void QmlLoadTest::topologyMergesDualStackBindings()
     QCOMPARE(hostChips.first()->property("text").toString(), QStringLiteral("20004"));
     // 并且标记为双栈（Canvas 据此画双环）
     QVERIFY2(hostChips.first()->parentItem() != nullptr, "the chip must sit in a binding row");
+}
+
+
+/*!
+ * 端口行内冲突提示（ARCH_next_ports.md §4.D，里程碑 M2）。
+ *
+ * 被运行中的容器占用 → 行内出现提示与「使用建议端口 N」；点一下采用后提示消失；
+ * 空闲的行**不显示任何东西**（用户要求：减少冗余小字）。
+ */
+void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
+{
+    Container holder;
+    holder.id = QStringLiteral("holder-id");
+    holder.name = QStringLiteral("web");
+    holder.image = QStringLiteral("alpine:3.19");
+    holder.state = ContainerState::Running;
+    holder.ports = {{QStringLiteral("0.0.0.0"), 80, 8100, QStringLiteral("tcp")}};
+    m_backend->setContainers({holder});
+
+    auto *wizard = m_stubKcm->controller()->createContainer();
+    QVERIFY(wizard);
+    wizard->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
+                         QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 9000}}});
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PortMappingEditor.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("controller"), QVariant::fromValue(wizard));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *editor = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(editor);
+
+    QQuickWindow window;
+    window.resize(1000, 300);
+    editor->setParentItem(window.contentItem());
+    editor->setWidth(1000);
+    editor->setHeight(300);
+    window.show();
+    QTRY_VERIFY(editor->width() > 0);
+
+    QList<QQuickItem *> statuses;
+    QList<QQuickItem *> suggestions;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        statuses.clear();
+        suggestions.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("wizardPortRowStatus")) {
+                statuses.append(node);
+            } else if (node->objectName() == QLatin1String("wizardPortSuggestionButton")) {
+                suggestions.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return statuses.size() == 2;
+    }(), 5000);
+
+    // 只有冲突那一行可见（空闲行不显示任何提示）
+    QTRY_VERIFY_WITH_TIMEOUT(statuses.at(0)->property("visible").toBool()
+                                 && !statuses.at(1)->property("visible").toBool(), 5000);
+    QVERIFY2(statuses.at(0)->property("text").toString().contains(QStringLiteral("web")),
+             qPrintable(statuses.at(0)->property("text").toString()));
+
+    // 建议端口按钮：点一下写回该行，提示随之消失
+    QQuickItem *suggestionButton = suggestions.isEmpty() ? nullptr : suggestions.first();
+    QVERIFY2(suggestionButton, "the conflicting row must offer a suggested port");
+    const int suggestion = wizard->portRowStatuses().at(0).toMap().value(QStringLiteral("suggestion")).toInt();
+    QVERIFY(suggestion > 0);
+    // QQC2.Button 的信号是 clicked（`triggered` 属于 QML Action，不在这里）
+    QVERIFY(QMetaObject::invokeMethod(suggestionButton, "clicked"));
+    QTRY_COMPARE(wizard->portRows().at(0).toMap().value(QStringLiteral("hostPort")).toInt(), suggestion);
+    QTRY_VERIFY_WITH_TIMEOUT(!statuses.at(0)->property("visible").toBool(), 5000);
 }
 
 
