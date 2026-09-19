@@ -79,6 +79,14 @@ class StatusController : public QObject
     Q_PROPERTY(QString engineStateSemanticKey READ engineStateSemanticKey NOTIFY engineStateChanged)
     Q_PROPERTY(QString engineStateIconName READ engineStateIconName NOTIFY engineStateChanged)
 
+    /*!
+     * 调试用起始标签页（`KONTAINER_START_TAB=<索引>`）。
+     *
+     * QML 读不到环境变量，因此由这里读一次给界面：只是为了让"打开就看到某一页"
+     * （截图复核 / 排查）成为可能，默认 0 = 容器页，行为不变。
+     */
+    Q_PROPERTY(int startTabFromEnvironment READ startTabFromEnvironment CONSTANT)
+
     Q_PROPERTY(bool busy READ busy NOTIFY busyChanged)
     Q_PROPERTY(QString engineError READ engineError NOTIFY engineErrorChanged)
     Q_PROPERTY(QString containersError READ containersError NOTIFY containersErrorChanged)
@@ -109,8 +117,10 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::HostPortModel *portModel READ portModel CONSTANT)
     /*! 端口页用的搜索/过滤/排序代理模型。 */
     Q_PROPERTY(Kontainer::HostPortFilterModel *hostPortList READ hostPortList CONSTANT)
-    /*! "声明了但没发布"的行数（端口页据此决定要不要在顶部说明一次）。 */
+    /*! "声明了但没发布"的行数（运行中的容器；端口页据此决定要不要在顶部说明一次）。 */
     Q_PROPERTY(int declaredNotPublishedCount READ declaredNotPublishedCount NOTIFY declaredNotPublishedCountChanged)
+    /*! "声明过、但容器没在运行"的行数（端口现在是空的，容器一起来就要回去）。 */
+    Q_PROPERTY(int reservedPortCount READ reservedPortCount NOTIFY declaredNotPublishedCountChanged)
     /*!
      * 区间地图的数据（ARCH_next_ports.md §4.B）：每段
      * `{first, last, title, tileCount, hiddenCount, usedCount, tiles: [{port, stateKey}]}`。
@@ -345,6 +355,8 @@ public:
         return m_hostPortFilter;
     }
     int declaredNotPublishedCount() const;
+    int startTabFromEnvironment() const;
+    int reservedPortCount() const;
     QVariantList portRanges() const;
     int nextFreeHostPort() const;
     NetworkFilterModel *networkList() const

@@ -12,6 +12,7 @@
 
 #include "logging.h"
 #include "model/docker_error_text.h"
+#include "model/port_binding_rules.h"
 
 namespace Kontainer
 {
@@ -223,8 +224,9 @@ void StatusController::rebuildPorts()
 {
     // 端口表、计数与区间地图都从这一份数据来：只在这里重建，避免三处各写一遍
     const int declaredBefore = declaredNotPublishedCount();
+    const int reservedBefore = reservedPortCount();
     m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
-    if (declaredNotPublishedCount() != declaredBefore) {
+    if (declaredNotPublishedCount() != declaredBefore || reservedPortCount() != reservedBefore) {
         Q_EMIT declaredNotPublishedCountChanged();
     }
     Q_EMIT portRangesChanged();
@@ -241,10 +243,49 @@ int StatusController::declaredNotPublishedCount() const
     return count;
 }
 
+int StatusController::startTabFromEnvironment() const
+{
+    bool ok = false;
+    const int index = qEnvironmentVariable("KONTAINER_START_TAB").toInt(&ok);
+    return ok && index > 0 ? index : 0;
+}
+
+int StatusController::reservedPortCount() const
+{
+    int count = 0;
+    for (const HostPortEntry &entry : m_hostPortModel->entries()) {
+        if (entry.stateKey == QLatin1String("reserved")) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 QVariantList StatusController::portRanges() const
 {
+    /*
+     * 地图画的是**过滤后**的端口：搜索框与状态过滤对地图同样生效
+     * （用户实测反馈：地图里筛不了，等于两个视图各有一套数据）。
+     * 数据从代理模型取，因此过滤条件只有一份实现。
+     */
+    QList<HostPortEntry> entries;
+    entries.reserve(m_hostPortFilter->rowCount());
+    for (int row = 0; row < m_hostPortFilter->rowCount(); ++row) {
+        const QModelIndex index = m_hostPortFilter->index(row, 0);
+        HostPortEntry entry;
+        // 用 role 里的结构化字段重建（不要从字符串反解：区间曾经因此丢掉终点）
+        entry.hostPort = quint16(index.data(HostPortModel::HostPortRole).toUInt());
+        entry.hostPortEnd = quint16(index.data(HostPortModel::RangeEndRole).toUInt());
+        entry.hostIp = index.data(HostPortModel::HostIpRole).toString();
+        entry.containerPort = quint16(index.data(HostPortModel::ContainerPortRole).toUInt());
+        entry.protocol = index.data(HostPortModel::ProtocolRole).toString();
+        entry.stateKey = index.data(HostPortModel::StateKeyRole).toString();
+        entry.containerId = index.data(HostPortModel::ContainerIdRole).toString();
+        entry.containerName = index.data(HostPortModel::ContainerNameRole).toString();
+        entries.append(entry);
+    }
+
     QVariantList ranges;
-    const QList<HostPortEntry> entries = m_hostPortModel->entries();
     for (const HostPortRange &range : HostPortUsage::clusterRanges(entries)) {
         QVariantList tiles;
         for (quint16 port = range.first; port < quint16(range.first + range.tileCount); ++port) {
@@ -274,19 +315,14 @@ void StatusController::refreshPorts()
 {
     m_backend->refreshContainers();
     /*
-     * 声明（inspect）只对运行中的容器取：已停止的容器不占端口，用户已拍板不做
-     * "reserved"。已经拉过的容器不重复拉（每轮的 m_declaredRequested 记着）。
+     * 声明来自 inspect：**所有**容器都要取——
+     *   - 运行中：分辨"声明了却没真正发布"（`declaredNotPublished`）；
+     *   - 未运行：标明"这个端口现在是空的，但那个容器一起来就会要回去"（`reserved`）。
+     * 用户实测反馈要求两种都显示（早前"不做 reserved"的决定已被推翻，见 ARCH_next_ports.md）。
+     * 进页面时每个容器只拉一次（`m_declaredRequested` 记着），不为一个视图反复 inspect。
      */
     for (const Container &container : m_backend->containers()) {
-        switch (container.state) {
-        case ContainerState::Running:
-        case ContainerState::Paused:
-        case ContainerState::Restarting:
-            break;
-        default:
-            continue;
-        }
-        if (m_declaredRequested.contains(container.id)) {
+        if (container.id.isEmpty() || m_declaredRequested.contains(container.id)) {
             continue;
         }
         m_declaredRequested.append(container.id);

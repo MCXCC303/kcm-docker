@@ -68,6 +68,7 @@ Item {
                 model: [
                     {text: i18n("In use"), stateKey: "inUse"},
                     {text: i18n("Declared, not published"), stateKey: "declaredNotPublished"},
+                    {text: i18n("Declared (container not running)"), stateKey: "reserved"},
                     {text: i18n("Free"), stateKey: ""}
                 ]
 

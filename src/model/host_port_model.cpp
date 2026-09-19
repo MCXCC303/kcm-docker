@@ -5,6 +5,8 @@
 
 #include "model/host_port_model.h"
 
+#include "model/port_binding_rules.h"
+
 namespace Kontainer
 {
 
@@ -38,8 +40,14 @@ QVariant HostPortModel::data(const QModelIndex &index, int role) const
         return entry.portText();
     case HostPortRole:
         return int(entry.hostPort);
+    case RangeEndRole:
+        return int(entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort);
+    case HostIpRole:
+        return entry.hostIp;
     case AddressTextRole:
         return entry.displayAddress();
+    case WildcardRole:
+        return entry.dualStack || entry.hostIp.isEmpty() || PortBindingRules::isWildcardAddress(entry.hostIp);
     case ContainerPortRole:
         return int(entry.containerPort);
     case ProtocolRole:
@@ -66,7 +74,10 @@ QHash<int, QByteArray> HostPortModel::roleNames() const
     return {
         {PortTextRole, QByteArrayLiteral("portText")},
         {HostPortRole, QByteArrayLiteral("hostPort")},
+        {RangeEndRole, QByteArrayLiteral("rangeEnd")},
+        {HostIpRole, QByteArrayLiteral("hostIp")},
         {AddressTextRole, QByteArrayLiteral("addressText")},
+        {WildcardRole, QByteArrayLiteral("wildcard")},
         {ContainerPortRole, QByteArrayLiteral("containerPort")},
         {ProtocolRole, QByteArrayLiteral("protocol")},
         {StateKeyRole, QByteArrayLiteral("stateKey")},

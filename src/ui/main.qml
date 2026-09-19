@@ -73,6 +73,8 @@ KCM.AbstractKCM {
             id: mainPageComponent
 
             MainPage {
+                // 调试用：KONTAINER_START_TAB=<索引>（由控制器读环境变量，QML 读不到环境）
+                startTab: kcm.controller.startTabFromEnvironment
                 onContainerActivated: function (containerId) {
                     stack.push(containerDetailComponent, {
                         "containerId": containerId

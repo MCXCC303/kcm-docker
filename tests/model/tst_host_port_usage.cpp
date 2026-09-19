@@ -41,6 +41,7 @@ private Q_SLOTS:
     void refreshKeepsTheModelIntact();
     void rangeClusteringGroupsNearbyPorts();
     void rangeClusteringCapsVeryLongRanges();
+    void stoppedContainersKeepTheirDeclaredPortsAsReserved();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -449,6 +450,68 @@ void HostPortUsageTest::rangeClusteringCapsVeryLongRanges()
     QCOMPARE(ranges.at(0).tileCount, 20);
     QCOMPARE(ranges.at(0).hiddenCount, 101 - 20);
     QVERIFY2(ranges.at(0).tileCount <= 20, "a long range must be capped");
+}
+
+
+/*!
+ * 未运行容器声明过的端口 = `reserved`（用户实测反馈要求能看到）。
+ *
+ * 语义（与"占用"区分开）：端口**现在是空的**，但那个容器一起来就会要回去；
+ * 因此它不能参与创建表单的冲突判断（`holderFor` 只算运行中的容器，另有负例守着）。
+ */
+void HostPortUsageTest::stoppedContainersKeepTheirDeclaredPortsAsReserved()
+{
+    Container running;
+    running.id = QStringLiteral("cid-run");
+    running.name = QStringLiteral("live");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8100, QStringLiteral("tcp")}};
+
+    Container stopped;
+    stopped.id = QStringLiteral("cid-stop");
+    stopped.name = QStringLiteral("alpine-82dc");
+    stopped.image = QStringLiteral("alpine:latest");
+    stopped.state = ContainerState::Exited;
+
+    ContainerDetail detail;
+    detail.id = stopped.id;
+    detail.declaredPorts = {{80, QStringLiteral("tcp"), QString(), 8810, 8810},
+                            {81, QStringLiteral("tcp"), QString(), 8810, 8810}};
+
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    declared.insert(detail.id, detail.declaredPorts);
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running, stopped}, declared);
+    /*
+     * 3 条：8100（运行中占用）+ 8810 的**两条**声明。
+     *
+     * 后者就是真实容器的样子：`alpine-82dc` 把 8810 同时声明给了 80/81/82 三个容器端口
+     * （正是"一个宿主端口映射到多个容器端口"那个必然会启动失败的写法）。端口页如实列出两条，
+     * 用户一眼就能看出这个容器起了会炸——不要在这里"帮"他合并成一条。
+     */
+    QCOMPARE(entries.size(), 3);
+    QCOMPARE(entries.at(0).hostPort, quint16(8100));
+    QCOMPARE(entries.at(0).stateKey, QStringLiteral("inUse"));
+    QCOMPARE(entries.at(1).hostPort, quint16(8810));
+    QCOMPARE(entries.at(1).stateKey, QStringLiteral("reserved"));
+    QCOMPARE(entries.at(1).containerPort, quint16(80));
+    QCOMPARE(entries.at(1).containerName, QStringLiteral("alpine-82dc"));
+    QCOMPARE(entries.at(2).hostPort, quint16(8810));
+    QCOMPARE(entries.at(2).containerPort, quint16(81));
+
+    // 关键：reserved 不算"占用"——创建表单不能因为它拦住用户
+    QVERIFY2(HostPortUsage::holderFor({running, stopped}, QStringLiteral("0.0.0.0"), 8810).isEmpty(),
+             "a stopped container must not block a port for new containers");
+
+    // 模型里 reserved 不给"停止容器"（它没在跑），但仍可跳转
+    HostPortModel model;
+    model.setEntries(entries);
+    const QModelIndex reservedRow = model.index(1, 0);
+    QVERIFY2(!reservedRow.data(HostPortModel::ActionableRole).toBool(), "reserved rows cannot be stopped");
+    QCOMPARE(reservedRow.data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("alpine-82dc"));
+
+    // 地图：未运行的声明也点亮（用保留色）
+    QCOMPARE(HostPortUsage::stateKeyForPort(entries, 8810), QStringLiteral("reserved"));
 }
 
 

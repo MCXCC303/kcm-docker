@@ -32,7 +32,13 @@ public:
         PortTextRole = Qt::UserRole + 1,
         /*! 排序/过滤用的数字端口（区间时是起点）。 */
         HostPortRole,
+        /*! 区间终点（单端口时等于起点）；地图要靠它把整段点亮。 */
+        RangeEndRole,
+        /*! 绑定的宿主地址（空 = 所有接口）。 */
+        HostIpRole,
         AddressTextRole,
+        /*! 绑定在**所有接口**上（IPv4/IPv6 通配，或两者合并）——界面上写"所有接口"而不是一个破折号。 */
+        WildcardRole,
         ContainerPortRole,
         ProtocolRole,
         /*! `inUse` / `declaredNotPublished`（QML 只认 key，文案与图标在 QML）。 */

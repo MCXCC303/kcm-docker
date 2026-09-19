@@ -57,6 +57,8 @@ QtObject {
         case "inUse":
             return Kirigami.Theme.positiveBackgroundColor;
         case "declaredNotPublished":
+            return Kirigami.Theme.negativeBackgroundColor;
+        case "reserved":
             return Kirigami.Theme.neutralBackgroundColor;
         default:
             return Kirigami.Theme.backgroundColor;

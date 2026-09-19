@@ -110,9 +110,13 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
      * 剩下的就是"声明了但没生效"——端口页要如实标出来（决定 3）。
      */
     for (const Container &container : containers) {
-        if (!holdsHostPorts(container.state)) {
-            continue;
-        }
+        /*
+         * 这里**故意**不过滤运行状态（与 `holderFor()` 相反）：
+         *  - 运行中容器声明了却没发布的 → `declaredNotPublished`（"占着却连不上"）；
+         *  - 未运行容器声明过的 → `reserved`："端口现在是空的，但那个容器一起来就会要回去"。
+         * 用户实测反馈：这两种都要能在端口页看到（早前决定"不做 reserved"已被这次反馈推翻）。
+         * 冲突判断（`holderFor`）仍然只算运行中的容器——没运行就不该拦住别人。
+         */
         const QList<DeclaredPortBinding> bindings = declared.value(container.id);
         for (const DeclaredPortBinding &binding : bindings) {
             const bool published = std::any_of(entries.cbegin(), entries.cend(), [&](const HostPortEntry &entry) {
@@ -131,7 +135,8 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
             entry.ipv6 = wildcardFamily(binding.hostIp) == 6;
             entry.containerPort = binding.containerPort;
             entry.protocol = binding.protocol;
-            entry.stateKey = QStringLiteral("declaredNotPublished");
+            entry.stateKey = holdsHostPorts(container.state) ? QStringLiteral("declaredNotPublished")
+                                                            : QStringLiteral("reserved");
             entry.containerId = container.id;
             entry.containerName = container.name;
             entry.containerImage = container.image;

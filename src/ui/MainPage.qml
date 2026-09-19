@@ -23,6 +23,15 @@ import "components" as Components
 Kirigami.Page {
     id: root
 
+    Component.onCompleted: {
+        if (root.startTab > 0 && tabBar) {
+            tabBar.currentIndex = root.startTab;
+            if (root.startTab === 4) {
+                root.controller.refreshPorts();
+            }
+        }
+    }
+
     readonly property var controller: kcm.controller
     readonly property var containerList: controller.containerList
     readonly property var imageList: controller.imageList
@@ -145,6 +154,14 @@ Kirigami.Page {
     /* ------------------------------------------------------------------ */
     /* 端口页（下一期 M3）的辅助                                            */
     /* ------------------------------------------------------------------ */
+    /*!
+     * 调试用起始标签页（默认 0 = 容器）。
+     *
+     * 由宿主注入（`kcmshell6` 侧读 `KONTAINER_START_TAB`）：只是为了"打开就能看到某一页"
+     * 以便截图复核 / 排查，默认行为完全不变。
+     */
+    property int startTab: 0
+
     /*! 端口页的视图模式：`list`（默认）或 `map`（区间地图）。 */
     property string portViewMode: "list"
 
@@ -1180,10 +1197,21 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     // 只在真的有"声明了但没发布"的行时说明一次（减少冗余小字）
                     visible: root.portsDeclaredCount > 0
-                    type: Kirigami.MessageType.Information
+                    type: Kirigami.MessageType.Warning
                     text: i18ncp("@info", "%1 port is declared by a running container but was not actually published.",
                                  "%1 ports are declared by running containers but were not actually published.",
                                  root.portsDeclaredCount)
+                }
+
+                Kirigami.InlineMessage {
+                    objectName: "portsReservedHint"
+                    Layout.fillWidth: true
+                    // 未运行容器声明过的端口：现在是空的，但那个容器一起来就会要回去
+                    visible: root.controller.reservedPortCount > 0
+                    type: Kirigami.MessageType.Information
+                    text: i18ncp("@info", "%1 port is declared by a container that is not running. It is free now, but that container will take it back when started.",
+                                 "%1 ports are declared by containers that are not running. They are free now, but those containers will take them back when started.",
+                                 root.controller.reservedPortCount)
                 }
 
                 RowLayout {
@@ -1205,7 +1233,8 @@ Kirigami.Page {
                         model: [
                             {text: i18n("All ports"), value: "all"},
                             {text: i18n("In use"), value: "inUse"},
-                            {text: i18n("Declared only"), value: "declaredNotPublished"}
+                            {text: i18n("Declared, not published"), value: "declaredNotPublished"},
+                            {text: i18n("Declared (container not running)"), value: "reserved"}
                         ]
                         onActivated: root.controller.hostPortList.stateFilter = currentValue
                         Component.onCompleted: currentIndex = indexOfValue(root.controller.hostPortList.stateFilter)
@@ -1225,6 +1254,8 @@ Kirigami.Page {
 
                     QQC2.ComboBox {
                         objectName: "portSortCombo"
+                        // 地图是按端口位置铺开的，没有"排序"这回事：只对列表视图显示
+                        visible: root.portViewMode === "list"
                         textRole: "text"
                         valueRole: "value"
                         model: [

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 21:51+0800\n"
+"POT-Creation-Date: 2026-09-19 22:37+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -156,7 +156,7 @@ msgid "This mount has no host directory to open."
 msgstr "该挂载没有可打开的宿主目录。"
 
 #: src/model/container_detail_controller.cpp:54
-#: src/model/status_controller.cpp:152
+#: src/model/status_controller.cpp:153
 msgid "Could not open the file manager: %1"
 msgstr "无法打开文件管理器：%1"
 
@@ -187,7 +187,8 @@ msgctxt "@info elapsed time less than one minute"
 msgid "less than a minute"
 msgstr "不到一分钟"
 
-#: src/model/create_container_controller.cpp:1004 src/ui/ImageDetail.qml:114
+#: src/model/create_container_controller.cpp:1004
+#: src/ui/components/HostPortList.qml:141 src/ui/ImageDetail.qml:114
 #: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr "镜像"
@@ -297,21 +298,21 @@ msgstr "启动容器"
 msgid "Leave it stopped"
 msgstr "保持停止"
 
-#: src/model/status_controller.cpp:146 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:147 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr "该宿主路径不存在。"
 
-#: src/model/status_controller.cpp:149
+#: src/model/status_controller.cpp:150
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:600
+#: src/model/status_controller.cpp:629
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr "Docker 一直没有响应，已放弃这次请求。等服务恢复后再重试。"
 
-#: src/model/status_controller.cpp:833
+#: src/model/status_controller.cpp:862
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -1287,7 +1288,7 @@ msgstr "正在停止…"
 msgid "Start"
 msgstr "启动"
 
-#: src/ui/components/ServiceCard.qml:93 src/ui/components/HostPortList.qml:141
+#: src/ui/components/ServiceCard.qml:93 src/ui/components/HostPortList.qml:254
 #: src/ui/ContainerDetail.qml:222 src/ui/ContainerCard.qml:190
 #: src/ui/ContainerCard.qml:194
 msgid "Stop"
@@ -1447,7 +1448,8 @@ msgstr "改用端口 %1"
 msgid "Host"
 msgstr "宿主机"
 
-#: src/ui/components/PortMappingEditor.qml:155 src/ui/ContainerDetail.qml:310
+#: src/ui/components/PortMappingEditor.qml:155
+#: src/ui/components/HostPortList.qml:132 src/ui/ContainerDetail.qml:310
 #: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr "容器"
@@ -1457,10 +1459,12 @@ msgid "Host address"
 msgstr "宿主机地址"
 
 #: src/ui/components/PortMappingEditor.qml:221
+#: src/ui/components/HostPortList.qml:96
 msgid "Host port"
 msgstr "宿主端口"
 
 #: src/ui/components/PortMappingEditor.qml:292
+#: src/ui/components/HostPortList.qml:114
 msgid "Container port"
 msgstr "容器端口"
 
@@ -1485,17 +1489,35 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr "没有发布端口。容器只能通过它所在的网络访问。"
 
-#: src/ui/components/HostPortList.qml:106
+#: src/ui/components/HostPortList.qml:56
 #: src/ui/components/HostPortRangeMap.qml:69 src/ui/MainPage.qml:551
-#: src/ui/MainPage.qml:971 src/ui/MainPage.qml:1207
+#: src/ui/MainPage.qml:971 src/ui/MainPage.qml:1218
 msgid "In use"
 msgstr "运行中占用"
 
-#: src/ui/components/HostPortList.qml:106
-msgid "Declared"
-msgstr "已声明"
+#: src/ui/components/HostPortList.qml:58
+#: src/ui/components/HostPortRangeMap.qml:70 src/ui/MainPage.qml:1219
+msgid "Declared, not published"
+msgstr "已声明但未发布"
 
-#: src/ui/components/HostPortList.qml:131
+#: src/ui/components/HostPortList.qml:60
+#: src/ui/components/HostPortRangeMap.qml:71 src/ui/MainPage.qml:1220
+msgid "Declared (container not running)"
+msgstr "已声明（容器未运行）"
+
+#: src/ui/components/HostPortList.qml:105
+msgid "Bind address"
+msgstr "绑定地址"
+
+#: src/ui/components/HostPortList.qml:123
+msgid "State"
+msgstr "状态"
+
+#: src/ui/components/HostPortList.qml:197
+msgid "All interfaces"
+msgstr "所有接口"
+
+#: src/ui/components/HostPortList.qml:244
 msgid "Open"
 msgstr "跳转"
 
@@ -1507,28 +1529,24 @@ msgstr "下一个空闲宿主端口：%1"
 msgid "next free host port"
 msgstr "下一个空闲宿主端口"
 
-#: src/ui/components/HostPortRangeMap.qml:70
-msgid "Declared, not published"
-msgstr "已声明但未发布"
-
-#: src/ui/components/HostPortRangeMap.qml:71
+#: src/ui/components/HostPortRangeMap.qml:72
 msgid "Free"
 msgstr "空闲"
 
-#: src/ui/components/HostPortRangeMap.qml:130
+#: src/ui/components/HostPortRangeMap.qml:131
 msgid "%1 port in use"
 msgid_plural "%1 ports in use"
 msgstr[0] "有 %1 个端口被占用"
 
-#: src/ui/components/HostPortRangeMap.qml:143
+#: src/ui/components/HostPortRangeMap.qml:144
 msgid "%1 more not shown"
 msgstr "还有 %1 个未显示"
 
-#: src/ui/components/HostPortRangeMap.qml:179
+#: src/ui/components/HostPortRangeMap.qml:180
 msgid "Port %1: %2"
 msgstr "端口 %1：%2"
 
-#: src/ui/components/HostPortRangeMap.qml:180
+#: src/ui/components/HostPortRangeMap.qml:181
 msgid "Port %1: free"
 msgstr "端口 %1：空闲"
 
@@ -3021,7 +3039,7 @@ msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr "没有匹配“%1”的容器。"
 
-#: src/ui/MainPage.qml:194 src/ui/MainPage.qml:220 src/ui/MainPage.qml:1247
+#: src/ui/MainPage.qml:194 src/ui/MainPage.qml:220 src/ui/MainPage.qml:1261
 msgid "Clear search"
 msgstr "清除搜索"
 
@@ -3298,59 +3316,65 @@ msgid_plural ""
 "%1 ports are declared by running containers but were not actually published."
 msgstr[0] "有 %1 个端口被运行中的容器声明，但没有真正发布。"
 
-#: src/ui/MainPage.qml:1196
+#: src/ui/MainPage.qml:1195
+msgctxt "@info"
+msgid ""
+"%1 port is declared by a container that is not running. It is free now, but "
+"that container will take it back when started."
+msgid_plural ""
+"%1 ports are declared by containers that are not running. They are free now, "
+"but those containers will take them back when started."
+msgstr[0] "有 %1 个端口被未运行的容器声明过。它现在是空闲的，但那个容器一启动就会把它要回去。"
+
+#: src/ui/MainPage.qml:1207
 msgid "Search by port, container or image…"
 msgstr "搜索端口 / 容器 / 镜像…"
 
-#: src/ui/MainPage.qml:1206
+#: src/ui/MainPage.qml:1217
 msgid "All ports"
 msgstr "全部端口"
 
-#: src/ui/MainPage.qml:1208
-msgid "Declared only"
-msgstr "仅声明未发布"
-
-#: src/ui/MainPage.qml:1219
+#: src/ui/MainPage.qml:1231
 msgid "List"
 msgstr "列表"
 
-#: src/ui/MainPage.qml:1220
+#: src/ui/MainPage.qml:1232
 msgid "Range map"
 msgstr "区间地图"
 
-#: src/ui/MainPage.qml:1231
+#: src/ui/MainPage.qml:1245
 msgid "Sort by port"
 msgstr "排序：端口"
 
-#: src/ui/MainPage.qml:1232
+#: src/ui/MainPage.qml:1246
 msgid "Sort by container"
 msgstr "排序：容器"
 
-#: src/ui/MainPage.qml:1245
+#: src/ui/MainPage.qml:1259
 msgid "No port matches “%1”."
 msgstr "没有匹配「%1」的端口。"
 
-#: src/ui/MainPage.qml:1246
+#: src/ui/MainPage.qml:1260
 msgid "No host port is currently used by a running container."
 msgstr "当前没有运行中的容器占用宿主端口。"
 
-#: src/ui/MainPage.qml:1284
+#: src/ui/MainPage.qml:1298
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:1307
+#: src/ui/MainPage.qml:1321
 msgid "User configuration…"
 msgstr "用户级配置…"
 
-#: src/ui/MainPage.qml:1314
+#: src/ui/MainPage.qml:1328
 msgid "System configuration…"
 msgstr "系统级配置…"
 
-#: src/ui/MainPage.qml:1346 src/ui/MainPage.qml:1354
+#: src/ui/MainPage.qml:1360 src/ui/MainPage.qml:1368
 msgid "Stop container"
 msgstr "停止容器"
 
-#: src/ui/MainPage.qml:1347
+#: src/ui/MainPage.qml:1361
 msgid "“%1” will stop and the ports it publishes will be released."
 msgstr "「%1」将被停止，它发布的端口会被释放。"
 
@@ -3473,6 +3497,12 @@ msgstr "移除为“%1”保存的凭据吗？"
 #: src/ui/RegistryAuthPage.qml:314
 msgid "Pulling private images from this registry will need a new login."
 msgstr "之后拉取该仓库的私有镜像需要重新登录。"
+
+#~ msgid "Declared"
+#~ msgstr "已声明"
+
+#~ msgid "Declared only"
+#~ msgstr "仅声明未发布"
 
 #~ msgid "Credentials are stored in KWallet, never in a plain-text file."
 #~ msgstr "凭据保存在 KWallet 中，绝不写入明文文件。"
