@@ -106,13 +106,6 @@ Kirigami.Dialog {
             ]
         }
 
-        QQC2.Label {
-            Layout.fillWidth: true
-            text: i18n("Pulling continues in the background; progress is shown in the image list.")
-            wrapMode: Text.WordWrap
-            font: Kirigami.Theme.smallFont
-            opacity: 0.7
-        }
     }
 
     footer: QQC2.DialogButtonBox {

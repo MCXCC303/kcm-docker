@@ -42,6 +42,7 @@ private Q_SLOTS:
     void rangeClusteringGroupsNearbyPorts();
     void rangeClusteringCapsVeryLongRanges();
     void stoppedContainersKeepTheirDeclaredPortsAsReserved();
+    void rangeUsedCountCountsPortsNotDeclarations();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -512,6 +513,39 @@ void HostPortUsageTest::stoppedContainersKeepTheirDeclaredPortsAsReserved()
 
     // 地图：未运行的声明也点亮（用保留色）
     QCOMPARE(HostPortUsage::stateKeyForPort(entries, 8810), QStringLiteral("reserved"));
+}
+
+
+/*!
+ * 区间里的"被占用"数量必须按**端口个数**算（用户实测：WinBoat 的情况）。
+ *
+ * 它声明了 5 段、每段 10 个端口，落在同一个区间里，其中两段还重叠
+ * （47268-47278 与 47270-47279）：原来按"声明条数"显示 5，而图上亮着几十个格子。
+ */
+void HostPortUsageTest::rangeUsedCountCountsPortsNotDeclarations()
+{
+    Container stopped;
+    stopped.id = QStringLiteral("winboat-id");
+    stopped.name = QStringLiteral("WinBoat");
+    stopped.state = ContainerState::Exited;
+
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    declared.insert(stopped.id,
+                    {DeclaredPortBinding {3389, QStringLiteral("tcp"), QStringLiteral("127.0.0.1"), 47268, 47278},
+                     DeclaredPortBinding {3389, QStringLiteral("udp"), QStringLiteral("127.0.0.1"), 47270, 47279},
+                     DeclaredPortBinding {7148, QStringLiteral("tcp"), QStringLiteral("127.0.0.1"), 47280, 47289},
+                     DeclaredPortBinding {7149, QStringLiteral("tcp"), QStringLiteral("127.0.0.1"), 47290, 47299},
+                     DeclaredPortBinding {8006, QStringLiteral("tcp"), QStringLiteral("127.0.0.1"), 47300, 47309}});
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({stopped}, declared);
+    QCOMPARE(entries.size(), 5); // 五条声明（两条重叠）
+
+    const QList<HostPortRange> ranges = HostPortUsage::clusterRanges(entries, 5, 0, 64);
+    QCOMPARE(ranges.size(), 1);
+    // 并集 = 47268..47309 → 42 个端口（不是 5，也不是 50：重叠只算一次）
+    QCOMPARE(ranges.first().first, quint16(47268));
+    QCOMPARE(ranges.first().last, quint16(47309));
+    QCOMPARE(ranges.first().usedCount, 42);
 }
 
 

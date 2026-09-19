@@ -185,7 +185,7 @@ private Q_SLOTS:
     void longCommandIsCollapsedUntilExpanded();
     void containerDetailOpensTheImage();
     void portRowShowsConflictAndAdoptsTheSuggestion();
-    void portsTabListsRowsAndConfirmsStop();
+    void portsTabListsRowsAndOpensTheContainer();
     void portsTabSwitchesToTheRangeMap();
     void engineViewListsComponentVersions();
     void topologyMergesDualStackBindings();
@@ -583,7 +583,8 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
     QQuickItem *systemHint = findItemByName(systemPage.data(), QStringLiteral("dataRootHint"));
     QVERIFY(systemHint);
     QVERIFY(systemHint->property("visible").toBool());
-    QVERIFY2(systemHint->property("text").toString().contains(QStringLiteral("belongs to the system")),
+    // 用户反馈后统一压成一句：不再区分"文件归谁"，只说"生效需要管理员权限"
+    QVERIFY2(systemHint->property("text").toString().contains(QStringLiteral("administrator rights")),
              qPrintable(systemHint->property("text").toString()));
 }
 
@@ -3010,7 +3011,7 @@ void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
  * 端口是第一视觉焦点，容器只是其中一列；行内「停止」与其它危险动作一样要**二次确认**
  * （确认前不能真的发操作）。
  */
-void QmlLoadTest::portsTabListsRowsAndConfirmsStop()
+void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
 {
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     m_stubKcm->controller()->operations()->refreshWriteAccess();
@@ -3102,21 +3103,22 @@ void QmlLoadTest::portsTabListsRowsAndConfirmsStop()
     QVERIFY2(sawState, "the row must carry a state chip");
     QVERIFY2(sawContainer, "the container name must be visible in the row");
 
-    // 「停止」必须先确认：点一下只打开对话框，不发操作
-    QVERIFY2(stopButtons.size() == 1, "a running holder must offer 'stop container'");
-    const int callsBefore = m_backend->mutationCalls().size();
-    QVERIFY(QMetaObject::invokeMethod(stopButtons.first(), "clicked"));
-    // 弹层挂在 overlay 上，不在 childItems 里：用 QObject 树找（与其它对话框用例一致）
-    QObject *dialog = nullptr;
-    QTRY_VERIFY_WITH_TIMEOUT((dialog = page->findChild<QObject *>(QStringLiteral("portStopContainerDialog"))) != nullptr, 5000);
-    QTRY_VERIFY_WITH_TIMEOUT(dialog->property("visible").toBool(), 5000);
-    QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
+    /*
+     * 交互（用户实测反馈）：按钮都去掉了——**整行可点**即跳转，
+     * "停止"改到容器详情页去做。因此这里断言：行内没有停止按钮，点行会发跳转信号。
+     */
+    QVERIFY2(stopButtons.isEmpty(), "the row must not carry a stop button any more");
+    QVERIFY2(!page->findChild<QObject *>(QStringLiteral("portStopContainerDialog")),
+             "the stop confirmation dialog must be gone with the button");
 
-    // 确认后才真的停止
-    QObject *confirm = page->findChild<QObject *>(QStringLiteral("portStopContainerConfirm"));
-    QVERIFY(confirm);
-    QVERIFY(QMetaObject::invokeMethod(confirm, "triggered"));
-    QVERIFY2(m_backend->mutationCalls().size() > callsBefore, "confirming must actually stop the container");
+    const int callsBefore = m_backend->mutationCalls().size();
+    QSignalSpy openSpy(page, SIGNAL(portContainerActivated(QString)));
+    QVERIFY(openSpy.isValid());
+    QVERIFY(QMetaObject::invokeMethod(rows.first(), "clicked"));
+    QCOMPARE(openSpy.count(), 1);
+    QCOMPARE(openSpy.first().at(0).toString(), QStringLiteral("running-id"));
+    // 只是导航，不发任何写操作
+    QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
 }
 
 

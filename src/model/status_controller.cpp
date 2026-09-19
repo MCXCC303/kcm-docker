@@ -225,8 +225,10 @@ void StatusController::rebuildPorts()
     // 端口表、计数与区间地图都从这一份数据来：只在这里重建，避免三处各写一遍
     const int declaredBefore = declaredNotPublishedCount();
     const int reservedBefore = reservedPortCount();
+    const int inUseBefore = inUsePortCount();
     m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
-    if (declaredNotPublishedCount() != declaredBefore || reservedPortCount() != reservedBefore) {
+    if (declaredNotPublishedCount() != declaredBefore || reservedPortCount() != reservedBefore
+        || inUsePortCount() != inUseBefore) {
         Q_EMIT declaredNotPublishedCountChanged();
     }
     Q_EMIT portRangesChanged();
@@ -239,6 +241,20 @@ int StatusController::declaredNotPublishedCount() const
         if (entry.stateKey == QLatin1String("declaredNotPublished")) {
             ++count;
         }
+    }
+    return count;
+}
+
+int StatusController::inUsePortCount() const
+{
+    // 区间（47300-47309）按**端口数**算，不是按声明条数
+    int count = 0;
+    for (const HostPortEntry &entry : m_hostPortModel->entries()) {
+        if (entry.stateKey != QLatin1String("inUse")) {
+            continue;
+        }
+        const quint16 last = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
+        count += int(last) - int(entry.hostPort) + 1;
     }
     return count;
 }

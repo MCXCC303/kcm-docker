@@ -122,6 +122,12 @@ class StatusController : public QObject
     /*! "声明过、但容器没在运行"的行数（端口现在是空的，容器一起来就要回去）。 */
     Q_PROPERTY(int reservedPortCount READ reservedPortCount NOTIFY declaredNotPublishedCountChanged)
     /*!
+     * **运行中**容器真正占用的宿主端口数（标签页标题用它，不随筛选变化）。
+     *
+     * 用户实测反馈：原来用列表行数，把"已声明"的也数进去了；标签上该显示的是"现在真被占着几个"。
+     */
+    Q_PROPERTY(int inUsePortCount READ inUsePortCount NOTIFY declaredNotPublishedCountChanged)
+    /*!
      * 区间地图的数据（ARCH_next_ports.md §4.B）：每段
      * `{first, last, title, tileCount, hiddenCount, usedCount, tiles: [{port, stateKey}]}`。
      *
@@ -357,6 +363,7 @@ public:
     int declaredNotPublishedCount() const;
     int startTabFromEnvironment() const;
     int reservedPortCount() const;
+    int inUsePortCount() const;
     QVariantList portRanges() const;
     int nextFreeHostPort() const;
     NetworkFilterModel *networkList() const

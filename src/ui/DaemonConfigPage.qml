@@ -199,9 +199,7 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     visible: page.protectedScope
                     type: Kirigami.MessageType.Warning
-                    text: page.scope === "user"
-                        ? i18n("This file is not writable by the current user (it may belong to another user), so changing it needs administrator rights.")
-                        : i18n("These settings affect the Docker daemon for the whole machine and every user. Changing them needs administrator rights.")
+                    text: i18n("Making changes take effect needs administrator rights.")
                 }
 
                 /* 这个文件不是正在运行的 daemon 读的那个：改了不会生效 */
@@ -211,8 +209,12 @@ KCM.AbstractKCM {
                     visible: !page.controller.activeScope
                     type: Kirigami.MessageType.Information
                     text: page.scope === "user"
-                        ? i18n("The running Docker daemon is a system service, so it does not read this file. Making changes here take effect needs administrator rights (or a rootless daemon).")
-                        : i18n("The running Docker daemon is rootless, so it does not read this file. Changes here only affect a system-wide daemon.")
+                        /*
+                         * 用户反馈：这一页最多同时出现三条"需要管理员权限"的长说明，
+                         * 内容重复且占版面。统一压成一句，细节留给锁按钮的提示。
+                         */
+                        ? i18n("Making changes take effect needs administrator rights.")
+                        : i18n("Making changes take effect needs administrator rights.")
                 }
 
                 /* 解锁状态 */
@@ -243,10 +245,7 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     visible: page.controller.dataRootInHomeDir && page.controller.formKey === "systemRoot"
                     type: Kirigami.MessageType.Information
-                    text: page.scope === "user"
-                        // 用户级这一页：文件是自己的，改它不需要权限；需要权限的是"让改动生效"
-                        ? i18n("This file is yours to change. The running daemon is a system service, so making the change take effect needs administrator rights.")
-                        : i18n("The Docker data directory is inside your home directory, but the daemon itself runs as a system service: this file belongs to the system, so changing it needs administrator rights.")
+                    text: i18n("Making changes take effect needs administrator rights.")
                 }
 
                 Kirigami.InlineMessage {
@@ -276,45 +275,6 @@ KCM.AbstractKCM {
                     showCloseButton: true
                 }
 
-                Kirigami.InlineMessage {
-                    objectName: "saveErrorMessage"
-                    Layout.fillWidth: true
-                    visible: page.controller.lastError.length > 0
-                    type: page.controller.lastError === "privilegeRequired" ? Kirigami.MessageType.Warning : Kirigami.MessageType.Error
-                    text: {
-                        switch (page.controller.lastError) {
-                        case "privilegeRequired":
-                            return i18n("Changing this file needs administrator rights.");
-                        case "configUnparsable":
-                            return i18n("Saving is disabled because the current file cannot be parsed.");
-                        case "nothingToSave":
-                            return i18n("Nothing to save: no setting was changed.");
-                        case "noBackup":
-                            return i18n("There is no backup to restore yet.");
-                        case "backupUnreadable":
-                            return i18n("That backup cannot be used (it is unreadable or not valid JSON).");
-                        case "writeFailed":
-                            return i18n("Writing the configuration file failed. The previous file was left unchanged.");
-                        case "helperUnavailable":
-                            return i18n("Administrator access is not available (the helper or its policy is not installed). Use the command below instead.");
-                        case "cancelled":
-                            return i18n("Authorization was cancelled; nothing was changed.");
-                        case "authorizationDenied":
-                            return i18n("Authorization was denied; nothing was changed.");
-                        case "invalidRequest":
-                            return i18n("The helper rejected the request; nothing was changed.");
-                        case "systemdUnavailable":
-                            return i18n("Could not reach systemd to restart the Docker service.");
-                        case "restartFailed":
-                            return i18n("Restarting the Docker service failed.");
-                        case "locked":
-                            return i18n("Unlock the settings before saving.");
-                        default:
-                            return "";
-                        }
-                    }
-                }
-
                 /* ---------------- 可改的设置 ---------------- */
                 Kirigami.Separator {
                     Layout.fillWidth: true
@@ -324,14 +284,6 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     level: 3
                     text: i18n("Registry mirrors")
-                }
-
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    text: i18n("Tried in the listed order. A mirror is useful when the registry itself is unreachable from this machine.")
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.8
-                    wrapMode: Text.WordWrap
                 }
 
                 Components.StringListEditor {

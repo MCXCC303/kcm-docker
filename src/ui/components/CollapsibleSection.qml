@@ -66,12 +66,6 @@ ColumnLayout {
                 text: parent.parent.text
                 Layout.fillWidth: true
             }
-            QQC2.Label {
-                visible: !control.expanded
-                text: i18n("hidden by default")
-                font: Kirigami.Theme.smallFont
-                opacity: 0.6
-            }
         }
     }
 

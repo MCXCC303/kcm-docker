@@ -5,12 +5,18 @@
     宿主端口列表（ARCH_next_ports.md §4.A，里程碑 M3）。
 
     一行 = 一个宿主端口 + 谁在用它 + 它映射到容器里的哪个端口。
-    状态只有两种（用户拍板：不做 reserved）：
-      - `inUse`：运行中的容器**真的**发布了它；
-      - `declaredNotPublished`：运行中的容器**声明**了它，但没真正发布——
-        用于解释"为什么显示占用了却连不上"。
+    三种状态（用户实测反馈后确定的措辞，短到一眼能读完）：
+      - `inUse`                 运行中：运行中的容器**真的**发布了它；
+      - `declaredNotPublished`  未占用：容器在跑，但声明的那条映射没真正生效
+                                        （`--net=host` 之类会让 `-p` 被忽略）；
+      - `reserved`              未启动：容器没在跑，端口现在是空的，
+                                        但它一起来就会要回去。
 
-    用 `ListView` 而不是 Repeater：端口可能有上百行（用户机器上就有几十条映射）。
+    布局注意（用户实测反馈）：整页只保留**一个**滚动条——ScrollBar 交给 ScrollView 自带，
+    不要再手写一个；表头也不再压在第一条上（用 ColumnLayout 分开排，并给表头底色）。
+
+    交互（用户实测反馈）：条目**整行可点**即可跳转容器详情，"跳转/停止"按钮都去掉了
+    （停止在容器详情页里有）。
 */
 
 import QtQuick
@@ -21,13 +27,24 @@ import org.kde.kirigami as Kirigami
 
 import "." as Local
 
-Item {
+ColumnLayout {
     id: root
 
     /*! 过滤后的模型（`HostPortFilterModel`）。 */
     required property var model
-    /*! 是否允许写操作（socket 可写）；否则不显示"停止容器"。 */
-    required property bool writeAllowed
+
+    /*! 点整行：请求打开这个容器的详情。 */
+    signal containerRequested(string containerId, string containerName)
+
+    objectName: "hostPortListView"
+    spacing: Kirigami.Units.smallSpacing
+
+    /* 列宽只在这里定义一次：表头与数据行共用，改一处两边一起变 */
+    readonly property real portWidth: Kirigami.Units.gridUnit * 7
+    readonly property real addressWidth: Kirigami.Units.gridUnit * 13
+    readonly property real mappingWidth: Kirigami.Units.gridUnit * 9
+    readonly property real stateWidth: Kirigami.Units.gridUnit * 7
+    readonly property real imageWidth: Kirigami.Units.gridUnit * 12
 
     /*! 状态 key → 语义色 / 图标 / 文字（颜色不单独承担语义，所以三者永远一起给）。 */
     function semanticKeyFor(stateKey: string): string {
@@ -50,105 +67,114 @@ Item {
             return "dialog-information";
         }
     }
+    /*! 状态文案：短（运行中 / 未占用 / 未启动），完整含义放悬停提示。 */
     function stateText(stateKey: string): string {
         switch (stateKey) {
         case "inUse":
-            return i18n("In use");
+            return i18n("Running");
         case "declaredNotPublished":
-            return i18n("Declared, not published");
+            return i18n("Not bound");
         default:
-            return i18n("Declared (container not running)");
+            return i18n("Not started");
+        }
+    }
+    function stateHint(stateKey: string): string {
+        switch (stateKey) {
+        case "inUse":
+            return i18n("A running container publishes this port.");
+        case "declaredNotPublished":
+            return i18n("The container is running, but this declared mapping is not actually bound on the host.");
+        default:
+            return i18n("The container is not running and does not hold this port now, but will take it back when started.");
         }
     }
 
-    /*! 点"跳转"：请求打开这个容器的详情。 */
-    signal containerRequested(string containerId, string containerName)
-    /*! 点"停止"：请求停止该容器（由页面负责确认与执行）。 */
-    signal stopRequested(string containerId, string containerName)
-
-    objectName: "hostPortListView"
-
-    /* 列宽只在这里定义一次：表头与数据行共用，改一处两边一起变 */
-    readonly property real portWidth: Kirigami.Units.gridUnit * 7
-    readonly property real addressWidth: Kirigami.Units.gridUnit * 13
-    readonly property real mappingWidth: Kirigami.Units.gridUnit * 9
-    readonly property real imageWidth: Kirigami.Units.gridUnit * 12
-
     /*!
-     * 表头：用户实测反馈"不知道第二个参数是什么、那一列还总是 —"。
+     * 表头（用户实测反馈：不知道各列是什么，第二列还总是 —）。
      *
-     * 除了列出列名，地址列现在把"所有接口"写出来（不再是一个破折号），
-     * 因为 `0.0.0.0` 对普通用户没有意义。
+     * 有底色（主题的交替背景色），并且与列表**分开排**——之前用 anchors 定位时
+     * 第一条会被表头压住、看起来像图层串了。
      */
-    RowLayout {
-        id: header
+    Rectangle {
+        id: headerBackground
 
-        objectName: "hostPortHeader"
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        height: Kirigami.Units.gridUnit * 1.6
-        spacing: Kirigami.Units.smallSpacing
+        objectName: "hostPortHeaderBackground"
+        Layout.fillWidth: true
+        implicitHeight: header.implicitHeight + Kirigami.Units.smallSpacing * 2
+        color: Kirigami.Theme.alternateBackgroundColor
+        radius: 4
 
-        QQC2.Label {
-            objectName: "hostPortHeaderPort"
-            Layout.preferredWidth: root.portWidth
-            text: i18n("Host port")
-            font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.8
-        }
+        RowLayout {
+            id: header
 
-        QQC2.Label {
-            objectName: "hostPortHeaderAddress"
-            Layout.preferredWidth: root.addressWidth
-            text: i18n("Bind address")
-            font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.8
-        }
+            objectName: "hostPortHeader"
+            anchors.fill: parent
+            anchors.leftMargin: Kirigami.Units.smallSpacing
+            anchors.rightMargin: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing
 
-        QQC2.Label {
-            objectName: "hostPortHeaderMapping"
-            Layout.preferredWidth: root.mappingWidth
-            text: i18n("Container port")
-            font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.8
-        }
+            QQC2.Label {
+                objectName: "hostPortHeaderPort"
+                Layout.preferredWidth: root.portWidth
+                text: i18n("Host port")
+                font.bold: true
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.8
+            }
 
-        QQC2.Label {
-            objectName: "hostPortHeaderState"
-            Layout.preferredWidth: Kirigami.Units.gridUnit * 11
-            text: i18n("State")
-            font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.8
-        }
+            QQC2.Label {
+                objectName: "hostPortHeaderAddress"
+                Layout.preferredWidth: root.addressWidth
+                text: i18n("Bind address")
+                font.bold: true
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.8
+            }
 
-        QQC2.Label {
-            objectName: "hostPortHeaderContainer"
-            Layout.fillWidth: true
-            text: i18n("Container")
-            font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.8
-        }
+            QQC2.Label {
+                objectName: "hostPortHeaderMapping"
+                Layout.preferredWidth: root.mappingWidth
+                text: i18n("Container port")
+                font.bold: true
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.8
+            }
 
-        QQC2.Label {
-            objectName: "hostPortHeaderImage"
-            Layout.preferredWidth: root.imageWidth
-            text: i18n("Image")
-            font.bold: true
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.8
+            QQC2.Label {
+                objectName: "hostPortHeaderState"
+                Layout.preferredWidth: root.stateWidth
+                text: i18n("State")
+                font.bold: true
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.8
+            }
+
+            QQC2.Label {
+                objectName: "hostPortHeaderContainer"
+                Layout.fillWidth: true
+                text: i18n("Container")
+                font.bold: true
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.8
+            }
+
+            QQC2.Label {
+                objectName: "hostPortHeaderImage"
+                Layout.preferredWidth: root.imageWidth
+                text: i18n("Image")
+                font.bold: true
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                opacity: 0.8
+            }
         }
     }
 
     QQC2.ScrollView {
-        anchors.top: header.bottom
-        anchors.topMargin: Kirigami.Units.smallSpacing
-        anchors.fill: parent
+        id: scroll
+
+        // 只在这里滚动（ScrollBar 由 ScrollView 自带；再手写一个就会出现两条滚动条）
+        Layout.fillWidth: true
+        Layout.fillHeight: true
         clip: true
 
         ListView {
@@ -157,8 +183,6 @@ Item {
             objectName: "hostPortList"
             model: root.model
             spacing: 0
-
-            QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
 
             delegate: QQC2.ItemDelegate {
                 id: row
@@ -172,11 +196,12 @@ Item {
                 required property string containerName
                 required property string containerId
                 required property string containerImage
-                required property bool actionable
 
                 objectName: "hostPortRow"
                 width: listView.width
                 hoverEnabled: true
+                // 整行可点 = 跳转（用户要求：不要额外的"跳转"按钮）
+                onClicked: root.containerRequested(row.containerId, row.containerName)
 
                 contentItem: RowLayout {
                     spacing: Kirigami.Units.smallSpacing
@@ -208,23 +233,21 @@ Item {
                         opacity: 0.85
                     }
 
-                    /*
-                     * 状态用既有的 StatusChip（图标 + 颜色 + 文字三重编码）：
-                     * 颜色语义由 C++ 的 Presentation 给，QML 不自己判状态字符串。
-                     */
                     Local.StatusChip {
                         objectName: "hostPortRowState"
+                        Layout.preferredWidth: root.stateWidth
                         semanticKey: root.semanticKeyFor(row.stateKey)
                         iconName: root.iconNameFor(row.stateKey)
                         text: root.stateText(row.stateKey)
+
+                        // 短文案 + 悬停看完整含义（用户要求状态要短，但含义不能丢）
+                        QQC2.ToolTip.text: root.stateHint(row.stateKey)
+                        QQC2.ToolTip.visible: hovered
                     }
 
                     QQC2.Label {
                         objectName: "hostPortRowContainer"
-                        // 容器名与镜像是"这一列"的信息：给固定宽度并省略，
-                        // 否则它们会把右侧的动作按钮挤出可视区域（实测踩到）
                         Layout.fillWidth: true
-                        Layout.preferredWidth: Kirigami.Units.gridUnit * 14
                         Layout.minimumWidth: Kirigami.Units.gridUnit * 6
                         text: row.containerName
                         elide: Text.ElideRight
@@ -239,23 +262,13 @@ Item {
                         elide: Text.ElideMiddle
                     }
 
-                    QQC2.Button {
-                        objectName: "hostPortRowOpen"
-                        text: i18n("Open")
-                        display: QQC2.AbstractButton.TextBesideIcon
-                        icon.name: "go-next-symbolic"
-                        flat: true
-                        onClicked: root.containerRequested(row.containerId, row.containerName)
-                    }
-
-                    QQC2.Button {
-                        objectName: "hostPortRowStop"
-                        visible: root.writeAllowed && row.actionable
-                        text: i18n("Stop")
-                        display: QQC2.AbstractButton.TextBesideIcon
-                        icon.name: "process-stop"
-                        flat: true
-                        onClicked: root.stopRequested(row.containerId, row.containerName)
+                    /* 整行可点的提示：只留一个图标，不再是按钮 */
+                    Kirigami.Icon {
+                        objectName: "hostPortRowChevron"
+                        source: "go-next-symbolic"
+                        implicitWidth: Kirigami.Units.iconSizes.small
+                        implicitHeight: Kirigami.Units.iconSizes.small
+                        opacity: 0.6
                     }
                 }
             }

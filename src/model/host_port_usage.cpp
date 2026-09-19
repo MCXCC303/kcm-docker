@@ -251,12 +251,24 @@ QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &en
         const int total = int(last) - int(first) + 1;
         range.tileCount = qMin(total, safeTiles);
         range.hiddenCount = qMax(0, total - safeTiles);
+        /*
+         * `usedCount` 数的是**端口个数**（去重），不是"声明了几条"。
+         *
+         * 用户实测：`WinBoat` 声明了 5 段（每段 10 个）落在同一区间里，
+         * 其中两段还重叠，原来显示"5 个端口被占用"——而图上明明亮着几十个格子。
+         */
+        QList<quint16> covered;
         for (const HostPortEntry &entry : entries) {
             const quint16 entryLast = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
-            if (entry.hostPort <= last && entryLast >= first) {
-                ++range.usedCount;
+            const quint16 from = qMax(entry.hostPort, first);
+            const quint16 to = qMin(entryLast, last);
+            for (quint16 port = from; port <= to; ++port) {
+                if (!covered.contains(port)) {
+                    covered.append(port);
+                }
             }
         }
+        range.usedCount = int(covered.size());
         ranges.append(range);
         index = cursor + 1;
     }

@@ -168,24 +168,11 @@ Kirigami.Page {
     /*! "声明了但没发布"的行数（由控制器算好；QML 不碰模型枚举）。 */
     readonly property int portsDeclaredCount: root.controller.declaredNotPublishedCount
 
-    /*! 待停止的容器（端口页行内"停止"与其他危险动作一样要二次确认）。 */
-    property string pendingStopContainerId: ""
-    property string pendingStopContainerName: ""
-
     function openContainerFromPorts(containerId, containerName): void {
         if (containerId.length === 0) {
             return;
         }
         root.portContainerActivated(containerId);
-    }
-
-    function confirmStopFromPorts(containerId, containerName): void {
-        if (containerId.length === 0) {
-            return;
-        }
-        root.pendingStopContainerId = containerId;
-        root.pendingStopContainerName = containerName;
-        stopContainerDialog.open();
     }
 
     /* ------------------------------------------------------------------ */
@@ -490,7 +477,8 @@ Kirigami.Page {
                 text: i18ncp("@title:tab volume list", "Volumes (%1)", "Volumes (%1)", root.controller.volumeModel.count)
             }
             QQC2.TabButton {
-                text: i18ncp("@title:tab host port list", "Ports (%1)", "Ports (%1)", root.controller.hostPortList.count)
+                // 用户要求：这里显示**运行中**的端口数（不是所有声明），且不随筛选变化
+                text: i18ncp("@title:tab host port list", "Ports (%1)", "Ports (%1)", root.controller.inUsePortCount)
             }
             QQC2.TabButton {
                 text: i18nc("@title:tab mount presets", "Mount presets")
@@ -1203,17 +1191,6 @@ Kirigami.Page {
                                  root.portsDeclaredCount)
                 }
 
-                Kirigami.InlineMessage {
-                    objectName: "portsReservedHint"
-                    Layout.fillWidth: true
-                    // 未运行容器声明过的端口：现在是空的，但那个容器一起来就会要回去
-                    visible: root.controller.reservedPortCount > 0
-                    type: Kirigami.MessageType.Information
-                    text: i18ncp("@info", "%1 port is declared by a container that is not running. It is free now, but that container will take it back when started.",
-                                 "%1 ports are declared by containers that are not running. They are free now, but those containers will take them back when started.",
-                                 root.controller.reservedPortCount)
-                }
-
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -1294,9 +1271,7 @@ Kirigami.Page {
                     Layout.fillHeight: true
                     visible: root.portViewMode === "list" && root.controller.hostPortList.count > 0
                     model: root.controller.hostPortList
-                    writeAllowed: root.operations.writeAllowed
                     onContainerRequested: (containerId, containerName) => root.openContainerFromPorts(containerId, containerName)
-                    onStopRequested: (containerId, containerName) => root.confirmStopFromPorts(containerId, containerName)
                 }
             }
 
@@ -1369,27 +1344,6 @@ Kirigami.Page {
         }
     }
 
-    /* 端口页的"停止容器"确认（危险动作的后果要写清楚） */
-    Kirigami.PromptDialog {
-        id: stopContainerDialog
-
-        objectName: "portStopContainerDialog"
-        title: i18n("Stop container")
-        subtitle: i18n("“%1” will stop and the ports it publishes will be released.", root.pendingStopContainerName)
-        dialogType: Kirigami.PromptDialog.Warning
-        standardButtons: Kirigami.Dialog.Cancel
-
-        customFooterActions: [
-            Kirigami.Action {
-                objectName: "portStopContainerConfirm"
-                text: i18n("Stop container")
-                icon.name: "process-stop"
-                onTriggered: root.operations.stopContainer(root.pendingStopContainerId)
-            }
-        ]
-    }
-
-    /* 拉取镜像对话框（进度与取消也在这里） */
     Components.CreateNetworkDialog {
         id: createNetworkDialog
         operations: root.operations
