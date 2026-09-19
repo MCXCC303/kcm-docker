@@ -76,14 +76,6 @@ Kirigami.Dialog {
             text: dialog.errorText
         }
 
-        QQC2.Label {
-            Layout.fillWidth: true
-            text: i18n("Credentials are stored in KWallet, never in a plain-text file.")
-            font: Kirigami.Theme.smallFont
-            opacity: 0.8
-            wrapMode: Text.WordWrap
-        }
-
         QQC2.TextField {
             id: serverField
 

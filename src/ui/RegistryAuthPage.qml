@@ -235,9 +235,6 @@ KCM.AbstractKCM {
                     objectName: "credentialsEmptyPlaceholder"
                     Layout.fillWidth: true
                     message: page.auth.credentials.empty ? i18n("No credentials stored.") : ""
-                    explanationText: page.auth.credentials.empty
-                        ? i18n("Log in to a registry to pull private images. Credentials are kept in KWallet only.")
-                        : ""
                 }
 
                 Repeater {

@@ -12,6 +12,7 @@
 #include "model/qml_registration.h"
 #include "support/qml_item_utils.h"
 #include "support/mock_docker_backend.h"
+#include "domain/engine_info.h"
 #include "model/detail_list_model.h"
 #include "model/registry_credential_model.h"
 #include "support/qml_stub_kcm.h"
@@ -183,6 +184,7 @@ private Q_SLOTS:
     void keyValueRowsKeepLongKeysVisible();
     void longCommandIsCollapsedUntilExpanded();
     void containerDetailOpensTheImage();
+    void engineViewListsComponentVersions();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2770,6 +2772,79 @@ void QmlLoadTest::containerDetailOpensTheImage()
     m_stubKcm->controller()->containerDetail()->reload();
     m_backend->completeRefresh();
     QTRY_VERIFY_WITH_TIMEOUT(!row->property("enabled").toBool(), 5000);
+}
+
+
+/*!
+ * 引擎页下半部分展示组件版本（实测需求：除了 dockerd 还要能看到 containerd 等）。
+ */
+void QmlLoadTest::engineViewListsComponentVersions()
+{
+    EngineInfo info;
+    info.available = true;
+    info.countsAvailable = true;
+    info.serverVersion = QStringLiteral("29.8.0");
+    info.apiVersion = QStringLiteral("1.56");
+    info.operatingSystem = QStringLiteral("Arch Linux");
+    info.architecture = QStringLiteral("x86_64");
+    info.cgroupDriver = QStringLiteral("systemd");
+    info.cgroupVersion = QStringLiteral("2");
+    info.storageDriver = QStringLiteral("overlay2");
+    info.cpuCount = 16;
+    info.components = {{QStringLiteral("Engine"), QStringLiteral("29.8.0")},
+                       {QStringLiteral("containerd"), QStringLiteral("1.7.24")},
+                       {QStringLiteral("runc"), QStringLiteral("1.2.3")}};
+    m_backend->setEngineInfo(info);
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/EngineStatusView.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    auto *engineStatus = m_stubKcm->controller()->engine();
+    QVERIFY(engineStatus);
+    initial.insert(QStringLiteral("engine"), QVariant::fromValue(engineStatus));
+    initial.insert(QStringLiteral("buildStamp"), QStringLiteral("test"));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *view = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(view);
+
+    QQuickWindow window;
+    window.resize(900, 600);
+    view->setParentItem(window.contentItem());
+    view->setWidth(900);
+    view->setHeight(600);
+    window.show();
+    QTRY_VERIFY(view->width() > 0);
+
+    // 三个组件各一行，值就是版本号
+    QStringList versions;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        versions.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("engineComponentRow")) {
+                versions.append(node->property("text").toString());
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return versions.size() == 3;
+    }(), 5000);
+    QVERIFY(versions.contains(QStringLiteral("29.8.0")));
+    QVERIFY2(versions.contains(QStringLiteral("1.7.24")), "the containerd version must be shown");
+    QVERIFY(versions.contains(QStringLiteral("1.2.3")));
+
+    // cgroup 驱动与 CPU 数也在
+    QQuickItem *cpus = findItemDeep(window.contentItem(), QStringLiteral("engineCpuCount"));
+    QVERIFY(cpus);
+    QCOMPARE(cpus->property("text").toString(), QStringLiteral("16"));
 }
 
 

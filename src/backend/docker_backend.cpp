@@ -190,6 +190,15 @@ void DockerBackend::startVersionRequest()
         m_engine.osType = version->os;
         m_engine.architecture = version->arch;
         m_engine.kernelVersion = version->kernelVersion;
+        // 组件表（dockerd / containerd / runc …）：引擎版本之外的信息同样要能展示
+        m_engine.components.clear();
+        m_engine.components.reserve(version->components.size());
+        for (const DockerComponentDTO &component : version->components) {
+            EngineComponent entry;
+            entry.name = component.name;
+            entry.version = component.version;
+            m_engine.components.append(entry);
+        }
 
         startInfoRequest();
     });
@@ -228,6 +237,9 @@ void DockerBackend::startInfoRequest()
         m_engine.operatingSystem = info->operatingSystem;
         m_engine.storageDriver = info->storageDriver;
         m_engine.cgroupVersion = info->cgroupVersion;
+        m_engine.cgroupDriver = info->cgroupDriver;
+        m_engine.cpuCount = info->cpus;
+        m_engine.warnings = info->warnings;
         m_engine.containerTotal = info->containers;
         m_engine.containersRunning = info->containersRunning;
         m_engine.containersPaused = info->containersPaused;
@@ -261,6 +273,10 @@ void DockerBackend::resetEngineCounts()
     m_engine.operatingSystem.clear();
     m_engine.storageDriver.clear();
     m_engine.cgroupVersion.clear();
+    m_engine.cgroupDriver.clear();
+    m_engine.components.clear();
+    m_engine.warnings.clear();
+    m_engine.cpuCount = 0;
     m_engine.containerTotal = 0;
     m_engine.memoryTotalBytes = 0;
     m_engine.containersRunning = 0;

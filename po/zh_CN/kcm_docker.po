@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 18:41+0800\n"
+"POT-Creation-Date: 2026-09-19 19:03+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -12,11 +12,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/backend/docker_backend.cpp:1256 src/model/operation_controller.cpp:1058
+#: src/backend/docker_backend.cpp:1277 src/model/operation_controller.cpp:1058
 msgid "Uploading the build context…"
 msgstr "正在上传构建上下文…"
 
-#: src/backend/docker_backend.cpp:1440
+#: src/backend/docker_backend.cpp:1461
 msgid "Step %1/%2 (%3) failed: %4"
 msgstr "第 %1/%2 步（%3）失败：%4"
 
@@ -824,9 +824,9 @@ msgid "Show value"
 msgstr "显示值"
 
 #: src/ui/components/KeyValueListEditor.qml:160
-#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:283
-#: src/ui/RegistryAuthPage.qml:318 src/ui/NetworkDetail.qml:304
-#: src/ui/VolumeDetail.qml:225
+#: src/ui/components/StringListEditor.qml:172 src/ui/NetworkDetail.qml:304
+#: src/ui/VolumeDetail.qml:225 src/ui/RegistryAuthPage.qml:280
+#: src/ui/RegistryAuthPage.qml:315
 msgid "Remove"
 msgstr "删除"
 
@@ -868,38 +868,34 @@ msgstr "下移"
 msgid "Log in to a registry"
 msgstr "登录镜像仓库"
 
-#: src/ui/components/RegistryLoginDialog.qml:81
-msgid "Credentials are stored in KWallet, never in a plain-text file."
-msgstr "凭据保存在 KWallet 中，绝不写入明文文件。"
-
-#: src/ui/components/RegistryLoginDialog.qml:94
+#: src/ui/components/RegistryLoginDialog.qml:86
 msgid "Registry"
 msgstr "仓库"
 
-#: src/ui/components/RegistryLoginDialog.qml:102
+#: src/ui/components/RegistryLoginDialog.qml:94
 msgid "Use an access token instead of a password"
 msgstr "使用访问令牌代替密码"
 
-#: src/ui/components/RegistryLoginDialog.qml:112
-#: src/ui/components/RegistryLoginDialog.qml:113
+#: src/ui/components/RegistryLoginDialog.qml:104
+#: src/ui/components/RegistryLoginDialog.qml:105
 msgid "User name"
 msgstr "用户名"
 
-#: src/ui/components/RegistryLoginDialog.qml:125
-#: src/ui/components/RegistryLoginDialog.qml:126
+#: src/ui/components/RegistryLoginDialog.qml:117
+#: src/ui/components/RegistryLoginDialog.qml:118
 msgid "Password"
 msgstr "密码"
 
-#: src/ui/components/RegistryLoginDialog.qml:138
-#: src/ui/components/RegistryLoginDialog.qml:139
+#: src/ui/components/RegistryLoginDialog.qml:130
+#: src/ui/components/RegistryLoginDialog.qml:131
 msgid "Access token"
 msgstr "访问令牌"
 
-#: src/ui/components/RegistryLoginDialog.qml:147
+#: src/ui/components/RegistryLoginDialog.qml:139
 msgid "Checking…"
 msgstr "正在校验…"
 
-#: src/ui/components/RegistryLoginDialog.qml:147
+#: src/ui/components/RegistryLoginDialog.qml:139
 msgid "Log in"
 msgstr "登录"
 
@@ -1513,9 +1509,9 @@ msgid "Registry logins…"
 msgstr "仓库登录…"
 
 #: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:349 src/ui/main.qml:37
-#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:123
-#: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:936
+#: src/ui/DaemonConfigPage.qml:165 src/ui/NetworkDetail.qml:59
+#: src/ui/VolumeDetail.qml:46 src/ui/CreateContainer.qml:936
+#: src/ui/RegistryAuthPage.qml:123
 msgid "Back"
 msgstr "返回"
 
@@ -1977,7 +1973,20 @@ msgstr "Cgroup 版本："
 msgid "Storage driver:"
 msgstr "存储驱动："
 
-#: src/ui/EngineStatusView.qml:87
+#: src/ui/EngineStatusView.qml:83
+msgid "Cgroup driver:"
+msgstr "Cgroup 驱动："
+
+#: src/ui/EngineStatusView.qml:90
+msgid "CPUs:"
+msgstr "CPU 数量："
+
+#: src/ui/EngineStatusView.qml:104
+msgctxt "@item %1 is a component name such as containerd"
+msgid "%1 version:"
+msgstr "%1 版本："
+
+#: src/ui/EngineStatusView.qml:123
 msgctxt "@info build identification"
 msgid "Build: %1"
 msgstr "构建：%1"
@@ -2451,131 +2460,6 @@ msgstr "恢复"
 #: src/ui/DaemonConfigPage.qml:622
 msgid "Previous configuration restored. Docker must be restarted to apply it."
 msgstr "已恢复上一份配置。需要重启 Docker 后才会生效。"
-
-#: src/ui/RegistryAuthPage.qml:52
-msgid "Logged in. The credentials are stored in KWallet."
-msgstr "已登录，凭据已保存到 KWallet。"
-
-#: src/ui/RegistryAuthPage.qml:54
-msgid "The connection was verified with the stored credentials."
-msgstr "已用保存的凭据验证连接。"
-
-#: src/ui/RegistryAuthPage.qml:56
-msgid "The credentials were removed."
-msgstr "凭据已移除。"
-
-#: src/ui/RegistryAuthPage.qml:58
-msgid "The registry rejected these credentials (user name, password or token)."
-msgstr "仓库拒绝了这组凭据（用户名、密码或令牌不正确）。"
-
-#: src/ui/RegistryAuthPage.qml:60
-msgid "The registry could not be reached: check the network, DNS or a proxy."
-msgstr "无法连接到该仓库：请检查网络、DNS 或代理。"
-
-#: src/ui/RegistryAuthPage.qml:62
-msgid "The registry check failed."
-msgstr "仓库校验失败。"
-
-#: src/ui/RegistryAuthPage.qml:64
-msgid "No credentials are stored for this registry yet."
-msgstr "还没有为这个仓库保存凭据。"
-
-#: src/ui/RegistryAuthPage.qml:66
-msgid "KWallet is not available, so credentials cannot be read or saved."
-msgstr "KWallet 不可用，因此无法读取或保存凭据。"
-
-#: src/ui/RegistryAuthPage.qml:68
-msgid "Enter a registry address."
-msgstr "请填写仓库地址。"
-
-#: src/ui/RegistryAuthPage.qml:70
-msgid "Enter a user name and password, or switch to token login."
-msgstr "请填写用户名与密码，或改用令牌登录。"
-
-#: src/ui/RegistryAuthPage.qml:72
-msgid "The credentials could not be written to KWallet."
-msgstr "无法把凭据写入 KWallet。"
-
-#: src/ui/RegistryAuthPage.qml:74
-msgid "The credentials could not be removed."
-msgstr "无法移除凭据。"
-
-#: src/ui/RegistryAuthPage.qml:76
-msgid ""
-"The credentials are stored, but writing them to the Docker CLI configuration "
-"(%1) failed. The Docker CLI will not see them."
-msgstr "凭据已保存，但写入 Docker CLI 配置文件（%1）失败，`docker` 命令将看不到它们。"
-
-#: src/ui/RegistryAuthPage.qml:87
-msgid ""
-"KWallet is disabled in the system settings. Kontainer does not fall back to "
-"plain-text storage."
-msgstr "系统设置里关闭了 KWallet。Kontainer 不会退回到明文存储。"
-
-#: src/ui/RegistryAuthPage.qml:89
-msgid "KWallet is open, but the Kontainer folder could not be created."
-msgstr "KWallet 已打开，但无法创建 Kontainer 文件夹。"
-
-#: src/ui/RegistryAuthPage.qml:91
-msgid ""
-"KWallet could not be opened (the unlock request may have been cancelled)."
-msgstr "无法打开 KWallet（可能取消了授权）。"
-
-#: src/ui/RegistryAuthPage.qml:147
-msgid "Registry credentials"
-msgstr "仓库凭据"
-
-#: src/ui/RegistryAuthPage.qml:186
-msgid "Waiting for KWallet to be unlocked…"
-msgstr "正在等待 KWallet 解锁…"
-
-#: src/ui/RegistryAuthPage.qml:192
-msgid "Try again"
-msgstr "重试"
-
-#: src/ui/RegistryAuthPage.qml:208
-msgid "Stored credentials"
-msgstr "已保存的凭据"
-
-#: src/ui/RegistryAuthPage.qml:214
-msgid "Add credential…"
-msgstr "添加凭据…"
-
-#: src/ui/RegistryAuthPage.qml:227
-msgid ""
-"These registries are managed by an external credential helper and were not "
-"taken over: %1"
-msgstr "以下仓库由外部凭据助手管理，未被接管：%1"
-
-#: src/ui/RegistryAuthPage.qml:237
-msgid "No credentials stored."
-msgstr "没有保存任何凭据。"
-
-#: src/ui/RegistryAuthPage.qml:239
-msgid ""
-"Log in to a registry to pull private images. Credentials are kept in KWallet "
-"only."
-msgstr "要拉取私有镜像，请先登录对应的仓库。凭据只保存在 KWallet 里。"
-
-#: src/ui/RegistryAuthPage.qml:266
-msgid "token"
-msgstr "令牌"
-
-#: src/ui/RegistryAuthPage.qml:275
-msgid "Test"
-msgstr "测试连接"
-
-#: src/ui/RegistryAuthPage.qml:315
-msgid "Remove credentials"
-msgstr "移除凭据"
-
-#: src/ui/RegistryAuthPage.qml:316
-msgid "Remove the stored credentials for “%1”?"
-msgstr "移除为“%1”保存的凭据吗？"
-
-#: src/ui/RegistryAuthPage.qml:317
-msgid "Pulling private images from this registry will need a new login."
-msgstr "之后拉取该仓库的私有镜像需要重新登录。"
 
 #: src/ui/NetworkCard.qml:43
 msgid "Network %1"
@@ -3315,6 +3199,134 @@ msgstr "系统级配置…"
 #: src/ui/MainPage.qml:1188
 msgid "Mount presets"
 msgstr "挂载预设"
+
+#: src/ui/RegistryAuthPage.qml:52
+msgid "Logged in. The credentials are stored in KWallet."
+msgstr "已登录，凭据已保存到 KWallet。"
+
+#: src/ui/RegistryAuthPage.qml:54
+msgid "The connection was verified with the stored credentials."
+msgstr "已用保存的凭据验证连接。"
+
+#: src/ui/RegistryAuthPage.qml:56
+msgid "The credentials were removed."
+msgstr "凭据已移除。"
+
+#: src/ui/RegistryAuthPage.qml:58
+msgid "The registry rejected these credentials (user name, password or token)."
+msgstr "仓库拒绝了这组凭据（用户名、密码或令牌不正确）。"
+
+#: src/ui/RegistryAuthPage.qml:60
+msgid "The registry could not be reached: check the network, DNS or a proxy."
+msgstr "无法连接到该仓库：请检查网络、DNS 或代理。"
+
+#: src/ui/RegistryAuthPage.qml:62
+msgid "The registry check failed."
+msgstr "仓库校验失败。"
+
+#: src/ui/RegistryAuthPage.qml:64
+msgid "No credentials are stored for this registry yet."
+msgstr "还没有为这个仓库保存凭据。"
+
+#: src/ui/RegistryAuthPage.qml:66
+msgid "KWallet is not available, so credentials cannot be read or saved."
+msgstr "KWallet 不可用，因此无法读取或保存凭据。"
+
+#: src/ui/RegistryAuthPage.qml:68
+msgid "Enter a registry address."
+msgstr "请填写仓库地址。"
+
+#: src/ui/RegistryAuthPage.qml:70
+msgid "Enter a user name and password, or switch to token login."
+msgstr "请填写用户名与密码，或改用令牌登录。"
+
+#: src/ui/RegistryAuthPage.qml:72
+msgid "The credentials could not be written to KWallet."
+msgstr "无法把凭据写入 KWallet。"
+
+#: src/ui/RegistryAuthPage.qml:74
+msgid "The credentials could not be removed."
+msgstr "无法移除凭据。"
+
+#: src/ui/RegistryAuthPage.qml:76
+msgid ""
+"The credentials are stored, but writing them to the Docker CLI configuration "
+"(%1) failed. The Docker CLI will not see them."
+msgstr ""
+"凭据已保存，但写入 Docker CLI 配置文件（%1）失败，`docker` 命令将看不到它们。"
+
+#: src/ui/RegistryAuthPage.qml:87
+msgid ""
+"KWallet is disabled in the system settings. Kontainer does not fall back to "
+"plain-text storage."
+msgstr "系统设置里关闭了 KWallet。Kontainer 不会退回到明文存储。"
+
+#: src/ui/RegistryAuthPage.qml:89
+msgid "KWallet is open, but the Kontainer folder could not be created."
+msgstr "KWallet 已打开，但无法创建 Kontainer 文件夹。"
+
+#: src/ui/RegistryAuthPage.qml:91
+msgid ""
+"KWallet could not be opened (the unlock request may have been cancelled)."
+msgstr "无法打开 KWallet（可能取消了授权）。"
+
+#: src/ui/RegistryAuthPage.qml:147
+msgid "Registry credentials"
+msgstr "仓库凭据"
+
+#: src/ui/RegistryAuthPage.qml:186
+msgid "Waiting for KWallet to be unlocked…"
+msgstr "正在等待 KWallet 解锁…"
+
+#: src/ui/RegistryAuthPage.qml:192
+msgid "Try again"
+msgstr "重试"
+
+#: src/ui/RegistryAuthPage.qml:208
+msgid "Stored credentials"
+msgstr "已保存的凭据"
+
+#: src/ui/RegistryAuthPage.qml:214
+msgid "Add credential…"
+msgstr "添加凭据…"
+
+#: src/ui/RegistryAuthPage.qml:227
+msgid ""
+"These registries are managed by an external credential helper and were not "
+"taken over: %1"
+msgstr "以下仓库由外部凭据助手管理，未被接管：%1"
+
+#: src/ui/RegistryAuthPage.qml:237
+msgid "No credentials stored."
+msgstr "没有保存任何凭据。"
+
+#: src/ui/RegistryAuthPage.qml:263
+msgid "token"
+msgstr "令牌"
+
+#: src/ui/RegistryAuthPage.qml:272
+msgid "Test"
+msgstr "测试连接"
+
+#: src/ui/RegistryAuthPage.qml:312
+msgid "Remove credentials"
+msgstr "移除凭据"
+
+#: src/ui/RegistryAuthPage.qml:313
+msgid "Remove the stored credentials for “%1”?"
+msgstr "移除为“%1”保存的凭据吗？"
+
+#: src/ui/RegistryAuthPage.qml:314
+msgid "Pulling private images from this registry will need a new login."
+msgstr "之后拉取该仓库的私有镜像需要重新登录。"
+
+#~ msgid "Credentials are stored in KWallet, never in a plain-text file."
+#~ msgstr "凭据保存在 KWallet 中，绝不写入明文文件。"
+
+#~ msgid ""
+#~ "Log in to a registry to pull private images. Credentials are kept in "
+#~ "KWallet only."
+#~ msgstr "要拉取私有镜像，请先登录对应的仓库。凭据只保存在 KWallet 里。"
 
 #~ msgid "Imported %1 credentials from the Docker CLI configuration."
 #~ msgstr "已从 Docker CLI 配置导入 %1 条凭据。"

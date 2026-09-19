@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 18:41+0800\n"
+"POT-Creation-Date: 2026-09-19 19:03+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,11 +18,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: src/backend/docker_backend.cpp:1256 src/model/operation_controller.cpp:1058
+#: src/backend/docker_backend.cpp:1277 src/model/operation_controller.cpp:1058
 msgid "Uploading the build context…"
 msgstr ""
 
-#: src/backend/docker_backend.cpp:1440
+#: src/backend/docker_backend.cpp:1461
 msgid "Step %1/%2 (%3) failed: %4"
 msgstr ""
 
@@ -827,9 +827,9 @@ msgid "Show value"
 msgstr ""
 
 #: src/ui/components/KeyValueListEditor.qml:160
-#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:283
-#: src/ui/RegistryAuthPage.qml:318 src/ui/NetworkDetail.qml:304
-#: src/ui/VolumeDetail.qml:225
+#: src/ui/components/StringListEditor.qml:172 src/ui/NetworkDetail.qml:304
+#: src/ui/VolumeDetail.qml:225 src/ui/RegistryAuthPage.qml:280
+#: src/ui/RegistryAuthPage.qml:315
 msgid "Remove"
 msgstr ""
 
@@ -871,38 +871,34 @@ msgstr ""
 msgid "Log in to a registry"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:81
-msgid "Credentials are stored in KWallet, never in a plain-text file."
-msgstr ""
-
-#: src/ui/components/RegistryLoginDialog.qml:94
+#: src/ui/components/RegistryLoginDialog.qml:86
 msgid "Registry"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:102
+#: src/ui/components/RegistryLoginDialog.qml:94
 msgid "Use an access token instead of a password"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:112
-#: src/ui/components/RegistryLoginDialog.qml:113
+#: src/ui/components/RegistryLoginDialog.qml:104
+#: src/ui/components/RegistryLoginDialog.qml:105
 msgid "User name"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:125
-#: src/ui/components/RegistryLoginDialog.qml:126
+#: src/ui/components/RegistryLoginDialog.qml:117
+#: src/ui/components/RegistryLoginDialog.qml:118
 msgid "Password"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:138
-#: src/ui/components/RegistryLoginDialog.qml:139
+#: src/ui/components/RegistryLoginDialog.qml:130
+#: src/ui/components/RegistryLoginDialog.qml:131
 msgid "Access token"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:147
+#: src/ui/components/RegistryLoginDialog.qml:139
 msgid "Checking…"
 msgstr ""
 
-#: src/ui/components/RegistryLoginDialog.qml:147
+#: src/ui/components/RegistryLoginDialog.qml:139
 msgid "Log in"
 msgstr ""
 
@@ -1513,9 +1509,9 @@ msgid "Registry logins…"
 msgstr ""
 
 #: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:349 src/ui/main.qml:37
-#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:123
-#: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:936
+#: src/ui/DaemonConfigPage.qml:165 src/ui/NetworkDetail.qml:59
+#: src/ui/VolumeDetail.qml:46 src/ui/CreateContainer.qml:936
+#: src/ui/RegistryAuthPage.qml:123
 msgid "Back"
 msgstr ""
 
@@ -1981,7 +1977,20 @@ msgstr ""
 msgid "Storage driver:"
 msgstr ""
 
-#: src/ui/EngineStatusView.qml:87
+#: src/ui/EngineStatusView.qml:83
+msgid "Cgroup driver:"
+msgstr ""
+
+#: src/ui/EngineStatusView.qml:90
+msgid "CPUs:"
+msgstr ""
+
+#: src/ui/EngineStatusView.qml:104
+msgctxt "@item %1 is a component name such as containerd"
+msgid "%1 version:"
+msgstr ""
+
+#: src/ui/EngineStatusView.qml:123
 msgctxt "@info build identification"
 msgid "Build: %1"
 msgstr ""
@@ -2442,131 +2451,6 @@ msgstr ""
 
 #: src/ui/DaemonConfigPage.qml:622
 msgid "Previous configuration restored. Docker must be restarted to apply it."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:52
-msgid "Logged in. The credentials are stored in KWallet."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:54
-msgid "The connection was verified with the stored credentials."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:56
-msgid "The credentials were removed."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:58
-msgid "The registry rejected these credentials (user name, password or token)."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:60
-msgid "The registry could not be reached: check the network, DNS or a proxy."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:62
-msgid "The registry check failed."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:64
-msgid "No credentials are stored for this registry yet."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:66
-msgid "KWallet is not available, so credentials cannot be read or saved."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:68
-msgid "Enter a registry address."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:70
-msgid "Enter a user name and password, or switch to token login."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:72
-msgid "The credentials could not be written to KWallet."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:74
-msgid "The credentials could not be removed."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:76
-msgid ""
-"The credentials are stored, but writing them to the Docker CLI configuration "
-"(%1) failed. The Docker CLI will not see them."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:87
-msgid ""
-"KWallet is disabled in the system settings. Kontainer does not fall back to "
-"plain-text storage."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:89
-msgid "KWallet is open, but the Kontainer folder could not be created."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:91
-msgid ""
-"KWallet could not be opened (the unlock request may have been cancelled)."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:147
-msgid "Registry credentials"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:186
-msgid "Waiting for KWallet to be unlocked…"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:192
-msgid "Try again"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:208
-msgid "Stored credentials"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:214
-msgid "Add credential…"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:227
-msgid ""
-"These registries are managed by an external credential helper and were not "
-"taken over: %1"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:237
-msgid "No credentials stored."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:239
-msgid ""
-"Log in to a registry to pull private images. Credentials are kept in KWallet "
-"only."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:266
-msgid "token"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:275
-msgid "Test"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:315
-msgid "Remove credentials"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:316
-msgid "Remove the stored credentials for “%1”?"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:317
-msgid "Pulling private images from this registry will need a new login."
 msgstr ""
 
 #: src/ui/NetworkCard.qml:43
@@ -3310,4 +3194,123 @@ msgstr ""
 
 #: src/ui/MainPage.qml:1188
 msgid "Mount presets"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:52
+msgid "Logged in. The credentials are stored in KWallet."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:54
+msgid "The connection was verified with the stored credentials."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:56
+msgid "The credentials were removed."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:58
+msgid "The registry rejected these credentials (user name, password or token)."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:60
+msgid "The registry could not be reached: check the network, DNS or a proxy."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:62
+msgid "The registry check failed."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:64
+msgid "No credentials are stored for this registry yet."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:66
+msgid "KWallet is not available, so credentials cannot be read or saved."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:68
+msgid "Enter a registry address."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:70
+msgid "Enter a user name and password, or switch to token login."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:72
+msgid "The credentials could not be written to KWallet."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:74
+msgid "The credentials could not be removed."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:76
+msgid ""
+"The credentials are stored, but writing them to the Docker CLI configuration "
+"(%1) failed. The Docker CLI will not see them."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:87
+msgid ""
+"KWallet is disabled in the system settings. Kontainer does not fall back to "
+"plain-text storage."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:89
+msgid "KWallet is open, but the Kontainer folder could not be created."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:91
+msgid ""
+"KWallet could not be opened (the unlock request may have been cancelled)."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:147
+msgid "Registry credentials"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:186
+msgid "Waiting for KWallet to be unlocked…"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:192
+msgid "Try again"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:208
+msgid "Stored credentials"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:214
+msgid "Add credential…"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:227
+msgid ""
+"These registries are managed by an external credential helper and were not "
+"taken over: %1"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:237
+msgid "No credentials stored."
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:263
+msgid "token"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:272
+msgid "Test"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:312
+msgid "Remove credentials"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:313
+msgid "Remove the stored credentials for “%1”?"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:314
+msgid "Pulling private images from this registry will need a new login."
 msgstr ""

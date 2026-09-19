@@ -78,6 +78,42 @@ ColumnLayout {
             visible: text.length > 0
             text: view.engine.storageDriver
         }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Cgroup driver:")
+            visible: text.length > 0
+            text: view.engine.cgroupDriver
+        }
+
+        QQC2.Label {
+            objectName: "engineCpuCount"
+            Kirigami.FormData.label: i18n("CPUs:")
+            visible: view.engine.cpuCount > 0
+            text: String(view.engine.cpuCount)
+        }
+
+        /* 组件版本（dockerd / containerd / runc / docker-init …）：
+           引擎版本只说明 dockerd，containerd 与 runc 的版本同样影响行为。 */
+        Repeater {
+            model: view.engine.components
+
+            delegate: QQC2.Label {
+                required property var modelData
+
+                objectName: "engineComponentRow"
+                Kirigami.FormData.label: i18nc("@item %1 is a component name such as containerd", "%1 version:", modelData.name)
+                text: modelData.version
+            }
+        }
+    }
+
+    /* 引擎自己报的问题（例如 swap 限制、iptables 不可用）：原样展示，不改写措辞 */
+    Kirigami.InlineMessage {
+        objectName: "engineWarnings"
+        Layout.fillWidth: true
+        visible: view.engine.warnings.length > 0
+        type: Kirigami.MessageType.Warning
+        text: view.engine.warnings.join("\n")
     }
 
     /* 构建标记：排查问题时用来确认运行的是哪一次构建（ARCH_V3 附录 A.1f）。 */

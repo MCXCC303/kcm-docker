@@ -86,6 +86,13 @@ void fillFixture(MockDockerBackend &backend)
     engine.operatingSystem = QStringLiteral("Arch Linux");
     engine.cgroupVersion = QStringLiteral("2");
     engine.storageDriver = QStringLiteral("overlayfs");
+    engine.components = {{QStringLiteral("Engine"), QStringLiteral("29.8.0")},
+                         {QStringLiteral("containerd"), QStringLiteral("1.7.24")},
+                         {QStringLiteral("runc"), QStringLiteral("1.2.3")},
+                         {QStringLiteral("docker-init"), QStringLiteral("0.19.0")}};
+    engine.cgroupDriver = QStringLiteral("systemd");
+    engine.cpuCount = 16;
+    engine.warnings = {QStringLiteral("No swap limit support")};
     engine.containerTotal = 5;
     engine.containersRunning = 3;
     engine.containersPaused = 1;

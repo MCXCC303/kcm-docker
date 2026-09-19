@@ -30,6 +30,27 @@ std::optional<QJsonObject> objectFromPayload(const QByteArray &payload, QString 
     return document.object();
 }
 
+/*! `/version` 的 `Components[]` → 组件表（Name + Version）。 */
+QList<DockerComponentDTO> parseComponents(const QJsonObject &object)
+{
+    QList<DockerComponentDTO> components;
+    const QJsonArray array = object.value(QStringLiteral("Components")).toArray();
+    components.reserve(array.size());
+    for (const QJsonValue &entry : array) {
+        if (!entry.isObject()) {
+            continue;
+        }
+        const QJsonObject component = entry.toObject();
+        DockerComponentDTO dto;
+        dto.name = stringValue(component, QStringLiteral("Name"));
+        dto.version = stringValue(component, QStringLiteral("Version"));
+        if (!dto.name.isEmpty()) {
+            components.append(dto);
+        }
+    }
+    return components;
+}
+
 /*! 从 /version 的 Components 数组中取出 Engine 组件的 Details。 */
 QJsonObject engineComponentDetails(const QJsonObject &object)
 {
@@ -56,6 +77,7 @@ std::optional<DockerVersionDTO> DockerVersionDTO::fromJson(const QJsonObject &ob
     dto.minApiVersion = stringValue(object, QStringLiteral("MinAPIVersion"));
     dto.os = stringValue(object, QStringLiteral("Os"));
     dto.arch = stringValue(object, QStringLiteral("Arch"));
+    dto.components = parseComponents(object);
 
     const QJsonObject details = engineComponentDetails(object);
     if (!details.isEmpty()) {
@@ -102,6 +124,7 @@ std::optional<DockerInfoDTO> DockerInfoDTO::fromJson(const QJsonObject &object, 
     dto.cgroupDriver = stringValue(object, QStringLiteral("CgroupDriver"));
     dto.storageDriver = stringValue(object, QStringLiteral("Driver"));
 
+    dto.warnings = stringListValue(object, QStringLiteral("Warnings"));
     dto.containers = intValue(object, QStringLiteral("Containers"));
     dto.containersRunning = intValue(object, QStringLiteral("ContainersRunning"));
     dto.containersPaused = intValue(object, QStringLiteral("ContainersPaused"));

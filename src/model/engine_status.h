@@ -9,6 +9,9 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
+#include <QVariantList>
+#include <QVariantMap>
 
 namespace Kontainer
 {
@@ -42,6 +45,18 @@ class EngineStatus : public QObject
     Q_PROPERTY(bool liveRestoreEnabled READ liveRestoreEnabled NOTIFY changed)
     Q_PROPERTY(QString operatingSystem READ operatingSystem NOTIFY changed)
     Q_PROPERTY(QString cgroupVersion READ cgroupVersion NOTIFY changed)
+    /*! `/info` 的 CgroupDriver（`systemd` / `cgroupfs`）。 */
+    Q_PROPERTY(QString cgroupDriver READ cgroupDriver NOTIFY changed)
+    /*! `/info` 的 NCPU。 */
+    Q_PROPERTY(int cpuCount READ cpuCount NOTIFY changed)
+    /*!
+     * `/version` 的组件表：`[{name, version}]`（dockerd / containerd / runc / docker-init …）。
+     *
+     * 是**属性**而不是函数：QML 里函数调用不建立依赖（本项目反复踩过）。
+     */
+    Q_PROPERTY(QVariantList components READ components NOTIFY changed)
+    /*! `/info` 的 Warnings：引擎自己报的配置问题（例如 swap 限制、bridge 未启用）。 */
+    Q_PROPERTY(QStringList warnings READ warnings NOTIFY changed)
     Q_PROPERTY(QString storageDriver READ storageDriver NOTIFY changed)
     Q_PROPERTY(int containerTotal READ containerTotal NOTIFY changed)
     Q_PROPERTY(int containersRunning READ containersRunning NOTIFY changed)
@@ -121,6 +136,31 @@ public:
     QString cgroupVersion() const
     {
         return m_info.cgroupVersion;
+    }
+
+    QString cgroupDriver() const
+    {
+        return m_info.cgroupDriver;
+    }
+    int cpuCount() const
+    {
+        return m_info.cpuCount;
+    }
+    QVariantList components() const
+    {
+        QVariantList list;
+        list.reserve(m_info.components.size());
+        for (const EngineComponent &component : m_info.components) {
+            QVariantMap entry;
+            entry.insert(QStringLiteral("name"), component.name);
+            entry.insert(QStringLiteral("version"), component.version);
+            list.append(entry);
+        }
+        return list;
+    }
+    QStringList warnings() const
+    {
+        return m_info.warnings;
     }
     QString storageDriver() const
     {

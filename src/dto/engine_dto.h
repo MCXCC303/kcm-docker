@@ -20,6 +20,12 @@ namespace Kontainer
  * ApiVersion / MinAPIVersion 是版本协商的唯一来源（Docker 29 的 /info 已不再返回
  * 这两个字段）。内核版本在 /version 中位于 Components[Name=Engine].Details 下。
  */
+/*! `/version` 的 `Components[]` 一项（Engine / containerd / runc / docker-init …）。 */
+struct DockerComponentDTO {
+    QString name;
+    QString version;
+};
+
 struct DockerVersionDTO {
     QString version;
     QString apiVersion;
@@ -28,6 +34,8 @@ struct DockerVersionDTO {
     QString arch;
     QString kernelVersion;
     QString gitCommit;
+    /*! 引擎自报的组件表：dockerd 之外还有 containerd / runc / docker-init 等。 */
+    QList<DockerComponentDTO> components;
 
     static std::optional<DockerVersionDTO> fromJson(const QJsonObject &object, QString *error = nullptr);
     static std::optional<DockerVersionDTO> fromPayload(const QByteArray &payload, QString *error = nullptr);
@@ -58,6 +66,8 @@ struct DockerInfoDTO {
     QString loggingDriver;
     /*! `/info` 的 RegistryConfig.Mirrors（配置编辑的「已生效」对照）。 */
     QStringList registryMirrors;
+    /*! `/info` 的 Warnings（引擎自己报的配置问题）。 */
+    QStringList warnings;
     /*! `/info` 的 LiveRestoreEnabled（重启 daemon 是否影响运行中容器）。 */
     bool liveRestoreEnabled = false;
 
