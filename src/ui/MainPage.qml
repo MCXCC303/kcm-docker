@@ -1094,11 +1094,10 @@ Kirigami.Page {
                     message: root.volumeList.count === 0 && root.controller.volumeModel.count > 0
                         ? i18n("No volume matches the current search or filter.")
                         : root.controller.volumeModel.count === 0 ? i18n("No volumes found.") : ""
+                    // 空状态只给"没有数据"这一句；"数据卷是干什么的"属于文档，不占界面
                     explanationText: root.volumeList.count === 0 && root.controller.volumeModel.count > 0
                         ? i18n("Clear the search field or switch the filter back to “All volumes”.")
-                        : root.controller.volumeModel.count === 0
-                            ? i18n("Volumes keep data across container restarts. Create one here or let Docker create it when a container declares it.")
-                            : ""
+                        : ""
                     actionText: root.volumeList.count === 0 && root.controller.volumeModel.count > 0 ? i18n("Clear filters") : ""
                     actionIconName: "edit-clear"
                     onActionTriggered: {

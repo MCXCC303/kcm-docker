@@ -300,14 +300,6 @@ ColumnLayout {
         }
     }
 
-    QQC2.Label {
-        Layout.fillWidth: true
-        text: i18n("A host port of 0 (shown as “random”) lets Docker pick a free one.")
-        font: Kirigami.Theme.smallFont
-        opacity: 0.75
-        wrapMode: Text.WordWrap
-    }
-
     QQC2.Button {
         objectName: "wizardAddPort"
         text: i18n("Add port")

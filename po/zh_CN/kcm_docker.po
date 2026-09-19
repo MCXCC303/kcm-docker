@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:08+0800\n"
+"POT-Creation-Date: 2026-09-19 16:17+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -1265,14 +1265,10 @@ msgid "Remove this port"
 msgstr "移除这一行端口"
 
 #: src/ui/components/PortMappingEditor.qml:305
-msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
-msgstr "宿主端口填 0（显示为“随机”）则由 Docker 挑一个空闲端口。"
-
-#: src/ui/components/PortMappingEditor.qml:313
 msgid "Add port"
 msgstr "添加端口"
 
-#: src/ui/components/PortMappingEditor.qml:322
+#: src/ui/components/PortMappingEditor.qml:314
 msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr "没有发布端口。容器只能通过它所在的网络访问。"
@@ -3272,7 +3268,7 @@ msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr "Docker 至少会提供内置的 bridge、host 与 none 三个网络。"
 
-#: src/ui/MainPage.qml:866 src/ui/MainPage.qml:1102
+#: src/ui/MainPage.qml:866 src/ui/MainPage.qml:1101
 msgid "Clear filters"
 msgstr "清除过滤条件"
 
@@ -3330,43 +3326,45 @@ msgstr "没有数据卷符合当前的搜索或过滤条件。"
 msgid "No volumes found."
 msgstr "没有找到数据卷。"
 
-#: src/ui/MainPage.qml:1098
+#: src/ui/MainPage.qml:1099
 msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr "清空搜索框，或把过滤条件切回“所有数据卷”。"
 
-#: src/ui/MainPage.qml:1100
-msgid ""
-"Volumes keep data across container restarts. Create one here or let Docker "
-"create it when a container declares it."
-msgstr ""
-"数据卷用于在容器重启之间保留数据。可以在这里创建，也可以在容器声明时由 "
-"Docker 自动创建。"
-
-#: src/ui/MainPage.qml:1145
+#: src/ui/MainPage.qml:1144
 msgid "User configuration…"
 msgstr "用户级配置…"
 
-#: src/ui/MainPage.qml:1152
+#: src/ui/MainPage.qml:1151
 msgid "System configuration…"
 msgstr "系统级配置…"
 
-#: src/ui/MainPage.qml:1159
+#: src/ui/MainPage.qml:1158
 msgid ""
 "Registry mirrors and other daemon settings. The system configuration needs "
 "administrator rights."
 msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
 
-#: src/ui/MainPage.qml:1196
+#: src/ui/MainPage.qml:1195
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:1201
+#: src/ui/MainPage.qml:1200
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."
 msgstr ""
 "预设保存在你自己的配置里（~/.config/kontainerrc），并在创建容器时作为一键添加"
 "的按钮出现。"
+
+#~ msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
+#~ msgstr "宿主端口填 0（显示为“随机”）则由 Docker 挑一个空闲端口。"
+
+#~ msgid ""
+#~ "Volumes keep data across container restarts. Create one here or let "
+#~ "Docker create it when a container declares it."
+#~ msgstr ""
+#~ "数据卷用于在容器重启之间保留数据。可以在这里创建，也可以在容器声明时由 "
+#~ "Docker 自动创建。"
 
 #~ msgid "Quick add from your presets:"
 #~ msgstr "从预设快速添加："

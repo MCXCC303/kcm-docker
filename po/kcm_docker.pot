@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:08+0800\n"
+"POT-Creation-Date: 2026-09-19 16:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1264,14 +1264,10 @@ msgid "Remove this port"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:305
-msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
-msgstr ""
-
-#: src/ui/components/PortMappingEditor.qml:313
 msgid "Add port"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:322
+#: src/ui/components/PortMappingEditor.qml:314
 msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""
@@ -3266,7 +3262,7 @@ msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr ""
 
-#: src/ui/MainPage.qml:866 src/ui/MainPage.qml:1102
+#: src/ui/MainPage.qml:866 src/ui/MainPage.qml:1101
 msgid "Clear filters"
 msgstr ""
 
@@ -3325,35 +3321,29 @@ msgstr ""
 msgid "No volumes found."
 msgstr ""
 
-#: src/ui/MainPage.qml:1098
+#: src/ui/MainPage.qml:1099
 msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr ""
 
-#: src/ui/MainPage.qml:1100
-msgid ""
-"Volumes keep data across container restarts. Create one here or let Docker "
-"create it when a container declares it."
-msgstr ""
-
-#: src/ui/MainPage.qml:1145
+#: src/ui/MainPage.qml:1144
 msgid "User configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1152
+#: src/ui/MainPage.qml:1151
 msgid "System configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1159
+#: src/ui/MainPage.qml:1158
 msgid ""
 "Registry mirrors and other daemon settings. The system configuration needs "
 "administrator rights."
 msgstr ""
 
-#: src/ui/MainPage.qml:1196
+#: src/ui/MainPage.qml:1195
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:1201
+#: src/ui/MainPage.qml:1200
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."
