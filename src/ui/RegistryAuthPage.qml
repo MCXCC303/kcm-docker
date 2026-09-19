@@ -31,8 +31,6 @@ KCM.AbstractKCM {
     /*! 预填的仓库地址（从"去登录…"引导带过来；空则用默认值）。 */
     property string presetServerAddress: ""
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
-    /*! 导入列表里勾选的仓库（地址 → true）。 */
-    property var importSelection: ({})
     /*! 正在等待"移除"确认的仓库地址。 */
     property string pendingRemovalAddress: ""
 
@@ -47,9 +45,6 @@ KCM.AbstractKCM {
         }
     }
 
-    onImportSelectionChanged: importCount = Object.keys(importSelection).length
-    property int importCount: 0
-
     /*! 结果 / 错误 key → 用户文案（C++ 只给 key，文案在这里）。 */
     function messageFor(key: string): string {
         switch (key) {
@@ -59,10 +54,6 @@ KCM.AbstractKCM {
             return i18n("The connection was verified with the stored credentials.");
         case "removed":
             return i18n("The credentials were removed.");
-        case "importSucceeded":
-            return i18n("Imported %1 credentials from the Docker CLI configuration.", page.auth.lastImportedCount);
-        case "importNothingToDo":
-            return i18n("Nothing to import: those registries are already stored.");
         case "invalidCredentials":
             return i18n("The registry rejected these credentials (user name, password or token).");
         case "registryUnreachable":
@@ -81,8 +72,9 @@ KCM.AbstractKCM {
             return i18n("The credentials could not be written to KWallet.");
         case "removeFailed":
             return i18n("The credentials could not be removed.");
-        case "importFailed":
-            return i18n("Some credentials could not be imported.");
+        case "cliWriteFailed":
+            return i18n("The credentials are stored, but writing them to the Docker CLI configuration (%1) failed. The Docker CLI will not see them.",
+                        page.auth.lastErrorDetail);
         default:
             return "";
         }
@@ -107,30 +99,8 @@ KCM.AbstractKCM {
         loginDialog.open();
     }
 
-    function resetImportSelection(): void {
-        const selection = ({});
-        for (const address of page.auth.importableAddresses) {
-            selection[address] = true;
-        }
-        page.importSelection = selection;
-    }
-
-    function selectedAddresses(): var {
-        const result = [];
-        for (const address of Object.keys(page.importSelection)) {
-            if (page.importSelection[address]) {
-                result.push(address);
-            }
-        }
-        return result;
-    }
-
     Connections {
         target: page.auth
-
-        function onImportScanChanged() {
-            page.resetImportSelection();
-        }
 
         function onResultChanged() {
             // 登录成功后关闭对话框（失败则把原因留在对话框里）
@@ -228,10 +198,37 @@ KCM.AbstractKCM {
                 }
 
                 /* ---------------- 已保存的仓库 ---------------- */
-                Kirigami.Heading {
+                RowLayout {
                     Layout.fillWidth: true
-                    level: 3
-                    text: i18n("Stored credentials")
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Kirigami.Heading {
+                        Layout.fillWidth: true
+                        level: 3
+                        text: i18n("Stored credentials")
+                    }
+
+                    // 新增凭据：工具栏之外再给一个显眼入口（实测反馈：不好找）
+                    QQC2.Button {
+                        objectName: "addCredentialButton"
+                        text: i18n("Add credential…")
+                        icon.name: "list-add"
+                        enabled: page.auth.walletStateKey === "ready"
+                        onClicked: page.openLoginDialog(page.auth.credentials.empty ? page.presetServerAddress : "")
+                    }
+                }
+
+                // 由外部凭据助手管理的条目：我们**不**调用它们，但要如实说明，
+                // 否则用户会奇怪"为什么我在 CLI 里登录的仓库没出现"
+                QQC2.Label {
+                    objectName: "helperManagedHint"
+                    Layout.fillWidth: true
+                    visible: page.auth.helperManagedKeys.length > 0
+                    text: i18n("These registries are managed by an external credential helper and were not taken over: %1",
+                              page.auth.helperManagedKeys.join(", "))
+                    font: Kirigami.Theme.smallFont
+                    opacity: 0.8
+                    wrapMode: Text.WordWrap
                 }
 
                 Components.EmptyPlaceholder {
@@ -291,91 +288,6 @@ KCM.AbstractKCM {
                                 removeCredentialDialog.open();
                             }
                         }
-                    }
-                }
-
-                /* ---------------- 从 docker CLI 导入 ---------------- */
-                Kirigami.Separator {
-                    Layout.fillWidth: true
-                }
-
-                Kirigami.Heading {
-                    Layout.fillWidth: true
-                    level: 3
-                    text: i18n("Import from the Docker CLI")
-                }
-
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    text: i18n("Read-only import from %1. The file itself is never modified.", page.auth.cliConfigPath)
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.8
-                    wrapMode: Text.WordWrap
-                }
-
-                Kirigami.InlineMessage {
-                    objectName: "cliConfigMissingMessage"
-                    Layout.fillWidth: true
-                    visible: !page.auth.cliConfigPresent
-                    type: Kirigami.MessageType.Information
-                    text: i18n("No Docker CLI configuration was found (or it could not be read).")
-                }
-
-                Kirigami.InlineMessage {
-                    objectName: "helperManagedMessage"
-                    Layout.fillWidth: true
-                    visible: page.auth.helperManagedKeys.length > 0
-                    type: Kirigami.MessageType.Information
-                    text: i18n("Some credentials are managed by an external credential helper (%1). Kontainer does not run external credential programs; log in to those registries manually.",
-                              page.auth.helperManagedKeys.join(", "))
-                }
-
-                QQC2.Label {
-                    objectName: "skippedImportKeysLabel"
-                    Layout.fillWidth: true
-                    visible: page.auth.skippedImportKeys.length > 0
-                    text: i18np("One entry in the Docker CLI configuration cannot be imported.",
-                                "%1 entries in the Docker CLI configuration cannot be imported.",
-                                page.auth.skippedImportKeys.length)
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.8
-                    wrapMode: Text.WordWrap
-                }
-
-                Repeater {
-                    model: page.auth.importableAddresses
-
-                    delegate: QQC2.CheckBox {
-                        id: importCheck
-
-                        required property string modelData
-
-                        objectName: "importCandidateCheck"
-                        Layout.fillWidth: true
-                        text: importCheck.modelData
-                        checked: page.importSelection[importCheck.modelData] === true
-                        onToggled: {
-                            const selection = Object.assign({}, page.importSelection);
-                            selection[importCheck.modelData] = importCheck.checked;
-                            page.importSelection = selection;
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
-
-                    QQC2.Button {
-                        objectName: "importSelectedButton"
-                        text: i18n("Import selected")
-                        icon.name: "document-import"
-                        enabled: page.auth.walletStateKey === "ready" && page.importCount > 0
-                        onClicked: page.auth.importFromCli(page.selectedAddresses())
-                    }
-
-                    Item {
-                        Layout.fillWidth: true
                     }
                 }
 

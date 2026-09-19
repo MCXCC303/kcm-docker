@@ -982,6 +982,11 @@ bool looksLikeUnreachableRegistry(const QString &detail)
         // request canceled while waiting for connection（超时措辞，不带 dial tcp）
         QStringLiteral("context deadline exceeded"),
         QStringLiteral("awaiting headers"),
+        // 实测（离线环境）：引擎回 500，原文是 `Get "https://…/v2/": EOF`——
+        // 传输层直接断了，属于"连不上仓库"，不该当成"我们请求格式错"的普通失败
+        QStringLiteral(": eof"),
+        QStringLiteral("no route to host"),
+        QStringLiteral("connection reset by peer"),
     };
     const QString lowered = detail.toLower();
     for (const QString &hint : hints) {

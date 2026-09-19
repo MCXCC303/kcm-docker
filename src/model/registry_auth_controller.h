@@ -97,10 +97,8 @@ public:
     Q_INVOKABLE void testCredential(const QString &serverAddress);
     /*! 移除凭据（界面负责二次确认）。 */
     Q_INVOKABLE void removeCredential(const QString &serverAddress);
-    /*! 重新只读扫描 CLI 配置。 */
-    Q_INVOKABLE void scanCliConfig();
-    /*! 导入指定仓库（空列表 = 导入全部可导入项）；已有条目一律不覆盖。 */
-    Q_INVOKABLE void importFromCli(const QStringList &serverAddresses = {});
+    /*! 重新只读扫描 CLI 配置（内部使用；界面不再有"同步"动作）。 */
+    void scanCliConfig();
     /*! 清掉最近一次结果（关闭提示条时用）。 */
     Q_INVOKABLE void clearResult();
     /*!
@@ -120,6 +118,18 @@ Q_SIGNALS:
     void credentialsChanged();
 
 private:
+    /*!
+     * 静默识别 CLI 配置里的条目并收进钱包（不覆盖已有条目）。
+     *
+     * 页面每次 `refresh()` 都会跑一次：用户在 CLI 里 `docker login` 过的仓库，
+     * 打开这个页面就已经在列表里了——不需要任何"导入"按钮。
+     */
+    void importFromCliSilently();
+    /*! 把 CLI 配置路径填进 `lastErrorDetail`（同步失败时界面要说明是哪个文件）。 */
+    void setCliConfigPathForMessages();
+    /*! 把一条凭据写回 CLI 配置文件；失败时填 `errorKey` 并返回 false。 */
+    static bool writeBackToCli(const RegistryCredential &credential, QString *errorKey);
+
     void setResultKeys(const QString &resultKey, const QString &errorKey, const QString &detail = {});
     void setBusy(bool busy);
     /*! 把 `DockerBackendInterface::AuthCheckResult` 翻成界面 key。 */

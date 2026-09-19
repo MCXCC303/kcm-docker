@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 18:14+0800\n"
+"POT-Creation-Date: 2026-09-19 18:41+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -60,7 +60,7 @@ msgid "Dead"
 msgstr ""
 
 #: src/model/state_text.cpp:33 src/ui/components/ServiceCard.qml:68
-#: src/ui/ContainerDetail.qml:450 src/ui/EngineStatusView.qml:29
+#: src/ui/ContainerDetail.qml:452 src/ui/EngineStatusView.qml:29
 #: src/ui/EngineStatusView.qml:35 src/ui/EngineStatusView.qml:42
 #: src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -677,7 +677,7 @@ msgid "Images"
 msgstr ""
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:375
-#: src/ui/ContainerDetail.qml:300 src/ui/MainPage.qml:71
+#: src/ui/ContainerDetail.qml:302 src/ui/MainPage.qml:71
 #: src/ui/MainPage.qml:847 src/ui/MainPage.qml:950
 msgid "Containers"
 msgstr ""
@@ -715,7 +715,7 @@ msgstr ""
 #: src/ui/components/ConfirmDialog.qml:107
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
-#: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:676
+#: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:701
 #: src/ui/CreateContainer.qml:966
 msgid "Cancel"
 msgstr ""
@@ -750,7 +750,7 @@ msgid ""
 msgstr ""
 
 #: src/ui/components/PullImageDialog.qml:99
-#: src/ui/components/PullProgressList.qml:133 src/ui/RegistryAuthPage.qml:147
+#: src/ui/components/PullProgressList.qml:133 src/ui/RegistryAuthPage.qml:117
 msgid "Log in…"
 msgstr ""
 
@@ -827,8 +827,8 @@ msgid "Show value"
 msgstr ""
 
 #: src/ui/components/KeyValueListEditor.qml:160
-#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:286
-#: src/ui/RegistryAuthPage.qml:406 src/ui/NetworkDetail.qml:304
+#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:283
+#: src/ui/RegistryAuthPage.qml:318 src/ui/NetworkDetail.qml:304
 #: src/ui/VolumeDetail.qml:225
 msgid "Remove"
 msgstr ""
@@ -958,12 +958,12 @@ msgstr[1] ""
 msgid "Follow"
 msgstr ""
 
-#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:236
+#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:238
 #: src/ui/ContainerCard.qml:177 src/ui/ContainerCard.qml:181
 msgid "Resume"
 msgstr ""
 
-#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:228
+#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:230
 #: src/ui/ContainerCard.qml:164 src/ui/ContainerCard.qml:168
 msgid "Pause"
 msgstr ""
@@ -1234,8 +1234,8 @@ msgstr ""
 msgid "Host"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:148 src/ui/ContainerDetail.qml:308
-#: src/ui/ContainerDetail.qml:883
+#: src/ui/components/PortMappingEditor.qml:148 src/ui/ContainerDetail.qml:310
+#: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr ""
 
@@ -1301,17 +1301,17 @@ msgstr ""
 msgid "Stopping…"
 msgstr ""
 
-#: src/ui/components/ServiceCard.qml:91 src/ui/ContainerDetail.qml:212
+#: src/ui/components/ServiceCard.qml:91 src/ui/ContainerDetail.qml:214
 #: src/ui/ContainerCard.qml:151 src/ui/ContainerCard.qml:155
 msgid "Start"
 msgstr ""
 
-#: src/ui/components/ServiceCard.qml:93 src/ui/ContainerDetail.qml:220
+#: src/ui/components/ServiceCard.qml:93 src/ui/ContainerDetail.qml:222
 #: src/ui/ContainerCard.qml:190 src/ui/ContainerCard.qml:194
 msgid "Stop"
 msgstr ""
 
-#: src/ui/components/ServiceCard.qml:95 src/ui/ContainerDetail.qml:244
+#: src/ui/components/ServiceCard.qml:95 src/ui/ContainerDetail.qml:246
 #: src/ui/DaemonConfigPage.qml:578
 msgid "Restart"
 msgstr ""
@@ -1488,7 +1488,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr ""
 
 #: src/ui/StorageView.qml:64 src/ui/ImageDetail.qml:156
-#: src/ui/ContainerDetail.qml:342 src/ui/MainPage.qml:324
+#: src/ui/ContainerDetail.qml:344 src/ui/MainPage.qml:324
 msgid "Retry"
 msgstr ""
 
@@ -1512,8 +1512,8 @@ msgstr ""
 msgid "Registry logins…"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:347 src/ui/main.qml:37
-#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
+#: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:349 src/ui/main.qml:37
+#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:123
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
 #: src/ui/CreateContainer.qml:936
 msgid "Back"
@@ -1551,12 +1551,12 @@ msgstr ""
 msgid "Image ID:"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:217 src/ui/ContainerDetail.qml:468
+#: src/ui/ImageDetail.qml:217 src/ui/ContainerDetail.qml:493
 #: src/ui/NetworkDetail.qml:172 src/ui/VolumeDetail.qml:173
 msgid "Created:"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:219 src/ui/ContainerDetail.qml:476
+#: src/ui/ImageDetail.qml:219 src/ui/ContainerDetail.qml:501
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr ""
@@ -1611,7 +1611,7 @@ msgstr[1] ""
 msgid "No containers use this image."
 msgstr ""
 
-#: src/ui/ImageDetail.qml:445 src/ui/ContainerDetail.qml:618
+#: src/ui/ImageDetail.qml:445 src/ui/ContainerDetail.qml:643
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
@@ -1623,7 +1623,7 @@ msgid "Delete all tags…"
 msgstr ""
 
 #: src/ui/ImageDetail.qml:508 src/ui/ImageDetail.qml:525
-#: src/ui/ContainerDetail.qml:274 src/ui/ContainerDetail.qml:1133
+#: src/ui/ContainerDetail.qml:276 src/ui/ContainerDetail.qml:1158
 msgid "Delete"
 msgstr ""
 
@@ -1669,276 +1669,276 @@ msgstr ""
 msgid "IPv4:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:177
+#: src/ui/ContainerDetail.qml:179
 msgid "Disconnect from network"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:178
+#: src/ui/ContainerDetail.qml:180
 msgid "Disconnect this container from “%1”?"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:180
+#: src/ui/ContainerDetail.qml:182
 msgid ""
 "The container loses this network's addresses and aliases; connections "
 "through it may be interrupted."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:181 src/ui/ContainerDetail.qml:817
+#: src/ui/ContainerDetail.qml:183 src/ui/ContainerDetail.qml:842
 msgid "Disconnect"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:262
+#: src/ui/ContainerDetail.qml:264
 msgid "Stop the container to delete it."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:312
+#: src/ui/ContainerDetail.qml:314
 msgid "container name"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:330
+#: src/ui/ContainerDetail.qml:332
 msgid "Loading container details…"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:339
+#: src/ui/ContainerDetail.qml:341
 msgid "Unable to retrieve container details."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:379
+#: src/ui/ContainerDetail.qml:381
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:382
+#: src/ui/ContainerDetail.qml:384
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:385
+#: src/ui/ContainerDetail.qml:387
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:388
+#: src/ui/ContainerDetail.qml:390
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:391
+#: src/ui/ContainerDetail.qml:393
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:433
+#: src/ui/ContainerDetail.qml:435
 msgid "State:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:449 src/ui/VolumeDetail.qml:179
+#: src/ui/ContainerDetail.qml:451 src/ui/VolumeDetail.qml:179
 msgid "Status:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:454
+#: src/ui/ContainerDetail.qml:458
 msgid "Image:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:461
+#: src/ui/ContainerDetail.qml:486
 msgid "Container ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:464 src/ui/ContainerCard.qml:203
+#: src/ui/ContainerDetail.qml:489 src/ui/ContainerCard.qml:203
 msgid "container ID"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:474
+#: src/ui/ContainerDetail.qml:499
 msgid "Started:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:480
+#: src/ui/ContainerDetail.qml:505
 msgid "Finished:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:489
+#: src/ui/ContainerDetail.qml:514
 msgid "Runtime"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:505
+#: src/ui/ContainerDetail.qml:530
 msgid "Restart count:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:509
+#: src/ui/ContainerDetail.qml:534
 msgid "Exit code:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:513
+#: src/ui/ContainerDetail.qml:538
 msgid "OOM killed:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:515 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:540 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:178
 msgid "Yes"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:519
+#: src/ui/ContainerDetail.qml:544
 msgid "Process ID:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:524
+#: src/ui/ContainerDetail.qml:549
 msgid "Restart policy:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:529
+#: src/ui/ContainerDetail.qml:554
 msgid "Platform:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:538
+#: src/ui/ContainerDetail.qml:563
 msgid "Configuration"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:563
+#: src/ui/ContainerDetail.qml:588
 msgid "Entrypoint:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:575
+#: src/ui/ContainerDetail.qml:600
 msgid "entry point"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:580
+#: src/ui/ContainerDetail.qml:605
 msgid "Command:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:592
+#: src/ui/ContainerDetail.qml:617
 msgid "command"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:597
+#: src/ui/ContainerDetail.qml:622
 msgid "Working directory:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:603
+#: src/ui/ContainerDetail.qml:628
 msgid "User:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:608
+#: src/ui/ContainerDetail.qml:633
 msgid "Hostname:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:628
+#: src/ui/ContainerDetail.qml:653
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/ContainerDetail.qml:665
+#: src/ui/ContainerDetail.qml:690
 msgid "No network information."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:676
+#: src/ui/ContainerDetail.qml:701
 msgid "Connect to a network…"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:713
+#: src/ui/ContainerDetail.qml:738
 msgid ""
 "This container is already connected to every network. Create another network "
 "first."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:719
+#: src/ui/ContainerDetail.qml:744
 msgid "Choose a network:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:740
+#: src/ui/ContainerDetail.qml:765
 msgid "already connected"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:749
+#: src/ui/ContainerDetail.qml:774
 msgid "Aliases (optional, comma separated)"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:750
+#: src/ui/ContainerDetail.qml:775
 msgid "Aliases"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:760
+#: src/ui/ContainerDetail.qml:785
 msgid "Connect"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:768
+#: src/ui/ContainerDetail.qml:793
 msgid "Other containers on the same network can reach this one by its aliases."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:801 src/ui/ResourceView.qml:128
+#: src/ui/ContainerDetail.qml:826 src/ui/ResourceView.qml:128
 msgid "Network:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:849
+#: src/ui/ContainerDetail.qml:874
 msgid "MAC:"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:865
+#: src/ui/ContainerDetail.qml:890
 msgid "Port mapping"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:874
+#: src/ui/ContainerDetail.qml:899
 msgid "No published ports."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:894
+#: src/ui/ContainerDetail.qml:919
 msgid "Exposed but not published"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:913
+#: src/ui/ContainerDetail.qml:938
 msgid "%1, exposed but not published to the host"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:935
+#: src/ui/ContainerDetail.qml:960
 msgid "No mounts."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:994
+#: src/ui/ContainerDetail.qml:1019
 msgid "mount"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1019
+#: src/ui/ContainerDetail.qml:1044
 msgid "Not a directory"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1019
+#: src/ui/ContainerDetail.qml:1044
 msgid "Host path missing"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1074 src/ui/VolumeDetail.qml:131
+#: src/ui/ContainerDetail.qml:1099 src/ui/VolumeDetail.qml:131
 msgid "Open host folder"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1082
+#: src/ui/ContainerDetail.qml:1107
 msgid "host path"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1087
+#: src/ui/ContainerDetail.qml:1112
 msgid "container path"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1094
+#: src/ui/ContainerDetail.qml:1119
 msgid "Save as preset"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1101
+#: src/ui/ContainerDetail.qml:1126
 msgid "Saved as a preset."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1102
+#: src/ui/ContainerDetail.qml:1127
 msgid "This mount is already saved as a preset."
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1130
+#: src/ui/ContainerDetail.qml:1155
 msgid "Delete container"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1131
+#: src/ui/ContainerDetail.qml:1156
 msgid "Delete the container “%1”?"
 msgstr ""
 
-#: src/ui/ContainerDetail.qml:1132
+#: src/ui/ContainerDetail.qml:1157
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr ""
 
@@ -2444,153 +2444,128 @@ msgstr ""
 msgid "Previous configuration restored. Docker must be restarted to apply it."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:57
+#: src/ui/RegistryAuthPage.qml:52
 msgid "Logged in. The credentials are stored in KWallet."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:59
+#: src/ui/RegistryAuthPage.qml:54
 msgid "The connection was verified with the stored credentials."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:61
+#: src/ui/RegistryAuthPage.qml:56
 msgid "The credentials were removed."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:63
-msgid "Imported %1 credentials from the Docker CLI configuration."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:65
-msgid "Nothing to import: those registries are already stored."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:67
+#: src/ui/RegistryAuthPage.qml:58
 msgid "The registry rejected these credentials (user name, password or token)."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:69
+#: src/ui/RegistryAuthPage.qml:60
 msgid "The registry could not be reached: check the network, DNS or a proxy."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:71
+#: src/ui/RegistryAuthPage.qml:62
 msgid "The registry check failed."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:73
+#: src/ui/RegistryAuthPage.qml:64
 msgid "No credentials are stored for this registry yet."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:75
+#: src/ui/RegistryAuthPage.qml:66
 msgid "KWallet is not available, so credentials cannot be read or saved."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:77
+#: src/ui/RegistryAuthPage.qml:68
 msgid "Enter a registry address."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:79
+#: src/ui/RegistryAuthPage.qml:70
 msgid "Enter a user name and password, or switch to token login."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:81
+#: src/ui/RegistryAuthPage.qml:72
 msgid "The credentials could not be written to KWallet."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:83
+#: src/ui/RegistryAuthPage.qml:74
 msgid "The credentials could not be removed."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:85
-msgid "Some credentials could not be imported."
+#: src/ui/RegistryAuthPage.qml:76
+msgid ""
+"The credentials are stored, but writing them to the Docker CLI configuration "
+"(%1) failed. The Docker CLI will not see them."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:95
+#: src/ui/RegistryAuthPage.qml:87
 msgid ""
 "KWallet is disabled in the system settings. Kontainer does not fall back to "
 "plain-text storage."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:97
+#: src/ui/RegistryAuthPage.qml:89
 msgid "KWallet is open, but the Kontainer folder could not be created."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:99
+#: src/ui/RegistryAuthPage.qml:91
 msgid ""
 "KWallet could not be opened (the unlock request may have been cancelled)."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:177
+#: src/ui/RegistryAuthPage.qml:147
 msgid "Registry credentials"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:216
+#: src/ui/RegistryAuthPage.qml:186
 msgid "Waiting for KWallet to be unlocked…"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:222
+#: src/ui/RegistryAuthPage.qml:192
 msgid "Try again"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:234
+#: src/ui/RegistryAuthPage.qml:208
 msgid "Stored credentials"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:240
+#: src/ui/RegistryAuthPage.qml:214
+msgid "Add credential…"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:227
+msgid ""
+"These registries are managed by an external credential helper and were not "
+"taken over: %1"
+msgstr ""
+
+#: src/ui/RegistryAuthPage.qml:237
 msgid "No credentials stored."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:242
+#: src/ui/RegistryAuthPage.qml:239
 msgid ""
 "Log in to a registry to pull private images. Credentials are kept in KWallet "
 "only."
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:269
+#: src/ui/RegistryAuthPage.qml:266
 msgid "token"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:278
+#: src/ui/RegistryAuthPage.qml:275
 msgid "Test"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:305
-msgid "Import from the Docker CLI"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:310
-msgid "Read-only import from %1. The file itself is never modified."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:321
-msgid "No Docker CLI configuration was found (or it could not be read)."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:329
-msgid ""
-"Some credentials are managed by an external credential helper (%1). "
-"Kontainer does not run external credential programs; log in to those "
-"registries manually."
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:337
-msgid "One entry in the Docker CLI configuration cannot be imported."
-msgid_plural "%1 entries in the Docker CLI configuration cannot be imported."
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/RegistryAuthPage.qml:371
-msgid "Import selected"
-msgstr ""
-
-#: src/ui/RegistryAuthPage.qml:403
+#: src/ui/RegistryAuthPage.qml:315
 msgid "Remove credentials"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:404
+#: src/ui/RegistryAuthPage.qml:316
 msgid "Remove the stored credentials for “%1”?"
 msgstr ""
 
-#: src/ui/RegistryAuthPage.qml:405
+#: src/ui/RegistryAuthPage.qml:317
 msgid "Pulling private images from this registry will need a new login."
 msgstr ""
 

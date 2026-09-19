@@ -13,6 +13,7 @@
 #include "support/qml_item_utils.h"
 #include "support/mock_docker_backend.h"
 #include "model/detail_list_model.h"
+#include "model/registry_credential_model.h"
 #include "support/qml_stub_kcm.h"
 
 #include <QJsonDocument>
@@ -619,7 +620,7 @@ void QmlLoadTest::topologyConnectionColorsAreStablePerContainer()
  */
 void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
 {
-    // CLI 扫描指向一个临时配置：不读开发者机器上的真实 ~/.docker
+    // CLI 配置指向临时目录：不读（也不写）开发者机器上真实的 ~/.docker
     QTemporaryDir cliDir;
     QVERIFY(cliDir.isValid());
     QJsonObject auths;
@@ -642,27 +643,20 @@ void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
     auto *page = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(page);
 
-    // 空状态：钱包可用（内存后端默认可用）、没有凭据
     QQuickItem *emptyPlaceholder = childByObjectName(page, QStringLiteral("credentialsEmptyPlaceholder"));
     QQuickItem *walletBanner = childByObjectName(page, QStringLiteral("walletBanner"));
     QVERIFY(emptyPlaceholder && walletBanner);
-    QTRY_VERIFY(emptyPlaceholder->property("visible").toBool());
     QVERIFY2(!walletBanner->property("visible").toBool(), "an available wallet must not show a banner");
 
-    // 预置一条凭据（模拟"已经登录过"）：列表出现该仓库，且只有地址/用户名
-    FakeCredentialBackend *wallet = m_stubKcm->credentialBackend();
-    QVERIFY(wallet);
-    RegistryCredential stored;
-    stored.serverAddress = QStringLiteral("ghcr.io");
-    stored.username = QStringLiteral("bob");
-    stored.password = QStringLiteral("s3cret");
-    QVERIFY(m_stubKcm->controller()->registryAuth()->credentials() != nullptr);
-    CredentialStore store(wallet);
-    store.open();
-    QVERIFY(store.store(stored));
-    m_stubKcm->controller()->registryAuth()->refresh();
-
+    /*
+     * 新版行为（实测需求）：不再有"导入/同步"按钮，CLI 配置里的条目在页面打开时
+     * 就被**静默**识别——所以 hub 那条已经在列表里，空状态不出现。
+     */
     QTRY_VERIFY(!emptyPlaceholder->property("visible").toBool());
+    QVERIFY2(m_stubKcm->controller()->registryAuth()->credentials()->rowCount() == 1,
+             "the docker cli entry must be recognized silently on load");
+
+    // 列表里出现该仓库
     int rows = 0;
     std::function<void(QQuickItem *)> countRows = [&](QQuickItem *item) {
         for (QQuickItem *child : item->childItems()) {
@@ -675,10 +669,17 @@ void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
     countRows(page);
     QCOMPARE(rows, 1);
 
-    // CLI 候选：钱包里还没有的仓库才列出来
-    QQuickItem *importButton = childByObjectName(page, QStringLiteral("importSelectedButton"));
-    QVERIFY(importButton);
-    QVERIFY(importButton->property("enabled").toBool());
+    // 「添加凭据」入口存在且可用（新增需求：能主动添加）
+    QQuickItem *addButton = childByObjectName(page, QStringLiteral("addCredentialButton"));
+    QVERIFY2(addButton, "the page must offer an 'add credential' entry");
+    QVERIFY(addButton->property("enabled").toBool());
+
+    // 旧的同步界面必须**彻底消失**：候选勾选框与"导入选中"按钮都不该再存在
+    QVERIFY2(!childByObjectName(page, QStringLiteral("importSelectedButton")),
+             "the explicit import/sync button must be gone");
+    QVERIFY2(!childByObjectName(page, QStringLiteral("importCandidateCheck")),
+             "the import candidate list must be gone");
+
     qunsetenv("DOCKER_CONFIG");
 }
 

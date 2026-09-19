@@ -104,6 +104,14 @@ public:
      * 两者格式不同（后者没有 JSON，只有 `用户名:密码`）。
      */
     static RegistryCredential decodeConfigAuth(const QString &serverAddress, const QByteArray &base64UserPassword, QString *errorKey = nullptr);
+
+    /*!
+     * `用户名:密码` → `config.json` 里 `auth` 字段的值（标准 base64，与 CLI 一致）。
+     *
+     * 与 `decodeConfigAuth()` 对称：写回 CLI 配置文件时用这个，保证 `docker login`
+     * 之后 CLI 读到的就是我们写进去的同一份凭据。
+     */
+    static QString encodeConfigAuth(const QString &username, const QString &password);
 };
 
 } // namespace Kontainer

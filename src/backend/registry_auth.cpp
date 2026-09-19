@@ -168,6 +168,12 @@ RegistryCredential RegistryAuth::decode(const QByteArray &headerValue, QString *
     return credential;
 }
 
+QString RegistryAuth::encodeConfigAuth(const QString &username, const QString &password)
+{
+    // 标准 base64（不是 base64url）：`~/.docker/config.json` 的 `auths` 用这种
+    return QString::fromLatin1(QByteArray(username.toUtf8() + ':' + password.toUtf8()).toBase64());
+}
+
 RegistryCredential RegistryAuth::decodeConfigAuth(const QString &serverAddress, const QByteArray &base64UserPassword, QString *errorKey)
 {
     auto fail = [errorKey](const char *key) {

@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 18:14+0800\n"
+"POT-Creation-Date: 2026-09-19 18:41+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -54,7 +54,7 @@ msgid "Dead"
 msgstr "已失效"
 
 #: src/model/state_text.cpp:33 src/ui/components/ServiceCard.qml:68
-#: src/ui/ContainerDetail.qml:450 src/ui/EngineStatusView.qml:29
+#: src/ui/ContainerDetail.qml:452 src/ui/EngineStatusView.qml:29
 #: src/ui/EngineStatusView.qml:35 src/ui/EngineStatusView.qml:42
 #: src/ui/DaemonConfigPage.qml:84
 msgid "Unknown"
@@ -674,7 +674,7 @@ msgid "Images"
 msgstr "镜像"
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:375
-#: src/ui/ContainerDetail.qml:300 src/ui/MainPage.qml:71
+#: src/ui/ContainerDetail.qml:302 src/ui/MainPage.qml:71
 #: src/ui/MainPage.qml:847 src/ui/MainPage.qml:950
 msgid "Containers"
 msgstr "容器"
@@ -712,7 +712,7 @@ msgstr "输入“%1”以确认"
 #: src/ui/components/ConfirmDialog.qml:107
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
-#: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:676
+#: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:701
 #: src/ui/CreateContainer.qml:966
 msgid "Cancel"
 msgstr "取消"
@@ -747,7 +747,7 @@ msgid ""
 msgstr "这个仓库还没有保存凭据。私有镜像在登录前会拉取失败。"
 
 #: src/ui/components/PullImageDialog.qml:99
-#: src/ui/components/PullProgressList.qml:133 src/ui/RegistryAuthPage.qml:147
+#: src/ui/components/PullProgressList.qml:133 src/ui/RegistryAuthPage.qml:117
 msgid "Log in…"
 msgstr "登录…"
 
@@ -824,8 +824,8 @@ msgid "Show value"
 msgstr "显示值"
 
 #: src/ui/components/KeyValueListEditor.qml:160
-#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:286
-#: src/ui/RegistryAuthPage.qml:406 src/ui/NetworkDetail.qml:304
+#: src/ui/components/StringListEditor.qml:172 src/ui/RegistryAuthPage.qml:283
+#: src/ui/RegistryAuthPage.qml:318 src/ui/NetworkDetail.qml:304
 #: src/ui/VolumeDetail.qml:225
 msgid "Remove"
 msgstr "删除"
@@ -956,12 +956,12 @@ msgstr[0] "较早的 %1 行已省略"
 msgid "Follow"
 msgstr "跟随"
 
-#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:236
+#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:238
 #: src/ui/ContainerCard.qml:177 src/ui/ContainerCard.qml:181
 msgid "Resume"
 msgstr "继续"
 
-#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:228
+#: src/ui/components/LogConsole.qml:125 src/ui/ContainerDetail.qml:230
 #: src/ui/ContainerCard.qml:164 src/ui/ContainerCard.qml:168
 msgid "Pause"
 msgstr "暂停"
@@ -1235,8 +1235,8 @@ msgstr "开始过的构建会留在这个列表里，构建期间可以继续做
 msgid "Host"
 msgstr "宿主机"
 
-#: src/ui/components/PortMappingEditor.qml:148 src/ui/ContainerDetail.qml:308
-#: src/ui/ContainerDetail.qml:883
+#: src/ui/components/PortMappingEditor.qml:148 src/ui/ContainerDetail.qml:310
+#: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr "容器"
 
@@ -1302,17 +1302,17 @@ msgstr "正在启动…"
 msgid "Stopping…"
 msgstr "正在停止…"
 
-#: src/ui/components/ServiceCard.qml:91 src/ui/ContainerDetail.qml:212
+#: src/ui/components/ServiceCard.qml:91 src/ui/ContainerDetail.qml:214
 #: src/ui/ContainerCard.qml:151 src/ui/ContainerCard.qml:155
 msgid "Start"
 msgstr "启动"
 
-#: src/ui/components/ServiceCard.qml:93 src/ui/ContainerDetail.qml:220
+#: src/ui/components/ServiceCard.qml:93 src/ui/ContainerDetail.qml:222
 #: src/ui/ContainerCard.qml:190 src/ui/ContainerCard.qml:194
 msgid "Stop"
 msgstr "停止"
 
-#: src/ui/components/ServiceCard.qml:95 src/ui/ContainerDetail.qml:244
+#: src/ui/components/ServiceCard.qml:95 src/ui/ContainerDetail.qml:246
 #: src/ui/DaemonConfigPage.qml:578
 msgid "Restart"
 msgstr "重启"
@@ -1488,7 +1488,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr "无法读取 Docker 磁盘占用：%1"
 
 #: src/ui/StorageView.qml:64 src/ui/ImageDetail.qml:156
-#: src/ui/ContainerDetail.qml:342 src/ui/MainPage.qml:324
+#: src/ui/ContainerDetail.qml:344 src/ui/MainPage.qml:324
 msgid "Retry"
 msgstr "重试"
 
@@ -1512,8 +1512,8 @@ msgstr "创建容器…"
 msgid "Registry logins…"
 msgstr "仓库登录…"
 
-#: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:347 src/ui/main.qml:37
-#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
+#: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:349 src/ui/main.qml:37
+#: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:123
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
 #: src/ui/CreateContainer.qml:936
 msgid "Back"
@@ -1551,12 +1551,12 @@ msgstr "完整引用："
 msgid "Image ID:"
 msgstr "镜像 ID："
 
-#: src/ui/ImageDetail.qml:217 src/ui/ContainerDetail.qml:468
+#: src/ui/ImageDetail.qml:217 src/ui/ContainerDetail.qml:493
 #: src/ui/NetworkDetail.qml:172 src/ui/VolumeDetail.qml:173
 msgid "Created:"
 msgstr "创建时间："
 
-#: src/ui/ImageDetail.qml:219 src/ui/ContainerDetail.qml:476
+#: src/ui/ImageDetail.qml:219 src/ui/ContainerDetail.qml:501
 msgctxt "@info absolute time and relative"
 msgid "%1 (%2 ago)"
 msgstr "%1（%2前）"
@@ -1609,7 +1609,7 @@ msgstr[0] "显示全部 %1 层"
 msgid "No containers use this image."
 msgstr "没有容器使用该镜像。"
 
-#: src/ui/ImageDetail.qml:445 src/ui/ContainerDetail.qml:618
+#: src/ui/ImageDetail.qml:445 src/ui/ContainerDetail.qml:643
 msgctxt "@info environment variable count"
 msgid "Environment (%1 variable)"
 msgid_plural "Environment (%1 variables)"
@@ -1620,7 +1620,7 @@ msgid "Delete all tags…"
 msgstr "删除全部标签…"
 
 #: src/ui/ImageDetail.qml:508 src/ui/ImageDetail.qml:525
-#: src/ui/ContainerDetail.qml:274 src/ui/ContainerDetail.qml:1133
+#: src/ui/ContainerDetail.qml:276 src/ui/ContainerDetail.qml:1158
 msgid "Delete"
 msgstr "删除"
 
@@ -1666,275 +1666,275 @@ msgstr "网关："
 msgid "IPv4:"
 msgstr "IPv4："
 
-#: src/ui/ContainerDetail.qml:177
+#: src/ui/ContainerDetail.qml:179
 msgid "Disconnect from network"
 msgstr "从网络断开"
 
-#: src/ui/ContainerDetail.qml:178
+#: src/ui/ContainerDetail.qml:180
 msgid "Disconnect this container from “%1”?"
 msgstr "把这个容器从“%1”断开吗？"
 
-#: src/ui/ContainerDetail.qml:180
+#: src/ui/ContainerDetail.qml:182
 msgid ""
 "The container loses this network's addresses and aliases; connections "
 "through it may be interrupted."
 msgstr "容器会失去这个网络上的地址与别名，经由该网络的连接可能中断。"
 
-#: src/ui/ContainerDetail.qml:181 src/ui/ContainerDetail.qml:817
+#: src/ui/ContainerDetail.qml:183 src/ui/ContainerDetail.qml:842
 msgid "Disconnect"
 msgstr "断开"
 
-#: src/ui/ContainerDetail.qml:262
+#: src/ui/ContainerDetail.qml:264
 msgid "Stop the container to delete it."
 msgstr "需要先停止容器才能删除。"
 
-#: src/ui/ContainerDetail.qml:312
+#: src/ui/ContainerDetail.qml:314
 msgid "container name"
 msgstr "容器名称"
 
-#: src/ui/ContainerDetail.qml:330
+#: src/ui/ContainerDetail.qml:332
 msgid "Loading container details…"
 msgstr "正在加载容器详情…"
 
-#: src/ui/ContainerDetail.qml:339
+#: src/ui/ContainerDetail.qml:341
 msgid "Unable to retrieve container details."
 msgstr "无法获取容器详情。"
 
-#: src/ui/ContainerDetail.qml:379
+#: src/ui/ContainerDetail.qml:381
 msgctxt "@title:tab container overview"
 msgid "Overview"
 msgstr "概览"
 
-#: src/ui/ContainerDetail.qml:382
+#: src/ui/ContainerDetail.qml:384
 msgctxt "@title:tab container resources"
 msgid "Resources"
 msgstr "资源"
 
-#: src/ui/ContainerDetail.qml:385
+#: src/ui/ContainerDetail.qml:387
 msgctxt "@title:tab container network"
 msgid "Network"
 msgstr "网络"
 
-#: src/ui/ContainerDetail.qml:388
+#: src/ui/ContainerDetail.qml:390
 msgctxt "@title:tab container mounts"
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:391
+#: src/ui/ContainerDetail.qml:393
 msgctxt "@title:tab container logs"
 msgid "Logs"
 msgstr "日志"
 
-#: src/ui/ContainerDetail.qml:433
+#: src/ui/ContainerDetail.qml:435
 msgid "State:"
 msgstr "状态："
 
-#: src/ui/ContainerDetail.qml:449 src/ui/VolumeDetail.qml:179
+#: src/ui/ContainerDetail.qml:451 src/ui/VolumeDetail.qml:179
 msgid "Status:"
 msgstr "状态描述："
 
-#: src/ui/ContainerDetail.qml:454
+#: src/ui/ContainerDetail.qml:458
 msgid "Image:"
 msgstr "镜像："
 
-#: src/ui/ContainerDetail.qml:461
+#: src/ui/ContainerDetail.qml:486
 msgid "Container ID:"
 msgstr "容器 ID："
 
-#: src/ui/ContainerDetail.qml:464 src/ui/ContainerCard.qml:203
+#: src/ui/ContainerDetail.qml:489 src/ui/ContainerCard.qml:203
 msgid "container ID"
 msgstr "容器 ID"
 
-#: src/ui/ContainerDetail.qml:474
+#: src/ui/ContainerDetail.qml:499
 msgid "Started:"
 msgstr "启动时间："
 
-#: src/ui/ContainerDetail.qml:480
+#: src/ui/ContainerDetail.qml:505
 msgid "Finished:"
 msgstr "结束时间："
 
-#: src/ui/ContainerDetail.qml:489
+#: src/ui/ContainerDetail.qml:514
 msgid "Runtime"
 msgstr "运行时"
 
-#: src/ui/ContainerDetail.qml:505
+#: src/ui/ContainerDetail.qml:530
 msgid "Restart count:"
 msgstr "重启次数："
 
-#: src/ui/ContainerDetail.qml:509
+#: src/ui/ContainerDetail.qml:534
 msgid "Exit code:"
 msgstr "退出码："
 
-#: src/ui/ContainerDetail.qml:513
+#: src/ui/ContainerDetail.qml:538
 msgid "OOM killed:"
 msgstr "因 OOM 被杀："
 
-#: src/ui/ContainerDetail.qml:515 src/ui/DaemonConfigPage.qml:92
+#: src/ui/ContainerDetail.qml:540 src/ui/DaemonConfigPage.qml:92
 #: src/ui/DaemonConfigPage.qml:96 src/ui/NetworkDetail.qml:178
 msgid "Yes"
 msgstr "是"
 
-#: src/ui/ContainerDetail.qml:519
+#: src/ui/ContainerDetail.qml:544
 msgid "Process ID:"
 msgstr "进程 ID："
 
-#: src/ui/ContainerDetail.qml:524
+#: src/ui/ContainerDetail.qml:549
 msgid "Restart policy:"
 msgstr "重启策略："
 
-#: src/ui/ContainerDetail.qml:529
+#: src/ui/ContainerDetail.qml:554
 msgid "Platform:"
 msgstr "平台："
 
-#: src/ui/ContainerDetail.qml:538
+#: src/ui/ContainerDetail.qml:563
 msgid "Configuration"
 msgstr "配置"
 
-#: src/ui/ContainerDetail.qml:563
+#: src/ui/ContainerDetail.qml:588
 msgid "Entrypoint:"
 msgstr "入口点："
 
-#: src/ui/ContainerDetail.qml:575
+#: src/ui/ContainerDetail.qml:600
 msgid "entry point"
 msgstr "入口点"
 
-#: src/ui/ContainerDetail.qml:580
+#: src/ui/ContainerDetail.qml:605
 msgid "Command:"
 msgstr "命令："
 
-#: src/ui/ContainerDetail.qml:592
+#: src/ui/ContainerDetail.qml:617
 msgid "command"
 msgstr "命令"
 
-#: src/ui/ContainerDetail.qml:597
+#: src/ui/ContainerDetail.qml:622
 msgid "Working directory:"
 msgstr "工作目录："
 
-#: src/ui/ContainerDetail.qml:603
+#: src/ui/ContainerDetail.qml:628
 msgid "User:"
 msgstr "用户："
 
-#: src/ui/ContainerDetail.qml:608
+#: src/ui/ContainerDetail.qml:633
 msgid "Hostname:"
 msgstr "主机名："
 
-#: src/ui/ContainerDetail.qml:628
+#: src/ui/ContainerDetail.qml:653
 msgctxt "@info label count"
 msgid "Labels (%1)"
 msgid_plural "Labels (%1)"
 msgstr[0] "标签（%1）"
 
-#: src/ui/ContainerDetail.qml:665
+#: src/ui/ContainerDetail.qml:690
 msgid "No network information."
 msgstr "没有网络信息。"
 
-#: src/ui/ContainerDetail.qml:676
+#: src/ui/ContainerDetail.qml:701
 msgid "Connect to a network…"
 msgstr "连接到网络…"
 
-#: src/ui/ContainerDetail.qml:713
+#: src/ui/ContainerDetail.qml:738
 msgid ""
 "This container is already connected to every network. Create another network "
 "first."
 msgstr "这个容器已经连接了所有网络。请先创建新的网络。"
 
-#: src/ui/ContainerDetail.qml:719
+#: src/ui/ContainerDetail.qml:744
 msgid "Choose a network:"
 msgstr "选择网络："
 
-#: src/ui/ContainerDetail.qml:740
+#: src/ui/ContainerDetail.qml:765
 msgid "already connected"
 msgstr "已连接"
 
-#: src/ui/ContainerDetail.qml:749
+#: src/ui/ContainerDetail.qml:774
 msgid "Aliases (optional, comma separated)"
 msgstr "别名（可选，用逗号分隔）"
 
-#: src/ui/ContainerDetail.qml:750
+#: src/ui/ContainerDetail.qml:775
 msgid "Aliases"
 msgstr "别名"
 
-#: src/ui/ContainerDetail.qml:760
+#: src/ui/ContainerDetail.qml:785
 msgid "Connect"
 msgstr "连接"
 
-#: src/ui/ContainerDetail.qml:768
+#: src/ui/ContainerDetail.qml:793
 msgid "Other containers on the same network can reach this one by its aliases."
 msgstr "同一网络里的其它容器可以用这些别名访问它。"
 
-#: src/ui/ContainerDetail.qml:801 src/ui/ResourceView.qml:128
+#: src/ui/ContainerDetail.qml:826 src/ui/ResourceView.qml:128
 msgid "Network:"
 msgstr "网络："
 
-#: src/ui/ContainerDetail.qml:849
+#: src/ui/ContainerDetail.qml:874
 msgid "MAC:"
 msgstr "MAC："
 
-#: src/ui/ContainerDetail.qml:865
+#: src/ui/ContainerDetail.qml:890
 msgid "Port mapping"
 msgstr "端口映射"
 
-#: src/ui/ContainerDetail.qml:874
+#: src/ui/ContainerDetail.qml:899
 msgid "No published ports."
 msgstr "没有已发布的端口。"
 
-#: src/ui/ContainerDetail.qml:894
+#: src/ui/ContainerDetail.qml:919
 msgid "Exposed but not published"
 msgstr "已暴露但未发布"
 
-#: src/ui/ContainerDetail.qml:913
+#: src/ui/ContainerDetail.qml:938
 msgid "%1, exposed but not published to the host"
 msgstr "%1，已暴露但未发布到宿主机"
 
-#: src/ui/ContainerDetail.qml:935
+#: src/ui/ContainerDetail.qml:960
 msgid "No mounts."
 msgstr "没有挂载。"
 
-#: src/ui/ContainerDetail.qml:994
+#: src/ui/ContainerDetail.qml:1019
 msgid "mount"
 msgstr "挂载"
 
-#: src/ui/ContainerDetail.qml:1019
+#: src/ui/ContainerDetail.qml:1044
 msgid "Not a directory"
 msgstr "不是目录"
 
-#: src/ui/ContainerDetail.qml:1019
+#: src/ui/ContainerDetail.qml:1044
 msgid "Host path missing"
 msgstr "宿主路径不存在"
 
-#: src/ui/ContainerDetail.qml:1074 src/ui/VolumeDetail.qml:131
+#: src/ui/ContainerDetail.qml:1099 src/ui/VolumeDetail.qml:131
 msgid "Open host folder"
 msgstr "打开宿主目录"
 
-#: src/ui/ContainerDetail.qml:1082
+#: src/ui/ContainerDetail.qml:1107
 msgid "host path"
 msgstr "宿主路径"
 
-#: src/ui/ContainerDetail.qml:1087
+#: src/ui/ContainerDetail.qml:1112
 msgid "container path"
 msgstr "容器路径"
 
-#: src/ui/ContainerDetail.qml:1094
+#: src/ui/ContainerDetail.qml:1119
 msgid "Save as preset"
 msgstr "保存为预设"
 
-#: src/ui/ContainerDetail.qml:1101
+#: src/ui/ContainerDetail.qml:1126
 msgid "Saved as a preset."
 msgstr "已保存为预设。"
 
-#: src/ui/ContainerDetail.qml:1102
+#: src/ui/ContainerDetail.qml:1127
 msgid "This mount is already saved as a preset."
 msgstr "这条挂载已经保存为预设了。"
 
-#: src/ui/ContainerDetail.qml:1130
+#: src/ui/ContainerDetail.qml:1155
 msgid "Delete container"
 msgstr "删除容器"
 
-#: src/ui/ContainerDetail.qml:1131
+#: src/ui/ContainerDetail.qml:1156
 msgid "Delete the container “%1”?"
 msgstr "确定要删除容器“%1”吗？"
 
-#: src/ui/ContainerDetail.qml:1132
+#: src/ui/ContainerDetail.qml:1157
 msgid "The container is removed. Its anonymous and named volumes are kept."
 msgstr "容器会被删除；它的匿名卷与命名卷都会保留。"
 
@@ -2452,154 +2452,128 @@ msgstr "恢复"
 msgid "Previous configuration restored. Docker must be restarted to apply it."
 msgstr "已恢复上一份配置。需要重启 Docker 后才会生效。"
 
-#: src/ui/RegistryAuthPage.qml:57
+#: src/ui/RegistryAuthPage.qml:52
 msgid "Logged in. The credentials are stored in KWallet."
 msgstr "已登录，凭据已保存到 KWallet。"
 
-#: src/ui/RegistryAuthPage.qml:59
+#: src/ui/RegistryAuthPage.qml:54
 msgid "The connection was verified with the stored credentials."
 msgstr "已用保存的凭据验证连接。"
 
-#: src/ui/RegistryAuthPage.qml:61
+#: src/ui/RegistryAuthPage.qml:56
 msgid "The credentials were removed."
 msgstr "凭据已移除。"
 
-#: src/ui/RegistryAuthPage.qml:63
-msgid "Imported %1 credentials from the Docker CLI configuration."
-msgstr "已从 Docker CLI 配置导入 %1 条凭据。"
-
-#: src/ui/RegistryAuthPage.qml:65
-msgid "Nothing to import: those registries are already stored."
-msgstr "没有可导入的内容：这些仓库都已经保存过了。"
-
-#: src/ui/RegistryAuthPage.qml:67
+#: src/ui/RegistryAuthPage.qml:58
 msgid "The registry rejected these credentials (user name, password or token)."
 msgstr "仓库拒绝了这组凭据（用户名、密码或令牌不正确）。"
 
-#: src/ui/RegistryAuthPage.qml:69
+#: src/ui/RegistryAuthPage.qml:60
 msgid "The registry could not be reached: check the network, DNS or a proxy."
 msgstr "无法连接到该仓库：请检查网络、DNS 或代理。"
 
-#: src/ui/RegistryAuthPage.qml:71
+#: src/ui/RegistryAuthPage.qml:62
 msgid "The registry check failed."
 msgstr "仓库校验失败。"
 
-#: src/ui/RegistryAuthPage.qml:73
+#: src/ui/RegistryAuthPage.qml:64
 msgid "No credentials are stored for this registry yet."
 msgstr "还没有为这个仓库保存凭据。"
 
-#: src/ui/RegistryAuthPage.qml:75
+#: src/ui/RegistryAuthPage.qml:66
 msgid "KWallet is not available, so credentials cannot be read or saved."
 msgstr "KWallet 不可用，因此无法读取或保存凭据。"
 
-#: src/ui/RegistryAuthPage.qml:77
+#: src/ui/RegistryAuthPage.qml:68
 msgid "Enter a registry address."
 msgstr "请填写仓库地址。"
 
-#: src/ui/RegistryAuthPage.qml:79
+#: src/ui/RegistryAuthPage.qml:70
 msgid "Enter a user name and password, or switch to token login."
 msgstr "请填写用户名与密码，或改用令牌登录。"
 
-#: src/ui/RegistryAuthPage.qml:81
+#: src/ui/RegistryAuthPage.qml:72
 msgid "The credentials could not be written to KWallet."
 msgstr "无法把凭据写入 KWallet。"
 
-#: src/ui/RegistryAuthPage.qml:83
+#: src/ui/RegistryAuthPage.qml:74
 msgid "The credentials could not be removed."
 msgstr "无法移除凭据。"
 
-#: src/ui/RegistryAuthPage.qml:85
-msgid "Some credentials could not be imported."
-msgstr "有部分凭据无法导入。"
+#: src/ui/RegistryAuthPage.qml:76
+msgid ""
+"The credentials are stored, but writing them to the Docker CLI configuration "
+"(%1) failed. The Docker CLI will not see them."
+msgstr "凭据已保存，但写入 Docker CLI 配置文件（%1）失败，`docker` 命令将看不到它们。"
 
-#: src/ui/RegistryAuthPage.qml:95
+#: src/ui/RegistryAuthPage.qml:87
 msgid ""
 "KWallet is disabled in the system settings. Kontainer does not fall back to "
 "plain-text storage."
 msgstr "系统设置里关闭了 KWallet。Kontainer 不会退回到明文存储。"
 
-#: src/ui/RegistryAuthPage.qml:97
+#: src/ui/RegistryAuthPage.qml:89
 msgid "KWallet is open, but the Kontainer folder could not be created."
 msgstr "KWallet 已打开，但无法创建 Kontainer 文件夹。"
 
-#: src/ui/RegistryAuthPage.qml:99
+#: src/ui/RegistryAuthPage.qml:91
 msgid ""
 "KWallet could not be opened (the unlock request may have been cancelled)."
 msgstr "无法打开 KWallet（可能取消了授权）。"
 
-#: src/ui/RegistryAuthPage.qml:177
+#: src/ui/RegistryAuthPage.qml:147
 msgid "Registry credentials"
 msgstr "仓库凭据"
 
-#: src/ui/RegistryAuthPage.qml:216
+#: src/ui/RegistryAuthPage.qml:186
 msgid "Waiting for KWallet to be unlocked…"
 msgstr "正在等待 KWallet 解锁…"
 
-#: src/ui/RegistryAuthPage.qml:222
+#: src/ui/RegistryAuthPage.qml:192
 msgid "Try again"
 msgstr "重试"
 
-#: src/ui/RegistryAuthPage.qml:234
+#: src/ui/RegistryAuthPage.qml:208
 msgid "Stored credentials"
 msgstr "已保存的凭据"
 
-#: src/ui/RegistryAuthPage.qml:240
+#: src/ui/RegistryAuthPage.qml:214
+msgid "Add credential…"
+msgstr "添加凭据…"
+
+#: src/ui/RegistryAuthPage.qml:227
+msgid ""
+"These registries are managed by an external credential helper and were not "
+"taken over: %1"
+msgstr "以下仓库由外部凭据助手管理，未被接管：%1"
+
+#: src/ui/RegistryAuthPage.qml:237
 msgid "No credentials stored."
 msgstr "没有保存任何凭据。"
 
-#: src/ui/RegistryAuthPage.qml:242
+#: src/ui/RegistryAuthPage.qml:239
 msgid ""
 "Log in to a registry to pull private images. Credentials are kept in KWallet "
 "only."
 msgstr "要拉取私有镜像，请先登录对应的仓库。凭据只保存在 KWallet 里。"
 
-#: src/ui/RegistryAuthPage.qml:269
+#: src/ui/RegistryAuthPage.qml:266
 msgid "token"
 msgstr "令牌"
 
-#: src/ui/RegistryAuthPage.qml:278
+#: src/ui/RegistryAuthPage.qml:275
 msgid "Test"
 msgstr "测试连接"
 
-#: src/ui/RegistryAuthPage.qml:305
-msgid "Import from the Docker CLI"
-msgstr "从 Docker CLI 导入"
-
-#: src/ui/RegistryAuthPage.qml:310
-msgid "Read-only import from %1. The file itself is never modified."
-msgstr "从 %1 只读导入，不会修改该文件。"
-
-#: src/ui/RegistryAuthPage.qml:321
-msgid "No Docker CLI configuration was found (or it could not be read)."
-msgstr "没有找到 Docker CLI 配置（或无法读取）。"
-
-#: src/ui/RegistryAuthPage.qml:329
-msgid ""
-"Some credentials are managed by an external credential helper (%1). "
-"Kontainer does not run external credential programs; log in to those "
-"registries manually."
-msgstr ""
-"有凭据由外部凭据程序管理（%1）。Kontainer 不执行外部凭据程序，请手动登录这些"
-"仓库。"
-
-#: src/ui/RegistryAuthPage.qml:337
-msgid "One entry in the Docker CLI configuration cannot be imported."
-msgid_plural "%1 entries in the Docker CLI configuration cannot be imported."
-msgstr[0] "Docker CLI 配置里有 %1 条无法导入。"
-
-#: src/ui/RegistryAuthPage.qml:371
-msgid "Import selected"
-msgstr "导入所选"
-
-#: src/ui/RegistryAuthPage.qml:403
+#: src/ui/RegistryAuthPage.qml:315
 msgid "Remove credentials"
 msgstr "移除凭据"
 
-#: src/ui/RegistryAuthPage.qml:404
+#: src/ui/RegistryAuthPage.qml:316
 msgid "Remove the stored credentials for “%1”?"
 msgstr "移除为“%1”保存的凭据吗？"
 
-#: src/ui/RegistryAuthPage.qml:405
+#: src/ui/RegistryAuthPage.qml:317
 msgid "Pulling private images from this registry will need a new login."
 msgstr "之后拉取该仓库的私有镜像需要重新登录。"
 
@@ -3341,6 +3315,40 @@ msgstr "系统级配置…"
 #: src/ui/MainPage.qml:1188
 msgid "Mount presets"
 msgstr "挂载预设"
+
+#~ msgid "Imported %1 credentials from the Docker CLI configuration."
+#~ msgstr "已从 Docker CLI 配置导入 %1 条凭据。"
+
+#~ msgid "Nothing to import: those registries are already stored."
+#~ msgstr "没有可导入的内容：这些仓库都已经保存过了。"
+
+#~ msgid "Some credentials could not be imported."
+#~ msgstr "有部分凭据无法导入。"
+
+#~ msgid "Import from the Docker CLI"
+#~ msgstr "从 Docker CLI 导入"
+
+#~ msgid "Read-only import from %1. The file itself is never modified."
+#~ msgstr "从 %1 只读导入，不会修改该文件。"
+
+#~ msgid "No Docker CLI configuration was found (or it could not be read)."
+#~ msgstr "没有找到 Docker CLI 配置（或无法读取）。"
+
+#~ msgid ""
+#~ "Some credentials are managed by an external credential helper (%1). "
+#~ "Kontainer does not run external credential programs; log in to those "
+#~ "registries manually."
+#~ msgstr ""
+#~ "有凭据由外部凭据程序管理（%1）。Kontainer 不执行外部凭据程序，请手动登录这"
+#~ "些仓库。"
+
+#~ msgid "One entry in the Docker CLI configuration cannot be imported."
+#~ msgid_plural ""
+#~ "%1 entries in the Docker CLI configuration cannot be imported."
+#~ msgstr[0] "Docker CLI 配置里有 %1 条无法导入。"
+
+#~ msgid "Import selected"
+#~ msgstr "导入所选"
 
 #~ msgid "Show less"
 #~ msgstr "收起"

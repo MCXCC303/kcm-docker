@@ -32,8 +32,19 @@ class RegistryAuthControllerTest : public QObject
 {
     Q_OBJECT
 
+private:
+    QTemporaryDir *m_isolation = nullptr;
+
 private Q_SLOTS:
     void initTestCase();
+    /*!
+     * 每个用例前把 `DOCKER_CONFIG` 指到空目录。
+     *
+     * 这些用例会调 `refresh()`（静默识别 CLI 配置）与登录/移除（**写回** CLI 配置），
+     * 不隔离的话就会读改用户真实的 `~/.docker/config.json`——那是他的登录状态。
+     */
+    void init();
+    void cleanup();
     void loginStoresOnlyAfterSuccessfulCheck();
     void loginRejectsIncompleteInput();
     void loginRequiresAnAvailableWallet();
@@ -41,7 +52,8 @@ private Q_SLOTS:
     void testCredentialDoesNotModifyAnything();
     void removeDropsTheCredential();
     void modelNeverExposesSecrets();
-    void importFromCliAddsOnlyTheSelectedAddresses();
+    void cliEntriesAreRecognizedSilently();
+    void changesAreWrittenBackToTheCliConfig();
     void walletLifecycleIsReportedToTheUi();
 };
 
@@ -76,6 +88,20 @@ void RegistryAuthControllerTest::initTestCase()
 {
     setupTranslationDomain();
     qRegisterMetaType<Kontainer::DockerBackendInterface::AuthCheckResult>("Kontainer::DockerBackendInterface::AuthCheckResult");
+}
+
+void RegistryAuthControllerTest::init()
+{
+    m_isolation = new QTemporaryDir();
+    QVERIFY(m_isolation->isValid());
+    qputenv("DOCKER_CONFIG", m_isolation->path().toUtf8());
+}
+
+void RegistryAuthControllerTest::cleanup()
+{
+    qunsetenv("DOCKER_CONFIG");
+    delete m_isolation;
+    m_isolation = nullptr;
 }
 
 void RegistryAuthControllerTest::loginStoresOnlyAfterSuccessfulCheck()
@@ -232,7 +258,13 @@ void RegistryAuthControllerTest::modelNeverExposesSecrets()
     }
 }
 
-void RegistryAuthControllerTest::importFromCliAddsOnlyTheSelectedAddresses()
+/*!
+ * 打开页面时**静默**识别 CLI 配置里的条目（取消同步机制后的行为）。
+ *
+ * 用户在 CLI 里 `docker login` 过的仓库，打开这个页面就应该已经在列表里——
+ * 没有任何"导入/同步"按钮。
+ */
+void RegistryAuthControllerTest::cliEntriesAreRecognizedSilently()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
@@ -248,24 +280,74 @@ void RegistryAuthControllerTest::importFromCliAddsOnlyTheSelectedAddresses()
     controller.refresh();
 
     QVERIFY(controller.cliConfigPresent());
-    QCOMPARE(controller.importableAddresses(), QStringList({QStringLiteral("ghcr.io"), QStringLiteral("index.docker.io")}));
-
-    // 只导入选中的一条
-    controller.importFromCli({QStringLiteral("ghcr.io")});
-    QCOMPARE(controller.lastResultKey(), QStringLiteral("importSucceeded"));
-    QCOMPARE(controller.lastImportedCount(), 1);
+    QCOMPARE(controller.lastImportedCount(), 2);
     QVERIFY(store.hasCredential(QStringLiteral("ghcr.io")));
-    QVERIFY2(!store.hasCredential(QStringLiteral("index.docker.io")), "only the selected address is imported");
-    // 导入后它就不再是"待导入"
-    QCOMPARE(controller.importableAddresses(), QStringList {QStringLiteral("index.docker.io")});
-
-    // 再导入剩下的：幂等，已存在的不会被覆盖
-    controller.importFromCli();
-    QCOMPARE(controller.lastImportedCount(), 1);
     QVERIFY(store.hasCredential(QStringLiteral("index.docker.io")));
-    controller.importFromCli();
-    QCOMPARE(controller.lastResultKey(), QStringLiteral("importNothingToDo"));
+
+    // 幂等：再打开一次不会重复导入，也不会覆盖钱包里的值
+    controller.refresh();
     QCOMPARE(controller.lastImportedCount(), 0);
+    QCOMPARE(controller.lastAlreadyPresentCount(), 2);
+
+    qunsetenv("DOCKER_CONFIG");
+}
+
+/*!
+ * 登录 / 移除都会**同步写回** CLI 配置文件（用户要求：静默维护同步）。
+ */
+void RegistryAuthControllerTest::changesAreWrittenBackToTheCliConfig()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = writeCliConfig(dir);
+    QVERIFY(!path.isEmpty());
+    qputenv("DOCKER_CONFIG", dir.path().toUtf8());
+
+    FakeCredentialBackend wallet;
+    CredentialStore store(&wallet);
+    store.open();
+    MockDockerBackend backend;
+    RegistryAuthController controller(&backend, &store);
+    controller.refresh();
+
+    // 登录一个新仓库 → 写进 CLI 配置（docker CLI 因此也能用）
+    // 注意：登录时写入的是**明文等价**的 base64，这正是 docker CLI 自己的格式
+    controller.login(QStringLiteral("registry.example.com"), QStringLiteral("carol"), QStringLiteral("s3cret"));
+    QCOMPARE(controller.lastResultKey(), QStringLiteral("loginSucceeded"));
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+    file.close();
+    const QJsonObject auths = root.value(QStringLiteral("auths")).toObject();
+    QVERIFY2(auths.contains(QStringLiteral("registry.example.com")),
+             qPrintable(QStringLiteral("keys: %1 err: %2 %3")
+                            .arg(auths.keys().join(QLatin1Char(',')))
+                            .arg(controller.lastErrorKey())
+                            .arg(controller.lastErrorDetail())));
+    const QJsonObject entry = auths.value(QStringLiteral("registry.example.com")).toObject();
+    QCOMPARE(entry.value(QStringLiteral("auth")).toString(),
+             QString::fromLatin1(QByteArrayLiteral("carol:s3cret").toBase64()));
+    // 文件里原有的条目必须保留，**Hub 那一条尤其不能被改**（曾经因为用了
+    // "从镜像引用推仓库"的函数做比较，把新仓库的凭据写进了 Hub 条目里）
+    QCOMPARE(auths.size(), 3);
+    QCOMPARE(auths.value(QStringLiteral("https://index.docker.io/v1/")).toObject().value(QStringLiteral("auth")).toString(),
+             QString::fromLatin1(QByteArrayLiteral("alice:hub-secret").toBase64()));
+
+    // 文件权限：等价于明文凭据，必须是 0600（目录 0700）
+    const QFile::Permissions permissions = QFile::permissions(path);
+    QVERIFY2(permissions.testFlag(QFile::ReadOwner) && permissions.testFlag(QFile::WriteOwner),
+             "the config must stay readable/writable by the owner");
+    QVERIFY2(!permissions.testFlag(QFile::ReadGroup) && !permissions.testFlag(QFile::ReadOther),
+             "credentials must not be readable by group or others");
+
+    // 移除 → 同步从 CLI 配置里删掉
+    controller.removeCredential(QStringLiteral("registry.example.com"));
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QJsonObject afterRemove = QJsonDocument::fromJson(file.readAll()).object();
+    file.close();
+    QVERIFY(!afterRemove.value(QStringLiteral("auths")).toObject().contains(QStringLiteral("registry.example.com")));
+    QCOMPARE(afterRemove.value(QStringLiteral("auths")).toObject().size(), 2);
 
     qunsetenv("DOCKER_CONFIG");
 }

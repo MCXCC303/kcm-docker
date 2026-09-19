@@ -5,6 +5,8 @@
 
 #include "model/registry_auth_controller.h"
 
+#include "backend/docker_cli_auth_writer.h"
+
 #include "logging.h"
 #include "model/registry_credential_model.h"
 
@@ -149,7 +151,26 @@ void RegistryAuthController::refresh()
     m_store->open();
     m_credentials->reload();
     scanCliConfig();
+    // 静默识别：CLI 配置文件里有、钱包里还没有的条目自动收进来（不覆盖已有条目）。
+    // 界面不再有"导入/同步"按钮——这是用户要求的行为（ARCH_V5_V8 §5.19）。
+    importFromCliSilently();
     Q_EMIT changed();
+}
+
+void RegistryAuthController::importFromCliSilently()
+{
+    if (m_store->state() != CredentialStore::State::Ready) {
+        return; // 钱包没准备好就先不碰（下次 refresh 再试）
+    }
+    const DockerCliAuthImporter::ImportOutcome outcome = DockerCliAuthImporter::importInto(*m_store, m_scan);
+    m_importedCount = outcome.imported;
+    m_alreadyPresentCount = outcome.alreadyPresent;
+    m_importFailedCount = outcome.failed;
+    if (outcome.imported > 0) {
+        m_credentials->reload();
+        qCDebug(kontainerModel) << "recognized" << outcome.imported << "credential(s) from the docker cli config";
+        Q_EMIT credentialsChanged();
+    }
 }
 
 void RegistryAuthController::clearResult()
@@ -277,6 +298,13 @@ void RegistryAuthController::handleAuthCheckFinished(const QString &serverAddres
     }
     // 模型与 credentialsChanged() 由 CredentialStore::changed() 驱动（见构造函数），
     // 这里不再重复发一次：重复的信号会让界面提示条闪两下
+    QString cliError;
+    if (!writeBackToCli(m_pendingLogin.credential, &cliError)) {
+        // 钱包里已经存好了；只是没能同步给 docker CLI——如实说明，别让用户以为 CLI 也能用了
+        setResultKeys(QStringLiteral("loginSucceeded"), QStringLiteral("cliWriteFailed"), detail);
+        setCliConfigPathForMessages();
+        return;
+    }
     setResultKeys(QStringLiteral("loginSucceeded"), QString(), serverAddress);
 }
 
@@ -287,7 +315,21 @@ void RegistryAuthController::removeCredential(const QString &serverAddress)
         setResultKeys(QString(), errorKey);
         return;
     }
+    // 同步删除 CLI 配置里的条目：只删我们这边会让 CLI 继续拿着一份已经作废的凭据
+    QString cliError;
+    if (!DockerCliAuthWriter::remove(DockerCliAuthWriter::defaultConfigPath(), serverAddress, &cliError)) {
+        setResultKeys(QStringLiteral("removed"), QStringLiteral("cliWriteFailed"));
+        setCliConfigPathForMessages();
+        return;
+    }
     setResultKeys(QStringLiteral("removed"), QString());
+}
+
+void RegistryAuthController::setCliConfigPathForMessages()
+{
+    // 提示文案里要说明"哪个文件没同步成功"，因此把路径填进 detail（路径不是敏感信息）
+    m_lastErrorDetail = DockerCliAuthWriter::defaultConfigPath();
+    Q_EMIT resultChanged();
 }
 
 void RegistryAuthController::scanCliConfig()
@@ -298,45 +340,20 @@ void RegistryAuthController::scanCliConfig()
     Q_EMIT changed();
 }
 
-void RegistryAuthController::importFromCli(const QStringList &serverAddresses)
+bool RegistryAuthController::writeBackToCli(const RegistryCredential &credential, QString *errorKey)
 {
-    if (m_store->state() != CredentialStore::State::Ready) {
-        setResultKeys(QString(), QStringLiteral("unavailable"));
-        return;
+    /*
+     * 把凭据同步进 Docker CLI 的配置文件（用户要求：静默维护，界面不再有"同步"动作）。
+     *
+     * 失败**不**影响 KWallet 里的结果（那边已经写成功了），但必须如实告诉用户——
+     * 否则他会在 docker CLI 里遇到"为什么这个仓库还要再登录一次"。
+     */
+    const QString path = DockerCliAuthWriter::defaultConfigPath();
+    if (DockerCliAuthWriter::upsert(path, credential.serverAddress, credential, errorKey)) {
+        return true;
     }
-
-    // 只导入用户选中的项（空列表 = 全部可导入项）
-    QStringList wanted;
-    for (const QString &address : serverAddresses) {
-        const QString normalized = RegistryAuth::normalizeServerAddress(address);
-        if (!normalized.isEmpty()) {
-            wanted.append(normalized);
-        }
-    }
-
-    DockerCliAuthScan selection = m_scan;
-    if (!wanted.isEmpty()) {
-        selection.credentials.erase(std::remove_if(selection.credentials.begin(),
-                                                  selection.credentials.end(),
-                                                  [&wanted](const ImportableCredential &importable) {
-                                                      return !wanted.contains(importable.credential.serverAddress);
-                                                  }),
-                                   selection.credentials.end());
-    }
-
-    const DockerCliAuthImporter::ImportOutcome outcome = DockerCliAuthImporter::importInto(*m_store, selection);
-    m_importedCount = outcome.imported;
-    m_alreadyPresentCount = outcome.alreadyPresent;
-    m_importFailedCount = outcome.failed;
-
-    if (outcome.failed > 0) {
-        setResultKeys(QString(), QStringLiteral("importFailed"));
-    } else if (outcome.imported == 0) {
-        setResultKeys(QStringLiteral("importNothingToDo"), QString());
-    } else {
-        setResultKeys(QStringLiteral("importSucceeded"), QString());
-    }
-    Q_EMIT importScanChanged();
+    qCWarning(kontainerModel) << "could not write the credential back to the docker cli config:" << path
+                              << (errorKey ? *errorKey : QString());
+    return false;
 }
-
 } // namespace Kontainer
