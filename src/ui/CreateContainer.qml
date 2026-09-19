@@ -149,6 +149,8 @@ Kirigami.Page {
             return i18n("Host ports must be between 1 and 65535 (leave empty for a random port).");
         case "portInUse":
             return i18n("This host port is already published by another container.");
+        case "portDuplicateInRequest":
+            return i18n("The same host port is used by more than one row. One host port cannot serve several container ports.");
         case "keyRequired":
             return i18n("Every environment or label row needs a key.");
         case "keyInvalid":

@@ -34,6 +34,7 @@ class ContainerCreateTest : public QObject
 
 private Q_SLOTS:
     void initTestCase();
+    void duplicateHostPortsInOneRequestAreRejected();
 
     void mapsFormFieldsToTheCreatePayload();
     void interactiveFlagsDefaultOnAndReachThePayload();
@@ -347,6 +348,8 @@ void ContainerCreateTest::wizardGatesSteps()
     existing.id = QStringLiteral("existing");
     existing.name = QStringLiteral("web");
     existing.image = QStringLiteral("alpine:3.19");
+    // 只有**运行中**的容器才真的占着宿主端口（见 OperationController::holdsHostPorts）
+    existing.state = ContainerState::Running;
     existing.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
     backend.setContainers({existing});
     OperationController operations(&backend);
@@ -700,6 +703,63 @@ void ContainerCreateTest::commandHistoryRecordsAndMerges()
     QVERIFY(reopened.empty());
     CommandHistoryStore afterClear(path);
     QVERIFY2(afterClear.empty(), "clearing must persist");
+}
+
+
+/*!
+ * 同一个请求里重复使用同一个宿主端口必须被拦下（实测反馈）：
+ * 用户填 8100→80 / 8100→81 / 8100→82，请求本身合法，但启动时 Docker 会报
+ * `Bind for 0.0.0.0:8100 failed: port is already allocated`。
+ */
+void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MockDockerBackend backend;
+    OperationController operations(&backend);
+    Image image;
+    image.id = QStringLiteral("sha256:aaaa");
+    image.repoTags = {QStringLiteral("alpine:3.19")};
+    backend.setImages({image});
+
+    CreateContainerController wizard(&operations, &presets, &backend);
+    wizard.setImage(QStringLiteral("alpine:3.19"));
+    wizard.setPullIfMissing(true);
+    wizard.setName(QStringLiteral("dup-ports"));
+    // 走到"端口"这一步（stepErrorKey() 说的是**当前**步骤）
+    QVERIFY(wizard.nextStep()); // basics
+    QVERIFY(wizard.nextStep()); // environment
+    QVERIFY(wizard.nextStep()); // interactive
+    QVERIFY(wizard.nextStep()); // ports
+    QCOMPARE(wizard.stepKey(), QStringLiteral("ports"));
+
+    // 三行都指向同一个宿主端口 → 拦截
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
+                        QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 8100}},
+                        QVariantMap {{QStringLiteral("containerPort"), 82}, {QStringLiteral("hostPort"), 8100}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portDuplicateInRequest"));
+
+    // 同一宿主端口、但绑在**不同具体地址**上是合法的
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80},
+                                     {QStringLiteral("hostPort"), 8100},
+                                     {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")}},
+                        QVariantMap {{QStringLiteral("containerPort"), 81},
+                                     {QStringLiteral("hostPort"), 8100},
+                                     {QStringLiteral("hostIp"), QStringLiteral("192.168.1.5")}}});
+    QVERIFY2(wizard.stepErrorKey().isEmpty(), qPrintable(wizard.stepErrorKey()));
+
+    // 通配 + 具体地址（同一端口）仍然冲突
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
+                        QVariantMap {{QStringLiteral("containerPort"), 81},
+                                     {QStringLiteral("hostPort"), 8100},
+                                     {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portDuplicateInRequest"));
+
+    // 随机端口（0）重复多少次都合法
+    wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 0}},
+                        QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 0}}});
+    QVERIFY2(wizard.stepErrorKey().isEmpty(), qPrintable(wizard.stepErrorKey()));
 }
 
 

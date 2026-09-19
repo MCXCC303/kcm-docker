@@ -873,7 +873,7 @@ void OperationControllerTest::portHolderIsReportedAndStoppedContainersDoNotBlock
     QVERIFY(m_operations->hostPortInUse(QStringLiteral("::"), 8100));
     QVERIFY(m_operations->hostPortInUse(QStringLiteral("127.0.0.1"), 8100));
 
-    // 已退出的容器不占端口 → 不冲突
+    // 已退出的容器不占端口 → 不冲突（没运行自然不会占用；按占用拦会挡住别的应用）
     QVERIFY2(!m_operations->hostPortInUse(QStringLiteral("0.0.0.0"), 8200),
              "a stopped container does not hold its published ports");
     QVERIFY(m_operations->hostPortHolder(QStringLiteral("0.0.0.0"), 8200).isEmpty());

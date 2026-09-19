@@ -647,21 +647,22 @@ bool OperationController::containerNameTaken(const QString &name) const
 namespace
 {
 /*!
- * 该状态的容器是否**可能**持有宿主端口。
+ * 该状态的容器是否**真的占着**宿主端口。
  *
- * 只有"肯定已经把端口还回去了"的状态才算不持有（已退出 / 还没启动 / 已死）；
- * 其余（含引擎没给状态的 `Unknown`）一律按**持有**算——冲突检查是"提前拦住用户"的
- * 辅助手段，宁可提示得保守，也不要放过真实的 `port is already allocated`。
+ * 只有跑着的容器才持有端口：没启动（Created）、已退出（Exited）、已死（Dead）的都不占，
+ * 状态读不出来（`Unknown`）时也按**不占**算——用户明确要求这样：
+ * 没运行自然不会占用，按"占用"拦下来反而会挡住其它应用使用它真正需要的端口。
+ * 代价是极端情况下会漏报，那种情况由启动时的错误文案兜底（见 `failureText()`）。
  */
 bool holdsHostPorts(ContainerState state)
 {
     switch (state) {
-    case ContainerState::Exited:
-    case ContainerState::Created:
-    case ContainerState::Dead:
-        return false;
-    default:
+    case ContainerState::Running:
+    case ContainerState::Paused:
+    case ContainerState::Restarting:
         return true;
+    default:
+        return false;
     }
 }
 

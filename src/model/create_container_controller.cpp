@@ -5,6 +5,8 @@
 
 #include "model/create_container_controller.h"
 
+#include "model/port_mapping_model.h"
+
 #include "domain/container.h"
 #include "model/command_history_store.h"
 #include "model/container_detail_controller.h"
@@ -790,8 +792,35 @@ void CreateContainerController::removeMountAt(int row)
     touch();
 }
 
+namespace
+{
+/*!
+ * 两个宿主绑定地址是否有交集（与 `OperationController::hostBindingsOverlap()` 同一套语义）：
+ * 通配与任何地址都冲突；两个具体地址只有完全相同才冲突。
+ */
+bool hostPortsOverlap(const QString &lhs, const QString &rhs)
+{
+    const QString left = lhs.isEmpty() ? QStringLiteral("0.0.0.0") : lhs;
+    const QString right = rhs.isEmpty() ? QStringLiteral("0.0.0.0") : rhs;
+    const auto isWildcard = [](const QString &value) {
+        return value == QLatin1String("0.0.0.0") || value == QLatin1String("::") || value == QLatin1String("[::]");
+    };
+    if (isWildcard(left) || isWildcard(right)) {
+        return true;
+    }
+    return left == right;
+}
+} // namespace
+
 QString CreateContainerController::validatePorts() const
 {
+    /*
+     * 同一个请求里**自己跟自己**冲突也要拦（实测反馈）：
+     * 用户填了 8100→80 / 8100→81 / 8100→82，创建请求本身是合法的，
+     * 但启动时 Docker 会报 `Bind for 0.0.0.0:8100 failed: port is already allocated`
+     * ——同一个宿主端口在一个容器里只能绑一次。
+     */
+    QList<PortMappingEntry> accepted;
     for (const QVariant &entry : m_portRows) {
         const QVariantMap row = entry.toMap();
         const quint16 containerPort = quint16(row.value(QStringLiteral("containerPort")).toUInt());
@@ -802,9 +831,27 @@ QString CreateContainerController::validatePorts() const
         if (hostPort < 0 || hostPort > 65535) {
             return QStringLiteral("portRange");
         }
-        if (m_operations->hostPortInUse(row.value(QStringLiteral("hostIp")).toString(), hostPort)) {
+        const QString hostIp = row.value(QStringLiteral("hostIp")).toString();
+
+        // 与本次请求里已经接受的行比较（0 = 随机分配，不参与冲突判断）
+        if (hostPort != 0) {
+            for (const PortMappingEntry &other : accepted) {
+                if (other.hostPort == hostPort && hostPortsOverlap(other.hostIp, hostIp)) {
+                    return QStringLiteral("portDuplicateInRequest");
+                }
+            }
+        }
+
+        if (m_operations->hostPortInUse(hostIp, hostPort)) {
             return QStringLiteral("portInUse");
         }
+
+        PortMappingEntry parsed;
+        parsed.containerPort = containerPort;
+        parsed.protocol = row.value(QStringLiteral("protocol")).toString();
+        parsed.hostIp = hostIp;
+        parsed.hostPort = quint16(hostPort);
+        accepted.append(parsed);
     }
     return {};
 }
