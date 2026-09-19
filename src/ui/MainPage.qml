@@ -1153,13 +1153,6 @@ Kirigami.Page {
                         onClicked: root.configureRuntimeRequested("system")
                     }
 
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Registry mirrors and other daemon settings. The system configuration needs administrator rights.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.7
-                        elide: Text.ElideRight
-                    }
                 }
 
                 Components.ServiceCard {
@@ -1193,14 +1186,6 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     level: 3
                     text: i18n("Mount presets")
-                }
-
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    text: i18n("Presets are stored in your own configuration (~/.config/kontainerrc) and offered as quick-add buttons in the container wizard.")
-                    font: Kirigami.Theme.smallFont
-                    opacity: 0.75
-                    wrapMode: Text.WordWrap
                 }
 
                 Components.MountPresetManager {

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:17+0800\n"
+"POT-Creation-Date: 2026-09-19 16:40+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -80,29 +80,6 @@ msgstr ""
 
 #: src/model/state_text.cpp:46
 msgid "Unhealthy"
-msgstr ""
-
-#: src/model/status_controller.cpp:130 src/ui/VolumeDetail.qml:141
-msgid "The host path does not exist."
-msgstr ""
-
-#: src/model/status_controller.cpp:133
-msgid "The host path is not a directory."
-msgstr ""
-
-#: src/model/status_controller.cpp:136
-#: src/model/container_detail_controller.cpp:54
-msgid "Could not open the file manager: %1"
-msgstr ""
-
-#: src/model/status_controller.cpp:491
-msgid ""
-"Docker stopped responding; the pending request was given up. Retry when the "
-"service is available again."
-msgstr ""
-
-#: src/model/status_controller.cpp:724
-msgid "Opening host paths is not available in this environment."
 msgstr ""
 
 #: src/model/docker_error_text.cpp:27
@@ -517,6 +494,11 @@ msgstr ""
 msgid "This mount has no host directory to open."
 msgstr ""
 
+#: src/model/container_detail_controller.cpp:54
+#: src/model/status_controller.cpp:136
+msgid "Could not open the file manager: %1"
+msgstr ""
+
 #: src/model/container_detail_controller.cpp:133
 msgid "No container selected."
 msgstr ""
@@ -647,6 +629,24 @@ msgstr ""
 
 #: src/model/create_container_controller.cpp:1013
 msgid "Leave it stopped"
+msgstr ""
+
+#: src/model/status_controller.cpp:130 src/ui/VolumeDetail.qml:141
+msgid "The host path does not exist."
+msgstr ""
+
+#: src/model/status_controller.cpp:133
+msgid "The host path is not a directory."
+msgstr ""
+
+#: src/model/status_controller.cpp:491
+msgid ""
+"Docker stopped responding; the pending request was given up. Retry when the "
+"service is available again."
+msgstr ""
+
+#: src/model/status_controller.cpp:724
+msgid "Opening host paths is not available in this environment."
 msgstr ""
 
 #: src/ui/components/CollapsibleSection.qml:71
@@ -1272,69 +1272,6 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:66
-msgid ""
-"No presets yet. Add one below, or save a mount as a preset from a "
-"container's details."
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:80
-msgid "Browse…"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:95
-#: src/ui/components/MountPresetManager.qml:158
-msgid "Host path or volume name"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:96
-msgid "New preset source"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:109
-#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
-#: src/ui/CreateContainer.qml:680
-msgid "Container path"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:110
-msgid "New preset destination"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:159
-msgid "Preset source"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:173
-msgid "Preset destination"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:182
-msgid "Favourite"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:204
-msgid "Remove this preset"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
-msgid "Named volume"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:218
-msgid "%1 to %2"
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:234
-msgid ""
-"Bind mounts need an absolute host path (use a volume name for a named "
-"volume)."
-msgstr ""
-
-#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:159
-msgid "The container path must be absolute."
-msgstr ""
-
 #: src/ui/components/ServiceCard.qml:44
 msgid "Docker socket"
 msgstr ""
@@ -1439,6 +1376,69 @@ msgstr ""
 
 #: src/ui/components/FilteredComboBox.qml:109
 msgid "Nothing matches the search."
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:66
+msgid ""
+"No presets yet. Add one below, or save a mount as a preset from a "
+"container's details."
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:80
+msgid "Browse…"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:95
+#: src/ui/components/MountPresetManager.qml:158
+msgid "Host path or volume name"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:96
+msgid "New preset source"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:109
+#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
+#: src/ui/CreateContainer.qml:680
+msgid "Container path"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:110
+msgid "New preset destination"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:159
+msgid "Preset source"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:173
+msgid "Preset destination"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:182
+msgid "Favourite"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:204
+msgid "Remove this preset"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
+msgid "Named volume"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:218
+msgid "%1 to %2"
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:234
+msgid ""
+"Bind mounts need an absolute host path (use a volume name for a named "
+"volume)."
+msgstr ""
+
+#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:159
+msgid "The container path must be absolute."
 msgstr ""
 
 #: src/ui/ImageCard.qml:45
@@ -3333,18 +3333,6 @@ msgstr ""
 msgid "System configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1158
-msgid ""
-"Registry mirrors and other daemon settings. The system configuration needs "
-"administrator rights."
-msgstr ""
-
-#: src/ui/MainPage.qml:1195
+#: src/ui/MainPage.qml:1188
 msgid "Mount presets"
-msgstr ""
-
-#: src/ui/MainPage.qml:1200
-msgid ""
-"Presets are stored in your own configuration (~/.config/kontainerrc) and "
-"offered as quick-add buttons in the container wizard."
 msgstr ""
