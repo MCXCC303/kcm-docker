@@ -1153,13 +1153,6 @@ Kirigami.Page {
                         onClicked: root.configureRuntimeRequested("system")
                     }
 
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Registry mirrors and other daemon settings. The system configuration needs administrator rights.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.7
-                        elide: Text.ElideRight
-                    }
                 }
 
                 Components.ServiceCard {

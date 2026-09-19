@@ -15,6 +15,7 @@
 #include "support/mock_docker_backend.h"
 
 #include <QObject>
+#include <QTimer>
 #include <QTemporaryDir>
 #include <QString>
 
@@ -56,14 +57,26 @@ public:
             : DirectoryPicker(parent)
         {
         }
-        QString chooseDirectory(const QString &startPath) override
+        void chooseDirectory(const QString &requestId, const QString &startPath) override
         {
+            lastRequestId = requestId;
             lastStartPath = startPath;
-            return nextResult;
+            ++callCount;
+            // 真实实现是异步的（门户走 D-Bus）：替身也让结果**在事件循环里**回来，
+            // 这样用例覆盖的就是真实时序（"先记下请求，结果回来再写回"）
+            if (!autoRespond) {
+                return;
+            }
+            QTimer::singleShot(0, this, [this, requestId] {
+                Q_EMIT directoryChosen(requestId, nextResult);
+            });
         }
         QString nextResult;
+        QString lastRequestId;
         QString lastStartPath;
         int callCount = 0;
+        /*! 是否自动回结果（默认自动；测试取消/挂起时可以关掉）。 */
+        bool autoRespond = true;
     };
 
     FakeDirectoryPicker *directoryPicker() const

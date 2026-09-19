@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:17+0800\n"
+"POT-Creation-Date: 2026-09-19 16:30+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -842,7 +842,7 @@ msgstr "名称重复。"
 
 #: src/ui/components/KeyValueListEditor.qml:205
 #: src/ui/components/StringListEditor.qml:45
-#: src/ui/components/MountPresetManager.qml:115
+#: src/ui/components/MountPresetManager.qml:139
 msgid "Add"
 msgstr "添加"
 
@@ -855,12 +855,12 @@ msgid "Paste .env content"
 msgstr "粘贴 .env 内容"
 
 #: src/ui/components/StringListEditor.qml:148
-#: src/ui/components/MountPresetManager.qml:190
+#: src/ui/components/MountPresetManager.qml:214
 msgid "Move up"
 msgstr "上移"
 
 #: src/ui/components/StringListEditor.qml:161
-#: src/ui/components/MountPresetManager.qml:197
+#: src/ui/components/MountPresetManager.qml:221
 msgid "Move down"
 msgstr "下移"
 
@@ -1273,66 +1273,66 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr "没有发布端口。容器只能通过它所在的网络访问。"
 
-#: src/ui/components/MountPresetManager.qml:66
+#: src/ui/components/MountPresetManager.qml:95
 msgid ""
 "No presets yet. Add one below, or save a mount as a preset from a "
 "container's details."
 msgstr "还没有预设。可以在下面添加，或在容器详情里把某条挂载保存为预设。"
 
-#: src/ui/components/MountPresetManager.qml:80
+#: src/ui/components/MountPresetManager.qml:109
 msgid "Browse…"
 msgstr "浏览…"
 
-#: src/ui/components/MountPresetManager.qml:95
-#: src/ui/components/MountPresetManager.qml:158
+#: src/ui/components/MountPresetManager.qml:119
+#: src/ui/components/MountPresetManager.qml:182
 msgid "Host path or volume name"
 msgstr "宿主路径或卷名"
 
-#: src/ui/components/MountPresetManager.qml:96
+#: src/ui/components/MountPresetManager.qml:120
 msgid "New preset source"
 msgstr "新预设的来源"
 
-#: src/ui/components/MountPresetManager.qml:109
-#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
+#: src/ui/components/MountPresetManager.qml:133
+#: src/ui/components/MountPresetManager.qml:196 src/ui/CreateContainer.qml:679
 #: src/ui/CreateContainer.qml:680
 msgid "Container path"
 msgstr "容器路径"
 
-#: src/ui/components/MountPresetManager.qml:110
+#: src/ui/components/MountPresetManager.qml:134
 msgid "New preset destination"
 msgstr "新预设的容器路径"
 
-#: src/ui/components/MountPresetManager.qml:159
+#: src/ui/components/MountPresetManager.qml:183
 msgid "Preset source"
 msgstr "预设来源"
 
-#: src/ui/components/MountPresetManager.qml:173
+#: src/ui/components/MountPresetManager.qml:197
 msgid "Preset destination"
 msgstr "预设的容器路径"
 
-#: src/ui/components/MountPresetManager.qml:182
+#: src/ui/components/MountPresetManager.qml:206
 msgid "Favourite"
 msgstr "收藏"
 
-#: src/ui/components/MountPresetManager.qml:204
+#: src/ui/components/MountPresetManager.qml:228
 msgid "Remove this preset"
 msgstr "删除这个预设"
 
-#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
+#: src/ui/components/MountPresetManager.qml:236 src/ui/CreateContainer.qml:661
 msgid "Named volume"
 msgstr "命名卷"
 
-#: src/ui/components/MountPresetManager.qml:218
+#: src/ui/components/MountPresetManager.qml:242
 msgid "%1 to %2"
 msgstr "%1 → %2"
 
-#: src/ui/components/MountPresetManager.qml:234
+#: src/ui/components/MountPresetManager.qml:258
 msgid ""
 "Bind mounts need an absolute host path (use a volume name for a named "
 "volume)."
 msgstr "bind 挂载需要绝对宿主路径（命名卷请直接填卷名）。"
 
-#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:159
+#: src/ui/components/MountPresetManager.qml:262 src/ui/CreateContainer.qml:159
 msgid "The container path must be absolute."
 msgstr "容器路径必须是绝对路径。"
 
@@ -3338,23 +3338,22 @@ msgstr "用户级配置…"
 msgid "System configuration…"
 msgstr "系统级配置…"
 
-#: src/ui/MainPage.qml:1158
-msgid ""
-"Registry mirrors and other daemon settings. The system configuration needs "
-"administrator rights."
-msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
-
-#: src/ui/MainPage.qml:1195
+#: src/ui/MainPage.qml:1188
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:1200
+#: src/ui/MainPage.qml:1193
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."
 msgstr ""
 "预设保存在你自己的配置里（~/.config/kontainerrc），并在创建容器时作为一键添加"
 "的按钮出现。"
+
+#~ msgid ""
+#~ "Registry mirrors and other daemon settings. The system configuration "
+#~ "needs administrator rights."
+#~ msgstr "镜像加速器与其他 Docker 守护进程设置。系统级配置需要管理员权限。"
 
 #~ msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
 #~ msgstr "宿主端口填 0（显示为“随机”）则由 Docker 挑一个空闲端口。"
