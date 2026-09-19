@@ -21,8 +21,13 @@ function(kontainer_add_test name source)
     # QML 加载测试需要知道源码目录
     target_compile_definitions(${name} PRIVATE KONTAINER_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
     add_test(NAME ${name} COMMAND ${name})
-    # 全部测试无需 X11/Wayland
-    set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # 全部测试无需 X11/Wayland。
+    #
+    # 同时把语言**钉到英文**：用例断言的是源码里的英文原文，而开发机上往往
+    # LANG=zh_CN 并且装了本包（/usr/share/locale 里有 kcm_docker.mo），
+    # 于是 i18n() 返回中文、用例集体失败——这是环境依赖，不是真的坏了。
+    # tst_i18n_consistency 需要中文，它自己的 set_tests_properties 在下面覆盖这一项。
+    set_tests_properties(${name} PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;LANGUAGE=en_US")
 endfunction()
 
 kontainer_add_test(tst_http_response_parser backend/tst_http_response_parser.cpp)
@@ -82,8 +87,10 @@ kontainer_add_test(tst_qml_load ui/tst_qml_load.cpp)
 # 配置页用例要断言"用户级配置可写 → 控件可编辑"，而 ~/.config 是否可写取决于运行环境
 # （沙箱/CI 里可能不可写）。给它一个自己的 HOME，断言才不随环境漂移。
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/tst-home")
+# 注意：这一行会**整体替换** ENVIRONMENT，所以要把 kontainer_add_test 里统一钉的
+# LANGUAGE 一起写上——漏了的话用例会跟着开发机的 LANG 走（中文环境下集体失败）。
 set_tests_properties(tst_qml_load PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;HOME=${CMAKE_BINARY_DIR}/tst-home")
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;LANGUAGE=en_US;HOME=${CMAKE_BINARY_DIR}/tst-home")
 
 # 从 qrc 加载界面（与插件运行时的加载路径完全一致）。
 #
