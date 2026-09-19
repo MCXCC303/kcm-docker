@@ -186,6 +186,7 @@ private Q_SLOTS:
     void containerDetailOpensTheImage();
     void portRowShowsConflictAndAdoptsTheSuggestion();
     void portsTabListsRowsAndConfirmsStop();
+    void portsTabSwitchesToTheRangeMap();
     void engineViewListsComponentVersions();
     void topologyMergesDualStackBindings();
     void privilegedNeedsTypedConfirmation();
@@ -3116,6 +3117,97 @@ void QmlLoadTest::portsTabListsRowsAndConfirmsStop()
     QVERIFY(confirm);
     QVERIFY(QMetaObject::invokeMethod(confirm, "triggered"));
     QVERIFY2(m_backend->mutationCalls().size() > callsBefore, "confirming must actually stop the container");
+}
+
+
+/*!
+ * 区间地图（ARCH_next_ports.md §4.B，里程碑 M4）。
+ *
+ * 切到地图后：每个区间一段、每个方块一个端口、被占的方块有状态；
+ * **超长区间必须限流**并显示"还有 N 个"——否则 1000-1100 会创建上百个方块。
+ */
+void QmlLoadTest::portsTabSwitchesToTheRangeMap()
+{
+    Container running;
+    running.id = QStringLiteral("running-id");
+    running.name = QStringLiteral("web");
+    running.image = QStringLiteral("alpine:3.21");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
+    m_backend->setContainers({running});
+    // "声明"里塞一段超长区间（1000-1100，共 101 个端口）
+    ContainerDetail detail;
+    detail.id = running.id;
+    detail.declaredPorts = {{80, QStringLiteral("tcp"), QString(), 1000, 1100}};
+    m_backend->setContainerDetail(detail);
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+    m_stubKcm->controller()->refreshPorts();
+    m_backend->completeRefresh();
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1200, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1200);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 4));
+    m_backend->completeRefresh();
+
+    // 切到地图视图
+    QQuickItem *viewCombo = childByObjectName(page, QStringLiteral("portViewCombo"));
+    QVERIFY(viewCombo);
+    QVERIFY(viewCombo->setProperty("currentIndex", 1)); // Range map
+    QMetaObject::invokeMethod(viewCombo, "activated", Q_ARG(int, 1));
+
+    QList<QQuickItem *> tiles;
+    QList<QQuickItem *> hiddenLabels;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        tiles.clear();
+        hiddenLabels.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("portMapTile")) {
+                tiles.append(node);
+            } else if (node->objectName() == QLatin1String("portMapHiddenCount")) {
+                hiddenLabels.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return tiles.size() > 0 && hiddenLabels.size() > 0;
+    }(), 5000);
+
+    // 上限生效：方块数远小于 101，并且给出了"还有 N 个"
+    QVERIFY2(tiles.size() < 101, qPrintable(QString::number(tiles.size())));
+    QVERIFY2(tiles.size() <= 64 + 8, "the map must cap how many tiles it renders");
+    bool sawHidden = false;
+    for (QQuickItem *label : hiddenLabels) {
+        if (label->property("visible").toBool() && !label->property("text").toString().isEmpty()) {
+            sawHidden = true;
+        }
+    }
+    QVERIFY2(sawHidden, "a capped range must say how many ports are not shown");
+
+    // 切回列表视图
+    QVERIFY(viewCombo->setProperty("currentIndex", 0));
+    QMetaObject::invokeMethod(viewCombo, "activated", Q_ARG(int, 0));
+    QTRY_VERIFY_WITH_TIMEOUT(childByObjectName(page, QStringLiteral("hostPortList")) != nullptr, 5000);
 }
 
 

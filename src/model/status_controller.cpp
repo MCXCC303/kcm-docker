@@ -120,11 +120,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
             return;
         }
         m_declaredPorts.insert(detail.id, detail.declaredPorts);
-        const int declaredBefore = declaredNotPublishedCount();
-        m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
-        if (declaredNotPublishedCount() != declaredBefore) {
-            Q_EMIT declaredNotPublishedCountChanged();
-        }
+        rebuildPorts();
     });
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &StatusController::onImagesUpdated);
     connect(m_backend, &DockerBackendInterface::networksUpdated, this, &StatusController::onNetworksUpdated);
@@ -223,6 +219,17 @@ void StatusController::loadLowFrequencyListsOnce()
     m_backend->refreshVolumes(false);
 }
 
+void StatusController::rebuildPorts()
+{
+    // 端口表、计数与区间地图都从这一份数据来：只在这里重建，避免三处各写一遍
+    const int declaredBefore = declaredNotPublishedCount();
+    m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
+    if (declaredNotPublishedCount() != declaredBefore) {
+        Q_EMIT declaredNotPublishedCountChanged();
+    }
+    Q_EMIT portRangesChanged();
+}
+
 int StatusController::declaredNotPublishedCount() const
 {
     int count = 0;
@@ -232,6 +239,35 @@ int StatusController::declaredNotPublishedCount() const
         }
     }
     return count;
+}
+
+QVariantList StatusController::portRanges() const
+{
+    QVariantList ranges;
+    const QList<HostPortEntry> entries = m_hostPortModel->entries();
+    for (const HostPortRange &range : HostPortUsage::clusterRanges(entries)) {
+        QVariantList tiles;
+        for (quint16 port = range.first; port < quint16(range.first + range.tileCount); ++port) {
+            const QString stateKey = HostPortUsage::stateKeyForPort(entries, port);
+            tiles.append(QVariantMap {{QStringLiteral("port"), int(port)},
+                                      {QStringLiteral("text"), QString::number(port)},
+                                      {QStringLiteral("stateKey"), stateKey},
+                                      {QStringLiteral("occupied"), !stateKey.isEmpty()}});
+        }
+        ranges.append(QVariantMap {{QStringLiteral("first"), int(range.first)},
+                                   {QStringLiteral("last"), int(range.last)},
+                                   {QStringLiteral("title"), QStringLiteral("%1 – %2").arg(range.first).arg(range.last)},
+                                   {QStringLiteral("tileCount"), range.tileCount},
+                                   {QStringLiteral("hiddenCount"), range.hiddenCount},
+                                   {QStringLiteral("usedCount"), range.usedCount},
+                                   {QStringLiteral("tiles"), tiles}});
+    }
+    return ranges;
+}
+
+int StatusController::nextFreeHostPort() const
+{
+    return HostPortUsage::nextFreePort(m_backend->containers(), 0);
 }
 
 void StatusController::refreshPorts()
@@ -467,11 +503,7 @@ void StatusController::onContainersUpdated()
     m_daemonConfigSystem->setRunningContainerCount(runningContainerCount());
     m_containerModel->setContainers(m_backend->containers());
     // 端口视图跟着容器列表走："实际发布"来自它，"声明"来自已拉到的 inspect
-    const int declaredBefore = declaredNotPublishedCount();
-    m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
-    if (declaredNotPublishedCount() != declaredBefore) {
-        Q_EMIT declaredNotPublishedCountChanged();
-    }
+    rebuildPorts();
     m_containersOk = true;
     m_containersFailed = false;
     setSectionError(Section::Containers, QString());

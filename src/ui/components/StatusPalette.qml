@@ -46,6 +46,47 @@ QtObject {
         「已停止」用 Error（红）是**颜色约定**，不代表容器处于错误状态；
         状态文字本身始终由 C++ 的 stateText 提供，不由此处派生。
     */
+    /*!
+     * 区间地图方块的颜色（ARCH_next_ports.md §4.B）。
+     *
+     * `stateKey` 为空 = 空闲：只用虚线边框，不填色——"空"就应该看起来是空的。
+     * 颜色只是辅助：方块里写着端口号，页面还有文字图例。
+     */
+    function portTileColor(stateKey: string): color {
+        switch (stateKey) {
+        case "inUse":
+            return Kirigami.Theme.positiveBackgroundColor;
+        case "declaredNotPublished":
+            return Kirigami.Theme.neutralBackgroundColor;
+        default:
+            return Kirigami.Theme.backgroundColor;
+        }
+    }
+
+    /*! 方块边框色（空闲用虚线灰，占用用对应语义的前景/边框色）。 */
+    function portTileBorderColor(stateKey: string): color {
+        switch (stateKey) {
+        case "inUse":
+            return Kirigami.Theme.positiveTextColor;
+        case "declaredNotPublished":
+            return Kirigami.Theme.neutralTextColor;
+        default:
+            return Kirigami.Theme.disabledTextColor;
+        }
+    }
+
+    /*! 方块文字色。 */
+    function portTileTextColor(stateKey: string): color {
+        switch (stateKey) {
+        case "inUse":
+            return Kirigami.Theme.positiveTextColor;
+        case "declaredNotPublished":
+            return Kirigami.Theme.neutralTextColor;
+        default:
+            return Kirigami.Theme.disabledTextColor;
+        }
+    }
+
     function badgeType(semanticKey: string): int {
         switch (semanticKey) {
         case "positive":

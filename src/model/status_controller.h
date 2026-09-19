@@ -111,6 +111,15 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::HostPortFilterModel *hostPortList READ hostPortList CONSTANT)
     /*! "声明了但没发布"的行数（端口页据此决定要不要在顶部说明一次）。 */
     Q_PROPERTY(int declaredNotPublishedCount READ declaredNotPublishedCount NOTIFY declaredNotPublishedCountChanged)
+    /*!
+     * 区间地图的数据（ARCH_next_ports.md §4.B）：每段
+     * `{first, last, title, tileCount, hiddenCount, usedCount, tiles: [{port, stateKey}]}`。
+     *
+     * 做成**属性**而不是 `Q_INVOKABLE`：QML 里函数调用不建立依赖，端口表一变地图就不会更新。
+     */
+    Q_PROPERTY(QVariantList portRanges READ portRanges NOTIFY portRangesChanged)
+    /*! 下一个空闲宿主端口（地图视图里显示并支持一键复制；0 = 找不到）。 */
+    Q_PROPERTY(int nextFreeHostPort READ nextFreeHostPort NOTIFY portRangesChanged)
     Q_PROPERTY(Kontainer::NetworkFilterModel *networkList READ networkList CONSTANT)
     /*! 数据卷列表与过滤代理。 */
     Q_PROPERTY(Kontainer::VolumeModel *volumeModel READ volumeModel CONSTANT)
@@ -336,6 +345,8 @@ public:
         return m_hostPortFilter;
     }
     int declaredNotPublishedCount() const;
+    QVariantList portRanges() const;
+    int nextFreeHostPort() const;
     NetworkFilterModel *networkList() const
     {
         return m_networkFilter;
@@ -471,6 +482,8 @@ public Q_SLOTS:
      * （只为拿到它们"声明"了哪些宿主端口，见 `ARCH_next_ports.md` 决定 3）。
      */
     Q_INVOKABLE void refreshPorts();
+    /*! 端口表 / 计数 / 区间地图的唯一重建处。 */
+    void rebuildPorts();
     /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
     void refreshVolumes(bool includeUsage = true);
 
@@ -478,6 +491,8 @@ Q_SIGNALS:
     void stateChanged();
     /*! "声明了但没发布"的行数变化（端口页顶部的说明条据此显隐）。 */
     void declaredNotPublishedCountChanged();
+    /*! 端口表 / 区间地图的数据变化。 */
+    void portRangesChanged();
     void engineStateChanged();
     void containersStateChanged();
     void imagesStateChanged();

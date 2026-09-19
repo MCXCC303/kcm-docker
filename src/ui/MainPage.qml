@@ -145,6 +145,9 @@ Kirigami.Page {
     /* ------------------------------------------------------------------ */
     /* 端口页（下一期 M3）的辅助                                            */
     /* ------------------------------------------------------------------ */
+    /*! 端口页的视图模式：`list`（默认）或 `map`（区间地图）。 */
+    property string portViewMode: "list"
+
     /*! "声明了但没发布"的行数（由控制器算好；QML 不碰模型枚举）。 */
     readonly property int portsDeclaredCount: root.controller.declaredNotPublishedCount
 
@@ -1209,6 +1212,18 @@ Kirigami.Page {
                     }
 
                     QQC2.ComboBox {
+                        objectName: "portViewCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("List"), value: "list"},
+                            {text: i18n("Range map"), value: "map"}
+                        ]
+                        onActivated: root.portViewMode = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.portViewMode)
+                    }
+
+                    QQC2.ComboBox {
                         objectName: "portSortCombo"
                         textRole: "text"
                         valueRole: "value"
@@ -1225,7 +1240,7 @@ Kirigami.Page {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     objectName: "portsEmptyPlaceholder"
-                    visible: root.controller.hostPortList.count === 0
+                    visible: root.portViewMode === "list" && root.controller.hostPortList.count === 0
                     message: root.controller.hostPortList.searchText.length > 0
                         ? i18n("No port matches “%1”.", root.controller.hostPortList.searchText)
                         : i18n("No host port is currently used by a running container.")
@@ -1234,10 +1249,19 @@ Kirigami.Page {
                     onActionTriggered: root.controller.hostPortList.searchText = ""
                 }
 
+                Components.HostPortRangeMap {
+                    objectName: "portRangeMap"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: root.portViewMode === "map"
+                    ranges: root.controller.portRanges
+                    nextFreePort: root.controller.nextFreeHostPort
+                }
+
                 Components.HostPortList {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    visible: root.controller.hostPortList.count > 0
+                    visible: root.portViewMode === "list" && root.controller.hostPortList.count > 0
                     model: root.controller.hostPortList
                     writeAllowed: root.operations.writeAllowed
                     onContainerRequested: (containerId, containerName) => root.openContainerFromPorts(containerId, containerName)

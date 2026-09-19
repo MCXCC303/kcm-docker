@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 21:42+0800\n"
+"POT-Creation-Date: 2026-09-19 21:51+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -34,12 +34,12 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
-#: src/model/state_text.cpp:19 src/ui/MainPage.qml:543
+#: src/model/state_text.cpp:19 src/ui/MainPage.qml:537
 msgid "Restarting"
 msgstr ""
 
 #: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
-#: src/ui/MainPage.qml:79 src/ui/MainPage.qml:531
+#: src/ui/MainPage.qml:79 src/ui/MainPage.qml:525
 msgid "Running"
 msgstr ""
 
@@ -47,7 +47,7 @@ msgstr ""
 msgid "Removing"
 msgstr ""
 
-#: src/model/state_text.cpp:25 src/ui/MainPage.qml:85 src/ui/MainPage.qml:535
+#: src/model/state_text.cpp:25 src/ui/MainPage.qml:85 src/ui/MainPage.qml:529
 msgid "Paused"
 msgstr ""
 
@@ -55,7 +55,7 @@ msgstr ""
 msgid "Exited"
 msgstr ""
 
-#: src/model/state_text.cpp:29 src/ui/MainPage.qml:547
+#: src/model/state_text.cpp:29 src/ui/MainPage.qml:541
 msgid "Dead"
 msgstr ""
 
@@ -198,8 +198,8 @@ msgstr ""
 msgid "Image"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:1005 src/ui/MainPage.qml:887
-#: src/ui/MainPage.qml:990
+#: src/model/create_container_controller.cpp:1005 src/ui/MainPage.qml:881
+#: src/ui/MainPage.qml:984
 msgid "Name"
 msgstr ""
 
@@ -312,13 +312,13 @@ msgstr ""
 msgid "The host path is not a directory."
 msgstr ""
 
-#: src/model/status_controller.cpp:549
+#: src/model/status_controller.cpp:600
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr ""
 
-#: src/model/status_controller.cpp:782
+#: src/model/status_controller.cpp:833
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
@@ -687,7 +687,7 @@ msgstr ""
 #: src/ui/ResourceView.qml:39 src/ui/ResourceView.qml:97
 #: src/ui/NetworkDetail.qml:161 src/ui/NetworkDetail.qml:167
 #: src/ui/VolumeCard.qml:114 src/ui/VolumeDetail.qml:162
-#: src/ui/VolumeDetail.qml:169 src/ui/MainPage.qml:424
+#: src/ui/VolumeDetail.qml:169 src/ui/MainPage.qml:418
 msgid "—"
 msgstr ""
 
@@ -698,7 +698,7 @@ msgstr ""
 
 #: src/ui/components/StorageBar.qml:52 src/ui/ImageDetail.qml:375
 #: src/ui/ContainerDetail.qml:302 src/ui/MainPage.qml:73
-#: src/ui/MainPage.qml:890 src/ui/MainPage.qml:993
+#: src/ui/MainPage.qml:884 src/ui/MainPage.qml:987
 msgid "Containers"
 msgstr ""
 
@@ -748,7 +748,7 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
-#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:664
+#: src/ui/components/PullImageDialog.qml:51 src/ui/MainPage.qml:658
 msgid "Pull image"
 msgstr ""
 
@@ -1086,7 +1086,7 @@ msgid "Allow containers to be attached at runtime"
 msgstr ""
 
 #: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:973
-#: src/ui/MainPage.qml:1052
+#: src/ui/MainPage.qml:1046
 msgid "Create"
 msgstr ""
 
@@ -1208,7 +1208,7 @@ msgid ""
 "affected; only intermediate layers and cache records are removed."
 msgstr ""
 
-#: src/ui/components/BuildImagePanel.qml:344 src/ui/MainPage.qml:1115
+#: src/ui/components/BuildImagePanel.qml:344 src/ui/MainPage.qml:1109
 msgid "Clean up"
 msgstr ""
 
@@ -1259,7 +1259,7 @@ msgid "containerd service"
 msgstr ""
 
 #: src/ui/components/ServiceCard.qml:60 src/ui/MainPage.qml:91
-#: src/ui/MainPage.qml:539
+#: src/ui/MainPage.qml:533
 msgid "Stopped"
 msgstr ""
 
@@ -1280,7 +1280,7 @@ msgstr ""
 msgid "Start"
 msgstr ""
 
-#: src/ui/components/ServiceCard.qml:93 src/ui/components/HostPortList.qml:136
+#: src/ui/components/ServiceCard.qml:93 src/ui/components/HostPortList.qml:141
 #: src/ui/ContainerDetail.qml:222 src/ui/ContainerCard.qml:190
 #: src/ui/ContainerCard.qml:194
 msgid "Stop"
@@ -1478,17 +1478,52 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:107 src/ui/MainPage.qml:557
-#: src/ui/MainPage.qml:977 src/ui/MainPage.qml:1213
+#: src/ui/components/HostPortList.qml:106
+#: src/ui/components/HostPortRangeMap.qml:69 src/ui/MainPage.qml:551
+#: src/ui/MainPage.qml:971 src/ui/MainPage.qml:1207
 msgid "In use"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:107
+#: src/ui/components/HostPortList.qml:106
 msgid "Declared"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:127
+#: src/ui/components/HostPortList.qml:131
 msgid "Open"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:48
+msgid "Next free host port: %1"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:54
+msgid "next free host port"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:70
+msgid "Declared, not published"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:71
+msgid "Free"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:130
+msgid "%1 port in use"
+msgid_plural "%1 ports in use"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/components/HostPortRangeMap.qml:143
+msgid "%1 more not shown"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:179
+msgid "Port %1: %2"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:180
+msgid "Port %1: free"
 msgstr ""
 
 #: src/ui/ImageCard.qml:45
@@ -1538,7 +1573,7 @@ msgid "Unable to read Docker disk usage: %1"
 msgstr ""
 
 #: src/ui/StorageView.qml:64 src/ui/ImageDetail.qml:156
-#: src/ui/ContainerDetail.qml:344 src/ui/MainPage.qml:361
+#: src/ui/ContainerDetail.qml:344 src/ui/MainPage.qml:355
 msgid "Retry"
 msgstr ""
 
@@ -1554,11 +1589,11 @@ msgstr ""
 msgid "Unable to retrieve image details."
 msgstr ""
 
-#: src/ui/ImageDetail.qml:145 src/ui/MainPage.qml:638
+#: src/ui/ImageDetail.qml:145 src/ui/MainPage.qml:632
 msgid "Create container…"
 msgstr ""
 
-#: src/ui/ImageDetail.qml:151 src/ui/MainPage.qml:652
+#: src/ui/ImageDetail.qml:151 src/ui/MainPage.qml:646
 msgid "Registry logins…"
 msgstr ""
 
@@ -2859,8 +2894,8 @@ msgstr ""
 msgid "tmpfs"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:690 src/ui/MainPage.qml:1046
-#: src/ui/MainPage.qml:1047
+#: src/ui/CreateContainer.qml:690 src/ui/MainPage.qml:1040
+#: src/ui/MainPage.qml:1041
 msgid "Volume name"
 msgstr ""
 
@@ -2963,291 +2998,291 @@ msgstr ""
 msgid "Loading Docker status…"
 msgstr ""
 
-#: src/ui/MainPage.qml:193
+#: src/ui/MainPage.qml:187
 msgid "No containers found."
 msgstr ""
 
-#: src/ui/MainPage.qml:199
+#: src/ui/MainPage.qml:193
 msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:200 src/ui/MainPage.qml:226 src/ui/MainPage.qml:1241
+#: src/ui/MainPage.qml:194 src/ui/MainPage.qml:220 src/ui/MainPage.qml:1247
 msgid "Clear search"
 msgstr ""
 
-#: src/ui/MainPage.qml:204
+#: src/ui/MainPage.qml:198
 msgid "No containers match the current filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:205
+#: src/ui/MainPage.qml:199
 msgid "Show all containers"
 msgstr ""
 
-#: src/ui/MainPage.qml:218
+#: src/ui/MainPage.qml:212
 msgid "No images found."
 msgstr ""
 
-#: src/ui/MainPage.qml:220
+#: src/ui/MainPage.qml:214
 msgid "Pull an image"
 msgstr ""
 
-#: src/ui/MainPage.qml:225
+#: src/ui/MainPage.qml:219
 msgctxt "@info no image matches the search"
 msgid "No images match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:230
+#: src/ui/MainPage.qml:224
 msgid "No images match the current filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:231
+#: src/ui/MainPage.qml:225
 msgid "Show all images"
 msgstr ""
 
-#: src/ui/MainPage.qml:289
+#: src/ui/MainPage.qml:283
 msgctxt "@info last successful update"
 msgid "Updated %1 ago"
 msgstr ""
 
-#: src/ui/MainPage.qml:290
+#: src/ui/MainPage.qml:284
 msgid "Not updated yet"
 msgstr ""
 
-#: src/ui/MainPage.qml:296
+#: src/ui/MainPage.qml:290
 msgid "Update failed"
 msgstr ""
 
-#: src/ui/MainPage.qml:302
+#: src/ui/MainPage.qml:296
 msgid "Data is stale"
 msgstr ""
 
-#: src/ui/MainPage.qml:309
+#: src/ui/MainPage.qml:303
 msgid "Auto-refresh is off"
 msgstr ""
 
-#: src/ui/MainPage.qml:358
+#: src/ui/MainPage.qml:352
 msgid "Unable to connect to Docker Engine."
 msgstr ""
 
-#: src/ui/MainPage.qml:428
+#: src/ui/MainPage.qml:422
 msgid "Engine summary is unavailable"
 msgstr ""
 
-#: src/ui/MainPage.qml:470
+#: src/ui/MainPage.qml:464
 msgctxt "@title:tab container list"
 msgid "Containers (%1)"
 msgid_plural "Containers (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:473
+#: src/ui/MainPage.qml:467
 msgctxt "@title:tab image list"
 msgid "Images (%1)"
 msgid_plural "Images (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:476
+#: src/ui/MainPage.qml:470
 msgctxt "@title:tab network list"
 msgid "Networks (%1)"
 msgid_plural "Networks (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:479
+#: src/ui/MainPage.qml:473
 msgctxt "@title:tab volume list"
 msgid "Volumes (%1)"
 msgid_plural "Volumes (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:482
+#: src/ui/MainPage.qml:476
 msgctxt "@title:tab host port list"
 msgid "Ports (%1)"
 msgid_plural "Ports (%1)"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:485
+#: src/ui/MainPage.qml:479
 msgctxt "@title:tab mount presets"
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:488
+#: src/ui/MainPage.qml:482
 msgctxt "@title:tab engine information"
 msgid "Engine"
 msgstr ""
 
-#: src/ui/MainPage.qml:509
+#: src/ui/MainPage.qml:503
 msgid "Search containers (name, image, ID)…"
 msgstr ""
 
-#: src/ui/MainPage.qml:509
+#: src/ui/MainPage.qml:503
 msgid "Search images (repository, tag, ID)…"
 msgstr ""
 
-#: src/ui/MainPage.qml:527
+#: src/ui/MainPage.qml:521
 msgid "All states"
 msgstr ""
 
-#: src/ui/MainPage.qml:553
+#: src/ui/MainPage.qml:547
 msgid "All images"
 msgstr ""
 
-#: src/ui/MainPage.qml:561
+#: src/ui/MainPage.qml:555
 msgid "Dangling"
 msgstr ""
 
-#: src/ui/MainPage.qml:585
+#: src/ui/MainPage.qml:579
 msgid "Sort: Name"
 msgstr ""
 
-#: src/ui/MainPage.qml:589
+#: src/ui/MainPage.qml:583
 msgid "Sort: State"
 msgstr ""
 
-#: src/ui/MainPage.qml:593 src/ui/MainPage.qml:603
+#: src/ui/MainPage.qml:587 src/ui/MainPage.qml:597
 msgid "Sort: Created"
 msgstr ""
 
-#: src/ui/MainPage.qml:599
+#: src/ui/MainPage.qml:593
 msgid "Sort: Repository"
 msgstr ""
 
-#: src/ui/MainPage.qml:607
+#: src/ui/MainPage.qml:601
 msgid "Sort: Size"
 msgstr ""
 
-#: src/ui/MainPage.qml:629
+#: src/ui/MainPage.qml:623
 msgid "Build image…"
 msgstr ""
 
-#: src/ui/MainPage.qml:663
+#: src/ui/MainPage.qml:657
 msgid "Pull image (%1 running)"
 msgstr ""
 
-#: src/ui/MainPage.qml:690
+#: src/ui/MainPage.qml:684
 msgid "Unable to retrieve the container list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:755
+#: src/ui/MainPage.qml:749
 msgid "Unable to retrieve the image list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:837
+#: src/ui/MainPage.qml:831
 msgid "Unable to retrieve the network list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:848
+#: src/ui/MainPage.qml:842
 msgid "Search by name, ID, driver or subnet…"
 msgstr ""
 
-#: src/ui/MainPage.qml:857
+#: src/ui/MainPage.qml:851
 msgid "Create network…"
 msgstr ""
 
-#: src/ui/MainPage.qml:872
+#: src/ui/MainPage.qml:866
 msgid "All networks"
 msgstr ""
 
-#: src/ui/MainPage.qml:873
+#: src/ui/MainPage.qml:867
 msgid "Built-in"
 msgstr ""
 
-#: src/ui/MainPage.qml:874
+#: src/ui/MainPage.qml:868
 msgid "User-defined"
 msgstr ""
 
-#: src/ui/MainPage.qml:888 src/ui/MainPage.qml:991
+#: src/ui/MainPage.qml:882 src/ui/MainPage.qml:985
 msgid "Driver"
 msgstr ""
 
-#: src/ui/MainPage.qml:889
+#: src/ui/MainPage.qml:883
 msgid "Scope"
 msgstr ""
 
-#: src/ui/MainPage.qml:902
+#: src/ui/MainPage.qml:896
 msgid "No network matches the current search or filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:903
+#: src/ui/MainPage.qml:897
 msgid "No networks found."
 msgstr ""
 
-#: src/ui/MainPage.qml:905
+#: src/ui/MainPage.qml:899
 msgid "Clear the search field or switch the filter back to “All networks”."
 msgstr ""
 
-#: src/ui/MainPage.qml:907
+#: src/ui/MainPage.qml:901
 msgid ""
 "Docker always provides at least the built-in bridge, host and none networks."
 msgstr ""
 
-#: src/ui/MainPage.qml:909 src/ui/MainPage.qml:1144
+#: src/ui/MainPage.qml:903 src/ui/MainPage.qml:1138
 msgid "Clear filters"
 msgstr ""
 
-#: src/ui/MainPage.qml:953
+#: src/ui/MainPage.qml:947
 msgid "Unable to retrieve the volume list: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:963
+#: src/ui/MainPage.qml:957
 msgid "Search by name, driver or mount point…"
 msgstr ""
 
-#: src/ui/MainPage.qml:975
+#: src/ui/MainPage.qml:969
 msgid "All volumes"
 msgstr ""
 
-#: src/ui/MainPage.qml:976
+#: src/ui/MainPage.qml:970
 msgid "Unused"
 msgstr ""
 
-#: src/ui/MainPage.qml:992
+#: src/ui/MainPage.qml:986
 msgid "Size"
 msgstr ""
 
-#: src/ui/MainPage.qml:1003
+#: src/ui/MainPage.qml:997
 msgid "Create volume…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1012
+#: src/ui/MainPage.qml:1006
 msgid "Clean up unused…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1065
+#: src/ui/MainPage.qml:1059
 msgid "The volume is created with the local driver."
 msgstr ""
 
-#: src/ui/MainPage.qml:1086
+#: src/ui/MainPage.qml:1080
 msgctxt "@info volumes about to be removed"
 msgid "One unused volume will be removed:"
 msgid_plural "%1 unused volumes will be removed:"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:1105
+#: src/ui/MainPage.qml:1099
 msgid "Reclaimable space: %1"
 msgstr ""
 
-#: src/ui/MainPage.qml:1125
+#: src/ui/MainPage.qml:1119
 msgid "Only volumes that no container uses are removed."
 msgstr ""
 
-#: src/ui/MainPage.qml:1138
+#: src/ui/MainPage.qml:1132
 msgid "No volume matches the current search or filter."
 msgstr ""
 
-#: src/ui/MainPage.qml:1139
+#: src/ui/MainPage.qml:1133
 msgid "No volumes found."
 msgstr ""
 
-#: src/ui/MainPage.qml:1142
+#: src/ui/MainPage.qml:1136
 msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr ""
 
-#: src/ui/MainPage.qml:1190
+#: src/ui/MainPage.qml:1184
 msgctxt "@info"
 msgid ""
 "%1 port is declared by a running container but was not actually published."
@@ -3256,51 +3291,59 @@ msgid_plural ""
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/ui/MainPage.qml:1202
+#: src/ui/MainPage.qml:1196
 msgid "Search by port, container or image…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1212
+#: src/ui/MainPage.qml:1206
 msgid "All ports"
 msgstr ""
 
-#: src/ui/MainPage.qml:1214
+#: src/ui/MainPage.qml:1208
 msgid "Declared only"
 msgstr ""
 
-#: src/ui/MainPage.qml:1225
+#: src/ui/MainPage.qml:1219
+msgid "List"
+msgstr ""
+
+#: src/ui/MainPage.qml:1220
+msgid "Range map"
+msgstr ""
+
+#: src/ui/MainPage.qml:1231
 msgid "Sort by port"
 msgstr ""
 
-#: src/ui/MainPage.qml:1226
+#: src/ui/MainPage.qml:1232
 msgid "Sort by container"
 msgstr ""
 
-#: src/ui/MainPage.qml:1239
+#: src/ui/MainPage.qml:1245
 msgid "No port matches “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:1240
+#: src/ui/MainPage.qml:1246
 msgid "No host port is currently used by a running container."
 msgstr ""
 
-#: src/ui/MainPage.qml:1269
+#: src/ui/MainPage.qml:1284
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:1292
+#: src/ui/MainPage.qml:1307
 msgid "User configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1299
+#: src/ui/MainPage.qml:1314
 msgid "System configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1331 src/ui/MainPage.qml:1339
+#: src/ui/MainPage.qml:1346 src/ui/MainPage.qml:1354
 msgid "Stop container"
 msgstr ""
 
-#: src/ui/MainPage.qml:1332
+#: src/ui/MainPage.qml:1347
 msgid "“%1” will stop and the ports it publishes will be released."
 msgstr ""
 

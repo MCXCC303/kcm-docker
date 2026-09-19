@@ -212,6 +212,12 @@ void fillFixture(MockDockerBackend &backend)
     detail.pid = 41237;
     detail.platform = QStringLiteral("linux");
     detail.restartPolicy = QStringLiteral("unless-stopped");
+    // KONTAINER_RENDER_DECLARED_PORT=1：造出"声明了但没真正发布"的端口 + 一段超长区间，
+    // 用来复核端口页的 declaredNotPublished 状态与区间地图的"还有 N 个"限流
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_DECLARED_PORT")) {
+        detail.declaredPorts = {{4880, QStringLiteral("tcp"), QString(), 4880, 4880},
+                                {3389, QStringLiteral("tcp"), QString(), 1000, 1100}};
+    }
     detail.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
                     {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
                     {QStringLiteral("::"), 9090, 0, QStringLiteral("tcp")}};
@@ -908,6 +914,11 @@ int main(int argc, char **argv)
         // KONTAINER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
         if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_LOGIN")) {
             QMetaObject::invokeMethod(item, "openLoginDialog", Q_ARG(QString, QString()));
+        }
+
+        // KONTAINER_RENDER_PORT_VIEW=map：端口页切到区间地图（复核聚类与限流）
+        if (qEnvironmentVariable("KONTAINER_RENDER_PORT_VIEW") == QLatin1String("map")) {
+            item->setProperty("portViewMode", QStringLiteral("map"));
         }
 
         if (tabIndex > 0) {

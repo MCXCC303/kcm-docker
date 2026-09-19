@@ -70,6 +70,30 @@ struct HostPortEntry {
 };
 
 /*!
+ * 区间地图里的一段（ARCH_next_ports.md §4.B，里程碑 M4）。
+ *
+ * 端口分布通常集中在几段（例如 8000-8010、20001-20004），把 0-65535 全画出来
+ * 只会让人看到一片空白；因此按"相邻已用端口的间隔"聚类成若干段再画。
+ */
+struct HostPortRange {
+    /*! 段的范围（含两端；`last - first + 1` 是这一段覆盖的端口数）。 */
+    quint16 first = 0;
+    quint16 last = 0;
+    /*! 这一段实际渲染的方块数（受 `tilesPerRange` 限制）。 */
+    int tileCount = 0;
+    /*! 因为上限而没渲染出来的端口数（> 0 时界面显示"还有 N 个"）。 */
+    int hiddenCount = 0;
+    /*! 这一段里有几个端口被容器占着（标题上给个摘要）。 */
+    int usedCount = 0;
+
+    friend bool operator==(const HostPortRange &lhs, const HostPortRange &rhs)
+    {
+        return lhs.first == rhs.first && lhs.last == rhs.last && lhs.tileCount == rhs.tileCount
+            && lhs.hiddenCount == rhs.hiddenCount && lhs.usedCount == rhs.usedCount;
+    }
+};
+
+/*!
  * 宿主端口占用表（ARCH_next_ports.md §3 的 `HostPortUsage`）。
  *
  * 纯函数式的门面：输入容器列表，输出"哪个宿主端口被谁占着"。
@@ -118,6 +142,25 @@ public:
      * 否则建议出来的端口会在提交时因为"请求内重复"被自己拦下。
      */
     static int nextFreePort(const QList<Container> &containers, int afterPort, const QList<int> &extraUsed = {});
+
+    /*!
+     * 把占用表聚类成区间（区间地图用）。
+     *
+     * 规则：
+     *  - 端口升序后，相邻**已占用**端口的间隔 ≤ `gap` 就归为同一段；
+     *  - 每段向两侧各扩展 `margin` 个端口（让用户看到"附近哪里还空着"）；
+     *  - 每段渲染的方块数不超过 `tilesPerRange`，超出的部分记进 `hiddenCount`
+     *    （界面显示"还有 N 个"）——没有这个上限，1000-1100 这种区间会拖垮界面。
+     */
+    static QList<HostPortRange> clusterRanges(const QList<HostPortEntry> &entries, int gap = 5, int margin = 2,
+                                             int tilesPerRange = 64);
+
+    /*!
+     * 某个端口在占用表里的状态 key：`inUse` / `declaredNotPublished` / 空字符串（空闲）。
+     *
+     * 区间地图的每个方块按它上色；区间（`47300-47309`）按整段算——落在区间里也算被占。
+     */
+    static QString stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port);
 };
 
 } // namespace Kontainer

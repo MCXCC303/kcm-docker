@@ -9,6 +9,8 @@
 
 #include <algorithm>
 
+#include <QtGlobal>
+
 namespace Kontainer
 {
 
@@ -187,6 +189,73 @@ int HostPortUsage::nextFreePort(const QList<Container> &containers, int afterPor
         }
     }
     return 0;
+}
+
+QString HostPortUsage::stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port)
+{
+    for (const HostPortEntry &entry : entries) {
+        const quint16 last = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
+        if (port >= entry.hostPort && port <= last) {
+            return entry.stateKey;
+        }
+    }
+    return {};
+}
+
+QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &entries, int gap, int margin, int tilesPerRange)
+{
+    QList<HostPortRange> ranges;
+    if (entries.isEmpty()) {
+        return ranges;
+    }
+
+    // 已占用的端口（升序、去重）
+    QList<quint16> used;
+    for (const HostPortEntry &entry : entries) {
+        const quint16 last = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
+        for (quint16 port = entry.hostPort; port <= last; ++port) {
+            if (!used.contains(port)) {
+                used.append(port);
+            }
+        }
+    }
+    std::sort(used.begin(), used.end());
+
+    const int safeGap = qMax(0, gap);
+    const int safeMargin = qMax(0, margin);
+    const int safeTiles = qMax(1, tilesPerRange);
+
+    int index = 0;
+    while (index < used.size()) {
+        quint16 first = used.at(index);
+        quint16 last = first;
+        int cursor = index;
+        while (cursor + 1 < used.size() && int(used.at(cursor + 1)) - int(used.at(cursor)) <= safeGap + 1) {
+            last = used.at(cursor + 1);
+            ++cursor;
+        }
+        // 向两侧扩展几个空闲端口：让用户看到"这一段附近哪里空着"
+        const int expandedFirst = qMax(1, int(first) - safeMargin);
+        const int expandedLast = qMin(65535, int(last) + safeMargin);
+        first = quint16(expandedFirst);
+        last = quint16(expandedLast);
+
+        HostPortRange range;
+        range.first = first;
+        range.last = last;
+        const int total = int(last) - int(first) + 1;
+        range.tileCount = qMin(total, safeTiles);
+        range.hiddenCount = qMax(0, total - safeTiles);
+        for (const HostPortEntry &entry : entries) {
+            const quint16 entryLast = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
+            if (entry.hostPort <= last && entryLast >= first) {
+                ++range.usedCount;
+            }
+        }
+        ranges.append(range);
+        index = cursor + 1;
+    }
+    return ranges;
 }
 
 } // namespace Kontainer

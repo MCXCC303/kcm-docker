@@ -39,6 +39,8 @@ private Q_SLOTS:
     void modelExposesRowsForThePage();
     void filterSearchesAndSeparatesTheTwoStates();
     void refreshKeepsTheModelIntact();
+    void rangeClusteringGroupsNearbyPorts();
+    void rangeClusteringCapsVeryLongRanges();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -354,6 +356,99 @@ void HostPortUsageTest::refreshKeepsTheModelIntact()
     QCOMPARE(resetSpy.count(), 0);
     QCOMPARE(model.count(), 1);
     QVERIFY(dataSpy.count() >= 1);
+}
+
+
+/*!
+ * 区间聚类（ARCH_next_ports.md §4.B，里程碑 M4）。
+ *
+ * 边界要稳：紧挨着的端口算一段，间隔超过 gap 就断开；每段还会向两侧留几个空闲端口，
+ * 这样用户能直接看出"这一段附近哪里空着"。
+ */
+void HostPortUsageTest::rangeClusteringGroupsNearbyPorts()
+{
+    Container container;
+    container.id = QStringLiteral("cid-1");
+    container.name = QStringLiteral("medai");
+    container.state = ContainerState::Running;
+    // 20001-20004 紧邻 → 一段；8000 与它们相距很远 → 另一段
+    container.ports = {{QStringLiteral("0.0.0.0"), 8888, 20001, QStringLiteral("tcp")},
+                       {QStringLiteral("0.0.0.0"), 8888, 20002, QStringLiteral("tcp")},
+                       {QStringLiteral("0.0.0.0"), 8888, 20003, QStringLiteral("tcp")},
+                       {QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
+                       {QStringLiteral("0.0.0.0"), 80, 8000, QStringLiteral("tcp")}};
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({container});
+    const QList<HostPortRange> ranges = HostPortUsage::clusterRanges(entries, 5, 2, 64);
+    QCOMPARE(ranges.size(), 2);
+
+    // 第一段：8000 前后各留 2 个空闲端口
+    QCOMPARE(ranges.at(0).first, quint16(7998));
+    QCOMPARE(ranges.at(0).last, quint16(8002));
+    QCOMPARE(ranges.at(0).tileCount, 5);
+    QCOMPARE(ranges.at(0).hiddenCount, 0);
+    QCOMPARE(ranges.at(0).usedCount, 1);
+
+    // 第二段：20001-20004 合并成一段，两侧各留 2 个
+    QCOMPARE(ranges.at(1).first, quint16(19999));
+    QCOMPARE(ranges.at(1).last, quint16(20006));
+    QCOMPARE(ranges.at(1).usedCount, 4);
+
+    // 间隔 6（> gap=5）时断开
+    Container spaced;
+    spaced.id = QStringLiteral("cid-2");
+    spaced.name = QStringLiteral("spaced");
+    spaced.state = ContainerState::Running;
+    spaced.ports = {{QStringLiteral("0.0.0.0"), 80, 9000, QStringLiteral("tcp")},
+                    {QStringLiteral("0.0.0.0"), 81, 9007, QStringLiteral("tcp")}}; // 9000 与 9007 之间空 6 个
+    QCOMPARE(HostPortUsage::clusterRanges(HostPortUsage::entriesFor({spaced}), 5, 0, 64).size(), 2);
+    QCOMPARE(HostPortUsage::clusterRanges(HostPortUsage::entriesFor({spaced}), 6, 0, 64).size(), 1);
+
+    // 每个方块的状态：空闲为空、占用是 inUse
+    QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003), QStringLiteral("inUse"));
+    QVERIFY(HostPortUsage::stateKeyForPort(entries, 20005).isEmpty());
+
+    // 区间（47300-47309）按整段算被占
+    Container ranged;
+    ranged.id = QStringLiteral("cid-3");
+    ranged.name = QStringLiteral("winboat");
+    ranged.state = ContainerState::Running;
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    declared.insert(ranged.id, {DeclaredPortBinding {3389, QStringLiteral("tcp"), QString(), 47300, 47309}});
+    const QList<HostPortEntry> rangedEntries = HostPortUsage::entriesFor({ranged}, declared);
+    QCOMPARE(rangedEntries.size(), 1);
+    QCOMPARE(HostPortUsage::stateKeyForPort(rangedEntries, 47305), QStringLiteral("declaredNotPublished"));
+    QVERIFY(HostPortUsage::stateKeyForPort(rangedEntries, 47310).isEmpty());
+}
+
+/*!
+ * 很长的区间必须限流：1000-1100 这种段不能渲染 101 个方块。
+ *
+ * 超出上限的部分记进 `hiddenCount`，界面显示"还有 N 个"。
+ */
+void HostPortUsageTest::rangeClusteringCapsVeryLongRanges()
+{
+    Container container;
+    container.id = QStringLiteral("cid-long");
+    container.name = QStringLiteral("range-holder");
+    container.state = ContainerState::Running;
+    // 声明 1000-1100（101 个端口）——用一个区间式的声明最省事
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    DeclaredPortBinding binding;
+    binding.containerPort = 80;
+    binding.protocol = QStringLiteral("tcp");
+    binding.hostPort = 1000;
+    binding.hostPortEnd = 1100;
+    declared.insert(container.id, {binding});
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({container}, declared);
+    const QList<HostPortRange> ranges = HostPortUsage::clusterRanges(entries, 5, 0, 20);
+    QCOMPARE(ranges.size(), 1);
+    QCOMPARE(ranges.at(0).first, quint16(1000));
+    QCOMPARE(ranges.at(0).last, quint16(1100));
+    QCOMPARE(ranges.at(0).tileCount, 20);
+    QCOMPARE(ranges.at(0).hiddenCount, 101 - 20);
+    QVERIFY2(ranges.at(0).tileCount <= 20, "a long range must be capped");
 }
 
 
