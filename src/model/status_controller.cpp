@@ -58,7 +58,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_commandHistory(new CommandHistoryStore({}, this))
     , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, m_commandHistory, this))
     // 目录选择：注入时用注入的（测试与离屏渲染不弹真实对话框）
-    , m_directoryPicker(directoryPicker ? directoryPicker : new PortalDirectoryPicker(this))
+    , m_directoryPicker(directoryPicker ? directoryPicker : new SystemDirectoryPicker(this))
     , m_busyWatchdog(new QTimer(this))
     , m_services(serviceStatus ? serviceStatus : new SystemdServiceStatus(this))
     , m_hostPaths(hostPaths)

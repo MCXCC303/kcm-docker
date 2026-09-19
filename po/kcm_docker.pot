@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:30+0800\n"
+"POT-Creation-Date: 2026-09-19 16:17+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -845,7 +845,7 @@ msgstr ""
 
 #: src/ui/components/KeyValueListEditor.qml:205
 #: src/ui/components/StringListEditor.qml:45
-#: src/ui/components/MountPresetManager.qml:139
+#: src/ui/components/MountPresetManager.qml:115
 msgid "Add"
 msgstr ""
 
@@ -858,12 +858,12 @@ msgid "Paste .env content"
 msgstr ""
 
 #: src/ui/components/StringListEditor.qml:148
-#: src/ui/components/MountPresetManager.qml:214
+#: src/ui/components/MountPresetManager.qml:190
 msgid "Move up"
 msgstr ""
 
 #: src/ui/components/StringListEditor.qml:161
-#: src/ui/components/MountPresetManager.qml:221
+#: src/ui/components/MountPresetManager.qml:197
 msgid "Move down"
 msgstr ""
 
@@ -1272,66 +1272,66 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:95
+#: src/ui/components/MountPresetManager.qml:66
 msgid ""
 "No presets yet. Add one below, or save a mount as a preset from a "
 "container's details."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:109
+#: src/ui/components/MountPresetManager.qml:80
 msgid "Browse…"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:119
-#: src/ui/components/MountPresetManager.qml:182
+#: src/ui/components/MountPresetManager.qml:95
+#: src/ui/components/MountPresetManager.qml:158
 msgid "Host path or volume name"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:120
+#: src/ui/components/MountPresetManager.qml:96
 msgid "New preset source"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:133
-#: src/ui/components/MountPresetManager.qml:196 src/ui/CreateContainer.qml:679
+#: src/ui/components/MountPresetManager.qml:109
+#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
 #: src/ui/CreateContainer.qml:680
 msgid "Container path"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:134
+#: src/ui/components/MountPresetManager.qml:110
 msgid "New preset destination"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:183
+#: src/ui/components/MountPresetManager.qml:159
 msgid "Preset source"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:197
+#: src/ui/components/MountPresetManager.qml:173
 msgid "Preset destination"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:206
+#: src/ui/components/MountPresetManager.qml:182
 msgid "Favourite"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:228
+#: src/ui/components/MountPresetManager.qml:204
 msgid "Remove this preset"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:236 src/ui/CreateContainer.qml:661
+#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
 msgid "Named volume"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:242
+#: src/ui/components/MountPresetManager.qml:218
 msgid "%1 to %2"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:258
+#: src/ui/components/MountPresetManager.qml:234
 msgid ""
 "Bind mounts need an absolute host path (use a volume name for a named "
 "volume)."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:262 src/ui/CreateContainer.qml:159
+#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:159
 msgid "The container path must be absolute."
 msgstr ""
 
@@ -3333,11 +3333,17 @@ msgstr ""
 msgid "System configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1188
+#: src/ui/MainPage.qml:1158
+msgid ""
+"Registry mirrors and other daemon settings. The system configuration needs "
+"administrator rights."
+msgstr ""
+
+#: src/ui/MainPage.qml:1195
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:1193
+#: src/ui/MainPage.qml:1200
 msgid ""
 "Presets are stored in your own configuration (~/.config/kontainerrc) and "
 "offered as quick-add buttons in the container wizard."

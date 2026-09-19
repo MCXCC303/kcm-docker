@@ -1459,17 +1459,13 @@ void QmlLoadTest::presetPanelManagesPresets()
     QVERIFY2(manager->findChild<QObject *>(QStringLiteral("presetManagerNewRow")) != nullptr
                  || browseButton != nullptr,
              "the create row must exist");
-    // 取消（回空串）：保持输入框里的内容不变，且请求必须带标签（结果要能回到发起方）
+    // 取消（返回空串）：保持输入框里的内容不变
     newSourceField->setProperty("text", QStringLiteral("/srv/hand-typed"));
     m_stubKcm->directoryPicker()->nextResult = QString();
-    const int callsBefore = m_stubKcm->directoryPicker()->callCount;
     QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
-    QTRY_COMPARE(m_stubKcm->directoryPicker()->callCount, callsBefore + 1);
-    QCOMPARE(m_stubKcm->directoryPicker()->lastRequestId, QStringLiteral("preset-new"));
-    QTRY_VERIFY(!m_stubKcm->directoryPicker()->lastStartPath.isEmpty());
     QTest::qWait(20);
     QCOMPARE(newSourceField->property("text").toString(), QStringLiteral("/srv/hand-typed"));
-    // 选中一个目录：结果**异步**回来后才填进新建行的宿主路径
+    // 选中一个目录：填进新建行的宿主路径
     m_stubKcm->directoryPicker()->nextResult = QStringLiteral("/srv/picked");
     QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
     QTRY_COMPARE(newSourceField->property("text").toString(), QStringLiteral("/srv/picked"));

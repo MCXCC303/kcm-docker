@@ -27,35 +27,6 @@ ColumnLayout {
     /*! 目录选择（`kcm.controller.directoryPicker`）：宿主路径用它挑。 */
     required property var directoryPicker
 
-    /*
-     * 目录选择的结果（异步）。
-     *
-     * `requestId` 标明是哪一行发起的：`preset-new` 是顶部的新建行，
-     * `preset-<id>` 是某条已有预设行。取消（空串）时什么都不改，
-     * 免得把手打的路径清掉。
-     */
-    Connections {
-        target: root.directoryPicker
-        function onDirectoryChosen(requestId, path) {
-            if (path.length === 0) {
-                return;
-            }
-            if (requestId === "preset-new") {
-                newSource.text = path;
-                return;
-            }
-            if (requestId.indexOf("preset-") === 0) {
-                const presetId = requestId.substring("preset-".length);
-                for (const preset of manager.store.summaries()) {
-                    if (preset.id === presetId) {
-                        manager.store.update(presetId, path, preset.destination, preset.readOnly, preset.note);
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
     /*!
      * delegate 用的中转对象（Unbound 下 delegate 拿不到根对象 id，见 CreateContainer.qml）。
      */
@@ -107,8 +78,13 @@ ColumnLayout {
             objectName: "presetManagerNewBrowse"
             icon.name: "folder-open"
             text: i18n("Browse…")
-            // 目录选择是**异步**的（门户走 D-Bus）：请求带上标签，结果回来再写回对应输入框
-            onClicked: root.directoryPicker.chooseDirectory("preset-new", newSource.text)
+            onClicked: {
+                const chosen = root.directoryPicker.chooseDirectory(newSource.text);
+                if (chosen.length > 0) {
+                    // 取消（空串）时保持原值：不要把手打的路径清掉
+                    newSource.text = chosen;
+                }
+            }
         }
 
         QQC2.TextField {
