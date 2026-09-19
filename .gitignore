@@ -60,10 +60,10 @@ ui_*.h
 *.svg
 
 # 文档不进版本控制（仅在本地保留；用户要求仓库只留代码）
+# 例外：README.md 是仓库的门面，重新按 KDE 惯例撰写后由维护者决定是否提交
 ARCH_*.md
 CHANGELOG.md
 DEBUGGING.md
-README.md
 
 # 打包脚本（本地测试用，不进仓库）
 packaging/
