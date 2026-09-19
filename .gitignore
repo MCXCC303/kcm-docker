@@ -64,3 +64,6 @@ ARCH_*.md
 CHANGELOG.md
 DEBUGGING.md
 README.md
+
+# 打包脚本（本地测试用，不进仓库）
+packaging/
