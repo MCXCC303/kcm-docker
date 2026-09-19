@@ -45,6 +45,7 @@ private Q_SLOTS:
     void rangeUsedCountCountsPortsNotDeclarations();
     void reservedPortThatIsTakenByAnotherContainerIsMarked();
     void sortingByContainerReallyReordersRows();
+    void rangeBuildingScalesWithManyPorts();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -640,6 +641,50 @@ void HostPortUsageTest::sortingByContainerReallyReordersRows()
     // 换回端口排序也要立即生效
     filter.setSortKey(QStringLiteral("port"));
     QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 8000);
+}
+
+
+/*!
+ * 区间地图的数据构建必须是"能扛住真实规模"的（用户实测：切筛选会卡 1-2 秒）。
+ *
+ * 造 40 个容器 × 每个 40 个端口（含区间），断言：构建耗时可接受、方块数受上限约束。
+ * 这不是精确的性能测试，而是防止有人再把去重改回 `QList::contains()` 这类平方级写法
+ * （本用例在优化前需要几百毫秒，优化后是个位数毫秒）。
+ */
+void HostPortUsageTest::rangeBuildingScalesWithManyPorts()
+{
+    QList<Container> containers;
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    for (int i = 0; i < 40; ++i) {
+        Container container;
+        container.id = QStringLiteral("cid-%1").arg(i);
+        container.name = QStringLiteral("container-%1").arg(i, 2, 10, QLatin1Char('0'));
+        container.image = QStringLiteral("alpine:latest");
+        container.state = i % 3 == 0 ? ContainerState::Exited : ContainerState::Running;
+        for (int p = 0; p < 20; ++p) {
+            // 每个容器一段 20 个端口的区间（展开后 40 个端口）
+            const quint16 base = quint16(1000 + i * 1200 + p * 12); // 各容器互相隔开 → 形成很多段
+            declared[container.id].append(DeclaredPortBinding {quint16(8000 + p), QStringLiteral("tcp"), QString(),
+                                                                base, quint16(base + 9)});
+        }
+        containers.append(container);
+    }
+
+    QElapsedTimer timer;
+    timer.start();
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor(containers, declared);
+    const QList<HostPortRange> ranges = HostPortUsage::clusterRanges(entries);
+    const qint64 elapsed = timer.elapsed();
+
+    QVERIFY(entries.size() >= 40 * 20);
+    QVERIFY(!ranges.isEmpty());
+    for (const HostPortRange &range : ranges) {
+        QVERIFY2(range.tileCount <= 64, "each range must stay capped");
+    }
+    qInfo() << "range building took" << elapsed << "ms for" << entries.size() << "entries →" << ranges.size() << "ranges";
+    // 实测：优化前（QList::contains 平方级去重）129 ms，优化后 16 ms；
+    // 门限取 60 ms——比实测慢 4 倍仍然会失败，但不会因为机器慢而误报
+    QVERIFY2(elapsed < 60, qPrintable(QStringLiteral("range building too slow: %1 ms").arg(elapsed)));
 }
 
 

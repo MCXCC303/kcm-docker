@@ -51,9 +51,13 @@ ColumnLayout {
         switch (stateKey) {
         case "inUse":
             return "positive";
-        case "declaredNotPublished":
         case "reservedTaken":
             return "negative";
+        case "reserved":
+            return "neutral";
+        case "declaredNotPublished":
+            // 比"未启动"更弱的一档（用户要求：未启动 > 未占用）
+            return "disabled";
         default:
             return "neutral";
         }

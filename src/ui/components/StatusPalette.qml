@@ -56,34 +56,45 @@ QtObject {
         switch (stateKey) {
         case "inUse":
             return Kirigami.Theme.positiveBackgroundColor;
-        case "declaredNotPublished":
-            return Kirigami.Theme.negativeBackgroundColor;
         case "reserved":
-        case "reservedTaken":
             return Kirigami.Theme.neutralBackgroundColor;
+        case "reservedTaken":
+            return Kirigami.Theme.negativeBackgroundColor;
+        case "declaredNotPublished":
+            // 用户要求："未启动"要比"未占用"更重（对调两者的强弱），因此未占用退到最弱的一档
+            // （Kirigami 没有 disabledBackgroundColor，用交替背景色做最弱的一档灰）
+            return Kirigami.Theme.alternateBackgroundColor;
         default:
             return Kirigami.Theme.backgroundColor;
         }
     }
 
-    /*! 方块边框色（空闲用虚线灰，占用用对应语义的前景/边框色）。 */
+    /*!
+     * 方块边框色。强弱顺序（用户要求）：运行中 = 被占用 > 未启动 > 未占用 > 空闲。
+     *
+     * 空闲是最弱的一档：只留一圈灰边，不填色——"空"看起来就该是空的。
+     */
     function portTileBorderColor(stateKey: string): color {
         switch (stateKey) {
         case "inUse":
             return Kirigami.Theme.positiveTextColor;
-        case "declaredNotPublished":
+        case "reservedTaken":
+            return Kirigami.Theme.negativeTextColor;
+        case "reserved":
             return Kirigami.Theme.neutralTextColor;
         default:
             return Kirigami.Theme.disabledTextColor;
         }
     }
 
-    /*! 方块文字色。 */
+    /*! 方块文字色（与边框同一套强弱）。 */
     function portTileTextColor(stateKey: string): color {
         switch (stateKey) {
         case "inUse":
             return Kirigami.Theme.positiveTextColor;
-        case "declaredNotPublished":
+        case "reservedTaken":
+            return Kirigami.Theme.negativeTextColor;
+        case "reserved":
             return Kirigami.Theme.neutralTextColor;
         default:
             return Kirigami.Theme.disabledTextColor;

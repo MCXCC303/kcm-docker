@@ -365,6 +365,8 @@ public:
     int reservedPortCount() const;
     int inUsePortCount() const;
     QVariantList portRanges() const;
+    /*! 让缓存的区间地图数据失效（数据或筛选变化时调用，下一次读取时重算）。 */
+    void invalidatePortRanges();
     int nextFreeHostPort() const;
     NetworkFilterModel *networkList() const
     {
@@ -572,6 +574,16 @@ private:
      * 只对**运行中**的容器取（用户拍板：不做"已停止容器声明过什么"），
      * 并且只在打开端口页时拉一次——不为一个视图把每个容器都 inspect 一遍。
      */
+    /*
+     * 区间地图的缓存。
+     *
+     * `portRanges()` 是 QML 绑定的数据源；一次重算要遍历整个过滤后的模型、聚类、
+     * 再为每个方块查状态。缓存住并只在数据/筛选真的变化时重算，切换筛选时就不会重复算
+     * （用户实测：地图里切筛选会卡 1-2 秒）。
+     */
+    mutable QVariantList m_portRanges;
+    mutable bool m_portRangesDirty = true;
+
     QHash<QString, QList<DeclaredPortBinding>> m_declaredPorts;
     /*! 已经为本轮拉过声明的容器（避免每次刷新都重发 inspect）。 */
     QStringList m_declaredRequested;

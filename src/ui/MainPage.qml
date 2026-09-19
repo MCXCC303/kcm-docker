@@ -1210,8 +1210,9 @@ Kirigami.Page {
                         model: [
                             {text: i18n("All ports"), value: "all"},
                             {text: i18n("In use"), value: "inUse"},
-                            {text: i18n("Declared, not published"), value: "declaredNotPublished"},
-                            {text: i18n("Declared (container not running)"), value: "reserved"}
+                            {text: i18n("Not bound"), value: "declaredNotPublished"},
+                            // 这一项同时包含"未启动"和"被占用"（用户要求改这个名字）
+                            {text: i18n("Not started / taken"), value: "reserved"}
                         ]
                         onActivated: root.controller.hostPortList.stateFilter = currentValue
                         Component.onCompleted: currentIndex = indexOfValue(root.controller.hostPortList.stateFilter)

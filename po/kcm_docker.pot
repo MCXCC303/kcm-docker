@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 23:21+0800\n"
+"POT-Creation-Date: 2026-09-19 23:35+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -39,7 +39,8 @@ msgid "Restarting"
 msgstr ""
 
 #: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
-#: src/ui/components/HostPortList.qml:76 src/ui/MainPage.qml:88
+#: src/ui/components/HostPortRangeMap.qml:70
+#: src/ui/components/HostPortList.qml:80 src/ui/MainPage.qml:88
 #: src/ui/MainPage.qml:530
 msgid "Running"
 msgstr ""
@@ -163,7 +164,7 @@ msgid "This mount has no host directory to open."
 msgstr ""
 
 #: src/model/container_detail_controller.cpp:54
-#: src/model/status_controller.cpp:153
+#: src/model/status_controller.cpp:160
 msgid "Could not open the file manager: %1"
 msgstr ""
 
@@ -195,7 +196,7 @@ msgid "less than a minute"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:1004
-#: src/ui/components/HostPortList.qml:171 src/ui/ImageDetail.qml:114
+#: src/ui/components/HostPortList.qml:175 src/ui/ImageDetail.qml:114
 #: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr ""
@@ -306,21 +307,21 @@ msgstr ""
 msgid "Leave it stopped"
 msgstr ""
 
-#: src/model/status_controller.cpp:147 src/ui/VolumeDetail.qml:141
+#: src/model/status_controller.cpp:154 src/ui/VolumeDetail.qml:141
 msgid "The host path does not exist."
 msgstr ""
 
-#: src/model/status_controller.cpp:150
+#: src/model/status_controller.cpp:157
 msgid "The host path is not a directory."
 msgstr ""
 
-#: src/model/status_controller.cpp:652
+#: src/model/status_controller.cpp:674
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr ""
 
-#: src/model/status_controller.cpp:885
+#: src/model/status_controller.cpp:907
 msgid "Opening host paths is not available in this environment."
 msgstr ""
 
@@ -1433,7 +1434,7 @@ msgid "Host"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:155
-#: src/ui/components/HostPortList.qml:162 src/ui/ContainerDetail.qml:310
+#: src/ui/components/HostPortList.qml:166 src/ui/ContainerDetail.qml:310
 #: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr ""
@@ -1443,12 +1444,12 @@ msgid "Host address"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:221
-#: src/ui/components/HostPortList.qml:126
+#: src/ui/components/HostPortList.qml:130
 msgid "Host port"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:292
-#: src/ui/components/HostPortList.qml:144
+#: src/ui/components/HostPortList.qml:148
 msgid "Container port"
 msgstr ""
 
@@ -1481,82 +1482,72 @@ msgstr ""
 msgid "next free host port"
 msgstr ""
 
-#: src/ui/components/HostPortRangeMap.qml:69 src/ui/MainPage.qml:556
-#: src/ui/MainPage.qml:976 src/ui/MainPage.qml:1212
-msgid "In use"
-msgstr ""
-
-#: src/ui/components/HostPortRangeMap.qml:70 src/ui/MainPage.qml:1213
-msgid "Declared, not published"
-msgstr ""
-
-#: src/ui/components/HostPortRangeMap.qml:71 src/ui/MainPage.qml:1214
-msgid "Declared (container not running)"
-msgstr ""
-
-#: src/ui/components/HostPortRangeMap.qml:72
-msgid "Free"
-msgstr ""
-
-#: src/ui/components/HostPortRangeMap.qml:131
-msgid "%1 port in use"
-msgid_plural "%1 ports in use"
-msgstr[0] ""
-msgstr[1] ""
-
-#: src/ui/components/HostPortRangeMap.qml:144
-msgid "%1 more not shown"
-msgstr ""
-
-#: src/ui/components/HostPortRangeMap.qml:180
-msgid "Port %1: %2"
-msgstr ""
-
-#: src/ui/components/HostPortRangeMap.qml:181
-msgid "Port %1: free"
-msgstr ""
-
-#: src/ui/components/HostPortList.qml:78
-msgid "Not bound"
-msgstr ""
-
-#: src/ui/components/HostPortList.qml:81
-msgid "Taken"
-msgstr ""
-
-#: src/ui/components/HostPortList.qml:83
+#: src/ui/components/HostPortRangeMap.qml:71
+#: src/ui/components/HostPortList.qml:87
 msgid "Not started"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:89
+#: src/ui/components/HostPortRangeMap.qml:72
+#: src/ui/components/HostPortList.qml:85
+msgid "Taken"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:73
+#: src/ui/components/HostPortList.qml:82 src/ui/MainPage.qml:1213
+msgid "Not bound"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:74
+msgid "Free"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:134
+msgid "%1 port used by containers"
+msgid_plural "%1 ports used by containers"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/ui/components/HostPortRangeMap.qml:147
+msgid "%1 more not shown"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:183
+msgid "Port %1: %2"
+msgstr ""
+
+#: src/ui/components/HostPortRangeMap.qml:184
+msgid "Port %1: free"
+msgstr ""
+
+#: src/ui/components/HostPortList.qml:93
 msgid "A running container publishes this port."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:91
+#: src/ui/components/HostPortList.qml:95
 msgid ""
 "The container is running, but this declared mapping is not actually bound on "
 "the host."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:93
+#: src/ui/components/HostPortList.qml:97
 msgid ""
 "This port is currently used by another container, so this container will "
 "fail to start with a port conflict."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:95
+#: src/ui/components/HostPortList.qml:99
 msgid "This container needs to publish this port when it starts."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:135
+#: src/ui/components/HostPortList.qml:139
 msgid "Bind address"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:153
+#: src/ui/components/HostPortList.qml:157
 msgid "State"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:229
+#: src/ui/components/HostPortList.qml:233
 msgid "All interfaces"
 msgstr ""
 
@@ -2947,7 +2938,7 @@ msgctxt "@info no container matches the search"
 msgid "No containers match “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:198 src/ui/MainPage.qml:224 src/ui/MainPage.qml:1255
+#: src/ui/MainPage.qml:198 src/ui/MainPage.qml:224 src/ui/MainPage.qml:1256
 msgid "Clear search"
 msgstr ""
 
@@ -3068,6 +3059,10 @@ msgstr ""
 
 #: src/ui/MainPage.qml:552
 msgid "All images"
+msgstr ""
+
+#: src/ui/MainPage.qml:556 src/ui/MainPage.qml:976 src/ui/MainPage.qml:1212
+msgid "In use"
 msgstr ""
 
 #: src/ui/MainPage.qml:560
@@ -3239,39 +3234,43 @@ msgstr ""
 msgid "All ports"
 msgstr ""
 
-#: src/ui/MainPage.qml:1225
-msgid "List"
+#: src/ui/MainPage.qml:1215
+msgid "Not started / taken"
 msgstr ""
 
 #: src/ui/MainPage.qml:1226
+msgid "List"
+msgstr ""
+
+#: src/ui/MainPage.qml:1227
 msgid "Range map"
 msgstr ""
 
-#: src/ui/MainPage.qml:1239
+#: src/ui/MainPage.qml:1240
 msgid "Sort by port"
 msgstr ""
 
-#: src/ui/MainPage.qml:1240
+#: src/ui/MainPage.qml:1241
 msgid "Sort by container"
 msgstr ""
 
-#: src/ui/MainPage.qml:1253
+#: src/ui/MainPage.qml:1254
 msgid "No port matches “%1”."
 msgstr ""
 
-#: src/ui/MainPage.qml:1254
+#: src/ui/MainPage.qml:1255
 msgid "No host port is currently used by a running container."
 msgstr ""
 
-#: src/ui/MainPage.qml:1290
+#: src/ui/MainPage.qml:1291
 msgid "Mount presets"
 msgstr ""
 
-#: src/ui/MainPage.qml:1313
+#: src/ui/MainPage.qml:1314
 msgid "User configuration…"
 msgstr ""
 
-#: src/ui/MainPage.qml:1320
+#: src/ui/MainPage.qml:1321
 msgid "System configuration…"
 msgstr ""
 

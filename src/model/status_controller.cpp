@@ -11,6 +11,8 @@
 #include <KLocalizedString>
 
 #include "logging.h"
+
+#include <QElapsedTimer>
 #include "model/docker_error_text.h"
 #include "model/port_binding_rules.h"
 
@@ -100,6 +102,11 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_imageFilter->setSourceModel(m_imageModel);
     m_networkFilter->setSourceModel(m_networkModel);
     m_hostPortFilter->setSourceModel(m_hostPortModel);
+    // 筛选/搜索/排序变化都要让缓存的区间地图数据失效（否则地图还是旧的）
+    connect(m_hostPortFilter, &HostPortFilterModel::searchTextChanged, this, &StatusController::invalidatePortRanges);
+    connect(m_hostPortFilter, &HostPortFilterModel::stateFilterChanged, this, &StatusController::invalidatePortRanges);
+    connect(m_hostPortFilter, &HostPortFilterModel::sortKeyChanged, this, &StatusController::invalidatePortRanges);
+    connect(m_hostPortFilter, &HostPortFilterModel::countChanged, this, &StatusController::invalidatePortRanges);
     m_volumeFilter->setSourceModel(m_volumeModel);
 
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
@@ -231,7 +238,7 @@ void StatusController::rebuildPorts()
         || inUsePortCount() != inUseBefore) {
         Q_EMIT declaredNotPublishedCountChanged();
     }
-    Q_EMIT portRangesChanged();
+    invalidatePortRanges();
 }
 
 int StatusController::declaredNotPublishedCount() const
@@ -277,8 +284,21 @@ int StatusController::reservedPortCount() const
     return count;
 }
 
+void StatusController::invalidatePortRanges()
+{
+    m_portRangesDirty = true;
+    Q_EMIT portRangesChanged();
+}
+
 QVariantList StatusController::portRanges() const
 {
+    if (!m_portRangesDirty) {
+        return m_portRanges;
+    }
+    m_portRangesDirty = false;
+    QElapsedTimer timer;
+    timer.start();
+
     /*
      * 地图画的是**过滤后**的端口：搜索框与状态过滤对地图同样生效
      * （用户实测反馈：地图里筛不了，等于两个视图各有一套数据）。
@@ -319,7 +339,9 @@ QVariantList StatusController::portRanges() const
                                    {QStringLiteral("usedCount"), range.usedCount},
                                    {QStringLiteral("tiles"), tiles}});
     }
-    return ranges;
+    m_portRanges = ranges;
+    qCDebug(kontainerModel) << "rebuilt port ranges:" << ranges.size() << "ranges in" << timer.elapsed() << "ms";
+    return m_portRanges;
 }
 
 int StatusController::nextFreeHostPort() const

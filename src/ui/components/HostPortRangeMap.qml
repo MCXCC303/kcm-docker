@@ -65,10 +65,12 @@ Item {
             spacing: Kirigami.Units.largeSpacing
 
             Repeater {
+                // 与列表视图同一套措辞（用户要求统一）：运行中 / 未启动 / 被占用 / 未占用 / 空闲
                 model: [
-                    {text: i18n("In use"), stateKey: "inUse"},
-                    {text: i18n("Declared, not published"), stateKey: "declaredNotPublished"},
-                    {text: i18n("Declared (container not running)"), stateKey: "reserved"},
+                    {text: i18n("Running"), stateKey: "inUse"},
+                    {text: i18n("Not started"), stateKey: "reserved"},
+                    {text: i18n("Taken"), stateKey: "reservedTaken"},
+                    {text: i18n("Not bound"), stateKey: "declaredNotPublished"},
                     {text: i18n("Free"), stateKey: ""}
                 ]
 
@@ -128,7 +130,8 @@ Item {
 
                             QQC2.Label {
                                 objectName: "portMapRangeSummary"
-                                text: i18np("%1 port in use", "%1 ports in use", modelData.usedCount)
+                                // 这一段里非空闲的端口既有"正在使用"也有"被声明"，措辞不要写成"in use"
+                                text: i18np("%1 port used by containers", "%1 ports used by containers", modelData.usedCount)
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.75
                             }

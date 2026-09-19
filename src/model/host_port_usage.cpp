@@ -9,6 +9,8 @@
 
 #include <algorithm>
 
+#include <QSet>
+
 #include <QtGlobal>
 
 namespace Kontainer
@@ -230,12 +232,15 @@ QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &en
         return ranges;
     }
 
-    // 已占用的端口（升序、去重）
+    // 已占用的端口（升序、去重）。用 QSet 去重：原来对 QList 调 contains() 是 O(n)，
+    // 端口多的容器（几十上百个区间端口）会变成平方级，切换筛选时肉眼可见地卡。
+    QSet<quint16> seen;
     QList<quint16> used;
     for (const HostPortEntry &entry : entries) {
         const quint16 last = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
         for (quint16 port = entry.hostPort; port <= last; ++port) {
-            if (!used.contains(port)) {
+            if (!seen.contains(port)) {
+                seen.insert(port);
                 used.append(port);
             }
         }
@@ -273,15 +278,13 @@ QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &en
          * 用户实测：`WinBoat` 声明了 5 段（每段 10 个）落在同一区间里，
          * 其中两段还重叠，原来显示"5 个端口被占用"——而图上明明亮着几十个格子。
          */
-        QList<quint16> covered;
+        QSet<quint16> covered;
         for (const HostPortEntry &entry : entries) {
             const quint16 entryLast = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
             const quint16 from = qMax(entry.hostPort, first);
             const quint16 to = qMin(entryLast, last);
             for (quint16 port = from; port <= to; ++port) {
-                if (!covered.contains(port)) {
-                    covered.append(port);
-                }
+                covered.insert(port);
             }
         }
         range.usedCount = int(covered.size());
