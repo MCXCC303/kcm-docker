@@ -68,6 +68,10 @@ QVariant DetailListModel::data(const QModelIndex &index, int role) const
         return entry.detail;
     case EntryKeyRole:
         return entry.entryKey;
+    case StateKeyRole:
+        return entry.stateKey;
+    case TargetRole:
+        return entry.target;
     default:
         break;
     }
@@ -81,6 +85,8 @@ QHash<int, QByteArray> DetailListModel::roleNames() const
         {ValueRole, "value"},
         {DetailRole, "detail"},
         {EntryKeyRole, "entryKey"},
+        {StateKeyRole, "stateKey"},
+        {TargetRole, "target"},
     };
 }
 

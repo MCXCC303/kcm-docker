@@ -182,6 +182,11 @@ KCM.AbstractKCM {
 
             ImageDetail {
                 onCloseRequested: stack.pop()
+                onContainerRequested: function (containerId) {
+                    stack.push(containerDetailComponent, {
+                        "containerId": containerId
+                    });
+                }
                 onCreateContainerRequested: function (imageReference) {
                     stack.push(createContainerComponent, {
                         "presetImage": imageReference

@@ -144,6 +144,14 @@ void NetworkDetailController::reload()
         entry.detail = member.macAddress;
         // 容器 id 放在 entryKey 里：QML 用它做"跳到容器详情"（列表行不显示 id）
         entry.entryKey = member.containerId;
+        entry.target = member.containerId;
+        // 状态图标：与镜像的"关联容器"列表保持同一种视觉（用户反馈要统一）
+        for (const Container &container : m_backend->containers()) {
+            if (container.id == member.containerId) {
+                entry.stateKey = container.stateKey();
+                break;
+            }
+        }
         memberEntries.append(entry);
     }
     m_members->setEntries(memberEntries);
@@ -151,14 +159,14 @@ void NetworkDetailController::reload()
     QList<DetailEntry> labelEntries;
     labelEntries.reserve(found.labels.size());
     for (const auto &label : found.labels) {
-        labelEntries.append({label.first, label.second, QString(), QString()});
+        labelEntries.append({label.first, label.second, QString(), QString(), QString(), QString()});
     }
     m_labels->setEntries(labelEntries);
 
     QList<DetailEntry> optionEntries;
     optionEntries.reserve(found.options.size());
     for (const auto &option : found.options) {
-        optionEntries.append({option.first, option.second, QString(), QString()});
+        optionEntries.append({option.first, option.second, QString(), QString(), QString(), QString()});
     }
     m_options->setEntries(optionEntries);
 

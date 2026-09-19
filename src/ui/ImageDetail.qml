@@ -46,6 +46,8 @@ KCM.SimpleKCM {
     signal registryAuthRequested(string serverAddress)
     /*! 基于这个镜像创建容器（七期 §4.5）。 */
     signal createContainerRequested(string imageReference)
+    /*! 打开关联容器的详情（与网络详情页的成员行同一个交互）。 */
+    signal containerRequested(string containerId)
 
     /*!
         删除语义（ARCH_V4 §2.4）：
@@ -383,30 +385,48 @@ KCM.SimpleKCM {
                 Repeater {
                     model: controller.usedByContainers
 
-                    delegate: RowLayout {
+                    // 与「网络 → 已连接容器」同一种行：状态图标 + 名称 + 状态 + 跳转箭头，
+                    // 并且**可以点击**打开容器详情（用户反馈：镜像这边以前点不动）
+                    delegate: QQC2.ItemDelegate {
+                        id: usedByRow
+
                         required property string label
                         required property string value
-                        required property string entryKey
+                        required property string stateKey
+                        required property string target
 
                         objectName: "usedByEntry"
                         Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                        enabled: usedByRow.target.length > 0
+                        onClicked: page.containerRequested(usedByRow.target)
 
-                        Kirigami.Icon {
-                            source: Kontainer.Presentation.stateIconName(entryKey)
-                            color: Components.StatusPalette.color(Kontainer.Presentation.stateSemanticKey(entryKey, "none"))
-                            implicitWidth: Kirigami.Units.iconSizes.small
-                            implicitHeight: Kirigami.Units.iconSizes.small
-                        }
-                        QQC2.Label {
-                            text: label
-                            Layout.fillWidth: true
-                            elide: Text.ElideRight
-                        }
-                        QQC2.Label {
-                            text: value
-                            font: Kirigami.Theme.smallFont
-                            opacity: 0.8
+                        contentItem: RowLayout {
+                            spacing: Kirigami.Units.smallSpacing
+
+                            Kirigami.Icon {
+                                objectName: "usedByStateIcon"
+                                visible: usedByRow.stateKey.length > 0
+                                source: Kontainer.Presentation.stateIconName(usedByRow.stateKey)
+                                color: Components.StatusPalette.color(Kontainer.Presentation.stateSemanticKey(usedByRow.stateKey, "none"))
+                                implicitWidth: Kirigami.Units.iconSizes.small
+                                implicitHeight: Kirigami.Units.iconSizes.small
+                            }
+                            QQC2.Label {
+                                Layout.fillWidth: true
+                                text: usedByRow.label
+                                elide: Text.ElideRight
+                            }
+                            QQC2.Label {
+                                text: usedByRow.value
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.8
+                            }
+                            Kirigami.Icon {
+                                source: "go-next-symbolic"
+                                implicitWidth: Kirigami.Units.iconSizes.small
+                                implicitHeight: Kirigami.Units.iconSizes.small
+                                opacity: 0.6
+                            }
                         }
                     }
                 }

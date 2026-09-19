@@ -3,7 +3,11 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include "i18n.h"
 #include "model/presentation.h"
+#include "model/state_text.h"
+
+#include <KLocalizedString>
 
 #include <QSet>
 #include <QtTest>
@@ -21,6 +25,7 @@ class PresentationTest : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
+    void stateTextFollowsTheDomain();
     void colorIndexIsDeterministic();
     void colorIndexSpreadsAcrossThePalette();
     void colorIndexHandlesDegenerateInput();
@@ -63,6 +68,31 @@ void PresentationTest::colorIndexHandlesDegenerateInput()
     QCOMPARE(presentation.connectionColorIndex(QStringLiteral("cid"), -3), 0);
     QCOMPARE(presentation.connectionColorIndex(QString(), 0), 0);
 }
+
+/*!
+ * 状态文案要跟着翻译域走（详情页的"关联容器/网络成员"列表用它）。
+ */
+void PresentationTest::stateTextFollowsTheDomain()
+{
+    /*
+     * 语言必须在**第一次 i18n 调用之前**设好：ki18n 会缓存"域 + 语言"的查找结果，
+     * 先取过英文再切语言不会重新翻译（这个坑在本用例里实测踩到过）。
+     */
+    // 与 KCM 的启动顺序一致：先设域再做任何翻译（少了这一步 i18n 会以"无域"查找）
+    setupTranslationDomain();
+
+    Presentation presentation;
+    // 键就是 Docker 的状态字符串；未知键不能返回空串（界面会出现空白）
+    QVERIFY(!presentation.stateText(QStringLiteral("running")).isEmpty());
+    QVERIFY(!presentation.stateText(QStringLiteral("paused")).isEmpty());
+    QVERIFY(!presentation.stateText(QStringLiteral("exited")).isEmpty());
+    QVERIFY(!presentation.stateText(QStringLiteral("no-such-state")).isEmpty());
+    // 与容器列表用的是同一份文案（同一个 C++ 助手）；至于"是否翻成中文"——
+    // 那是 tst_i18n_consistency 的事（只有它带着译文目录与 zh_CN 环境跑）
+    QCOMPARE(presentation.stateText(QStringLiteral("running")), containerStateText(ContainerState::Running));
+
+}
+
 
 QTEST_GUILESS_MAIN(PresentationTest)
 

@@ -4,6 +4,7 @@
 */
 
 #include "i18n.h"
+#include "model/presentation.h"
 
 #include <KLocalizedString>
 
@@ -331,6 +332,11 @@ void I18nConsistencyTest::translationsLoadAtRuntime()
     QCOMPARE(i18n("Save"), QStringLiteral("保存"));
     QCOMPARE(i18n("Unlock to edit"), QStringLiteral("解锁以编辑"));
     QCOMPARE(i18ncp("@info image layer count", "Layers (%1)", "Layers (%1)", 3), QStringLiteral("层（3）"));
+
+    // 详情页的"关联容器/网络成员"用 Presentation 取状态文案：必须和容器列表同一份译文
+    Presentation presentation;
+    QCOMPARE(presentation.stateText(QStringLiteral("running")), QStringLiteral("运行中"));
+    QCOMPARE(presentation.stateText(QStringLiteral("paused")), QStringLiteral("已暂停"));
 
     // 没有译文的字符串必须原样返回：返回空串会让界面出现空白按钮
     const char *untranslated = "this string is intentionally not translated";

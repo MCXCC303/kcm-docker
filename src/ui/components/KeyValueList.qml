@@ -4,8 +4,11 @@
 
     「键 = 值」只读列表（ARCH_V3 §2.1）：
 
-    渲染 DetailListModel（环境变量 / 标签 / 端口 …）的 label + value 两列，
-    键列等宽、值列等宽并中间省略。原本这段布局在两个详情页里各写了一遍。
+    渲染 DetailListModel（环境变量 / 标签 / 驱动选项 …）的 label + value 两列。
+
+    实测反馈：「驱动选项」里选项名（`com.docker.network.bridge.name` 这种很长）**全被挡住**——
+    原来给键列固定了 10 个 gridUnit 宽，长键被省略号吃掉。现在反过来：
+    **键占剩余宽度**（真的放不下才省略），**值贴右对齐**（值通常很短）。
 
     调用方负责把它放进 Kirigami.FormLayout 之外的容器（例如 CollapsibleSection）。
 */
@@ -21,8 +24,12 @@ ColumnLayout {
 
     required property var model
 
-    /*! 键列宽度；等宽字体下保证多行对齐。 */
-    property real keyWidth: Kirigami.Units.gridUnit * 10
+    /*!
+     * 值列的宽度上限（占整行比例）。
+     *
+     * 值通常很短（`true` / `172.18.0.0/16`），给个上限是为了让长值也不会把键挤没。
+     */
+    property real valueWidthRatio: 0.45
 
     Layout.fillWidth: true
     spacing: 0
@@ -36,16 +43,23 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
+            // 键：占据剩余宽度（长键只有在真的放不下时才省略）
             QQC2.Label {
+                objectName: "keyValueListKey"
                 text: label
                 font.family: "monospace"
-                Layout.preferredWidth: list.keyWidth
+                Layout.fillWidth: true
                 elide: Text.ElideRight
             }
+            // 值：贴右对齐，长度有上限，过长时中间省略
             QQC2.Label {
+                objectName: "keyValueListValue"
                 text: value
                 font.family: "monospace"
-                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignRight
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+                Layout.maximumWidth: Math.max(Kirigami.Units.gridUnit * 4,
+                                              list.width * list.valueWidthRatio)
                 elide: Text.ElideMiddle
             }
         }

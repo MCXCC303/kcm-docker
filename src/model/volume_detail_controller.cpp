@@ -132,14 +132,14 @@ void VolumeDetailController::reload()
     QList<DetailEntry> labelEntries;
     labelEntries.reserve(found.labels.size());
     for (const auto &label : found.labels) {
-        labelEntries.append({label.first, label.second, QString(), QString()});
+        labelEntries.append({label.first, label.second, QString(), QString(), QString(), QString()});
     }
     m_labels->setEntries(labelEntries);
 
     QList<DetailEntry> optionEntries;
     optionEntries.reserve(found.options.size());
     for (const auto &option : found.options) {
-        optionEntries.append({option.first, option.second, QString(), QString()});
+        optionEntries.append({option.first, option.second, QString(), QString(), QString(), QString()});
     }
     m_options->setEntries(optionEntries);
 

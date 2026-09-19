@@ -136,7 +136,7 @@ void ImageDetailController::rebuildLists()
     QList<DetailEntry> tags;
     tags.reserve(m_detail.repoTags.size());
     for (const QString &tag : m_detail.repoTags) {
-        tags.append({tag, QString(), QString(), QStringLiteral("tag")});
+        tags.append({tag, QString(), QString(), QStringLiteral("tag"), QString(), QString()});
     }
     m_tags->setEntries(tags);
 
@@ -145,9 +145,9 @@ void ImageDetailController::rebuildLists()
     for (const QString &digest : m_detail.repoDigests) {
         const int at = digest.indexOf(QLatin1Char('@'));
         if (at > 0) {
-            digests.append({digest.left(at), digest.mid(at + 1), QString(), QStringLiteral("digest")});
+            digests.append({digest.left(at), digest.mid(at + 1), QString(), QStringLiteral("digest"), QString(), QString()});
         } else {
-            digests.append({digest, QString(), QString(), QStringLiteral("digest")});
+            digests.append({digest, QString(), QString(), QStringLiteral("digest"), QString(), QString()});
         }
     }
     m_digests->setEntries(digests);
@@ -160,7 +160,7 @@ void ImageDetailController::rebuildLists()
         if (shortDigest.startsWith(QLatin1String("sha256:"))) {
             shortDigest.remove(0, 7);
         }
-        layers.append({QString::number(index), shortDigest.left(24), layer, QStringLiteral("layer")});
+        layers.append({QString::number(index), shortDigest.left(24), layer, QStringLiteral("layer"), QString(), QString()});
         ++index;
     }
     m_layers->setEntries(layers);
@@ -175,7 +175,14 @@ void ImageDetailController::rebuildUsedBy()
         if (container.imageId != m_detail.id) {
             continue;
         }
-        used.append({container.name, containerStateText(container.state), container.shortId(), container.stateKey()});
+        // 第 5 个字段是状态 key（图标用），第 6 个是跳转目标（容器 id）——
+        // 镜像的"关联容器"列表要能点击打开容器详情（实测反馈）
+        used.append({container.name,
+                     containerStateText(container.state),
+                     container.shortId(),
+                     container.stateKey(),
+                     container.stateKey(),
+                     container.id});
     }
     m_usedBy->setEntries(used);
 }

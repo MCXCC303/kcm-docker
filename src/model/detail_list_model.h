@@ -40,6 +40,10 @@ public:
         ValueRole,
         DetailRole,
         EntryKeyRole,
+        /*! 关联容器的状态 key（图标与语义）。 */
+        StateKeyRole,
+        /*! 点击跳转的目标（容器 id）；空 = 该行不可跳转。 */
+        TargetRole,
     };
     Q_ENUM(Roles)
 

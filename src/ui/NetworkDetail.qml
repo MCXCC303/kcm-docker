@@ -196,17 +196,25 @@ Kirigami.Page {
                         required property string value
                         required property string detail
                         required property string entryKey
+                        required property string stateKey
+                        required property string target
 
                         objectName: "networkMemberRow"
                         Layout.fillWidth: true
-                        // 容器 id 在 entryKey 里（列表行不显示它，但导航需要）
-                        onClicked: page.containerRequested(memberRow.entryKey)
+                        // 可跳转的行才响应点击（target 是容器 id）
+                        enabled: memberRow.target.length > 0
+                        onClicked: page.containerRequested(memberRow.target)
 
                         contentItem: RowLayout {
                             spacing: Kirigami.Units.smallSpacing
 
+                            // 与「镜像 → 关联容器」同一种状态图标（用户反馈要统一）
                             Kirigami.Icon {
-                                source: "application-x-executable"
+                                objectName: "networkMemberStateIcon"
+                                // 状态未知时干脆不画：宁可少一个图标，也不要一个"?"占位
+                                visible: memberRow.stateKey.length > 0
+                                source: Kontainer.Presentation.stateIconName(memberRow.stateKey)
+                                color: Components.StatusPalette.color(Kontainer.Presentation.stateSemanticKey(memberRow.stateKey, "none"))
                                 implicitWidth: Kirigami.Units.iconSizes.small
                                 implicitHeight: Kirigami.Units.iconSizes.small
                             }
@@ -214,6 +222,13 @@ Kirigami.Page {
                                 Layout.fillWidth: true
                                 text: memberRow.label
                                 elide: Text.ElideMiddle
+                            }
+                            QQC2.Label {
+                                objectName: "networkMemberStateText"
+                                visible: memberRow.stateKey.length > 0
+                                text: Kontainer.Presentation.stateText(memberRow.stateKey)
+                                font: Kirigami.Theme.smallFont
+                                opacity: 0.8
                             }
                             QQC2.Label {
                                 objectName: "networkMemberAddress"

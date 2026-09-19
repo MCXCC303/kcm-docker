@@ -244,12 +244,12 @@ void ContainerDetailController::rebuildLists()
     networks.reserve(m_detail.networks.size());
     for (const ContainerNetwork &network : m_detail.networks) {
         // label=网络名 value=IPv4 detail=MAC，其余（IPv6/网关）作为附加条目展开
-        networks.append({network.name, network.ipAddress, network.macAddress, QStringLiteral("network")});
+        networks.append({network.name, network.ipAddress, network.macAddress, QStringLiteral("network"), QString(), QString()});
         if (!network.ipv6Address.isEmpty()) {
-            networks.append({i18n("IPv6"), network.ipv6Address, network.name, QStringLiteral("network-ipv6")});
+            networks.append({i18n("IPv6"), network.ipv6Address, network.name, QStringLiteral("network-ipv6"), QString(), QString()});
         }
         if (!network.gateway.isEmpty()) {
-            networks.append({i18n("Gateway"), network.gateway, network.name, QStringLiteral("network-gateway")});
+            networks.append({i18n("Gateway"), network.gateway, network.name, QStringLiteral("network-gateway"), QString(), QString()});
         }
     }
     m_networks->setEntries(networks);
@@ -259,7 +259,7 @@ void ContainerDetailController::rebuildLists()
     QList<DetailEntry> labels;
     labels.reserve(m_detail.labels.size());
     for (const auto &[key, value] : m_detail.labels) {
-        labels.append({key, value, QString(), QStringLiteral("label")});
+        labels.append({key, value, QString(), QStringLiteral("label"), QString(), QString()});
     }
     m_labels->setEntries(labels);
 
@@ -268,9 +268,9 @@ void ContainerDetailController::rebuildLists()
     for (const QString &entry : m_detail.environment) {
         const int equals = entry.indexOf(QLatin1Char('='));
         if (equals > 0) {
-            environment.append({entry.left(equals), entry.mid(equals + 1), QString(), QStringLiteral("env")});
+            environment.append({entry.left(equals), entry.mid(equals + 1), QString(), QStringLiteral("env"), QString(), QString()});
         } else {
-            environment.append({entry, QString(), QString(), QStringLiteral("env")});
+            environment.append({entry, QString(), QString(), QStringLiteral("env"), QString(), QString()});
         }
     }
     m_environment->setEntries(environment);

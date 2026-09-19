@@ -132,9 +132,15 @@ QByteArray ContainerCreateRequest::toJson() const
             entry.insert(QStringLiteral("HostIp"), port.hostIp);
             // 0 表示随机分配：Docker 用空字符串表达"随机"
             entry.insert(QStringLiteral("HostPort"), port.hostPort == 0 ? QString() : QString::number(port.hostPort));
-            QJsonArray array;
+            /*
+             * 同一个容器端口可以对应**多个宿主端口**（实测反馈：指定 1000/2000/3000 → 容器 80，
+             * 结果只有 1000 生效）。PortBindings 是"容器端口 → 绑定数组"，必须**追加**，
+             * 直接 insert 只会留下最后一行。
+             */
+            const QString key = portKey(port.containerPort, port.protocol);
+            QJsonArray array = bindings.value(key).toArray();
             array.append(entry);
-            bindings.insert(portKey(port.containerPort, port.protocol), array);
+            bindings.insert(key, array);
         }
         if (!bindings.isEmpty()) {
             hostConfig.insert(QStringLiteral("PortBindings"), bindings);

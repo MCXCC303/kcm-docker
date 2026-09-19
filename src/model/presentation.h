@@ -43,6 +43,14 @@ public:
     /*! 容器状态 → 图标名（icon theme name）。 */
     Q_INVOKABLE QString stateIconName(const QString &stateKey) const;
 
+    /*!
+     * 状态 key → 用户可见文案（`running` → 「运行中」）。
+     *
+     * 详情页的"关联容器/网络成员"列表都要显示状态，文案只在 C++ 里定义一处
+     * （`state_text.cpp`，与容器列表用的是同一份）。
+     */
+    Q_INVOKABLE QString stateText(const QString &stateKey) const;
+
     /*! 健康状态 → 图标名；无健康检查时返回空。 */
     Q_INVOKABLE QString healthIconName(const QString &healthKey) const;
 

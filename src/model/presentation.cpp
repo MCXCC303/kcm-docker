@@ -5,6 +5,8 @@
 
 #include "model/presentation.h"
 
+#include "model/state_text.h"
+
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QRegularExpression>
@@ -62,6 +64,13 @@ QString Presentation::stateIconName(const QString &stateKey) const
     }
     return QStringLiteral("dialog-question");
 }
+
+QString Presentation::stateText(const QString &stateKey) const
+{
+    // stateKey 就是 Docker 的状态字符串（running/exited/…），与解析 DTO 时用的是同一套映射
+    return containerStateText(containerStateFromString(stateKey));
+}
+
 
 QString Presentation::healthIconName(const QString &healthKey) const
 {

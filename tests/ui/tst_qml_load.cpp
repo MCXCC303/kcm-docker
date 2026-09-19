@@ -12,12 +12,14 @@
 #include "model/qml_registration.h"
 #include "support/qml_item_utils.h"
 #include "support/mock_docker_backend.h"
+#include "model/detail_list_model.h"
 #include "support/qml_stub_kcm.h"
 
 #include <QJsonDocument>
 #include <QTemporaryDir>
 #include <cstdio>
 #include <QJsonObject>
+#include <QFontMetricsF>
 #include <QQmlComponent>
 #include <QQmlContext>
 #include <QQmlExpression>
@@ -176,6 +178,8 @@ private Q_SLOTS:
     void portEditorColoursEachRowDifferently();
     void serviceCardConfirmsRiskyActions();
     void filteredComboBoxNarrowsAndSelects();
+    void imageUsedByRowsShowStateAndNavigate();
+    void keyValueRowsKeepLongKeysVisible();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2447,6 +2451,203 @@ void QmlLoadTest::filteredComboBoxNarrowsAndSelects()
              QStringLiteral("postgres:17-alpine"));
 }
 
+
+/*!
+ * 镜像详情的「关联容器」列表（实测反馈）：要有**状态图标**，并且**点击能跳到容器详情**。
+ *
+ * 与网络详情的成员行统一：同样的状态图标 + 同样的跳转信号（target = 容器 id）。
+ */
+void QmlLoadTest::imageUsedByRowsShowStateAndNavigate()
+{
+    const QString imageId = QStringLiteral("sha256:feedface");
+    Image image;
+    image.id = imageId;
+    image.repoTags = {QStringLiteral("demo:1.0")};
+    image.sizeBytes = 1024;
+    image.created = QDateTime::currentDateTimeUtc();
+    m_backend->setImages({image});
+
+    Container running;
+    running.id = QStringLiteral("cid-run");
+    running.name = QStringLiteral("demo-run");
+    running.image = QStringLiteral("demo:1.0");
+    running.imageId = imageId;
+    running.state = ContainerState::Running;
+    Container paused;
+    paused.id = QStringLiteral("cid-pause");
+    paused.name = QStringLiteral("demo-paused");
+    paused.image = QStringLiteral("demo:1.0");
+    paused.imageId = imageId;
+    paused.state = ContainerState::Paused;
+    m_backend->setContainers({running, paused});
+
+    ImageDetail detail;
+    detail.id = imageId;
+    detail.repoTags = {QStringLiteral("demo:1.0")};
+    m_backend->setImageDetail(detail);
+
+    auto *controller = m_stubKcm->controller()->imageDetail();
+    controller->setImageId(imageId);
+    controller->refresh();
+    m_backend->completeRefresh();
+    QTRY_VERIFY_WITH_TIMEOUT(controller->usedByContainers()->count() == 2, 5000);
+
+    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("imageId"), imageId}},
+                                                                        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(900, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(900);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    // 两行都要有状态图标（不是通用图标）
+    QList<QQuickItem *> rows;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        rows.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("usedByEntry")) {
+                rows.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return rows.size() == 2;
+    }(), 5000);
+    for (QQuickItem *row : rows) {
+        QQuickItem *icon = findItemDeep(row, QStringLiteral("usedByStateIcon"));
+        QVERIFY2(icon, "every used-by row must carry a state icon");
+        QVERIFY2(!icon->property("source").toString().isEmpty(), "the state icon must resolve to an icon name");
+    }
+
+    // 点击第一行：发出 containerRequested，且带上**容器 id**（不是状态 key）
+    QSignalSpy requestedSpy(page, SIGNAL(containerRequested(QString)));
+    QVERIFY(requestedSpy.isValid());
+    QVERIFY(QMetaObject::invokeMethod(rows.first(), "clicked"));
+    QCOMPARE(requestedSpy.count(), 1);
+    const QString requested = requestedSpy.at(0).at(0).toString();
+    QVERIFY2(requested == QLatin1String("cid-run") || requested == QLatin1String("cid-pause"),
+             qPrintable(QStringLiteral("expected a container id, got '%1'").arg(requested)));
+}
+
+
+/*!
+ * 「驱动选项」这类键值列表（实测反馈）：长选项名不能被挤没，值要贴右。
+ *
+ * 原来键列固定 10 个 gridUnit，`com.docker.network.bridge.name` 这种长键只剩省略号，
+ * 值却占满整行。现在键占剩余宽度、值贴右对齐（且长度有上限）。
+ */
+void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
+{
+    /*
+     * 用一小段包装 QML 把组件放进真实布局里（`ColumnLayout` 撑满窗口）：
+     * 被测的问题只在**宽度受限**时才出现——直接给组件 setWidth，列宽不会被拉伸，
+     * 长键自然放得下，那样子测不到东西。
+     */
+    QTemporaryFile wrapper;
+    QVERIFY(wrapper.open());
+    wrapper.write(QStringLiteral("import QtQuick\n"
+                                 "import QtQuick.Layouts\n"
+                                 "import \"file://" KONTAINER_SOURCE_DIR "/src/ui/components\"\n"
+                                 "ColumnLayout {\n"
+                                 "    property var kvModel\n"
+                                 "    KeyValueList { Layout.fillWidth: true; model: kvModel }\n"
+                                 "}\n")
+                      .toUtf8());
+    wrapper.flush();
+
+    DetailListModel model;
+    model.setEntries({{QStringLiteral("com.docker.network.bridge.name"), QStringLiteral("docker0"), QString(), QString(), QString(), QString()},
+                      {QStringLiteral("com.docker.network.bridge.enable_icc"), QStringLiteral("true"), QString(), QString(), QString(), QString()}});
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(wrapper.fileName()));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QVariantMap initial;
+    initial.insert(QStringLiteral("kvModel"), QVariant::fromValue(&model));
+    QScopedPointer<QObject> object(component.createWithInitialProperties(initial, m_engine->rootContext()));
+    QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
+    auto *list = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(list);
+
+    /*
+     * 行宽取 **320px**：这就是用户看到问题时的场景（面板不宽、选项名很长）。
+     * 旧策略下键列被固定在 ≈180px，`com.docker.network.bridge.name`（≈198px）
+     * 必然被省略号吃掉；新策略把剩余宽度给键列，于是完整显示。
+     */
+    QQuickWindow window;
+    window.resize(320, 300);
+    list->setParentItem(window.contentItem());
+    list->setWidth(320);
+    list->setHeight(300);
+    window.show();
+    QTRY_VERIFY(list->width() > 0);
+
+    QList<QQuickItem *> keys;
+    QList<QQuickItem *> values;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        keys.clear();
+        values.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("keyValueListKey")) {
+                keys.append(node);
+            } else if (node->objectName() == QLatin1String("keyValueListValue")) {
+                values.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return keys.size() == 2 && values.size() == 2;
+    }(), 5000);
+
+    /*
+     * 关键断言：**完整的选项名必须放得下**（没有被省略号吃掉）。
+     *
+     * 旧实现给键列固定 10 个 gridUnit（≈180px）而键需要约 198px，同时值列
+     * `Layout.fillWidth` 把剩余宽度全拿走——于是选项名被截断、值却占满整行
+     * （实测反馈："选项名全被挡住了"）。Text 的 contentWidth 是完整文本所需宽度，
+     * contentWidth <= width 就代表没被截断。
+     */
+    for (QQuickItem *key : keys) {
+        // 用字体度量算"完整显示这个选项名需要多宽"，再和实际列宽比——不依赖
+        // QQC2.Label 在 elide 时对 contentWidth 的处理（实测它会给 0，断言会失效）
+        const QFontMetricsF metrics(key->property("font").value<QFont>());
+        const qreal needed = metrics.horizontalAdvance(key->property("text").toString());
+        QVERIFY2(needed <= key->width() + 1.0,
+                 qPrintable(QStringLiteral("the key '%1' is truncated (needs %2px, has %3px)")
+                                .arg(key->property("text").toString())
+                                .arg(needed)
+                                .arg(key->width())));
+    }
+    // 键列拿到剩余宽度、值贴右：值通常很短，长的是键
+    QVERIFY2(keys.first()->width() > values.first()->width(),
+             "the key column must take the room; the value hugs the right edge");
+
+    // 值贴右：右边缘与行右边缘基本重合
+    QQuickItem *row = values.first()->parentItem();
+    QVERIFY(row);
+    const qreal rowRight = row->mapToItem(list, QPointF(row->width(), 0)).x();
+    const qreal valueRight = values.first()->mapToItem(list, QPointF(values.first()->width(), 0)).x();
+    QVERIFY2(qAbs(rowRight - valueRight) < 2.0,
+             qPrintable(QStringLiteral("the value must hug the right edge (row %1 vs value %2)").arg(rowRight).arg(valueRight)));
+}
 
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
