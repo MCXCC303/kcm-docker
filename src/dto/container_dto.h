@@ -26,6 +26,20 @@ struct DockerPortDTO {
 };
 
 /*!
+ * `HostConfig.PortBindings` 里的一条**声明**绑定。
+ *
+ * 与 `DockerPortDTO`（来自 `NetworkSettings.Ports`，即"实际发布"）刻意分开：
+ * 声明里 `HostPort` 可以是区间字符串（`"47300-47309"`），解析失败时整条丢弃。
+ */
+struct DockerDeclaredPortDTO {
+    quint16 containerPort = 0;
+    QString protocol;
+    QString hostIp;
+    quint16 hostPort = 0;
+    quint16 hostPortEnd = 0;
+};
+
+/*!
  * `GET /containers/json` 的单条记录（ARCH_V1 §40：DTO 是 API schema 的镜像）。
  *
  * 只有 Id / State / Names 是必需的；其余字段缺失或类型不符时使用默认值，

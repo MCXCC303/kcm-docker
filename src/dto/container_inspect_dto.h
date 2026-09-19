@@ -73,6 +73,8 @@ struct DockerContainerInspectDTO {
     QDateTime created;
 
     QList<DockerPortDTO> ports;
+    /*! `HostConfig.PortBindings`：容器**声明**的宿主绑定（与"实际发布"的 `ports` 分开）。 */
+    QList<DockerDeclaredPortDTO> declaredPorts;
     QList<ContainerNetworkDTO> networks;
     QList<DockerMountDTO> mounts;
 

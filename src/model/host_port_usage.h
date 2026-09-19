@@ -6,7 +6,9 @@
 #pragma once
 
 #include "domain/container.h"
+#include "domain/container_detail.h"
 
+#include <QHash>
 #include <QList>
 #include <QString>
 #include <QStringList>
@@ -57,9 +59,13 @@ struct HostPortEntry {
 
     friend bool operator==(const HostPortEntry &lhs, const HostPortEntry &rhs)
     {
+        // 注意：**展示用的字段也要比**（容器名/镜像）——漏掉它们时改名或换镜像不会
+        // 触发 dataChanged，页面就会一直显示旧值（用例 refreshKeepsTheModelIntact 守住这一点）
         return lhs.hostPort == rhs.hostPort && lhs.hostPortEnd == rhs.hostPortEnd && lhs.ipv4 == rhs.ipv4 && lhs.ipv6 == rhs.ipv6
             && lhs.dualStack == rhs.dualStack && lhs.hostIp == rhs.hostIp && lhs.containerPort == rhs.containerPort
-            && lhs.protocol == rhs.protocol && lhs.stateKey == rhs.stateKey && lhs.containerId == rhs.containerId;
+            && lhs.protocol == rhs.protocol && lhs.stateKey == rhs.stateKey && lhs.containerId == rhs.containerId
+            && lhs.containerName == rhs.containerName && lhs.containerImage == rhs.containerImage
+            && lhs.containerStateKey == rhs.containerStateKey;
     }
 };
 
@@ -82,7 +88,18 @@ public:
      *   - IPv4 与 IPv6 通配的同端口绑定合并成一条并标记 `dualStack`；
      *   - 结果按宿主端口升序，同一端口按容器名排序（刷新时行不会跳）。
      */
-    static QList<HostPortEntry> entriesFor(const QList<Container> &containers);
+    /*!
+     * 端口页用：把"实际发布"（容器列表）与"声明"（inspect，只对**运行中**的容器取）
+     * 合到一张表里（用户拍板决定 3：按"声明 vs 实际发布"的语义）。
+     *
+     * - 声明且**真的发布了** → 一条 `inUse`（以发布为准，地址/端口取实际的）
+     * - 声明了但**没有发布** → 一条 `declaredNotPublished`（`alpine-82dc` 那种情形）
+     * - 只发布没声明（理论上不该有） → 仍然按 `inUse` 收进来
+     *
+     * `declared` 的键是容器 id；缺省（空）时行为与单参数版本完全一致。
+     */
+    static QList<HostPortEntry> entriesFor(const QList<Container> &containers,
+                                           const QHash<QString, QList<DeclaredPortBinding>> &declared = {});
 
     /*!
      * 占用该宿主端口的容器名（没有则空）。

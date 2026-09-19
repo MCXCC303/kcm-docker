@@ -78,6 +78,12 @@ KCM.AbstractKCM {
                         "containerId": containerId
                     });
                 }
+                // 端口页的"跳转"与容器列表落到同一个详情页
+                onPortContainerActivated: function (containerId) {
+                    stack.push(containerDetailComponent, {
+                        "containerId": containerId
+                    });
+                }
                 onImageActivated: function (imageId) {
                     stack.push(imageDetailComponent, {
                         "imageId": imageId

@@ -31,6 +31,8 @@ Kirigami.Page {
 
     /*! 卡片被激活：由 main.qml 接到导航上（ARCH_V2 §43：导航属于 KCM 层） */
     signal containerActivated(string containerId)
+    /*! 端口页请求打开某个容器的详情（容器是那一页的"跳转"目标）。 */
+    signal portContainerActivated(string containerId)
     /*! 请求打开「运行时配置」页（daemon.json）；scope = user | system。 */
     signal configureRuntimeRequested(string scope)
     /*! 打开仓库认证页（ARCH_V5_V8 §2.7）：镜像标签页工具栏与失败引导都用它。 */
@@ -138,6 +140,32 @@ Kirigami.Page {
         default:
             return i18n("Not connected");
         }
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* 端口页（下一期 M3）的辅助                                            */
+    /* ------------------------------------------------------------------ */
+    /*! "声明了但没发布"的行数（由控制器算好；QML 不碰模型枚举）。 */
+    readonly property int portsDeclaredCount: root.controller.declaredNotPublishedCount
+
+    /*! 待停止的容器（端口页行内"停止"与其他危险动作一样要二次确认）。 */
+    property string pendingStopContainerId: ""
+    property string pendingStopContainerName: ""
+
+    function openContainerFromPorts(containerId, containerName): void {
+        if (containerId.length === 0) {
+            return;
+        }
+        root.portContainerActivated(containerId);
+    }
+
+    function confirmStopFromPorts(containerId, containerName): void {
+        if (containerId.length === 0) {
+            return;
+        }
+        root.pendingStopContainerId = containerId;
+        root.pendingStopContainerName = containerName;
+        stopContainerDialog.open();
     }
 
     /* ------------------------------------------------------------------ */
@@ -417,12 +445,15 @@ Kirigami.Page {
             Layout.fillWidth: true
 
             // 网络与数据卷都是低频数据：只在切到对应页面时刷新，不加入 5 秒轮询。
-            // 索引：0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 挂载预设 / 5 引擎
+            // 索引：0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 端口 / 5 挂载预设 / 6 引擎
             onCurrentIndexChanged: {
                 if (tabBar.currentIndex === 2) {
                     root.controller.refreshNetworks();
                 } else if (tabBar.currentIndex === 3) {
                     root.controller.refreshVolumes();
+                } else if (tabBar.currentIndex === 4) {
+                    // 端口页：刷新容器列表 + 为运行中的容器各拉一次 inspect（要它们的"声明"）
+                    root.controller.refreshPorts();
                 }
             }
 
@@ -437,6 +468,9 @@ Kirigami.Page {
             }
             QQC2.TabButton {
                 text: i18ncp("@title:tab volume list", "Volumes (%1)", "Volumes (%1)", root.controller.volumeModel.count)
+            }
+            QQC2.TabButton {
+                text: i18ncp("@title:tab host port list", "Ports (%1)", "Ports (%1)", root.controller.hostPortList.count)
             }
             QQC2.TabButton {
                 text: i18nc("@title:tab mount presets", "Mount presets")
@@ -1129,6 +1163,88 @@ Kirigami.Page {
                 }
             }
 
+            /* ---------------------------- 端口（下一期 M3） ---------------------------- */
+            /* 用户要求：端口是第一视觉焦点，容器只是其中一列 */
+            ColumnLayout {
+                id: portsTab
+
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                spacing: Kirigami.Units.smallSpacing
+
+                Kirigami.InlineMessage {
+                    objectName: "portsDeclaredHint"
+                    Layout.fillWidth: true
+                    // 只在真的有"声明了但没发布"的行时说明一次（减少冗余小字）
+                    visible: root.portsDeclaredCount > 0
+                    type: Kirigami.MessageType.Information
+                    text: i18ncp("@info", "%1 port is declared by a running container but was not actually published.",
+                                 "%1 ports are declared by running containers but were not actually published.",
+                                 root.portsDeclaredCount)
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.TextField {
+                        objectName: "portSearchField"
+                        Layout.fillWidth: true
+                        placeholderText: i18n("Search by port, container or image…")
+                        text: root.controller.hostPortList.searchText
+                        onTextChanged: root.controller.hostPortList.searchText = text
+                    }
+
+                    QQC2.ComboBox {
+                        objectName: "portStateCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("All ports"), value: "all"},
+                            {text: i18n("In use"), value: "inUse"},
+                            {text: i18n("Declared only"), value: "declaredNotPublished"}
+                        ]
+                        onActivated: root.controller.hostPortList.stateFilter = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.controller.hostPortList.stateFilter)
+                    }
+
+                    QQC2.ComboBox {
+                        objectName: "portSortCombo"
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            {text: i18n("Sort by port"), value: "port"},
+                            {text: i18n("Sort by container"), value: "container"}
+                        ]
+                        onActivated: root.controller.hostPortList.sortKey = currentValue
+                        Component.onCompleted: currentIndex = indexOfValue(root.controller.hostPortList.sortKey)
+                    }
+                }
+
+                Components.EmptyPlaceholder {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    objectName: "portsEmptyPlaceholder"
+                    visible: root.controller.hostPortList.count === 0
+                    message: root.controller.hostPortList.searchText.length > 0
+                        ? i18n("No port matches “%1”.", root.controller.hostPortList.searchText)
+                        : i18n("No host port is currently used by a running container.")
+                    actionText: root.controller.hostPortList.searchText.length > 0 ? i18n("Clear search") : ""
+                    actionIconName: "edit-clear"
+                    onActionTriggered: root.controller.hostPortList.searchText = ""
+                }
+
+                Components.HostPortList {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: root.controller.hostPortList.count > 0
+                    model: root.controller.hostPortList
+                    writeAllowed: root.operations.writeAllowed
+                    onContainerRequested: (containerId, containerName) => root.openContainerFromPorts(containerId, containerName)
+                    onStopRequested: (containerId, containerName) => root.confirmStopFromPorts(containerId, containerName)
+                }
+            }
+
             /* ------------------------ 挂载预设（七期 §4.2） ------------------------ */
             /* 用户实测反馈：在创建向导里管理预设不方便，因此独立成标签页 */
             ColumnLayout {
@@ -1196,6 +1312,26 @@ Kirigami.Page {
                 }
             }
         }
+    }
+
+    /* 端口页的"停止容器"确认（危险动作的后果要写清楚） */
+    Kirigami.PromptDialog {
+        id: stopContainerDialog
+
+        objectName: "portStopContainerDialog"
+        title: i18n("Stop container")
+        subtitle: i18n("“%1” will stop and the ports it publishes will be released.", root.pendingStopContainerName)
+        dialogType: Kirigami.PromptDialog.Warning
+        standardButtons: Kirigami.Dialog.Cancel
+
+        customFooterActions: [
+            Kirigami.Action {
+                objectName: "portStopContainerConfirm"
+                text: i18n("Stop container")
+                icon.name: "process-stop"
+                onTriggered: root.operations.stopContainer(root.pendingStopContainerId)
+            }
+        ]
     }
 
     /* 拉取镜像对话框（进度与取消也在这里） */

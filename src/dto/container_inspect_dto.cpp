@@ -5,6 +5,10 @@
 
 #include "dto/container_inspect_dto.h"
 
+#include <algorithm>
+
+#include "model/port_binding_rules.h"
+
 #include "dto/container_network_dto.h"
 
 #include "dto/json_helpers.h"
@@ -19,6 +23,58 @@ using namespace JsonHelpers;
 
 namespace
 {
+
+/*!
+ * `HostConfig.PortBindings` → 声明的绑定。
+ *
+ * 结构是 `{"80/tcp": [{"HostIp": "", "HostPort": "8100"}, …], …}`：
+ * `HostPort` 是**字符串**，可能是区间（`"47300-47309"`），也可能是空串（随机分配 → 跳过）。
+ */
+QList<DockerDeclaredPortDTO> parseDeclaredPorts(const QJsonObject &hostConfig)
+{
+    QList<DockerDeclaredPortDTO> declared;
+    const QJsonObject bindings = hostConfig.value(QStringLiteral("PortBindings")).toObject();
+    for (auto it = bindings.constBegin(); it != bindings.constEnd(); ++it) {
+        const QString key = it.key();
+        const int slash = key.indexOf(QLatin1Char('/'));
+        const int containerPort = slash > 0 ? key.left(slash).toInt() : key.toInt();
+        if (containerPort <= 0 || containerPort > 65535) {
+            continue;
+        }
+        const QString protocol = slash > 0 ? key.mid(slash + 1) : QStringLiteral("tcp");
+        const QJsonArray array = it.value().toArray();
+        for (const QJsonValue &entry : array) {
+            if (!entry.isObject()) {
+                continue;
+            }
+            const QJsonObject binding = entry.toObject();
+            DockerDeclaredPortDTO dto;
+            dto.containerPort = static_cast<quint16>(containerPort);
+            dto.protocol = protocol;
+            dto.hostIp = stringValue(binding, QStringLiteral("HostIp"));
+            quint16 first = 0;
+            quint16 last = 0;
+            if (!PortBindingRules::parseHostPortSpec(stringValue(binding, QStringLiteral("HostPort")), &first, &last)) {
+                continue; // 空串（随机分配）与坏值都不进模型
+            }
+            dto.hostPort = first;
+            dto.hostPortEnd = last;
+            declared.append(dto);
+        }
+    }
+    // 顺序稳定（QJsonObject 本身按键排序，不能依赖它）：按容器端口、宿主端口排一下，
+    // 端口页刷新时行才不会跳
+    std::sort(declared.begin(), declared.end(), [](const DockerDeclaredPortDTO &lhs, const DockerDeclaredPortDTO &rhs) {
+        if (lhs.containerPort != rhs.containerPort) {
+            return lhs.containerPort < rhs.containerPort;
+        }
+        if (lhs.hostPort != rhs.hostPort) {
+            return lhs.hostPort < rhs.hostPort;
+        }
+        return lhs.hostIp < rhs.hostIp;
+    });
+    return declared;
+}
 
 QList<DockerPortDTO> parsePorts(const QJsonObject &networkSettings)
 {
@@ -156,6 +212,7 @@ std::optional<DockerContainerInspectDTO> DockerContainerInspectDTO::fromJson(con
 
     dto.restartPolicy = restartPolicyText(object.value(QStringLiteral("HostConfig")).toObject());
     dto.ports = parsePorts(object.value(QStringLiteral("NetworkSettings")).toObject());
+    dto.declaredPorts = parseDeclaredPorts(object.value(QStringLiteral("HostConfig")).toObject());
     dto.networks = parseNetworks(object.value(QStringLiteral("NetworkSettings")).toObject());
     dto.mounts = parseMounts(object);
 
@@ -212,6 +269,17 @@ ContainerDetail containerDetailFromDto(const DockerContainerInspectDTO &dto)
         port.publicPort = portDto.publicPort;
         port.type = portDto.type;
         detail.ports.append(port);
+    }
+
+    detail.declaredPorts.reserve(dto.declaredPorts.size());
+    for (const DockerDeclaredPortDTO &declaredDto : dto.declaredPorts) {
+        DeclaredPortBinding binding;
+        binding.containerPort = declaredDto.containerPort;
+        binding.protocol = declaredDto.protocol;
+        binding.hostIp = declaredDto.hostIp;
+        binding.hostPort = declaredDto.hostPort;
+        binding.hostPortEnd = declaredDto.hostPortEnd;
+        detail.declaredPorts.append(binding);
     }
 
     detail.networks.reserve(dto.networks.size());

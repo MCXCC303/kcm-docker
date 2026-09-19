@@ -22,6 +22,8 @@
 #include "model/image_model.h"
 #include "model/network_filter_model.h"
 #include "model/network_detail_controller.h"
+#include "model/host_port_filter_model.h"
+#include "model/host_port_model.h"
 #include "model/network_model.h"
 #include "model/command_history_store.h"
 #include "model/create_container_controller.h"
@@ -103,6 +105,12 @@ class StatusController : public QObject
 
     /*! 网络列表与过滤代理（六期 §3.2）。 */
     Q_PROPERTY(Kontainer::NetworkModel *networkModel READ networkModel CONSTANT)
+    /*! 宿主端口视图（ARCH_next_ports.md §4.A）：容器列表的实际发布 + 运行中容器的声明。 */
+    Q_PROPERTY(Kontainer::HostPortModel *portModel READ portModel CONSTANT)
+    /*! 端口页用的搜索/过滤/排序代理模型。 */
+    Q_PROPERTY(Kontainer::HostPortFilterModel *hostPortList READ hostPortList CONSTANT)
+    /*! "声明了但没发布"的行数（端口页据此决定要不要在顶部说明一次）。 */
+    Q_PROPERTY(int declaredNotPublishedCount READ declaredNotPublishedCount NOTIFY declaredNotPublishedCountChanged)
     Q_PROPERTY(Kontainer::NetworkFilterModel *networkList READ networkList CONSTANT)
     /*! 数据卷列表与过滤代理。 */
     Q_PROPERTY(Kontainer::VolumeModel *volumeModel READ volumeModel CONSTANT)
@@ -319,6 +327,15 @@ public:
     {
         return m_networkModel;
     }
+    HostPortModel *portModel() const
+    {
+        return m_hostPortModel;
+    }
+    HostPortFilterModel *hostPortList() const
+    {
+        return m_hostPortFilter;
+    }
+    int declaredNotPublishedCount() const;
     NetworkFilterModel *networkList() const
     {
         return m_networkFilter;
@@ -449,11 +466,18 @@ public Q_SLOTS:
     void loadLowFrequencyListsOnce();
 
     Q_INVOKABLE void refreshNetworks();
+    /*!
+     * 打开端口页时调用：刷新容器列表，并为**运行中**的容器各拉一次 inspect
+     * （只为拿到它们"声明"了哪些宿主端口，见 `ARCH_next_ports.md` 决定 3）。
+     */
+    Q_INVOKABLE void refreshPorts();
     /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
     void refreshVolumes(bool includeUsage = true);
 
 Q_SIGNALS:
     void stateChanged();
+    /*! "声明了但没发布"的行数变化（端口页顶部的说明条据此显隐）。 */
+    void declaredNotPublishedCountChanged();
     void engineStateChanged();
     void containersStateChanged();
     void imagesStateChanged();
@@ -508,8 +532,19 @@ private:
     bool m_volumesOk = false;
     bool m_volumesFailed = false;
     NetworkModel *m_networkModel = nullptr;
+    /*!
+     * 各容器**声明**的宿主绑定（inspect 的 `HostConfig.PortBindings`）。
+     *
+     * 只对**运行中**的容器取（用户拍板：不做"已停止容器声明过什么"），
+     * 并且只在打开端口页时拉一次——不为一个视图把每个容器都 inspect 一遍。
+     */
+    QHash<QString, QList<DeclaredPortBinding>> m_declaredPorts;
+    /*! 已经为本轮拉过声明的容器（避免每次刷新都重发 inspect）。 */
+    QStringList m_declaredRequested;
     NetworkFilterModel *m_networkFilter = nullptr;
     NetworkDetailController *m_networkDetail = nullptr;
+    HostPortModel *m_hostPortModel = nullptr;
+    HostPortFilterModel *m_hostPortFilter = nullptr;
     ListState m_networksState = ListState::Idle;
     QString m_networksError;
     bool m_networksOk = false;

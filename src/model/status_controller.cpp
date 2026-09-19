@@ -47,6 +47,8 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_networkModel(new NetworkModel(this))
     , m_networkFilter(new NetworkFilterModel(this))
     , m_networkDetail(new NetworkDetailController(backend, this))
+    , m_hostPortModel(new HostPortModel(this))
+    , m_hostPortFilter(new HostPortFilterModel(this))
     , m_containerFilter(new ContainerFilterModel(this))
     , m_imageFilter(new ImageFilterModel(this))
     , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
@@ -96,6 +98,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_containerFilter->setSourceModel(m_containerModel);
     m_imageFilter->setSourceModel(m_imageModel);
     m_networkFilter->setSourceModel(m_networkModel);
+    m_hostPortFilter->setSourceModel(m_hostPortModel);
     m_volumeFilter->setSourceModel(m_volumeModel);
 
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
@@ -106,6 +109,23 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_daemonConfigUser->setEngineInfo(m_backend->engineInfo());
     m_daemonConfigSystem->setEngineInfo(m_backend->engineInfo());
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &StatusController::onContainersUpdated);
+    /*
+     * inspect 回来了：记下这个容器**声明**的宿主绑定，重建端口表。
+     * 只有端口页真的请求过（在 m_declaredRequested 里）才理会——容器详情页的
+     * inspect 也会走到这里，没必要为它多算一遍。
+     */
+    connect(m_backend, &DockerBackendInterface::containerDetailUpdated, this, [this] {
+        const ContainerDetail detail = m_backend->containerDetail();
+        if (detail.id.isEmpty() || !m_declaredRequested.contains(detail.id)) {
+            return;
+        }
+        m_declaredPorts.insert(detail.id, detail.declaredPorts);
+        const int declaredBefore = declaredNotPublishedCount();
+        m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
+        if (declaredNotPublishedCount() != declaredBefore) {
+            Q_EMIT declaredNotPublishedCountChanged();
+        }
+    });
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, &StatusController::onImagesUpdated);
     connect(m_backend, &DockerBackendInterface::networksUpdated, this, &StatusController::onNetworksUpdated);
     connect(m_backend, &DockerBackendInterface::volumesUpdated, this, &StatusController::onVolumesUpdated);
@@ -201,6 +221,41 @@ void StatusController::loadLowFrequencyListsOnce()
     m_lowFrequencyLoaded = true;
     m_backend->refreshNetworks();
     m_backend->refreshVolumes(false);
+}
+
+int StatusController::declaredNotPublishedCount() const
+{
+    int count = 0;
+    for (const HostPortEntry &entry : m_hostPortModel->entries()) {
+        if (entry.stateKey == QLatin1String("declaredNotPublished")) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void StatusController::refreshPorts()
+{
+    m_backend->refreshContainers();
+    /*
+     * 声明（inspect）只对运行中的容器取：已停止的容器不占端口，用户已拍板不做
+     * "reserved"。已经拉过的容器不重复拉（每轮的 m_declaredRequested 记着）。
+     */
+    for (const Container &container : m_backend->containers()) {
+        switch (container.state) {
+        case ContainerState::Running:
+        case ContainerState::Paused:
+        case ContainerState::Restarting:
+            break;
+        default:
+            continue;
+        }
+        if (m_declaredRequested.contains(container.id)) {
+            continue;
+        }
+        m_declaredRequested.append(container.id);
+        m_backend->inspectContainer(container.id);
+    }
 }
 
 void StatusController::refreshNetworks()
@@ -411,6 +466,12 @@ void StatusController::onContainersUpdated()
     m_daemonConfigUser->setRunningContainerCount(runningContainerCount());
     m_daemonConfigSystem->setRunningContainerCount(runningContainerCount());
     m_containerModel->setContainers(m_backend->containers());
+    // 端口视图跟着容器列表走："实际发布"来自它，"声明"来自已拉到的 inspect
+    const int declaredBefore = declaredNotPublishedCount();
+    m_hostPortModel->setEntries(HostPortUsage::entriesFor(m_backend->containers(), m_declaredPorts));
+    if (declaredNotPublishedCount() != declaredBefore) {
+        Q_EMIT declaredNotPublishedCountChanged();
+    }
     m_containersOk = true;
     m_containersFailed = false;
     setSectionError(Section::Containers, QString());

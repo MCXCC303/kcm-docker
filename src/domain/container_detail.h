@@ -19,6 +19,34 @@ namespace Kontainer
 {
 
 /*! 容器接入的网络（inspect → NetworkSettings.Networks）。 */
+/*!
+ * 容器**声明**的宿主端口绑定（来自 inspect 的 `HostConfig.PortBindings`）。
+ *
+ * 与"实际发布的端口"（`ports`，来自 `NetworkSettings.Ports`）是两回事：
+ * 实测 `alpine-82dc` 运行中、声明了绑定，但 `NetworkSettings.Ports` 是空的——
+ * 端口页要如实分列这两种状态（用户拍板决定 3）。
+ *
+ * `HostPort` 可以是**区间**（实测 `WinBoat` 用 `"47300-47309"`），因此终点单独一个字段。
+ */
+struct DeclaredPortBinding {
+    quint16 containerPort = 0;
+    QString protocol; /*!< tcp / udp / sctp */
+    QString hostIp; /*!< 空 = 所有接口 */
+    quint16 hostPort = 0;
+    /*! 区间终点；单端口时等于 `hostPort`。 */
+    quint16 hostPortEnd = 0;
+
+    bool isRange() const
+    {
+        return hostPortEnd != 0 && hostPortEnd != hostPort;
+    }
+    friend bool operator==(const DeclaredPortBinding &lhs, const DeclaredPortBinding &rhs)
+    {
+        return lhs.containerPort == rhs.containerPort && lhs.protocol == rhs.protocol && lhs.hostIp == rhs.hostIp
+            && lhs.hostPort == rhs.hostPort && lhs.hostPortEnd == rhs.hostPortEnd;
+    }
+};
+
 /*! 容器挂载（inspect → Mounts）。 */
 struct ContainerMount {
     QString type; /*!< bind / volume / tmpfs */
@@ -60,6 +88,8 @@ struct ContainerDetail {
     QString platform;
 
     QList<Port> ports;
+    /*! `HostConfig.PortBindings` 里**声明**的宿主绑定（可能是区间；未声明时为空）。 */
+    QList<DeclaredPortBinding> declaredPorts;
     QList<ContainerNetwork> networks;
     QList<ContainerMount> mounts;
 

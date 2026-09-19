@@ -50,7 +50,8 @@ QString HostPortEntry::displayAddress() const
     return QStringLiteral("%1:%2").arg(hostIp, portText());
 }
 
-QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &containers)
+QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &containers,
+                                               const QHash<QString, QList<DeclaredPortBinding>> &declared)
 {
     QList<HostPortEntry> entries;
     for (const Container &container : containers) {
@@ -94,6 +95,41 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
             entry.containerPort = port.privatePort;
             entry.protocol = port.type.isEmpty() ? QStringLiteral("tcp") : port.type;
             entry.stateKey = QStringLiteral("inUse");
+            entry.containerId = container.id;
+            entry.containerName = container.name;
+            entry.containerImage = container.image;
+            entry.containerStateKey = container.stateKey();
+            entries.append(entry);
+        }
+    }
+
+    /*
+     * 声明的绑定：已经真的发布了的不再重复出现（发布那条就是它），
+     * 剩下的就是"声明了但没生效"——端口页要如实标出来（决定 3）。
+     */
+    for (const Container &container : containers) {
+        if (!holdsHostPorts(container.state)) {
+            continue;
+        }
+        const QList<DeclaredPortBinding> bindings = declared.value(container.id);
+        for (const DeclaredPortBinding &binding : bindings) {
+            const bool published = std::any_of(entries.cbegin(), entries.cend(), [&](const HostPortEntry &entry) {
+                return entry.containerId == container.id && entry.containerPort == binding.containerPort
+                    && entry.protocol == binding.protocol && entry.hostPort == binding.hostPort
+                    && hostBindingsOverlap(entry.hostIp, binding.hostIp);
+            });
+            if (published) {
+                continue;
+            }
+            HostPortEntry entry;
+            entry.hostPort = binding.hostPort;
+            entry.hostPortEnd = binding.hostPortEnd != 0 ? binding.hostPortEnd : binding.hostPort;
+            entry.hostIp = isWildcardAddress(binding.hostIp) ? QString() : binding.hostIp;
+            entry.ipv4 = wildcardFamily(binding.hostIp) != 6;
+            entry.ipv6 = wildcardFamily(binding.hostIp) == 6;
+            entry.containerPort = binding.containerPort;
+            entry.protocol = binding.protocol;
+            entry.stateKey = QStringLiteral("declaredNotPublished");
             entry.containerId = container.id;
             entry.containerName = container.name;
             entry.containerImage = container.image;

@@ -31,6 +31,7 @@ function(kontainer_add_test name source)
 endfunction()
 
 kontainer_add_test(tst_http_response_parser backend/tst_http_response_parser.cpp)
+kontainer_add_test(tst_container_inspect_declared_ports dto/tst_container_inspect_declared_ports.cpp)
 kontainer_add_test(tst_json_line_reader backend/tst_json_line_reader.cpp)
 kontainer_add_test(tst_log_frame_reader backend/tst_log_frame_reader.cpp)
 kontainer_add_test(tst_http_request_body backend/tst_http_request_body.cpp)

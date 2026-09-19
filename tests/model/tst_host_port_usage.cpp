@@ -3,6 +3,8 @@
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
+#include "model/host_port_filter_model.h"
+#include "model/host_port_model.h"
 #include "model/host_port_usage.h"
 #include "model/port_binding_rules.h"
 
@@ -33,6 +35,10 @@ private Q_SLOTS:
     void collectsOnlyRunningContainers();
     void mergesDualStackWildcardBindings();
     void suggestsAPortOutsideTheUsedOnes();
+    void declaredBindingsShowUpOnlyWhenTheyDidNotTakeEffect();
+    void modelExposesRowsForThePage();
+    void filterSearchesAndSeparatesTheTwoStates();
+    void refreshKeepsTheModelIntact();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -173,6 +179,183 @@ void HostPortUsageTest::suggestsAPortOutsideTheUsedOnes()
     QVERIFY2(HostPortUsage::nextFreePort({container}, 0) >= 1024, "never suggest a privileged port");
     QCOMPARE(HostPortUsage::nextFreePort({}, 9000), 9001); // 没有容器时就是下一个端口
 }
+
+/*!
+ * "声明 vs 实际发布"（ARCH_next_ports.md 决定 3）。
+ *
+ * 实测 `alpine-82dc`：运行中、`HostConfig.PortBindings` 有绑定、`NetworkSettings.Ports` 是空的
+ * —— 端口页要能解释"为什么显示占用了却连不上"。已经真的发布了的声明不重复出现。
+ */
+void HostPortUsageTest::declaredBindingsShowUpOnlyWhenTheyDidNotTakeEffect()
+{
+    Container running;
+    running.id = QStringLiteral("cid-1");
+    running.name = QStringLiteral("alpine-82dc");
+    running.state = ContainerState::Running;
+    // 实际发布：只有 8100
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8100, QStringLiteral("tcp")}};
+
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    DeclaredPortBinding published; // 声明了 8100，而且真的发布了
+    published.containerPort = 80;
+    published.protocol = QStringLiteral("tcp");
+    published.hostPort = 8100;
+    published.hostPortEnd = 8100;
+    DeclaredPortBinding missing; // 声明了 4880，但没发布（实际情形）
+    missing.containerPort = 4880;
+    missing.protocol = QStringLiteral("tcp");
+    missing.hostPort = 4880;
+    missing.hostPortEnd = 4880;
+    DeclaredPortBinding range; // 声明的是区间
+    range.containerPort = 3389;
+    range.protocol = QStringLiteral("tcp");
+    range.hostIp = QStringLiteral("127.0.0.1");
+    range.hostPort = 47300;
+    range.hostPortEnd = 47309;
+    declared.insert(running.id, {published, missing, range});
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running}, declared);
+    QCOMPARE(entries.size(), 3); // 8100（发布）+ 4880（没生效）+ 47300-47309（区间）
+
+    QCOMPARE(entries.at(0).hostPort, quint16(4880));
+    QCOMPARE(entries.at(0).stateKey, QStringLiteral("declaredNotPublished"));
+    QCOMPARE(entries.at(0).containerName, QStringLiteral("alpine-82dc"));
+
+    QCOMPARE(entries.at(1).hostPort, quint16(8100));
+    QVERIFY2(entries.at(1).stateKey == QLatin1String("inUse"),
+             "a declared binding that really is published must stay a single inUse entry");
+    QCOMPARE(entries.at(1).displayAddress(), QStringLiteral("8100"));
+
+    const HostPortEntry ranged = entries.at(2);
+    QCOMPARE(ranged.portText(), QStringLiteral("47300-47309"));
+    QCOMPARE(ranged.displayAddress(), QStringLiteral("127.0.0.1:47300-47309"));
+    QCOMPARE(ranged.stateKey, QStringLiteral("declaredNotPublished"));
+
+    // 没给声明时，行为与单参数版本一致（M1/M2 不受影响）
+    QCOMPARE(HostPortUsage::entriesFor({running}).size(), 1);
+}
+
+
+/*! 端口页模型：role 齐备（端口是第一视觉焦点，容器只是其中一列）。 */
+void HostPortUsageTest::modelExposesRowsForThePage()
+{
+    Container dual;
+    dual.id = QStringLiteral("cid-dual");
+    dual.name = QStringLiteral("web-frontend");
+    dual.image = QStringLiteral("registry.example.com/team/frontend:2.4.1");
+    dual.state = ContainerState::Running;
+    dual.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
+                  {QStringLiteral("::"), 80, 8080, QStringLiteral("tcp")}};
+
+    Container declaredOnly;
+    declaredOnly.id = QStringLiteral("cid-declared");
+    declaredOnly.name = QStringLiteral("alpine-82dc");
+    declaredOnly.image = QStringLiteral("alpine:latest");
+    declaredOnly.state = ContainerState::Running;
+    declaredOnly.ports = {};
+
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    declared.insert(declaredOnly.id,
+                    {DeclaredPortBinding {4880, QStringLiteral("tcp"), QString(), 4880, 4880}});
+
+    HostPortModel model;
+    model.setEntries(HostPortUsage::entriesFor({dual, declaredOnly}, declared));
+    QCOMPARE(model.count(), 2);
+
+    const QModelIndex first = model.index(0, 0);
+    QCOMPARE(first.data(HostPortModel::PortTextRole).toString(), QStringLiteral("4880"));
+    QCOMPARE(first.data(HostPortModel::StateKeyRole).toString(), QStringLiteral("declaredNotPublished"));
+    QCOMPARE(first.data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("alpine-82dc"));
+    QVERIFY2(!first.data(HostPortModel::ActionableRole).toBool(),
+             "a declared-only binding must not offer 'stop container'");
+
+    const QModelIndex second = model.index(1, 0);
+    QCOMPARE(second.data(HostPortModel::PortTextRole).toString(), QStringLiteral("8080"));
+    QCOMPARE(second.data(HostPortModel::StateKeyRole).toString(), QStringLiteral("inUse"));
+    QVERIFY2(second.data(HostPortModel::ActionableRole).toBool(), "an in-use port can stop its holder");
+}
+
+/*! 搜索（端口 / 容器 / 镜像 / 地址都算）与状态过滤。 */
+void HostPortUsageTest::filterSearchesAndSeparatesTheTwoStates()
+{
+    Container running;
+    running.id = QStringLiteral("cid-1");
+    running.name = QStringLiteral("web-frontend");
+    running.image = QStringLiteral("registry.example.com/team/frontend:2.4.1");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
+
+    Container declaredOnly;
+    declaredOnly.id = QStringLiteral("cid-2");
+    declaredOnly.name = QStringLiteral("alpine-82dc");
+    declaredOnly.image = QStringLiteral("alpine:latest");
+    declaredOnly.state = ContainerState::Running;
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    declared.insert(declaredOnly.id, {DeclaredPortBinding {4880, QStringLiteral("tcp"), QString(), 4880, 4880}});
+
+    HostPortModel model;
+    model.setEntries(HostPortUsage::entriesFor({running, declaredOnly}, declared));
+
+    HostPortFilterModel filter;
+    filter.setSourceModel(&model);
+    QCOMPARE(filter.count(), 2);
+
+    // 搜容器名
+    filter.setSearchText(QStringLiteral("frontend"));
+    QCOMPARE(filter.count(), 1);
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("web-frontend"));
+
+    // 搜端口号
+    filter.setSearchText(QStringLiteral("4880"));
+    QCOMPARE(filter.count(), 1);
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::StateKeyRole).toString(), QStringLiteral("declaredNotPublished"));
+
+    // 搜镜像
+    filter.setSearchText(QStringLiteral("registry.example.com"));
+    QCOMPARE(filter.count(), 1);
+
+    // 过滤：只看"运行中占用"
+    filter.setSearchText(QString());
+    filter.setStateFilter(QStringLiteral("inUse"));
+    QCOMPARE(filter.count(), 1);
+    filter.setStateFilter(QStringLiteral("declaredNotPublished"));
+    QCOMPARE(filter.count(), 1);
+    filter.setStateFilter(QStringLiteral("all"));
+    QCOMPARE(filter.count(), 2);
+
+    // 排序：默认端口升序
+    QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 4880);
+    filter.setSortKey(QStringLiteral("container"));
+    QVERIFY(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString() < filter.index(1, 0).data(HostPortModel::ContainerNameRole).toString());
+}
+
+/*!
+ * 刷新不得重置模型（本项目的老问题：整表重置会把滚动位置拉回顶部）。
+ *
+ * 键相同、只有值变化时只发 `dataChanged`，不发 `beginResetModel`。
+ */
+void HostPortUsageTest::refreshKeepsTheModelIntact()
+{
+    Container running;
+    running.id = QStringLiteral("cid-1");
+    running.name = QStringLiteral("web");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
+
+    HostPortModel model;
+    model.setEntries(HostPortUsage::entriesFor({running}));
+    QCOMPARE(model.count(), 1);
+
+    QSignalSpy resetSpy(&model, &QAbstractItemModel::modelReset);
+    QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
+
+    running.image = QStringLiteral("alpine:3.21"); // 只有值变化，键不变
+    model.setEntries(HostPortUsage::entriesFor({running}));
+    QCOMPARE(resetSpy.count(), 0);
+    QCOMPARE(model.count(), 1);
+    QVERIFY(dataSpy.count() >= 1);
+}
+
 
 QTEST_MAIN(HostPortUsageTest)
 

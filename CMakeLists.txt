@@ -108,6 +108,7 @@ set(KONTAINER_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/LogConsole.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/CreateNetworkDialog.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/KeyValueListEditor.qml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/HostPortList.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/StatusChip.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/CopyButton.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components/CopyableText.qml"

@@ -185,6 +185,7 @@ private Q_SLOTS:
     void longCommandIsCollapsedUntilExpanded();
     void containerDetailOpensTheImage();
     void portRowShowsConflictAndAdoptsTheSuggestion();
+    void portsTabListsRowsAndConfirmsStop();
     void engineViewListsComponentVersions();
     void topologyMergesDualStackBindings();
     void privilegedNeedsTypedConfirmation();
@@ -2999,6 +3000,122 @@ void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
     QVERIFY(QMetaObject::invokeMethod(suggestionButton, "clicked"));
     QTRY_COMPARE(wizard->portRows().at(0).toMap().value(QStringLiteral("hostPort")).toInt(), suggestion);
     QTRY_VERIFY_WITH_TIMEOUT(!statuses.at(0)->property("visible").toBool(), 5000);
+}
+
+
+/*!
+ * 「端口」标签页（ARCH_next_ports.md §4.A，里程碑 M3）。
+ *
+ * 端口是第一视觉焦点，容器只是其中一列；行内「停止」与其它危险动作一样要**二次确认**
+ * （确认前不能真的发操作）。
+ */
+void QmlLoadTest::portsTabListsRowsAndConfirmsStop()
+{
+    m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
+    m_stubKcm->controller()->operations()->refreshWriteAccess();
+    QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
+
+    Container running;
+    running.id = QStringLiteral("running-id");
+    running.name = QStringLiteral("web-frontend");
+    running.image = QStringLiteral("registry.example.com/team/frontend:2.4.1");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
+    m_backend->setContainers({running});
+    // 让状态控制器收到容器列表（走一遍真实的刷新路径）
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1200, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1200);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QCOMPARE(tabBar->property("count").toInt(), 7);
+    QVERIFY(tabBar->setProperty("currentIndex", 4));
+    m_backend->completeRefresh();
+
+    QQuickItem *list = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        list = childByObjectName(page, QStringLiteral("hostPortList"));
+        return list != nullptr && list->property("count").toInt() == 1;
+    }(), 5000);
+
+    // 行里能看到端口、状态与容器名（"端口是第一视觉焦点"）
+    QList<QQuickItem *> rows;
+    QList<QQuickItem *> stopButtons;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        rows.clear();
+        stopButtons.clear();
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("hostPortRow")) {
+                rows.append(node);
+            } else if (node->objectName() == QLatin1String("hostPortRowStop")) {
+                stopButtons.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return rows.size() == 1;
+    }(), 5000);
+
+    bool sawPort = false;
+    bool sawState = false;
+    bool sawContainer = false;
+    std::function<void(QQuickItem *)> scan = [&](QQuickItem *node) {
+        if (!node) {
+            return;
+        }
+        const QString name = node->objectName();
+        if (name == QLatin1String("hostPortRowPort") && node->property("text").toString() == QLatin1String("8080")) {
+            sawPort = true;
+        } else if (name == QLatin1String("hostPortRowState")) {
+            sawState = true;
+        } else if (name == QLatin1String("hostPortRowContainer")
+                   && node->property("text").toString() == QLatin1String("web-frontend")) {
+            sawContainer = true;
+        }
+        for (QQuickItem *child : node->childItems()) {
+            scan(child);
+        }
+    };
+    scan(rows.first());
+    QVERIFY2(sawPort, "the host port must be visible in the row");
+    QVERIFY2(sawState, "the row must carry a state chip");
+    QVERIFY2(sawContainer, "the container name must be visible in the row");
+
+    // 「停止」必须先确认：点一下只打开对话框，不发操作
+    QVERIFY2(stopButtons.size() == 1, "a running holder must offer 'stop container'");
+    const int callsBefore = m_backend->mutationCalls().size();
+    QVERIFY(QMetaObject::invokeMethod(stopButtons.first(), "clicked"));
+    // 弹层挂在 overlay 上，不在 childItems 里：用 QObject 树找（与其它对话框用例一致）
+    QObject *dialog = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((dialog = page->findChild<QObject *>(QStringLiteral("portStopContainerDialog"))) != nullptr, 5000);
+    QTRY_VERIFY_WITH_TIMEOUT(dialog->property("visible").toBool(), 5000);
+    QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
+
+    // 确认后才真的停止
+    QObject *confirm = page->findChild<QObject *>(QStringLiteral("portStopContainerConfirm"));
+    QVERIFY(confirm);
+    QVERIFY(QMetaObject::invokeMethod(confirm, "triggered"));
+    QVERIFY2(m_backend->mutationCalls().size() > callsBefore, "confirming must actually stop the container");
 }
 
 
