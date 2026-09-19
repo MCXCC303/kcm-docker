@@ -1545,8 +1545,6 @@ msgid ""
 "The container is not running and does not hold this port now, but will take "
 "it back when started."
 msgstr "容器没在运行，现在不占用这个端口；但它一启动就会把端口要回去。"
-"有 %1 个端口被未运行的容器声明过。它现在是空闲的，但那个容器一启动就会把它要"
-"回去。"
 
 #: src/ui/components/HostPortList.qml:128
 msgid "Bind address"

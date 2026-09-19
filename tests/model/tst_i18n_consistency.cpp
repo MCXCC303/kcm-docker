@@ -41,6 +41,7 @@ private Q_SLOTS:
     void translationsLoadAtRuntime();
     void developmentPluginPathFindsTheCatalog();
     void noUnwrappedUiStrings();
+    void translationsDoNotInventArguments();
 };
 
 namespace
@@ -426,6 +427,80 @@ void I18nConsistencyTest::developmentPluginPathFindsTheCatalog()
     const QStringList emptyDirs = translationLocaleDirs();
     qputenv("QT_PLUGIN_PATH", previous);
     QVERIFY(!emptyDirs.contains(empty.filePath(QStringLiteral("locale"))));
+}
+
+
+/*!
+ * 译文不得凭空多出参数占位符。
+ *
+ * 背景（真实事故）：给 zh_CN 的 .po 批量填译文时，脚本只替换了 `msgstr` 的**第一行**，
+ * 旧译文的多行续行留了下来 —— 中文于是变成"两句拼接"，运行时 `%!I(18N_ARGUMENT_MISSING)`
+ * 直接显示在悬停提示里（用户截图发现）。判据：`msgstr` 里的 `%N` 必须也出现在
+ * 对应的 `msgid` / `msgid_plural` 里。
+ */
+void I18nConsistencyTest::translationsDoNotInventArguments()
+{
+    const QString poFile = sourceDir() + QStringLiteral("/po/zh_CN/kcm_docker.po");
+    QFile file(poFile);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QString content = QString::fromUtf8(file.readAll());
+
+    // 取出某个字段的完整文本（含多行续行）
+    const auto fieldText = [](const QString &entry, const QString &key) {
+        QString collected;
+        bool collecting = false;
+        const QStringList lines = entry.split(QLatin1Char('\n'));
+        for (const QString &line : lines) {
+            if (line.startsWith(key + QLatin1Char(' '))) {
+                collecting = true;
+            } else if (!line.startsWith(QLatin1Char('"'))) {
+                if (collecting) {
+                    break;
+                }
+                continue;
+            }
+            if (collecting) {
+                QString value = line.mid(line.indexOf(QLatin1Char('"')) + 1);
+                value.chop(1); // 去掉结尾引号
+                collected += value;
+            }
+        }
+        return collected;
+    };
+    const auto argumentsIn = [](const QString &text) {
+        QSet<QString> found;
+        static const QRegularExpression pattern(QStringLiteral("%\\d+"));
+        auto it = pattern.globalMatch(text);
+        while (it.hasNext()) {
+            found.insert(it.next().captured());
+        }
+        return found;
+    };
+
+    int offenders = 0;
+    const QStringList entries = content.split(QStringLiteral("\n\n"));
+    for (const QString &entry : entries) {
+        const QString msgid = fieldText(entry, QStringLiteral("msgid"));
+        if (msgid.isEmpty()) {
+            continue;
+        }
+        const QSet<QString> allowed = argumentsIn(msgid) | argumentsIn(fieldText(entry, QStringLiteral("msgid_plural")));
+        const QStringList keys {QStringLiteral("msgstr"), QStringLiteral("msgstr[0]"), QStringLiteral("msgstr[1]"),
+                                QStringLiteral("msgstr[2]")};
+        for (const QString &key : keys) {
+            const QString msgstr = fieldText(entry, key);
+            if (msgstr.isEmpty()) {
+                continue;
+            }
+            const QSet<QString> extra = argumentsIn(msgstr) - allowed;
+            if (!extra.isEmpty()) {
+                ++offenders;
+                qWarning() << "translation invents arguments" << extra << "for msgid" << msgid.left(60);
+            }
+        }
+    }
+    QVERIFY2(offenders == 0,
+             qPrintable(QStringLiteral("%1 translated entries use %N that the source string does not have").arg(offenders)));
 }
 
 
