@@ -201,6 +201,13 @@ public:
     Q_INVOKABLE bool createContainer(const QVariantMap &request, bool allowMissingImage = false);
     /*! 主机端口是否已被现有容器占用（界面在提交前也能用）。 */
     Q_INVOKABLE bool hostPortInUse(const QString &hostIp, int hostPort) const;
+    /*!
+     * 占用该宿主端口的容器名（没有则空）。
+     *
+     * 只算**真的占着端口**的容器：已经退出/创建中/已死的容器不持有宿主端口，
+     * 拿它们当冲突会误报（用户会被一个停掉的容器挡住）。
+     */
+    Q_INVOKABLE QString hostPortHolder(const QString &hostIp, int hostPort) const;
     /*! 名字是否已被现有容器占用。 */
     Q_INVOKABLE bool containerNameTaken(const QString &name) const;
     /*! 镜像是否在本地（界面据此提示"需要先拉取"）。 */

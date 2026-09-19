@@ -68,6 +68,8 @@ private Q_SLOTS:
     void createVolumeValidatesAndRefreshes();
     void removeAndPruneVolumes();
     void invalidReferenceIsRejectedBeforeBackend();
+    void portHolderIsReportedAndStoppedContainersDoNotBlock();
+    void startFailureAboutAnAllocatedPortIsExplained();
 
 private:
     QString writableSocketPath();
@@ -830,6 +832,88 @@ void OperationControllerTest::invalidReferenceIsRejectedBeforeBackend()
     QVERIFY(!m_operations->isValidImageReference(QString()));
     QCOMPARE(m_operations->normalizedImageReference(QStringLiteral("alpine")), QStringLiteral("alpine:latest"));
 }
+
+/*!
+ * 宿主端口冲突的判定（实测反馈：创建时没拦住，启动时才报
+ * `Bind for 0.0.0.0:8100 failed: port is already allocated`）。
+ *
+ * 两个要点：
+ *  - **只有真的占着端口的容器**才算冲突：已退出的容器不持有宿主端口，拿它当冲突会误报；
+ *  - 冲突时必须能说出**是谁占着**，界面才能告诉用户"先停掉哪个容器"。
+ */
+void OperationControllerTest::portHolderIsReportedAndStoppedContainersDoNotBlock()
+{
+    Container running;
+    running.id = QStringLiteral("running-id");
+    running.name = QStringLiteral("holder");
+    running.image = QStringLiteral("alpine:3.19");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 80, 8100, QStringLiteral("tcp")}};
+
+    Container stopped;
+    stopped.id = QStringLiteral("stopped-id");
+    stopped.name = QStringLiteral("old");
+    stopped.image = QStringLiteral("alpine:3.19");
+    stopped.state = ContainerState::Exited;
+    stopped.ports = {{QStringLiteral("0.0.0.0"), 80, 8200, QStringLiteral("tcp")}};
+
+    Container specific;
+    specific.id = QStringLiteral("specific-id");
+    specific.name = QStringLiteral("localhost-only");
+    specific.image = QStringLiteral("alpine:3.19");
+    specific.state = ContainerState::Running;
+    specific.ports = {{QStringLiteral("127.0.0.1"), 80, 8300, QStringLiteral("tcp")}};
+
+    m_backend->setContainers({running, stopped, specific});
+
+    // 运行中的容器占着 → 冲突，并报出名字
+    QVERIFY(m_operations->hostPortInUse(QStringLiteral("0.0.0.0"), 8100));
+    QCOMPARE(m_operations->hostPortHolder(QStringLiteral("0.0.0.0"), 8100), QStringLiteral("holder"));
+    // 具体地址与通配互相冲突（同一端口）
+    QVERIFY(m_operations->hostPortInUse(QStringLiteral("::"), 8100));
+    QVERIFY(m_operations->hostPortInUse(QStringLiteral("127.0.0.1"), 8100));
+
+    // 已退出的容器不占端口 → 不冲突
+    QVERIFY2(!m_operations->hostPortInUse(QStringLiteral("0.0.0.0"), 8200),
+             "a stopped container does not hold its published ports");
+    QVERIFY(m_operations->hostPortHolder(QStringLiteral("0.0.0.0"), 8200).isEmpty());
+
+    // 不同具体地址之间不冲突
+    QVERIFY(!m_operations->hostPortInUse(QStringLiteral("192.168.1.5"), 8300));
+    QVERIFY(m_operations->hostPortInUse(QStringLiteral("127.0.0.1"), 8300));
+
+    // 随机端口（0）永远不冲突
+    QVERIFY(!m_operations->hostPortInUse(QStringLiteral("0.0.0.0"), 0));
+}
+
+/*!
+ * 启动时才失败的端口占用：错误文案要说清"换个端口或停掉那个容器"，
+ * 并把端口号从引擎原文里提出来（普通用户读不懂 `driver failed programming external connectivity`）。
+ */
+void OperationControllerTest::startFailureAboutAnAllocatedPortIsExplained()
+{
+    Container container;
+    container.id = QStringLiteral("cid-1");
+    container.name = QStringLiteral("ubuntu-c184");
+    container.image = QStringLiteral("ubuntu:24.04");
+    container.state = ContainerState::Exited;
+    m_backend->setContainers({container});
+
+    m_operations->startContainer(QStringLiteral("cid-1"));
+    const DockerError error(DockerError::Kind::Conflict,
+                            QStringLiteral("driver failed programming external connectivity on endpoint ubuntu-c184 "
+                                           "(e80ee6afdf80): Bind for 0.0.0.0:8100 failed: port is already allocated"));
+    m_backend->completeMutation(OperationTarget::container(QStringLiteral("cid-1")),
+                                DockerBackendInterface::MutationOutcome::Failed,
+                                error);
+
+    const QString text = m_operations->resultText();
+    QVERIFY2(text.contains(QStringLiteral("8100")), qPrintable(text));
+    QVERIFY2(text.contains(QStringLiteral("already used")), qPrintable(text));
+    // 不要直接把引擎原文端给用户（那是"技术细节"的位置）
+    QVERIFY2(!text.contains(QStringLiteral("driver failed")), qPrintable(text));
+}
+
 
 QTEST_MAIN(OperationControllerTest)
 

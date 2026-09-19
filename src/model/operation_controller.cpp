@@ -5,6 +5,8 @@
 
 #include "model/operation_controller.h"
 
+#include <cstring>
+
 #include "model/format.h"
 
 #include <QRegularExpression>
@@ -642,27 +644,68 @@ bool OperationController::containerNameTaken(const QString &name) const
     return false;
 }
 
-bool OperationController::hostPortInUse(const QString &hostIp, int hostPort) const
+namespace
+{
+/*!
+ * 该状态的容器是否**可能**持有宿主端口。
+ *
+ * 只有"肯定已经把端口还回去了"的状态才算不持有（已退出 / 还没启动 / 已死）；
+ * 其余（含引擎没给状态的 `Unknown`）一律按**持有**算——冲突检查是"提前拦住用户"的
+ * 辅助手段，宁可提示得保守，也不要放过真实的 `port is already allocated`。
+ */
+bool holdsHostPorts(ContainerState state)
+{
+    switch (state) {
+    case ContainerState::Exited:
+    case ContainerState::Created:
+    case ContainerState::Dead:
+        return false;
+    default:
+        return true;
+    }
+}
+
+/*! 两个绑定地址是否有交集（0.0.0.0 与任何地址都冲突；IPv6 通配同理）。 */
+bool hostBindingsOverlap(const QString &lhs, const QString &rhs)
+{
+    const QString left = lhs.isEmpty() ? QStringLiteral("0.0.0.0") : lhs;
+    const QString right = rhs.isEmpty() ? QStringLiteral("0.0.0.0") : rhs;
+    const auto isWildcard = [](const QString &value) {
+        return value == QLatin1String("0.0.0.0") || value == QLatin1String("::") || value == QLatin1String("[::]");
+    };
+    if (isWildcard(left) || isWildcard(right)) {
+        /*
+         * 通配之间也要按协议族看：`0.0.0.0:8100` 与 `[::]:8100` 在 Linux 上默认
+         * 是**互相冲突**的（除非 net.ipv6.bindv6only=1），因此一律算冲突——
+         * 宁可提示得保守一点，也好过让用户在运行时报"port is already allocated"。
+         */
+        return true;
+    }
+    return left == right;
+}
+} // namespace
+
+QString OperationController::hostPortHolder(const QString &hostIp, int hostPort) const
 {
     if (hostPort <= 0) {
-        return false; // 0 = 随机分配，不冲突
+        return {}; // 0 = 随机分配，不冲突
     }
-    const QString wanted = hostIp.isEmpty() ? QStringLiteral("0.0.0.0") : hostIp;
-    const QList<Container> containers = m_backend->containers();
-    for (const Container &container : containers) {
+    for (const Container &container : m_backend->containers()) {
+        if (!holdsHostPorts(container.state)) {
+            continue;
+        }
         for (const Port &port : container.ports) {
-            if (!port.isPublished() || port.publicPort != hostPort) {
-                continue;
-            }
-            const QString used = port.ip.isEmpty() ? QStringLiteral("0.0.0.0") : port.ip;
-            // 同一个宿主端口：只要两边的绑定地址有交集就算冲突
-            // （0.0.0.0 与任何地址都冲突；具体地址之间必须相同）
-            if (used == wanted || used == QLatin1String("0.0.0.0") || wanted == QLatin1String("0.0.0.0")) {
-                return true;
+            if (port.isPublished() && port.publicPort == hostPort && hostBindingsOverlap(port.ip, hostIp)) {
+                return container.name.isEmpty() ? container.shortId() : container.name;
             }
         }
     }
-    return false;
+    return {};
+}
+
+bool OperationController::hostPortInUse(const QString &hostIp, int hostPort) const
+{
+    return !hostPortHolder(hostIp, hostPort).isEmpty();
 }
 
 bool OperationController::createContainer(const QVariantMap &request, bool allowMissingImage)
@@ -701,9 +744,10 @@ bool OperationController::createContainer(const QVariantMap &request, bool allow
         const QVariantMap port = entry.toMap();
         const int hostPort = port.value(QStringLiteral("hostPort")).toInt();
         const QString hostIp = port.value(QStringLiteral("hostIp")).toString();
-        if (hostPortInUse(hostIp, hostPort)) {
+        const QString holder = hostPortHolder(hostIp, hostPort);
+        if (!holder.isEmpty()) {
             setResult(Result::Error,
-                      i18n("The container was not created because host port %1 is already in use.", hostPort),
+                      i18n("The container was not created because host port %1 is already used by “%2”. Stop that container first.", hostPort, holder),
                       QStringLiteral("portInUse"));
             return false;
         }
@@ -1439,6 +1483,25 @@ QString OperationController::successText(Mutation mutation, const QString &targe
 QString OperationController::failureText(Mutation mutation, const DockerError &error)
 {
     const QString base = dockerErrorText(error);
+
+    /*
+     * 宿主端口已被占用（启动时才暴露，创建请求本身是合法的）：
+     * 引擎原文是 `driver failed programming external connectivity … Bind for 0.0.0.0:8100 failed:
+     * port is already allocated`，普通用户读不出"我该做什么"。这里翻成一句可行动的说明，
+     * 并把端口号提出来（能提出来才翻，提不出来就保留原文，不猜）。
+     */
+    const QString detail = error.detail();
+    if (detail.contains(QLatin1String("port is already allocated"), Qt::CaseInsensitive)) {
+        const int bindAt = detail.indexOf(QLatin1String("Bind for "), 0, Qt::CaseInsensitive);
+        if (bindAt >= 0) {
+            const QString afterBind = detail.mid(bindAt + int(strlen("Bind for ")));
+            const QString binding = afterBind.left(afterBind.indexOf(QLatin1String(" failed")));
+            if (!binding.isEmpty()) {
+                return i18n("The container could not be started because host port %1 is already used by another container. Choose a different host port or stop that container.", binding);
+            }
+        }
+        return i18n("The container could not be started because a host port is already used by another container. Choose a different host port or stop that container.");
+    }
     // 拉取卡住（引擎联系不上镜像仓库）时，光说「超时」用户不知道能做什么
     if (mutation == Mutation::PullImage && error.kind() == DockerError::Kind::Timeout) {
         return i18n("%1 The registry may be unreachable from the Docker daemon (network, proxy, or IPv6 routing).",

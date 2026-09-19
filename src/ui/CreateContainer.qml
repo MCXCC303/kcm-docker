@@ -183,6 +183,23 @@ Kirigami.Page {
         }
     }
 
+    Connections {
+        target: page.controller
+
+        /*
+         * 走到"端口"步骤时刷新一次容器列表。
+         *
+         * 端口冲突是拿**已发布端口**判断的（`hostPortHolder()`），而容器列表是 5 秒轮询；
+         * 用户刚在别处启动了一个占用该端口的容器时，本地列表可能还是旧的——于是"提前拦截"
+         * 失效，最后在启动时才收到 `Bind for 0.0.0.0:8100 failed: port is already allocated`。
+         */
+        function onStepKeyChanged() {
+            if (page.controller.stepKey === "ports") {
+                kcm.controller.refresh();
+            }
+        }
+    }
+
     Component.onCompleted: {
         // 网络选择列表是低频数据（进网络页才刷新）：向导自己再保一次险，
         // 否则"没点过网络标签页就选不到网络"（实测反馈 ②）

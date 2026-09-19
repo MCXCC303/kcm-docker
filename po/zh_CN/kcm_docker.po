@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 19:03+0800\n"
+"POT-Creation-Date: 2026-09-19 19:49+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -12,7 +12,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: src/backend/docker_backend.cpp:1277 src/model/operation_controller.cpp:1058
+#: src/backend/docker_backend.cpp:1277 src/model/operation_controller.cpp:1102
 msgid "Uploading the build context…"
 msgstr "正在上传构建上下文…"
 
@@ -151,7 +151,7 @@ msgid "The host directory of this mount does not exist."
 msgstr "该挂载的宿主目录不存在。"
 
 #: src/model/container_detail_controller.cpp:51
-#: src/model/container_detail_controller.cpp:359
+#: src/model/container_detail_controller.cpp:398
 msgid "This mount has no host directory to open."
 msgstr "该挂载没有可打开的宿主目录。"
 
@@ -173,7 +173,7 @@ msgstr "IPv6"
 msgid "Gateway"
 msgstr "网关"
 
-#: src/model/container_detail_controller.cpp:363
+#: src/model/container_detail_controller.cpp:402
 msgid "Opening host directories is not available in this environment."
 msgstr "当前环境不支持打开宿主目录。"
 
@@ -197,19 +197,19 @@ msgstr "镜像"
 msgid "Name"
 msgstr "名称"
 
-#: src/model/create_container_controller.cpp:938 src/ui/CreateContainer.qml:512
+#: src/model/create_container_controller.cpp:938 src/ui/CreateContainer.qml:529
 msgid "Command"
 msgstr "命令"
 
-#: src/model/create_container_controller.cpp:941 src/ui/CreateContainer.qml:523
+#: src/model/create_container_controller.cpp:941 src/ui/CreateContainer.qml:540
 msgid "Entry point"
 msgstr "入口点"
 
-#: src/model/create_container_controller.cpp:944 src/ui/CreateContainer.qml:536
+#: src/model/create_container_controller.cpp:944 src/ui/CreateContainer.qml:553
 msgid "Working directory"
 msgstr "工作目录"
 
-#: src/model/create_container_controller.cpp:947 src/ui/CreateContainer.qml:544
+#: src/model/create_container_controller.cpp:947 src/ui/CreateContainer.qml:561
 msgid "User"
 msgstr "用户"
 
@@ -231,17 +231,17 @@ msgid "Ports"
 msgstr "端口"
 
 #: src/model/create_container_controller.cpp:976 src/ui/CreateContainer.qml:125
-#: src/ui/CreateContainer.qml:618
+#: src/ui/CreateContainer.qml:635
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/model/create_container_controller.cpp:988 src/ui/CreateContainer.qml:580
+#: src/model/create_container_controller.cpp:988 src/ui/CreateContainer.qml:597
 msgid "Environment variables"
 msgstr "环境变量"
 
 #: src/model/create_container_controller.cpp:991
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:266
-#: src/ui/VolumeDetail.qml:187 src/ui/CreateContainer.qml:597
+#: src/ui/VolumeDetail.qml:187 src/ui/CreateContainer.qml:614
 msgid "Labels"
 msgstr "标签"
 
@@ -275,7 +275,7 @@ msgid "Terminal (-t)"
 msgstr "终端（-t）"
 
 #: src/model/create_container_controller.cpp:1011
-#: src/ui/CreateContainer.qml:121 src/ui/CreateContainer.qml:462
+#: src/ui/CreateContainer.qml:121 src/ui/CreateContainer.qml:479
 msgid "Interactive"
 msgstr "交互"
 
@@ -309,25 +309,25 @@ msgstr "Docker 一直没有响应，已放弃这次请求。等服务恢复后�
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
-#: src/model/operation_controller.cpp:99
-#: src/model/operation_controller.cpp:1419
+#: src/model/operation_controller.cpp:101
+#: src/model/operation_controller.cpp:1463
 #: src/ui/components/BuildImagePanel.qml:469
 msgid "Image built."
 msgstr "镜像已构建。"
 
-#: src/model/operation_controller.cpp:99
+#: src/model/operation_controller.cpp:101
 msgid "Image built: %1"
 msgstr "镜像已构建：%1"
 
-#: src/model/operation_controller.cpp:139
+#: src/model/operation_controller.cpp:141
 msgid "Nothing to clean up: no unused volume was found."
 msgstr "没有可清理的内容：没有找到未使用的数据卷。"
 
-#: src/model/operation_controller.cpp:143
+#: src/model/operation_controller.cpp:145
 msgid "Cleaned up %1 volume(s) and reclaimed %2."
 msgstr "已清理 %1 个数据卷，回收 %2。"
 
-#: src/model/operation_controller.cpp:236
+#: src/model/operation_controller.cpp:238
 msgid ""
 "The Docker daemon refused the last write operation because of missing "
 "permissions. Kontainer switched to read-only for this session."
@@ -335,7 +335,7 @@ msgstr ""
 "由于权限不足，Docker 守护进程拒绝了下一次写操作。Kontainer 已在本次会话中切换"
 "为只读。"
 
-#: src/model/operation_controller.cpp:238
+#: src/model/operation_controller.cpp:240
 msgid ""
 "Kontainer can only read from this Docker socket: the current user is not "
 "allowed to write it. Add the user to the group that owns the socket, or use "
@@ -344,305 +344,319 @@ msgstr ""
 "Kontainer 只能读取该 Docker socket：当前用户没有写权限。请把该用户加入 "
 "socket 所属的组，或改用 rootless Docker 部署。"
 
-#: src/model/operation_controller.cpp:241
+#: src/model/operation_controller.cpp:243
 msgid ""
 "The Docker socket does not exist, so containers and images cannot be managed."
 msgstr "Docker socket 不存在，因此无法管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:243
+#: src/model/operation_controller.cpp:245
 msgid ""
 "Managing containers and images is only available for the local Docker socket."
 msgstr "仅本机 Docker socket 支持管理容器与镜像。"
 
-#: src/model/operation_controller.cpp:301
-#: src/model/operation_controller.cpp:401
-#: src/model/operation_controller.cpp:414
-#: src/model/operation_controller.cpp:445
-#: src/model/operation_controller.cpp:549
-#: src/model/operation_controller.cpp:591
-#: src/model/operation_controller.cpp:728
-#: src/model/operation_controller.cpp:842
-#: src/model/operation_controller.cpp:878
-#: src/model/operation_controller.cpp:900
-#: src/model/operation_controller.cpp:931
-#: src/model/operation_controller.cpp:970
-#: src/model/operation_controller.cpp:1002
-#: src/model/operation_controller.cpp:1070
+#: src/model/operation_controller.cpp:303
+#: src/model/operation_controller.cpp:403
+#: src/model/operation_controller.cpp:416
+#: src/model/operation_controller.cpp:447
+#: src/model/operation_controller.cpp:551
+#: src/model/operation_controller.cpp:593
+#: src/model/operation_controller.cpp:772
+#: src/model/operation_controller.cpp:886
+#: src/model/operation_controller.cpp:922
+#: src/model/operation_controller.cpp:944
+#: src/model/operation_controller.cpp:975
+#: src/model/operation_controller.cpp:1014
+#: src/model/operation_controller.cpp:1046
+#: src/model/operation_controller.cpp:1114
 msgid "Kontainer is in read-only mode, so %1 was not performed."
 msgstr "Kontainer 处于只读模式，因此未执行%1。"
 
-#: src/model/operation_controller.cpp:306
-#: src/model/operation_controller.cpp:573
-#: src/model/operation_controller.cpp:599
-#: src/model/operation_controller.cpp:737
-#: src/model/operation_controller.cpp:851
-#: src/model/operation_controller.cpp:886
-#: src/model/operation_controller.cpp:908
-#: src/model/operation_controller.cpp:949
-#: src/model/operation_controller.cpp:979
+#: src/model/operation_controller.cpp:308
+#: src/model/operation_controller.cpp:575
+#: src/model/operation_controller.cpp:601
+#: src/model/operation_controller.cpp:781
+#: src/model/operation_controller.cpp:895
+#: src/model/operation_controller.cpp:930
+#: src/model/operation_controller.cpp:952
+#: src/model/operation_controller.cpp:993
+#: src/model/operation_controller.cpp:1023
 msgid "Another operation on this object is still running."
 msgstr "该对象上仍有操作在进行中。"
 
-#: src/model/operation_controller.cpp:370
+#: src/model/operation_controller.cpp:372
 msgid "starting the container"
 msgstr "启动容器"
 
-#: src/model/operation_controller.cpp:380
+#: src/model/operation_controller.cpp:382
 msgid "stopping the container"
 msgstr "停止容器"
 
-#: src/model/operation_controller.cpp:390
+#: src/model/operation_controller.cpp:392
 msgid "restarting the container"
 msgstr "重启容器"
 
-#: src/model/operation_controller.cpp:401
+#: src/model/operation_controller.cpp:403
 msgid "pausing the container"
 msgstr "暂停容器"
 
-#: src/model/operation_controller.cpp:414
+#: src/model/operation_controller.cpp:416
 msgid "resuming the container"
 msgstr "继续运行容器"
 
-#: src/model/operation_controller.cpp:426
+#: src/model/operation_controller.cpp:428
 msgid "removing the container"
 msgstr "删除容器"
 
-#: src/model/operation_controller.cpp:437
+#: src/model/operation_controller.cpp:439
 msgid "“%1” is not a valid image reference."
 msgstr "“%1”不是合法的镜像引用。"
 
-#: src/model/operation_controller.cpp:445
+#: src/model/operation_controller.cpp:447
 msgid "pulling the image"
 msgstr "拉取镜像"
 
-#: src/model/operation_controller.cpp:452
+#: src/model/operation_controller.cpp:454
 msgid "This image is already being pulled: %1"
 msgstr "该镜像已经在拉取中：%1"
 
-#: src/model/operation_controller.cpp:523
+#: src/model/operation_controller.cpp:525
 msgid "The network was not created because the name is not valid."
 msgstr "网络未创建：名称不合法。"
 
-#: src/model/operation_controller.cpp:528
+#: src/model/operation_controller.cpp:530
 msgid "The network was not created because the subnet is not valid."
 msgstr "网络未创建：子网格式不合法。"
 
-#: src/model/operation_controller.cpp:533
+#: src/model/operation_controller.cpp:535
 msgid "The network was not created because the gateway is not valid."
 msgstr "网络未创建：网关不合法（它必须属于所填子网）。"
 
-#: src/model/operation_controller.cpp:541
+#: src/model/operation_controller.cpp:543
 msgid "The network was not created because the name is already in use."
 msgstr "网络未创建：这个名称已经被占用。"
 
-#: src/model/operation_controller.cpp:549
+#: src/model/operation_controller.cpp:551
 msgid "creating the network"
 msgstr "创建网络"
 
-#: src/model/operation_controller.cpp:591
+#: src/model/operation_controller.cpp:593
 msgid "removing the network"
 msgstr "删除网络"
 
-#: src/model/operation_controller.cpp:676
+#: src/model/operation_controller.cpp:719
 msgid "The container was not created because the name is not valid."
 msgstr "容器未创建：名称不合法。"
 
-#: src/model/operation_controller.cpp:681
+#: src/model/operation_controller.cpp:724
 msgid "The container was not created because the name is already in use."
 msgstr "容器未创建：这个名称已经被占用。"
 
-#: src/model/operation_controller.cpp:687
+#: src/model/operation_controller.cpp:730
 msgid "The container was not created because no image was chosen."
 msgstr "容器未创建：没有选择镜像。"
 
-#: src/model/operation_controller.cpp:693
+#: src/model/operation_controller.cpp:736
 msgid ""
 "The container was not created because the image is not available locally."
 msgstr "容器未创建：本地没有这个镜像。"
 
-#: src/model/operation_controller.cpp:706
-msgid "The container was not created because host port %1 is already in use."
-msgstr "容器未创建：宿主端口 %1 已被占用。"
+#: src/model/operation_controller.cpp:750
+msgid ""
+"The container was not created because host port %1 is already used by “%2”. "
+"Stop that container first."
+msgstr "宿主端口 %1 已被容器「%2」占用，因此没有创建。请先停掉那个容器，或换一个宿主端口。"
 
-#: src/model/operation_controller.cpp:720
+#: src/model/operation_controller.cpp:764
 msgid "The container was not created because a mount destination is not valid."
 msgstr "容器未创建：挂载的容器路径不合法。"
 
-#: src/model/operation_controller.cpp:728
+#: src/model/operation_controller.cpp:772
 msgid "creating the container"
 msgstr "创建容器"
 
-#: src/model/operation_controller.cpp:830
+#: src/model/operation_controller.cpp:874
 msgid "The volume was not created because the name is not valid."
 msgstr "数据卷未创建：名称不合法。"
 
-#: src/model/operation_controller.cpp:836
+#: src/model/operation_controller.cpp:880
 msgid "The volume was not created because the name is already in use."
 msgstr "数据卷未创建：这个名称已经被占用。"
 
-#: src/model/operation_controller.cpp:842
+#: src/model/operation_controller.cpp:886
 msgid "creating the volume"
 msgstr "创建数据卷"
 
-#: src/model/operation_controller.cpp:878
+#: src/model/operation_controller.cpp:922
 msgid "removing the volume"
 msgstr "删除数据卷"
 
-#: src/model/operation_controller.cpp:900
+#: src/model/operation_controller.cpp:944
 msgid "cleaning up the volumes"
 msgstr "清理数据卷"
 
-#: src/model/operation_controller.cpp:925
+#: src/model/operation_controller.cpp:969
 msgid ""
 "The container was not connected because a network or container was missing."
 msgstr "容器未连接：缺少网络或容器。"
 
-#: src/model/operation_controller.cpp:931
+#: src/model/operation_controller.cpp:975
 msgid "connecting the container to the network"
 msgstr "把容器连接到网络"
 
-#: src/model/operation_controller.cpp:964
+#: src/model/operation_controller.cpp:1008
 msgid ""
 "The container was not disconnected because a network or container was "
 "missing."
 msgstr "容器未断开：缺少网络或容器。"
 
-#: src/model/operation_controller.cpp:970
+#: src/model/operation_controller.cpp:1014
 msgid "disconnecting the container from the network"
 msgstr "把容器从网络断开"
 
-#: src/model/operation_controller.cpp:1002
+#: src/model/operation_controller.cpp:1046
 msgid "building the image"
 msgstr "构建镜像"
 
-#: src/model/operation_controller.cpp:1008
+#: src/model/operation_controller.cpp:1052
 msgid "The image was not built because no tag was given."
 msgstr "镜像未构建：没有填写标签。"
 
-#: src/model/operation_controller.cpp:1019
+#: src/model/operation_controller.cpp:1063
 msgid "The build context could not be packaged."
 msgstr "构建上下文打包失败。"
 
-#: src/model/operation_controller.cpp:1070
+#: src/model/operation_controller.cpp:1114
 msgid "cleaning the build cache"
 msgstr "清理构建缓存"
 
-#: src/model/operation_controller.cpp:1187
+#: src/model/operation_controller.cpp:1231
 msgid "removing the image"
 msgstr "删除镜像"
 
-#: src/model/operation_controller.cpp:1262
+#: src/model/operation_controller.cpp:1306
 msgid "Container created and started: %1"
 msgstr "容器已创建并启动：%1"
 
-#: src/model/operation_controller.cpp:1280
+#: src/model/operation_controller.cpp:1324
 #: src/ui/components/PullProgressList.qml:176
 msgid "Image pull cancelled."
 msgstr "已取消镜像拉取。"
 
-#: src/model/operation_controller.cpp:1280
+#: src/model/operation_controller.cpp:1324
 msgid "Operation cancelled."
 msgstr "已取消操作。"
 
-#: src/model/operation_controller.cpp:1287
+#: src/model/operation_controller.cpp:1331
 msgid "The container was created but could not be started: %1"
 msgstr "容器已创建，但启动失败：%1"
 
-#: src/model/operation_controller.cpp:1385
+#: src/model/operation_controller.cpp:1429
 msgid "Container started."
 msgstr "容器已启动。"
 
-#: src/model/operation_controller.cpp:1387
+#: src/model/operation_controller.cpp:1431
 msgid "Container stopped."
 msgstr "容器已停止。"
 
-#: src/model/operation_controller.cpp:1389
+#: src/model/operation_controller.cpp:1433
 msgid "Container restarted."
 msgstr "容器已重启。"
 
-#: src/model/operation_controller.cpp:1391
+#: src/model/operation_controller.cpp:1435
 msgid "Container paused."
 msgstr "容器已暂停。"
 
-#: src/model/operation_controller.cpp:1393
+#: src/model/operation_controller.cpp:1437
 msgid "Container resumed."
 msgstr "容器已继续运行。"
 
-#: src/model/operation_controller.cpp:1395
+#: src/model/operation_controller.cpp:1439
 msgid "Container removed."
 msgstr "容器已删除。"
 
-#: src/model/operation_controller.cpp:1398
+#: src/model/operation_controller.cpp:1442
 msgid "Image pulled: %1"
 msgstr "已拉取镜像：%1"
 
-#: src/model/operation_controller.cpp:1401
+#: src/model/operation_controller.cpp:1445
 msgid "Image removed."
 msgstr "镜像已删除。"
 
-#: src/model/operation_controller.cpp:1404
+#: src/model/operation_controller.cpp:1448
 msgid "Network created: %1"
 msgstr "网络已创建：%1"
 
-#: src/model/operation_controller.cpp:1407
+#: src/model/operation_controller.cpp:1451
 msgid "Network removed."
 msgstr "网络已删除。"
 
-#: src/model/operation_controller.cpp:1409
+#: src/model/operation_controller.cpp:1453
 msgid "Container connected to the network."
 msgstr "容器已连接到网络。"
 
-#: src/model/operation_controller.cpp:1411
+#: src/model/operation_controller.cpp:1455
 msgid "Container disconnected from the network."
 msgstr "容器已从网络断开。"
 
-#: src/model/operation_controller.cpp:1415
+#: src/model/operation_controller.cpp:1459
 msgid "Container created: %1"
 msgstr "容器已创建：%1"
 
-#: src/model/operation_controller.cpp:1423
+#: src/model/operation_controller.cpp:1467
 msgid "No build cache to clean up."
 msgstr "没有需要清理的构建缓存。"
 
-#: src/model/operation_controller.cpp:1425
+#: src/model/operation_controller.cpp:1469
 msgid "Build cache cleaned up, %1 reclaimed."
 msgstr "构建缓存已清理，回收 %1。"
 
-#: src/model/operation_controller.cpp:1428
+#: src/model/operation_controller.cpp:1472
 msgid "Volume created: %1"
 msgstr "数据卷已创建：%1"
 
-#: src/model/operation_controller.cpp:1431
+#: src/model/operation_controller.cpp:1475
 msgid "Volume removed."
 msgstr "数据卷已删除。"
 
-#: src/model/operation_controller.cpp:1434
+#: src/model/operation_controller.cpp:1478
 msgid "Unused volumes cleaned up."
 msgstr "未使用的数据卷已清理。"
 
-#: src/model/operation_controller.cpp:1436
+#: src/model/operation_controller.cpp:1480
 msgid "Done."
 msgstr "完成。"
 
-#: src/model/operation_controller.cpp:1444
+#: src/model/operation_controller.cpp:1500
+msgid ""
+"The container could not be started because host port %1 is already used by "
+"another container. Choose a different host port or stop that container."
+msgstr "容器无法启动：宿主端口 %1 已被另一个容器占用。请换一个宿主端口，或先停掉那个容器。"
+
+#: src/model/operation_controller.cpp:1503
+msgid ""
+"The container could not be started because a host port is already used by "
+"another container. Choose a different host port or stop that container."
+msgstr "容器无法启动：某个宿主端口已被另一个容器占用。请换一个宿主端口，或先停掉那个容器。"
+
+#: src/model/operation_controller.cpp:1507
 msgid ""
 "%1 The registry may be unreachable from the Docker daemon (network, proxy, "
 "or IPv6 routing)."
 msgstr "%1 Docker 守护进程可能无法访问镜像仓库（网络、代理或 IPv6 路由问题）。"
 
-#: src/model/operation_controller.cpp:1449
+#: src/model/operation_controller.cpp:1512
 msgid "The image could not be built: %1"
 msgstr "镜像构建失败：%1"
 
-#: src/model/operation_controller.cpp:1458
+#: src/model/operation_controller.cpp:1521
 msgid "The container is already running."
 msgstr "容器已经在运行。"
 
-#: src/model/operation_controller.cpp:1460
+#: src/model/operation_controller.cpp:1523
 msgid "The container is already stopped."
 msgstr "容器已经停止。"
 
-#: src/model/operation_controller.cpp:1462
+#: src/model/operation_controller.cpp:1525
 msgid "Nothing to do: the object is already in the requested state."
 msgstr "无需操作：对象已处于目标状态。"
 
@@ -713,7 +727,7 @@ msgstr "输入“%1”以确认"
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
 #: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:701
-#: src/ui/CreateContainer.qml:966
+#: src/ui/CreateContainer.qml:983
 msgid "Cancel"
 msgstr "取消"
 
@@ -814,7 +828,7 @@ msgstr "未指定标签，将拉取 “latest”：%1"
 msgid "This image is already being pulled."
 msgstr "该镜像正在拉取中。"
 
-#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:300
+#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:317
 msgid "Image reference"
 msgstr "镜像引用"
 
@@ -1064,7 +1078,7 @@ msgstr "内部网络（无外部访问）"
 msgid "Allow containers to be attached at runtime"
 msgstr "允许容器在运行时加入"
 
-#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:954
+#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:971
 #: src/ui/MainPage.qml:1009
 msgid "Create"
 msgstr "创建"
@@ -1395,8 +1409,8 @@ msgid "New preset source"
 msgstr "新预设的来源"
 
 #: src/ui/components/MountPresetManager.qml:109
-#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
-#: src/ui/CreateContainer.qml:680
+#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:696
+#: src/ui/CreateContainer.qml:697
 msgid "Container path"
 msgstr "容器路径"
 
@@ -1420,7 +1434,7 @@ msgstr "收藏"
 msgid "Remove this preset"
 msgstr "删除这个预设"
 
-#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
+#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:678
 msgid "Named volume"
 msgstr "命名卷"
 
@@ -1510,7 +1524,7 @@ msgstr "仓库登录…"
 
 #: src/ui/ImageDetail.qml:161 src/ui/ContainerDetail.qml:349 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/NetworkDetail.qml:59
-#: src/ui/VolumeDetail.qml:46 src/ui/CreateContainer.qml:936
+#: src/ui/VolumeDetail.qml:46 src/ui/CreateContainer.qml:953
 #: src/ui/RegistryAuthPage.qml:123
 msgid "Back"
 msgstr "返回"
@@ -2675,95 +2689,95 @@ msgstr "内存上限不能是负数。"
 msgid "The CPU limit cannot be negative."
 msgstr "CPU 上限不能是负数。"
 
-#: src/ui/CreateContainer.qml:291
+#: src/ui/CreateContainer.qml:308
 msgid "Which image should the container use?"
 msgstr "容器用哪个镜像？"
 
-#: src/ui/CreateContainer.qml:299
+#: src/ui/CreateContainer.qml:316
 msgid "Image reference, for example alpine:3.19"
 msgstr "镜像引用，例如 alpine:3.19"
 
-#: src/ui/CreateContainer.qml:308
+#: src/ui/CreateContainer.qml:325
 msgid "Pull it first if it is missing locally"
 msgstr "本地没有时先拉取"
 
-#: src/ui/CreateContainer.qml:314
+#: src/ui/CreateContainer.qml:331
 msgid "Local images:"
 msgstr "本地镜像："
 
-#: src/ui/CreateContainer.qml:328
+#: src/ui/CreateContainer.qml:345
 msgid "Search images…"
 msgstr "搜索镜像…"
 
-#: src/ui/CreateContainer.qml:338
+#: src/ui/CreateContainer.qml:355
 msgid "No local images. Pull one from the Images tab first."
 msgstr "本地没有镜像。请先在“镜像”页拉取一个。"
 
-#: src/ui/CreateContainer.qml:352
+#: src/ui/CreateContainer.qml:369
 msgid "Name, network and restart policy"
 msgstr "名称、网络与重启策略"
 
-#: src/ui/CreateContainer.qml:364 src/ui/CreateContainer.qml:365
+#: src/ui/CreateContainer.qml:381 src/ui/CreateContainer.qml:382
 msgid "Container name"
 msgstr "容器名称"
 
-#: src/ui/CreateContainer.qml:372
+#: src/ui/CreateContainer.qml:389
 msgid "Suggest"
 msgstr "用建议名称"
 
-#: src/ui/CreateContainer.qml:416
+#: src/ui/CreateContainer.qml:433
 msgid "Network aliases (optional, comma separated)"
 msgstr "网络别名（可选，用逗号分隔）"
 
-#: src/ui/CreateContainer.qml:417
+#: src/ui/CreateContainer.qml:434
 msgid "Network aliases"
 msgstr "网络别名"
 
-#: src/ui/CreateContainer.qml:430
+#: src/ui/CreateContainer.qml:447
 msgid "Do not restart automatically"
 msgstr "不自动重启"
 
-#: src/ui/CreateContainer.qml:431
+#: src/ui/CreateContainer.qml:448
 msgid "Always"
 msgstr "总是"
 
-#: src/ui/CreateContainer.qml:432
+#: src/ui/CreateContainer.qml:449
 msgid "Unless stopped"
 msgstr "除非手动停止"
 
-#: src/ui/CreateContainer.qml:433
+#: src/ui/CreateContainer.qml:450
 msgid "On failure"
 msgstr "失败时"
 
-#: src/ui/CreateContainer.qml:442
+#: src/ui/CreateContainer.qml:459
 msgid "Start the container after creating it"
 msgstr "创建后启动容器"
 
-#: src/ui/CreateContainer.qml:457
+#: src/ui/CreateContainer.qml:474
 msgid "Command and entry point (optional)"
 msgstr "命令与入口点（可选）"
 
-#: src/ui/CreateContainer.qml:473
+#: src/ui/CreateContainer.qml:490
 msgid "Keep standard input open (-i)"
 msgstr "保持标准输入打开（-i）"
 
-#: src/ui/CreateContainer.qml:479
+#: src/ui/CreateContainer.qml:496
 msgid "Allocate a terminal (-t)"
 msgstr "分配终端（-t）"
 
-#: src/ui/CreateContainer.qml:485
+#: src/ui/CreateContainer.qml:502
 msgid "Close stdin after the first client disconnects"
 msgstr "第一个客户端断开后关闭标准输入"
 
-#: src/ui/CreateContainer.qml:500
+#: src/ui/CreateContainer.qml:517
 msgid "Search previous commands…"
 msgstr "搜索用过的命令…"
 
-#: src/ui/CreateContainer.qml:501
+#: src/ui/CreateContainer.qml:518
 msgid "Reuse a previous command…"
 msgstr "复用之前用过的命令…"
 
-#: src/ui/CreateContainer.qml:511
+#: src/ui/CreateContainer.qml:528
 msgid ""
 "One argument per line, for example:\n"
 "sh\n"
@@ -2775,98 +2789,98 @@ msgstr ""
 "-c\n"
 "sleep 3600"
 
-#: src/ui/CreateContainer.qml:522
+#: src/ui/CreateContainer.qml:539
 msgid "Entry point (optional, one argument per line)"
 msgstr "入口点（可选，一行一个参数）"
 
-#: src/ui/CreateContainer.qml:535
+#: src/ui/CreateContainer.qml:552
 msgid "Working directory (optional)"
 msgstr "工作目录（可选）"
 
-#: src/ui/CreateContainer.qml:543
+#: src/ui/CreateContainer.qml:560
 msgid "User (optional, name or uid:gid)"
 msgstr "用户（可选，名称或 uid:gid）"
 
-#: src/ui/CreateContainer.qml:560
+#: src/ui/CreateContainer.qml:577
 msgid "Published ports"
 msgstr "端口映射"
 
-#: src/ui/CreateContainer.qml:630
+#: src/ui/CreateContainer.qml:647
 msgid "Add a mount from a preset…"
 msgstr "从预设添加挂载…"
 
-#: src/ui/CreateContainer.qml:631
+#: src/ui/CreateContainer.qml:648
 msgid "Search presets…"
 msgstr "搜索预设…"
 
-#: src/ui/CreateContainer.qml:660 src/ui/CreateContainer.qml:671
+#: src/ui/CreateContainer.qml:677 src/ui/CreateContainer.qml:688
 msgid "Host path"
 msgstr "宿主路径"
 
-#: src/ui/CreateContainer.qml:662
+#: src/ui/CreateContainer.qml:679
 msgid "tmpfs"
 msgstr "tmpfs"
 
-#: src/ui/CreateContainer.qml:671 src/ui/MainPage.qml:1003
+#: src/ui/CreateContainer.qml:688 src/ui/MainPage.qml:1003
 #: src/ui/MainPage.qml:1004
 msgid "Volume name"
 msgstr "数据卷名称"
 
-#: src/ui/CreateContainer.qml:672
+#: src/ui/CreateContainer.qml:689
 msgid "Mount source"
 msgstr "挂载来源"
 
-#: src/ui/CreateContainer.qml:686
+#: src/ui/CreateContainer.qml:703
 msgid "Read-only"
 msgstr "只读"
 
-#: src/ui/CreateContainer.qml:694
+#: src/ui/CreateContainer.qml:711
 msgid "Remove this mount"
 msgstr "移除这个挂载"
 
-#: src/ui/CreateContainer.qml:703
+#: src/ui/CreateContainer.qml:720
 msgid "Add mount manually"
 msgstr "手动添加挂载"
 
-#: src/ui/CreateContainer.qml:719
+#: src/ui/CreateContainer.qml:736
 msgid "Resources and privileges"
 msgstr "资源与特权"
 
-#: src/ui/CreateContainer.qml:727
+#: src/ui/CreateContainer.qml:744
 msgid "Memory limit (MiB):"
 msgstr "内存上限（MiB）："
 
-#: src/ui/CreateContainer.qml:738 src/ui/CreateContainer.qml:762
+#: src/ui/CreateContainer.qml:755 src/ui/CreateContainer.qml:779
 msgid "No limit"
 msgstr "不限制"
 
-#: src/ui/CreateContainer.qml:749
+#: src/ui/CreateContainer.qml:766
 msgid "CPU limit (cores):"
 msgstr "CPU 上限（核）："
 
-#: src/ui/CreateContainer.qml:782
+#: src/ui/CreateContainer.qml:799
 msgid "Run with extended privileges (--privileged)"
 msgstr "以扩展特权运行（--privileged）"
 
-#: src/ui/CreateContainer.qml:799
+#: src/ui/CreateContainer.qml:816
 msgid ""
 "This container runs with the same access as root on the host. Only use it "
 "when you know why."
 msgstr "这个容器拥有与宿主 root 相同的访问权限。请只在明确知道原因时使用。"
 
-#: src/ui/CreateContainer.qml:812
+#: src/ui/CreateContainer.qml:829
 msgid "Review and create"
 msgstr "确认并创建"
 
-#: src/ui/CreateContainer.qml:920
+#: src/ui/CreateContainer.qml:937
 msgid "Run with extended privileges"
 msgstr "以扩展特权运行"
 
-#: src/ui/CreateContainer.qml:921
+#: src/ui/CreateContainer.qml:938
 msgid "Give this container the same access as root on the host?"
 msgstr "要让这个容器拥有与宿主 root 相同的访问权限吗？"
 
-#: src/ui/CreateContainer.qml:922
+#: src/ui/CreateContainer.qml:939
 msgid ""
 "The container can access all devices and host files. Only continue if you "
 "trust the image. Type the container name to confirm."
@@ -2874,15 +2888,15 @@ msgstr ""
 "容器可以访问所有设备与宿主文件。只有在信任该镜像时才继续。请把容器名原样输入"
 "以确认。"
 
-#: src/ui/CreateContainer.qml:923
+#: src/ui/CreateContainer.qml:940
 msgid "Yes, run privileged"
 msgstr "是，以特权运行"
 
-#: src/ui/CreateContainer.qml:945
+#: src/ui/CreateContainer.qml:962
 msgid "Next"
 msgstr "下一步"
 
-#: src/ui/CreateContainer.qml:954
+#: src/ui/CreateContainer.qml:971
 msgid "Create and start"
 msgstr "创建并启动"
 
@@ -3008,14 +3022,14 @@ msgid_plural "Volumes (%1)"
 msgstr[0] "数据卷 (%1)"
 
 #: src/ui/MainPage.qml:442
-msgctxt "@title:tab engine information"
-msgid "Engine"
-msgstr "引擎"
-
-#: src/ui/MainPage.qml:445
 msgctxt "@title:tab mount presets"
 msgid "Mount presets"
 msgstr "挂载预设"
+
+#: src/ui/MainPage.qml:445
+msgctxt "@title:tab engine information"
+msgid "Engine"
+msgstr "引擎"
 
 #: src/ui/MainPage.qml:466
 msgid "Search containers (name, image, ID)…"
@@ -3189,16 +3203,16 @@ msgid "Clear the search field or switch the filter back to “All volumes”."
 msgstr "清空搜索框，或把过滤条件切回“所有数据卷”。"
 
 #: src/ui/MainPage.qml:1144
+msgid "Mount presets"
+msgstr "挂载预设"
+
+#: src/ui/MainPage.qml:1167
 msgid "User configuration…"
 msgstr "用户级配置…"
 
-#: src/ui/MainPage.qml:1151
+#: src/ui/MainPage.qml:1174
 msgid "System configuration…"
 msgstr "系统级配置…"
-
-#: src/ui/MainPage.qml:1188
-msgid "Mount presets"
-msgstr "挂载预设"
 
 #: src/ui/RegistryAuthPage.qml:52
 msgid "Logged in. The credentials are stored in KWallet."
