@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 06:35+0800\n"
+"POT-Creation-Date: 2026-09-19 15:28+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -579,7 +579,7 @@ msgid "Restart policy"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:950
-#: src/ui/components/PortMappingEditor.qml:163
+#: src/ui/components/PortMappingEditor.qml:193
 msgid "random"
 msgstr ""
 
@@ -1229,40 +1229,48 @@ msgid ""
 "Builds you start stay in this list, so you can keep working while one runs."
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:112 src/ui/ContainerDetail.qml:55
+#: src/ui/components/PortMappingEditor.qml:136 src/ui/ContainerDetail.qml:55
 msgid "Host"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:124 src/ui/ContainerDetail.qml:292
+#: src/ui/components/PortMappingEditor.qml:148 src/ui/ContainerDetail.qml:292
 #: src/ui/ContainerDetail.qml:843
 msgid "Container"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:152
+#: src/ui/components/PortMappingEditor.qml:176
 msgid "Host address"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:239
-msgid "TCP"
-msgstr ""
-
-#: src/ui/components/PortMappingEditor.qml:240
-msgid "UDP"
-msgstr ""
-
-#: src/ui/components/PortMappingEditor.qml:250
-msgid "Remove this port"
-msgstr ""
-
-#: src/ui/components/PortMappingEditor.qml:258
-msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
+#: src/ui/components/PortMappingEditor.qml:194
+msgid "Host port"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:266
+msgid "Container port"
+msgstr ""
+
+#: src/ui/components/PortMappingEditor.qml:286
+msgid "TCP"
+msgstr ""
+
+#: src/ui/components/PortMappingEditor.qml:287
+msgid "UDP"
+msgstr ""
+
+#: src/ui/components/PortMappingEditor.qml:297
+msgid "Remove this port"
+msgstr ""
+
+#: src/ui/components/PortMappingEditor.qml:305
+msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
+msgstr ""
+
+#: src/ui/components/PortMappingEditor.qml:313
 msgid "Add port"
 msgstr ""
 
-#: src/ui/components/PortMappingEditor.qml:275
+#: src/ui/components/PortMappingEditor.qml:322
 msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr ""

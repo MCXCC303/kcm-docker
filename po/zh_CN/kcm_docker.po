@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 06:35+0800\n"
+"POT-Creation-Date: 2026-09-19 15:28+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -577,7 +577,7 @@ msgid "Restart policy"
 msgstr "重启策略"
 
 #: src/model/create_container_controller.cpp:950
-#: src/ui/components/PortMappingEditor.qml:163
+#: src/ui/components/PortMappingEditor.qml:193
 msgid "random"
 msgstr "随机"
 
@@ -1230,40 +1230,48 @@ msgid ""
 "Builds you start stay in this list, so you can keep working while one runs."
 msgstr "开始过的构建会留在这个列表里，构建期间可以继续做别的事。"
 
-#: src/ui/components/PortMappingEditor.qml:112 src/ui/ContainerDetail.qml:55
+#: src/ui/components/PortMappingEditor.qml:136 src/ui/ContainerDetail.qml:55
 msgid "Host"
 msgstr "宿主机"
 
-#: src/ui/components/PortMappingEditor.qml:124 src/ui/ContainerDetail.qml:292
+#: src/ui/components/PortMappingEditor.qml:148 src/ui/ContainerDetail.qml:292
 #: src/ui/ContainerDetail.qml:843
 msgid "Container"
 msgstr "容器"
 
-#: src/ui/components/PortMappingEditor.qml:152
+#: src/ui/components/PortMappingEditor.qml:176
 msgid "Host address"
 msgstr "宿主机地址"
 
-#: src/ui/components/PortMappingEditor.qml:239
+#: src/ui/components/PortMappingEditor.qml:194
+msgid "Host port"
+msgstr "宿主端口"
+
+#: src/ui/components/PortMappingEditor.qml:266
+msgid "Container port"
+msgstr "容器端口"
+
+#: src/ui/components/PortMappingEditor.qml:286
 msgid "TCP"
 msgstr "TCP"
 
-#: src/ui/components/PortMappingEditor.qml:240
+#: src/ui/components/PortMappingEditor.qml:287
 msgid "UDP"
 msgstr "UDP"
 
-#: src/ui/components/PortMappingEditor.qml:250
+#: src/ui/components/PortMappingEditor.qml:297
 msgid "Remove this port"
 msgstr "移除这一行端口"
 
-#: src/ui/components/PortMappingEditor.qml:258
+#: src/ui/components/PortMappingEditor.qml:305
 msgid "A host port of 0 (shown as “random”) lets Docker pick a free one."
 msgstr "宿主端口填 0（显示为“随机”）则由 Docker 挑一个空闲端口。"
 
-#: src/ui/components/PortMappingEditor.qml:266
+#: src/ui/components/PortMappingEditor.qml:313
 msgid "Add port"
 msgstr "添加端口"
 
-#: src/ui/components/PortMappingEditor.qml:275
+#: src/ui/components/PortMappingEditor.qml:322
 msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr "没有发布端口。容器只能通过它所在的网络访问。"

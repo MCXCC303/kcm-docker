@@ -61,12 +61,36 @@ ColumnLayout {
     }
 
     /*! 控制器里的行 → 编辑缓冲（内容一致时不重建，避免打断正在输入的行）。 */
+    /*
+     * 控制器 → 编辑缓冲。
+     *
+     * **就地更新**，行数不变时绝不 clear()+append()：重建 ListModel 会销毁正在输入的
+     * delegate（焦点与光标一起丢），这本身也会造成"输入被打断"。
+     * 行数变化（增删行）时才重建，这是必要的。
+     */
     function syncRows(): void {
-        if (rowsEqual(portRows, editor.controller.portRows)) {
+        const rows = editor.controller.portRows;
+        if (portRows.count === rows.length) {
+            for (let i = 0; i < rows.length; ++i) {
+                const row = rows[i];
+                const item = portRows.get(i);
+                if (item.containerPort !== (row.containerPort ?? 0)) {
+                    portRows.setProperty(i, "containerPort", row.containerPort ?? 0);
+                }
+                if (item.hostPort !== (row.hostPort ?? 0)) {
+                    portRows.setProperty(i, "hostPort", row.hostPort ?? 0);
+                }
+                if (item.hostIp !== (row.hostIp ?? "")) {
+                    portRows.setProperty(i, "hostIp", row.hostIp ?? "");
+                }
+                if (item.protocol !== (row.protocol ?? "tcp")) {
+                    portRows.setProperty(i, "protocol", row.protocol ?? "tcp");
+                }
+            }
             return;
         }
         portRows.clear();
-        for (const row of editor.controller.portRows) {
+        for (const row of rows) {
             portRows.append({
                 containerPort: row.containerPort ?? 0,
                 hostPort: row.hostPort ?? 0,
@@ -154,15 +178,29 @@ ColumnLayout {
                 onTextEdited: editor.setField(portRowItem.index, "hostIp", text)
             }
 
-            QQC2.SpinBox {
+            /*
+             * 宿主端口用**带校验的文本框**而不是 SpinBox。
+             *
+             * 用户实测：SpinBox 在每次外部改值时会重排自己的文本（并把光标推到末尾），
+             * 于是"输入 8000"变成 8→重新选中→0→重新选中…… 这里改用 TextField：
+             *  - 输入期间**不回写**控制器（只在 editingFinished 时回写），因此不会有
+             *    "模型 → 文本"的回环把光标弄丢；
+             *  - 校验交给 IntValidator（0…65535；留空/0 = 随机分配，由下面的提示说明）。
+             */
+            QQC2.TextField {
                 objectName: "wizardHostPort"
-                from: 0
-                to: 65535
-                value: portRowItem.hostPort
-                textFromValue: function (value) {
-                    return value === 0 ? i18n("random") : value.toString();
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                placeholderText: i18n("random")
+                Accessible.name: i18n("Host port")
+                horizontalAlignment: TextInput.AlignRight
+                inputMethodHints: Qt.ImhDigitsOnly
+                text: portRowItem.hostPort === 0 ? "" : String(portRowItem.hostPort)
+                validator: IntValidator {
+                    bottom: 0
+                    top: 65535
                 }
-                onValueModified: editor.setField(portRowItem.index, "hostPort", value)
+                // 只在输入结束时回写：输入过程中不动模型，光标因此不会被抢走
+                onEditingFinished: editor.setField(portRowItem.index, "hostPort", text.length === 0 ? 0 : parseInt(text, 10))
             }
 
             /* ---- 中间的连线：与端口拓扑同一视觉语言（两端插座圆点） ----
@@ -222,12 +260,21 @@ ColumnLayout {
             }
 
             /* ---- 容器一侧：端口 + 协议 ---- */
-            QQC2.SpinBox {
+            QQC2.TextField {
                 objectName: "wizardContainerPort"
-                from: 1
-                to: 65535
-                value: portRowItem.containerPort
-                onValueModified: editor.setField(portRowItem.index, "containerPort", value)
+                Layout.preferredWidth: Kirigami.Units.gridUnit * 6
+                Accessible.name: i18n("Container port")
+                horizontalAlignment: TextInput.AlignRight
+                inputMethodHints: Qt.ImhDigitsOnly
+                text: portRowItem.containerPort === 0 ? "" : String(portRowItem.containerPort)
+                validator: IntValidator {
+                    bottom: 1
+                    top: 65535
+                }
+                // 同上：失焦/回车才回写，输入中间不打断
+                onEditingFinished: editor.setField(portRowItem.index,
+                                                   "containerPort",
+                                                   text.length === 0 ? 0 : parseInt(text, 10))
             }
 
             QQC2.ComboBox {

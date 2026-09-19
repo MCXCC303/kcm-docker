@@ -1587,12 +1587,28 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
         // 删掉的是第一行（80/0），留下的那行要还是它自己
         QCOMPARE(wizard->portRows().first().toMap().value(QStringLiteral("containerPort")).toInt(), 443);
 
-        // 编辑宿主端口也要写回控制器（同一类 delegate 错误）
-        QQuickItem *hostPortSpin = findItemDeep(window.contentItem(), QStringLiteral("wizardHostPort"));
-        QVERIFY(hostPortSpin);
-        hostPortSpin->setProperty("value", 9443);
-        QMetaObject::invokeMethod(hostPortSpin, "valueModified");
-        QTRY_COMPARE(wizard->portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), 9443);
+        /*
+         * 端口输入不能被"每敲一位就打断一次"（用户实测：输入 8000 要反复重新选中）。
+         *
+         * 端口现在是"带校验的文本框 + 失焦才回写"：逐位输入期间模型不动，因此不会出现
+         * "模型 → 文本"的回环把光标/选区抢走。这里逐位模拟并断言：
+         *   ① 输入过程中文本框内容就是用户敲进去的内容（没有被改写）；
+         *   ② 控制器在这一期间**保持旧值**（回写是延迟的）；
+         *   ③ 输入结束（editingFinished）后才写回。
+         */
+        QQuickItem *hostPortField = findItemDeep(window.contentItem(), QStringLiteral("wizardHostPort"));
+        QVERIFY(hostPortField);
+        const int before = wizard->portRows().first().toMap().value(QStringLiteral("hostPort")).toInt();
+        QString typed = QString();
+        for (const QString &digit : {QStringLiteral("8"), QStringLiteral("0"), QStringLiteral("0"), QStringLiteral("0")}) {
+            typed += digit;
+            hostPortField->setProperty("text", typed);
+            QTest::qWait(5);
+            QCOMPARE(hostPortField->property("text").toString(), typed);
+            QCOMPARE(wizard->portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), before);
+        }
+        QVERIFY(QMetaObject::invokeMethod(hostPortField, "editingFinished"));
+        QTRY_COMPARE(wizard->portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), 8000);
     }
 
     // ② 键值对编辑器的"删除"按钮
