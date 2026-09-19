@@ -272,7 +272,18 @@ void fillFixture(MockDockerBackend &backend)
                           QStringLiteral("API_BASE_URL=https://api.example.com"),
                           QStringLiteral("LOG_LEVEL=info"),
                           QStringLiteral("TZ=Asia/Shanghai")};
-    detail.command = {QStringLiteral("node"), QStringLiteral("server.js")};
+    // 长命令：用来复核"折叠到 4 行 + 显示全部"的行为（KONTAINER_RENDER_LONG_COMMAND=1）
+    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LONG_COMMAND")) {
+        detail.command = {QStringLiteral("jupyter"), QStringLiteral("notebook"),
+                          QStringLiteral("--ip=0.0.0.0"), QStringLiteral("--port=8888"),
+                          QStringLiteral("--allow-root"), QStringLiteral("--no-browser"),
+                          QStringLiteral("--IdentityProvider.token=bohrium"),
+                          QStringLiteral("--ServerApp.root_dir=/workspace"),
+                          QStringLiteral("--ServerApp.allow_remote_access=True"),
+                          QStringLiteral("--ServerApp.iopub_data_rate_limit=1000000000")};
+    } else {
+        detail.command = {QStringLiteral("node"), QStringLiteral("server.js")};
+    }
     detail.entrypoint = {QStringLiteral("/usr/local/bin/docker-entrypoint.sh")};
     detail.workingDirectory = QStringLiteral("/app");
     detail.user = QStringLiteral("node");

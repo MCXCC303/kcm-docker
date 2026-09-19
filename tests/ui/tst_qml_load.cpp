@@ -180,6 +180,7 @@ private Q_SLOTS:
     void filteredComboBoxNarrowsAndSelects();
     void imageUsedByRowsShowStateAndNavigate();
     void keyValueRowsKeepLongKeysVisible();
+    void longCommandIsCollapsedUntilExpanded();
     void privilegedNeedsTypedConfirmation();
     void networkDetailShowsMembersAndJumpsToContainers();
     void registryAuthGuidesFromFailedPullsAndMissingCredentials();
@@ -2140,12 +2141,15 @@ void QmlLoadTest::detailOffersCopyForCommandAndEntrypoint()
 
     QQuickItem *commandCopy = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
-        commandCopy = findItemDeep(window.contentItem(), QStringLiteral("detailCommandCopyButton"));
+        QQuickItem *row = findItemDeep(window.contentItem(), QStringLiteral("detailCommandRow"));
+        commandCopy = row ? findItemDeep(row, QStringLiteral("copyButtonObject")) : nullptr;
         return commandCopy != nullptr && commandCopy->property("visible").toBool();
     }(), 5000);
     QCOMPARE(commandCopy->property("value").toString(), QStringLiteral("sh -c sleep infinity"));
 
-    QQuickItem *entrypointCopy = findItemDeep(window.contentItem(), QStringLiteral("detailEntrypointCopyButton"));
+    QQuickItem *entrypointRow = findItemDeep(window.contentItem(), QStringLiteral("detailEntrypointRow"));
+    QVERIFY(entrypointRow);
+    QQuickItem *entrypointCopy = findItemDeep(entrypointRow, QStringLiteral("copyButtonObject"));
     QVERIFY(entrypointCopy);
     QCOMPARE(entrypointCopy->property("value").toString(), QStringLiteral("/usr/bin/env sh"));
 }
@@ -2649,6 +2653,66 @@ void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
              qPrintable(QStringLiteral("the value must hug the right edge (row %1 vs value %2)").arg(rowRight).arg(valueRight)));
 }
 
+/*!
+ * 过长的命令（实测提问：命令很长会怎样）。
+ *
+ * 以前是无限换行：一条几百字符的命令会把整页撑高、把后面的分区顶下去。
+ * 现在默认最多 4 行，超出时给「显示全部（共 N 行）」；复制按钮始终给完整值。
+ */
+void QmlLoadTest::longCommandIsCollapsedUntilExpanded()
+{
+    /*
+     * 很长的命令（实测提问："如果命令过长会怎么样"）。
+     *
+     * 期望行为：在**自己那一行里换行**——整页不会被撑宽（不溢出面板），
+     * 也不会把后面的分区顶得看不见；复制按钮给的始终是完整值。
+     */
+    const QString longCommand = QString(400, QLatin1Char('x'));
+
+    ContainerDetail detail;
+    detail.id = QStringLiteral("cid-long");
+    detail.name = QStringLiteral("long-cmd");
+    detail.state = ContainerState::Running;
+    detail.command = {QStringLiteral("jupyter"), QStringLiteral("notebook"), longCommand};
+    m_backend->setContainerDetail(detail);
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("containerId"), QStringLiteral("cid-long")}},
+                                                                        m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(900, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(900);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+    m_backend->completeRefresh();
+
+    QQuickItem *row = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT((row = findItemDeep(window.contentItem(), QStringLiteral("detailCommandRow"))) != nullptr, 5000);
+    QQuickItem *label = findItemDeep(row, QStringLiteral("copyableTextValue"));
+    QVERIFY2(label, "the command value label must exist");
+
+    // ① 宽度不溢出：字段与标签都在页面宽度之内
+    QTRY_VERIFY_WITH_TIMEOUT(label->width() > 0, 5000);
+    const qreal rowRight = row->mapToItem(page, QPointF(row->width(), 0)).x();
+    QVERIFY2(rowRight <= page->width() + 1.0,
+             qPrintable(QStringLiteral("the command row overflows the page (%1 > %2)").arg(rowRight).arg(page->width())));
+
+    // ② 长值在自己的行里换行（不止一行），因此信息没有被丢掉
+    QTRY_VERIFY2(label->property("lineCount").toInt() > 1,
+                 "a long command must wrap inside its own field instead of overflowing");
+
+    // ③ 复制按钮给的始终是完整值
+    QQuickItem *copy = findItemDeep(row, QStringLiteral("copyButtonObject"));
+    QVERIFY(copy);
+    QCOMPARE(copy->property("value").toString(), detail.command.join(QLatin1Char(' ')));
+}
 void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");

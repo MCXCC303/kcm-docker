@@ -148,9 +148,10 @@ Kirigami.Page {
 
                 Kirigami.FormLayout {
                     /*
-                     * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，撑满整行时
-                     * 标签+值这一组会被推到右半边（实测反馈）。
-                    */
+                     * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
+                     * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
+                     * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                     */
                     Layout.fillWidth: false
                     Layout.alignment: Qt.AlignLeft
 

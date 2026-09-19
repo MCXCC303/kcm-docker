@@ -49,8 +49,16 @@ RowLayout {
     /*! 值为空时的占位文本。 */
     property string placeholderText: i18n("—")
 
-    /*! 过长时的省略方式。 */
+    /*! 过长时的省略方式（`wrap` 为真时忽略）。 */
     property int elideMode: Text.ElideMiddle
+
+    /*!
+     * 是否换行显示（默认否，单行省略）。
+     *
+     * 命令这类"一句话很长、又不想丢掉中间部分"的值用换行更合适：
+     * 调用方给它一个固定宽度的字段，长值就在字段内折行。
+     */
+    property bool wrap: false
 
     /*! 复制成功。 */
     signal copied
@@ -63,11 +71,13 @@ RowLayout {
     QQC2.Label {
         id: valueLabel
 
+        objectName: "copyableTextValue"
         Layout.fillWidth: true
         text: control.value.length > 0 ? control.value : control.placeholderText
         font.family: control.monospace ? "monospace" : Kirigami.Theme.defaultFont.family
         // 省略只对真实值有意义：占位符「—」本身很短，不需要也不能被截断
-        elide: control.value.length > 0 ? control.elideMode : Text.ElideNone
+        wrapMode: control.wrap ? Text.WrapAnywhere : Text.NoWrap
+        elide: (control.value.length > 0 && !control.wrap) ? control.elideMode : Text.ElideNone
         opacity: control.value.length > 0 ? 1.0 : 0.6
 
         HoverHandler {
@@ -82,6 +92,7 @@ RowLayout {
     }
 
     Local.CopyButton {
+        objectName: "copyButtonObject"
         value: control.effectiveCopyValue
         fieldLabel: control.fieldLabel
         onCopied: control.copied()

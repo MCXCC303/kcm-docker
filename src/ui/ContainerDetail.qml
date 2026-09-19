@@ -422,10 +422,10 @@ KCM.AbstractKCM {
                     /* ---------------- 一级信息 ---------------- */
                     Kirigami.FormLayout {
                         /*
-                         * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，
-                         * 一旦它撑满整行，标签+值这一组就被推到右半边（实测反馈：
-                         * 「运行时 / 配置」整体太靠右）。让它按内容宽度收缩、整体左对齐。
-                          */
+                         * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
+                         * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
+                         * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                         */
                         Layout.fillWidth: false
                         Layout.alignment: Qt.AlignLeft
 
@@ -494,10 +494,10 @@ KCM.AbstractKCM {
 
                     Kirigami.FormLayout {
                         /*
-                         * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，
-                         * 一旦它撑满整行，标签+值这一组就被推到右半边（实测反馈：
-                         * 「运行时 / 配置」整体太靠右）。让它按内容宽度收缩、整体左对齐。
-                          */
+                         * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
+                         * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
+                         * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                         */
                         Layout.fillWidth: false
                         Layout.alignment: Qt.AlignLeft
 
@@ -543,52 +543,54 @@ KCM.AbstractKCM {
 
                     Kirigami.FormLayout {
                         /*
-                         * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，
-                         * 一旦它撑满整行，标签+值这一组就被推到右半边（实测反馈：
-                         * 「运行时 / 配置」整体太靠右）。让它按内容宽度收缩、整体左对齐。
-                          */
+                         * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
+                         * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
+                         * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                         */
                         Layout.fillWidth: false
                         Layout.alignment: Qt.AlignLeft
 
-                        // 入口点与命令：可以一键复制（用户实测反馈 A2：命令经常要拿去别处复用）
-                        RowLayout {
+                        /*
+                         * 入口点与命令：可以一键复制（实测反馈 A2）。
+                         *
+                         * 宽度策略：表单是"按内容收缩"的，所以这两行必须自带宽度——
+                         *   - 不设宽度：字段会被内容的隐式宽度撑到面板之外（溢出）；
+                         *   - `implicitWidth: 0`：字段塌到几十像素（渲染实测），省略号立刻吃掉一切。
+                         * 给一个固定宽度（26 gridUnit ≈ 470px）后：短命令一行、长命令在字段内换行，
+                         * 整页不会被撑高，也不会溢出；完整值仍可通过复制按钮/悬停提示拿到。
+                         */
+                        Item {
                             Kirigami.FormData.label: i18n("Entrypoint:")
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 26
+                            implicitHeight: entrypointRow.implicitHeight
 
-                            QQC2.Label {
-                                objectName: "detailEntrypointLabel"
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                                text: page.controller.entrypoint.join(" ")
-                                font.family: "monospace"
-                                wrapMode: Text.WrapAnywhere
-                            }
-                            Components.CopyButton {
-                                objectName: "detailEntrypointCopyButton"
-                                visible: page.controller.entrypoint.length > 0
+                            Components.CopyableText {
+                                id: entrypointRow
+
+                                objectName: "detailEntrypointRow"
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
                                 value: page.controller.entrypoint.join(" ")
                                 fieldLabel: i18n("entry point")
+                                wrap: true
                             }
                         }
-                        RowLayout {
+                        Item {
                             Kirigami.FormData.label: i18n("Command:")
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 26
+                            implicitHeight: commandRow.implicitHeight
 
-                            QQC2.Label {
-                                objectName: "detailCommandLabel"
-                                Layout.fillWidth: true
-                                visible: text.length > 0
-                                text: page.controller.command.join(" ")
-                                font.family: "monospace"
-                                wrapMode: Text.WrapAnywhere
-                            }
-                            Components.CopyButton {
-                                objectName: "detailCommandCopyButton"
-                                visible: page.controller.command.length > 0
+                            Components.CopyableText {
+                                id: commandRow
+
+                                objectName: "detailCommandRow"
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
                                 value: page.controller.command.join(" ")
                                 fieldLabel: i18n("command")
+                                wrap: true
                             }
                         }
                         QQC2.Label {
