@@ -187,6 +187,7 @@ private Q_SLOTS:
     void portRowShowsConflictAndAdoptsTheSuggestion();
     void portsTabListsRowsAndOpensTheContainer();
     void portsTabSwitchesToTheRangeMap();
+    void rangeMapTilesOpenTheRunningContainer();
     void engineViewListsComponentVersions();
     void topologyMergesDualStackBindings();
     void privilegedNeedsTypedConfirmation();
@@ -3210,6 +3211,113 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
     QVERIFY(viewCombo->setProperty("currentIndex", 0));
     QMetaObject::invokeMethod(viewCombo, "activated", Q_ARG(int, 0));
     QTRY_VERIFY_WITH_TIMEOUT(childByObjectName(page, QStringLiteral("hostPortList")) != nullptr, 5000);
+}
+
+
+/*!
+ * 区间地图的方块点击跳转（用户要求：运行中的端口对应唯一容器，点一下就能过去）。
+ *
+ * 只有"运行中"的方块带容器信息，其它方块的点击是禁用的（不谎报可点）。
+ */
+void QmlLoadTest::rangeMapTilesOpenTheRunningContainer()
+{
+    Container running;
+    running.id = QStringLiteral("ml-id");
+    running.name = QStringLiteral("ml-medai");
+    running.image = QStringLiteral("alpine:latest");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 8888, 20003, QStringLiteral("tcp")}};
+
+    Container stopped;
+    stopped.id = QStringLiteral("dl-id");
+    stopped.name = QStringLiteral("dl-medai");
+    stopped.image = QStringLiteral("alpine:latest");
+    stopped.state = ContainerState::Exited;
+
+    m_backend->setContainers({running, stopped});
+    ContainerDetail detail;
+    detail.id = stopped.id;
+    detail.declaredPorts = {{8888, QStringLiteral("tcp"), QString(), 20003, 20003}};
+    m_backend->setContainerDetail(detail);
+    m_stubKcm->controller()->refresh();
+    m_backend->completeRefresh();
+    m_stubKcm->controller()->refreshPorts();
+    m_backend->completeRefresh();
+
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QVERIFY2(!component.isError(), qPrintable(component.errorString()));
+    QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
+    QVERIFY(!object.isNull());
+    auto *page = qobject_cast<QQuickItem *>(object.data());
+    QVERIFY(page);
+
+    QQuickWindow window;
+    window.resize(1200, 700);
+    page->setParentItem(window.contentItem());
+    page->setWidth(1200);
+    page->setHeight(700);
+    window.show();
+    QTRY_VERIFY(page->width() > 0);
+
+    QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
+    QVERIFY(tabBar);
+    QVERIFY(tabBar->setProperty("currentIndex", 4));
+    m_backend->completeRefresh();
+
+    QQuickItem *viewCombo = childByObjectName(page, QStringLiteral("portViewCombo"));
+    QVERIFY(viewCombo);
+    QVERIFY(viewCombo->setProperty("currentIndex", 1));
+    QMetaObject::invokeMethod(viewCombo, "activated", Q_ARG(int, 1));
+
+    // 找到 20003 那块方块：它在"全部端口"下应当是"运行中"（优先级高于被占用/未占用）
+    QQuickItem *runningTile = nullptr;
+    QTRY_VERIFY_WITH_TIMEOUT([&] {
+        runningTile = nullptr;
+        std::function<void(QQuickItem *)> walk = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("portMapTile")) {
+                const QVariant data = node->property("modelData");
+                const QVariantMap map = data.toMap();
+                if (map.value(QStringLiteral("port")).toInt() == 20003) {
+                    runningTile = node;
+                    return;
+                }
+            }
+            for (QQuickItem *child : node->childItems()) {
+                walk(child);
+            }
+        };
+        walk(window.contentItem());
+        return runningTile != nullptr;
+    }(), 5000);
+    QVERIFY(runningTile);
+
+    const QVariantMap tileData = runningTile->property("modelData").toMap();
+    QCOMPARE(tileData.value(QStringLiteral("stateKey")).toString(), QStringLiteral("inUse"));
+    QCOMPARE(tileData.value(QStringLiteral("containerId")).toString(), QStringLiteral("ml-id"));
+
+    /*
+     * 点击方块 → 跳转信号。
+     *
+     * `MouseArea.clicked` 带一个 `QQuickMouseEvent*` 参数，测试里没法构造（头文件不在公开
+     * 包含路径上），因此分两步守：① 方块的点击区存在且 enabled（只有运行中的才可点）；
+     * ② 直接发地图组件的 `containerRequested`，验证"地图 → 页面 → 弹出容器详情"这条接线。
+     */
+    QQuickItem *clickArea = childByObjectName(runningTile, QStringLiteral("portMapTileClick"));
+    QVERIFY2(clickArea, "a running tile must be clickable");
+    QVERIFY(clickArea->property("enabled").toBool());
+
+    QSignalSpy openSpy(page, SIGNAL(portContainerActivated(QString)));
+    QVERIFY(openSpy.isValid());
+    QQuickItem *map = childByObjectName(page, QStringLiteral("portRangeMap"));
+    QVERIFY(map);
+    QVERIFY(QMetaObject::invokeMethod(map, "containerRequested",
+                                     Q_ARG(QString, QStringLiteral("ml-id")),
+                                     Q_ARG(QString, QStringLiteral("ml-medai"))));
+    QCOMPARE(openSpy.count(), 1);
+    QCOMPARE(openSpy.first().at(0).toString(), QStringLiteral("ml-id"));
 }
 
 

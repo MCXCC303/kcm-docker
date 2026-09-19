@@ -61,9 +61,10 @@ QtObject {
         case "reservedTaken":
             return Kirigami.Theme.negativeBackgroundColor;
         case "declaredNotPublished":
-            // 用户要求："未启动"要比"未占用"更重（对调两者的强弱），因此未占用退到最弱的一档
-            // （Kirigami 没有 disabledBackgroundColor，用交替背景色做最弱的一档灰）
-            return Kirigami.Theme.alternateBackgroundColor;
+            // 用户要求：未占用用**浅蓝**——它原来那档灰和"空闲"几乎分不出来
+            // （Kirigami 没有现成的蓝色浅底，用高亮色的低透明度版本）
+            return Qt.rgba(Kirigami.Theme.highlightColor.r, Kirigami.Theme.highlightColor.g,
+                           Kirigami.Theme.highlightColor.b, 0.18);
         default:
             return Kirigami.Theme.backgroundColor;
         }

@@ -1265,6 +1265,7 @@ Kirigami.Page {
                     visible: root.portViewMode === "map"
                     ranges: root.controller.portRanges
                     nextFreePort: root.controller.nextFreeHostPort
+                    onContainerRequested: (containerId, containerName) => root.openContainerFromPorts(containerId, containerName)
                 }
 
                 Components.HostPortList {

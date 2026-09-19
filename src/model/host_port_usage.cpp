@@ -214,15 +214,68 @@ int HostPortUsage::nextFreePort(const QList<Container> &containers, int afterPor
     return 0;
 }
 
-QString HostPortUsage::stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port)
+namespace
 {
+/*!
+ * 筛选 key 是否"选中"了某个条目状态。
+ *
+ * `reserved` 这一档同时包含 `reserved`（未启动）与 `reservedTaken`（被占用）——
+ * 与 `HostPortFilterModel` 的过滤规则保持一致，否则地图切到"未启动 / 被占用"时
+ * 被占用的方块仍会按优先级显示成运行中。
+ */
+bool preferredMatches(const QString &stateKey, const QStringList &preferred)
+{
+    if (preferred.contains(stateKey)) {
+        return true;
+    }
+    return preferred.contains(QLatin1String("reserved"))
+        && (stateKey == QLatin1String("reserved") || stateKey == QLatin1String("reservedTaken"));
+}
+
+/*! 状态优先级：运行中 > 被占用 > 未启动 > 未占用（"全部端口"视图里靠它决定方块颜色）。 */
+int statePriority(const QString &stateKey)
+{
+    if (stateKey == QLatin1String("inUse")) {
+        return 4;
+    }
+    if (stateKey == QLatin1String("reservedTaken")) {
+        return 3;
+    }
+    if (stateKey == QLatin1String("reserved")) {
+        return 2;
+    }
+    if (stateKey == QLatin1String("declaredNotPublished")) {
+        return 1;
+    }
+    return 0;
+}
+} // namespace
+
+HostPortEntry HostPortUsage::entryForPort(const QList<HostPortEntry> &entries, quint16 port, const QStringList &preferred)
+{
+    HostPortEntry best;
+    int bestPriority = -1;
     for (const HostPortEntry &entry : entries) {
         const quint16 last = entry.hostPortEnd != 0 ? entry.hostPortEnd : entry.hostPort;
-        if (port >= entry.hostPort && port <= last) {
-            return entry.stateKey;
+        if (port < entry.hostPort || port > last) {
+            continue;
+        }
+        // 有筛选时先照顾筛选选中的状态；否则按固定优先级
+        const int priority = preferred.isEmpty()
+            ? statePriority(entry.stateKey)
+            : (preferredMatches(entry.stateKey, preferred) ? 100 + statePriority(entry.stateKey)
+                                                           : statePriority(entry.stateKey));
+        if (priority > bestPriority) {
+            bestPriority = priority;
+            best = entry;
         }
     }
-    return {};
+    return best;
+}
+
+QString HostPortUsage::stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port, const QStringList &preferred)
+{
+    return entryForPort(entries, port, preferred).stateKey;
 }
 
 QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &entries, int gap, int margin, int tilesPerRange)

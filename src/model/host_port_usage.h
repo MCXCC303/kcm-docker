@@ -159,11 +159,20 @@ public:
                                              int tilesPerRange = 64);
 
     /*!
-     * 某个端口在占用表里的状态 key：`inUse` / `declaredNotPublished` / 空字符串（空闲）。
+     * 某个端口在占用表里的状态 key（区间地图的方块按它上色）。
      *
-     * 区间地图的每个方块按它上色；区间（`47300-47309`）按整段算——落在区间里也算被占。
+     * - 区间（`47300-47309`）按整段算——落在区间里也算被占；
+     * - 同一个端口上可能有多条（例如 20003 既"被运行中的容器占着"，又被某个未运行的容器声明过）：
+     *   按**优先级**取 `inUse > reservedTaken > reserved > declaredNotPublished`，
+     *   因此"全部端口"视图里运行中永远压过被占用/未占用（用户要求）；
+     * - `preferred` 非空时优先取其中的状态：地图切到某个筛选时，只有该状态的方块才该显示出来。
      */
-    static QString stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port);
+    static QString stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port,
+                                   const QStringList &preferred = {});
+
+    /*! 该端口上占用它的容器（用于地图里点击跳转；没有则空）。 */
+    static HostPortEntry entryForPort(const QList<HostPortEntry> &entries, quint16 port,
+                                      const QStringList &preferred = {});
 };
 
 } // namespace Kontainer

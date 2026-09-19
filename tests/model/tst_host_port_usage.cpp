@@ -46,6 +46,7 @@ private Q_SLOTS:
     void reservedPortThatIsTakenByAnotherContainerIsMarked();
     void sortingByContainerReallyReordersRows();
     void rangeBuildingScalesWithManyPorts();
+    void mapTileStatePrefersRunningUnlessFiltered();
 };
 
 void HostPortUsageTest::initTestCase()
@@ -685,6 +686,68 @@ void HostPortUsageTest::rangeBuildingScalesWithManyPorts()
     // 实测：优化前（QList::contains 平方级去重）129 ms，优化后 16 ms；
     // 门限取 60 ms——比实测慢 4 倍仍然会失败，但不会因为机器慢而误报
     QVERIFY2(elapsed < 60, qPrintable(QStringLiteral("range building too slow: %1 ms").arg(elapsed)));
+}
+
+
+/*!
+ * 地图方块的状态解析（用户给的两个真实场景）。
+ *
+ * 机器上的实际情况：
+ *   - 20003：`alpine-9239` 运行中但映射没生效（未占用），`ml-medai` 运行中确实占着（运行中）
+ *   - 20004：`dl-medai` 已停止但声明过（未启动/被占用），同时那个端口被运行中的容器占着
+ * 要求：**"全部端口"里运行中优先**，被占用/未占用只有在选中对应筛选时才显示成那样。
+ */
+void HostPortUsageTest::mapTileStatePrefersRunningUnlessFiltered()
+{
+    Container running;
+    running.id = QStringLiteral("ml-id");
+    running.name = QStringLiteral("ml-medai");
+    running.state = ContainerState::Running;
+    running.ports = {{QStringLiteral("0.0.0.0"), 8888, 20003, QStringLiteral("tcp")}};
+
+    Container notBound;
+    notBound.id = QStringLiteral("alpine-id");
+    notBound.name = QStringLiteral("alpine-9239");
+    notBound.state = ContainerState::Running; // 在跑，但什么都没发布
+
+    Container stopped;
+    stopped.id = QStringLiteral("dl-id");
+    stopped.name = QStringLiteral("dl-medai");
+    stopped.state = ContainerState::Exited;
+
+    QHash<QString, QList<DeclaredPortBinding>> declared;
+    declared.insert(notBound.id, {DeclaredPortBinding {80, QStringLiteral("tcp"), QString(), 20003, 20003}});
+    declared.insert(stopped.id, {DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20003, 20003}});
+
+    const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running, notBound, stopped}, declared);
+    // 20003 上有三条：运行中（ml-medai）、未占用（alpine-9239）、未启动/被占用（dl-medai）
+    QCOMPARE(entries.size(), 3);
+
+    // 全部端口：运行中优先
+    QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003), QStringLiteral("inUse"));
+    QCOMPARE(HostPortUsage::entryForPort(entries, 20003).containerName, QStringLiteral("ml-medai"));
+
+    // 选中"未占用"筛选：显示成未占用（否则地图里永远看不到它）
+    QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003, {QStringLiteral("declaredNotPublished")}),
+             QStringLiteral("declaredNotPublished"));
+    QCOMPARE(HostPortUsage::entryForPort(entries, 20003, {QStringLiteral("declaredNotPublished")}).containerName,
+             QStringLiteral("alpine-9239"));
+
+    // 选中"未启动 / 被占用"筛选：显示成被占用（同一个端口被运行中的容器占着）
+    QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003, {QStringLiteral("reserved")}),
+             QStringLiteral("reservedTaken"));
+    QCOMPARE(HostPortUsage::entryForPort(entries, 20003, {QStringLiteral("reserved")}).containerName,
+             QStringLiteral("dl-medai"));
+
+    // 只有"未启动"（端口空着）的端口，在全部端口视图里仍然显示为未启动
+    Container stoppedOnly;
+    stoppedOnly.id = QStringLiteral("gt-id");
+    stoppedOnly.name = QStringLiteral("gt-medai");
+    stoppedOnly.state = ContainerState::Exited;
+    QHash<QString, QList<DeclaredPortBinding>> onlyDeclared;
+    onlyDeclared.insert(stoppedOnly.id, {DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20001, 20001}});
+    const QList<HostPortEntry> onlyEntries = HostPortUsage::entriesFor({stoppedOnly}, onlyDeclared);
+    QCOMPARE(HostPortUsage::stateKeyForPort(onlyEntries, 20001), QStringLiteral("reserved"));
 }
 
 

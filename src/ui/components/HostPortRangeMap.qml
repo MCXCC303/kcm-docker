@@ -31,6 +31,9 @@ Item {
     /*! 下一个空闲宿主端口（0 = 找不到）。 */
     required property int nextFreePort
 
+    /*! 点某个正在使用的端口：请求打开占用它的容器（运行中的端口只对应一个容器）。 */
+    signal containerRequested(string containerId, string containerName)
+
     objectName: "hostPortRangeMap"
 
     ColumnLayout {
@@ -158,6 +161,8 @@ Item {
                                 model: modelData.tiles
 
                                 delegate: Rectangle {
+                                    id: tile
+
                                     required property var modelData
 
                                     objectName: "portMapTile"
@@ -176,6 +181,19 @@ Item {
                                         font.family: "monospace"
                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                                         color: Local.StatusPalette.portTileTextColor(modelData.stateKey)
+                                    }
+
+                                    /* 点击跳转：只有"运行中"的端口能跳（容器唯一） */
+                                    MouseArea {
+                                        objectName: "portMapTileClick"
+                                        anchors.fill: parent
+                                        enabled: tile.modelData.containerId !== undefined
+                                            && String(tile.modelData.containerId).length > 0
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: root.containerRequested(tile.modelData.containerId, tile.modelData.containerName)
+
+                                        QQC2.ToolTip.text: tile.modelData.containerName
+                                        QQC2.ToolTip.visible: hovered && enabled
                                     }
 
                                     Accessible.role: Accessible.StaticText

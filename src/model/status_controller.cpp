@@ -322,14 +322,25 @@ QVariantList StatusController::portRanges() const
     }
 
     QVariantList ranges;
+    /*
+     * 方块的颜色按"筛选优先"解析：选了某个筛选时，只有该状态的方块显示成那样；
+     * "全部端口"时按优先级（运行中 > 被占用 > 未启动 > 未占用），
+     * 因此 20003 这种"未占用 + 运行中"的端口显示成运行中（用户要求）。
+     */
+    const QStringList preferred = m_hostPortFilter->stateFilter() == QLatin1String("all")
+        ? QStringList()
+        : QStringList {m_hostPortFilter->stateFilter()};
     for (const HostPortRange &range : HostPortUsage::clusterRanges(entries)) {
         QVariantList tiles;
         for (quint16 port = range.first; port < quint16(range.first + range.tileCount); ++port) {
-            const QString stateKey = HostPortUsage::stateKeyForPort(entries, port);
+            const HostPortEntry entry = HostPortUsage::entryForPort(entries, port, preferred);
             tiles.append(QVariantMap {{QStringLiteral("port"), int(port)},
                                       {QStringLiteral("text"), QString::number(port)},
-                                      {QStringLiteral("stateKey"), stateKey},
-                                      {QStringLiteral("occupied"), !stateKey.isEmpty()}});
+                                      {QStringLiteral("stateKey"), entry.stateKey},
+                                      {QStringLiteral("occupied"), !entry.stateKey.isEmpty()},
+                                      // 运行中的端口对应唯一一个容器：地图里点一下就能跳过去
+                                      {QStringLiteral("containerId"), entry.stateKey == QLatin1String("inUse") ? entry.containerId : QString()},
+                                      {QStringLiteral("containerName"), entry.stateKey == QLatin1String("inUse") ? entry.containerName : QString()}});
         }
         ranges.append(QVariantMap {{QStringLiteral("first"), int(range.first)},
                                    {QStringLiteral("last"), int(range.last)},
