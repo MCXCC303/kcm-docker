@@ -34,7 +34,7 @@ QStringList managedServiceVerbs();
 /*! 该 unit 是否在我们管理的白名单里（`managedServiceUnits()`）。 */
 bool isManagedServiceUnit(const QString &unit);
 
-/*! 动词对应的 KAuth 动作名（`org.kde.kontainer.service.start`）。 */
+/*! 动词对应的 KAuth 动作名（`org.kde.kcm.docker.service.start`）。 */
 QString serviceActionName(ServiceVerb verb);
 /*! 动词对应的 helper 槽名（`service_start`）。 */
 QString serviceHelperSlot(ServiceVerb verb);

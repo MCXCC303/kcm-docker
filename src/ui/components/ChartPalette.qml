@@ -41,7 +41,7 @@ pragma Singleton
 import QtQuick
 
 import org.kde.kirigami as Kirigami
-import org.kde.kontainer as Kontainer
+import org.kde.kcm.docker as Kontainer
 
 QtObject {
     /*!

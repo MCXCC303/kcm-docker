@@ -51,7 +51,7 @@ LANGUAGE=zh_CN kcmshell6 kcm_docker     # 需要先 source build/prefix.sh
 截图复核中文排版（中文比英文长，横幅折行与按钮宽度只有看截图才知道）：
 
 ```bash
-KONTAINER_RENDER_LANG=zh_CN tests/tools/render_ui.sh daemon-config 1200 950 dark /tmp/zh.png
+KCM_DOCKER_RENDER_LANG=zh_CN tests/tools/render_ui.sh daemon-config 1200 950 dark /tmp/zh.png
 ```
 
 > `xgettext` 会对"待译字符串里带 URL"给出警告（例如示例地址）。

@@ -215,7 +215,7 @@ void RefreshChurnTest::mainPageSurvivesDataChurn()
     controller->refresh();
     m_backend->completeRefresh();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -275,7 +275,7 @@ void RefreshChurnTest::containerDetailSurvivesDataChurn()
         detail.labels = {{QStringLiteral("k%1").arg(iteration), QStringLiteral("v")}};
         m_backend->setContainerDetail(detail);
 
-        const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+        const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
         QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
         QVERIFY2(!component.isError(), qPrintable(component.errorString()));
         QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -336,7 +336,7 @@ void RefreshChurnTest::imageDetailSurvivesDataChurn()
         detail.environment = {QStringLiteral("PATH=/usr/bin")};
         m_backend->setImageDetail(detail);
 
-        const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+        const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ImageDetail.qml");
         QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
         QVERIFY2(!component.isError(), qPrintable(component.errorString()));
         QScopedPointer<QObject> object(component.createWithInitialProperties(

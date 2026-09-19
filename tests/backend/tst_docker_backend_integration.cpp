@@ -21,9 +21,9 @@ using namespace Kontainer;
  *
  * 唯一的例外是显式 opt-in 的拉取测试（`pullsAnImageWhenExplicitlyRequested`）：
  * 自动化测试绝不擅自修改用户的 Docker 资源，因此它需要
- * `KONTAINER_PULL_TEST=1`，并且默认拉取一个**已经存在**的小镜像
+ * `KCM_DOCKER_PULL_TEST=1`，并且默认拉取一个**已经存在**的小镜像
  * （重复拉取对镜像库是无副作用的），引用可以用
- * `KONTAINER_PULL_REFERENCE` 覆盖。
+ * `KCM_DOCKER_PULL_REFERENCE` 覆盖。
  */
 class DockerBackendIntegrationTest : public QObject
 {
@@ -157,15 +157,15 @@ void DockerBackendIntegrationTest::missingSocketProducesClearError()
  *
  * 默认拉取 `quay.io/libpod/alpine:latest`（podman 常用的公共小镜像）：
  * 如果本地已经有它，重复拉取只会返回「已是最新」，不会向镜像库新增任何东西。
- * 想换镜像请设置 `KONTAINER_PULL_REFERENCE`。
+ * 想换镜像请设置 `KCM_DOCKER_PULL_REFERENCE`。
  *
  * 运行方式：
- *     KONTAINER_PULL_TEST=1 ./bin/tst_docker_backend_integration pullsAnImageWhenExplicitlyRequested
+ *     KCM_DOCKER_PULL_TEST=1 ./bin/tst_docker_backend_integration pullsAnImageWhenExplicitlyRequested
  */
 void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
 {
-    if (!qEnvironmentVariableIsSet("KONTAINER_PULL_TEST")) {
-        QSKIP("opt-in: set KONTAINER_PULL_TEST=1 to allow a real image pull");
+    if (!qEnvironmentVariableIsSet("KCM_DOCKER_PULL_TEST")) {
+        QSKIP("opt-in: set KCM_DOCKER_PULL_TEST=1 to allow a real image pull");
     }
 
     const DockerEndpoint endpoint = DockerEndpoint::fromEnvironment();
@@ -173,7 +173,7 @@ void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
         QSKIP("no Docker socket available on this machine");
     }
 
-    const QString reference = qEnvironmentVariable("KONTAINER_PULL_REFERENCE", QStringLiteral("quay.io/libpod/alpine:latest"));
+    const QString reference = qEnvironmentVariable("KCM_DOCKER_PULL_REFERENCE", QStringLiteral("quay.io/libpod/alpine:latest"));
 
     DockerBackend backend;
     backend.setEndpoint(endpoint);

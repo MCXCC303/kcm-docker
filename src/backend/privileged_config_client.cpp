@@ -52,7 +52,7 @@ QString errorKeyForJob(KAuth::ExecuteJob *job)
         break;
     }
 
-    // helper 自己返回的错误码（见 kontainer_helper.cpp 的 ErrorCode）
+    // helper 自己返回的错误码（见 kcm_docker_helper.cpp 的 ErrorCode）
     switch (job->data().value(QStringLiteral("errorCode")).toInt()) {
     case 1:
         return QStringLiteral("invalidRequest");

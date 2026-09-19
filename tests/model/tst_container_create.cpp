@@ -135,7 +135,7 @@ void ContainerCreateTest::interactiveFlagsDefaultOnAndReachThePayload()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     MockDockerBackend backend;
     OperationController operations(&backend);
     CreateContainerController wizard(&operations, &presets, &backend);
@@ -257,7 +257,7 @@ void ContainerCreateTest::presetStorePersistsAndOrders()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("kontainerrc"));
+    const QString path = dir.filePath(QStringLiteral("kcm_dockerrc"));
 
     QString firstId;
     QString secondId;
@@ -281,7 +281,7 @@ void ContainerCreateTest::presetStorePersistsAndOrders()
         QCOMPARE(store.presets().first().id, secondId);
     }
 
-    // 重新打开：内容与顺序都要还在（持久化真的写进了 kontainerrc）
+    // 重新打开：内容与顺序都要还在（持久化真的写进了 kcm_dockerrc）
     MountPresetStore reopened(path);
     QCOMPARE(reopened.count(), 2);
     QCOMPARE(reopened.presets().first().id, secondId);
@@ -302,7 +302,7 @@ void ContainerCreateTest::presetStoreDeduplicatesAndTrimsRecents()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore store(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore store(dir.filePath(QStringLiteral("kcm_dockerrc")));
 
     // 创建成功后把本次挂载并入"最近使用"
     QList<ContainerMountRequest> mounts;
@@ -339,7 +339,7 @@ void ContainerCreateTest::wizardGatesSteps()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     MockDockerBackend backend;
     Image image;
     image.id = QStringLiteral("sha256:aaaa");
@@ -462,7 +462,7 @@ void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     const QString presetId = presets.add(QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("bind"), true, QStringLiteral("数据"));
     QVERIFY(!presetId.isEmpty());
 
@@ -526,7 +526,7 @@ void ContainerCreateTest::cloneCopiesTheFullConfiguration()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     MockDockerBackend backend;
 
     Container listed;
@@ -587,7 +587,7 @@ void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     MockDockerBackend backend;
     Container taken;
     taken.id = QStringLiteral("taken");
@@ -650,7 +650,7 @@ void ContainerCreateTest::commandHistoryRecordsAndMerges()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    const QString path = dir.filePath(QStringLiteral("kontainerrc"));
+    const QString path = dir.filePath(QStringLiteral("kcm_dockerrc"));
 
     {
         CommandHistoryStore history(path);
@@ -716,7 +716,7 @@ void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     MockDockerBackend backend;
     OperationController operations(&backend);
     Image image;
@@ -775,7 +775,7 @@ void ContainerCreateTest::portRowStatusesReportHoldersAndSuggestFreePorts()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    MountPresetStore presets(dir.filePath(QStringLiteral("kontainerrc")));
+    MountPresetStore presets(dir.filePath(QStringLiteral("kcm_dockerrc")));
     MockDockerBackend backend;
     OperationController operations(&backend);
 

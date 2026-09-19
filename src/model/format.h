@@ -17,7 +17,7 @@ namespace Kontainer
  *
  * 时间与体积的 UI 文案在这里生成，domain model 只保存 QDateTime / 字节数，
  * backend 永不产出 "Up 2 hours" 这类界面字符串。
- * 作为 QML 单例注册为 org.kde.kontainer 的 Format。
+ * 作为 QML 单例注册为 org.kde.kcm.docker 的 Format。
  */
 class Format : public QObject
 {

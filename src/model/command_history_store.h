@@ -16,7 +16,7 @@ namespace Kontainer
  * 命令历史（用户实测 F3：复杂命令希望能快速复用）。
  *
  * 两个来源：
- *  1. **本地记录**：每次成功提交创建请求时记下命令（`~/.config/kontainerrc` 的 `[CommandHistory]`，
+ *  1. **本地记录**：每次成功提交创建请求时记下命令（`~/.config/kcm_dockerrc` 的 `[CommandHistory]`，
  *     上限 20 条，重复的命令提到最前）；
  *  2. **已有容器的命令**：由界面按需喂进来（`mergeExternal()`），只用于候选展示，不写盘—— 
  *     容器可能随时被删除，把它们的命令持久化下来没有意义。
@@ -40,7 +40,7 @@ public:
     /*! 上限：再多也不方便在下拉里挑。 */
     static constexpr int kMaxEntries = 20;
 
-    /*! `configPath` 为空时用 `QStandardPaths` 的 `kontainerrc`（测试传临时路径）。 */
+    /*! `configPath` 为空时用 `QStandardPaths` 的 `kcm_dockerrc`（测试传临时路径）。 */
     explicit CommandHistoryStore(const QString &configPath = {}, QObject *parent = nullptr);
 
     bool empty() const;

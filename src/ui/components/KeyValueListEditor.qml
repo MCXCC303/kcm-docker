@@ -34,7 +34,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
-import org.kde.kontainer as Kontainer
+import org.kde.kcm.docker as Kontainer
 
 import "." as Local
 

@@ -15,7 +15,7 @@ namespace
 {
 QString sourceDir()
 {
-    return QStringLiteral(KONTAINER_SOURCE_DIR);
+    return QStringLiteral(KCM_DOCKER_SOURCE_DIR);
 }
 
 /*! 递归收集某个目录下的文件内容（`relativePath -> content`）。 */
@@ -287,7 +287,7 @@ void SourceConventionsTest::externalProcessesStayForbidden()
     const QStringList privilegedFiles = {
         QStringLiteral("backend/privileged_config_client.cpp"),
         QStringLiteral("backend/privileged_config_client.h"),
-        QStringLiteral("kauth/kontainer_helper.cpp"),
+        QStringLiteral("kauth/kcm_docker_helper.cpp"),
         QStringLiteral("kauth/privileged_config_request.cpp"),
         QStringLiteral("kauth/privileged_config_request.h"),
     };
@@ -355,7 +355,7 @@ void SourceConventionsTest::pluginMetadataVersionMatchesProject()
     const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
     const QJsonObject plugin = root.value(QStringLiteral("KPlugin")).toObject();
     QVERIFY2(!plugin.isEmpty(), "the metadata must have a KPlugin section");
-    QCOMPARE(plugin.value(QStringLiteral("Version")).toString(), QString::fromLatin1(KONTAINER_VERSION));
+    QCOMPARE(plugin.value(QStringLiteral("Version")).toString(), QString::fromLatin1(KCM_DOCKER_VERSION));
 }
 
 /*!

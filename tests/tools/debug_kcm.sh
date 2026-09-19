@@ -9,7 +9,7 @@
 #   tests/tools/debug_kcm.sh                      # 在系统设置里打开本模块
 #   tests/tools/debug_kcm.sh standalone           # 用 kcmshell6 独立窗口打开
 #   tests/tools/debug_kcm.sh settings --gdb       # 在 gdb 里跑系统设置（断点/回溯）
-#   tests/tools/debug_kcm.sh standalone --isolated # 用临时 HOME（不碰真实 ~/.config/kontainerrc）
+#   tests/tools/debug_kcm.sh standalone --isolated # 用临时 HOME（不碰真实 ~/.config/kcm_dockerrc）
 #   tests/tools/debug_kcm.sh --coredumps          # 看最近的崩溃（coredumpctl）
 #
 # 关键点：插件可以直接从**构建目录**加载（`QT_PLUGIN_PATH=build/bin`），
@@ -38,7 +38,7 @@ done
 # 仓库根（本脚本在 tests/tools/ 下）
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BUILD="$ROOT/build"
-PREFIX="${KONTAINER_PREFIX:-$HOME/kde/usr}"
+PREFIX="${KCM_DOCKER_PREFIX:-$HOME/kde/usr}"
 
 if [ ! -f "$BUILD/bin/plasma/kcms/systemsettings/kcm_docker.so" ]; then
     echo "找不到构建产物，请先：cmake --build $BUILD" >&2
@@ -67,7 +67,7 @@ if [ "$ACTION" = "--fatal-warnings" ]; then
 fi
 
 if [ "$ISOLATED" = "1" ]; then
-    # 隔离 HOME：KCM 会读写 ~/.config/kontainerrc（挂载预设、命令历史），
+    # 隔离 HOME：KCM 会读写 ~/.config/kcm_dockerrc（挂载预设、命令历史），
     # 调试时不该动真实配置
     ISOLATED_HOME=$(mktemp -d)
     HOME="$ISOLATED_HOME"

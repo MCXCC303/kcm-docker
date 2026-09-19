@@ -3569,10 +3569,10 @@ msgstr "之后拉取该仓库的私有镜像需要重新登录。"
 #~ msgstr[0] "显示全部（共 %1 行）"
 
 #~ msgid ""
-#~ "Presets are stored in your own configuration (~/.config/kontainerrc) and "
+#~ "Presets are stored in your own configuration (~/.config/kcm_dockerrc) and "
 #~ "offered as quick-add buttons in the container wizard."
 #~ msgstr ""
-#~ "预设保存在你自己的配置里（~/.config/kontainerrc），并在创建容器时作为一键"
+#~ "预设保存在你自己的配置里（~/.config/kcm_dockerrc），并在创建容器时作为一键"
 #~ "添加的按钮出现。"
 
 #~ msgid ""

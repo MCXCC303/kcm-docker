@@ -19,7 +19,7 @@ import QtQuick
 import QtQuick.Controls as QQC2
 
 import org.kde.kirigami as Kirigami
-import org.kde.kontainer as Kontainer
+import org.kde.kcm.docker as Kontainer
 
 QQC2.ToolButton {
     id: button

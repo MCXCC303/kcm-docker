@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
 # 提权动作定义（ARCH_V5_V8 §2.4）——这是**源头**，polkit 的 .policy XML 是构建产物：
-# `kauth_install_actions()`（打包路径）或本仓库的 `kontainer_policy` 目标（前缀安装路径）
+# `kauth_install_actions()`（打包路径）或本仓库的 `kcm_docker_policy` 目标（前缀安装路径）
 # 会调用 KAuth 自带的 kauth-policy-gen 生成 XML。
 #
 # 为什么必须是这个 INI 格式而不是直接写 XML：kauth-policy-gen 只认这个格式，
@@ -14,9 +14,9 @@
 #
 # 动作名 → helper 槽名：去掉 helper id 前缀后把 `.` 换成 `_`
 # （规则见 src/backends/dbus/DBusHelperProxy.cpp，helper 侧对应
-#   kontainer_helper.cpp 的 daemon_save / daemon_restart）
-#   org.kde.kontainer.daemon.save    → daemon_save
-#   org.kde.kontainer.daemon.restart → daemon_restart
+#   kcm_docker_helper.cpp 的 daemon_save / daemon_restart）
+#   org.kde.kcm.docker.daemon.save    → daemon_save
+#   org.kde.kcm.docker.daemon.restart → daemon_restart
 #
 # Policy/Persistence 的语义（官方教程 + 生成结果实测）：
 #   Policy=auth_admin             → 需要以管理员身份认证
@@ -33,7 +33,7 @@ Name[zh_CN]=Kontainer
 Icon=utilities-terminal
 URL=https://invent.kde.org/
 
-[org.kde.kontainer.daemon.save]
+[org.kde.kcm.docker.daemon.save]
 Name=Write the Docker daemon configuration
 Name[zh_CN]=写入 Docker 守护进程配置
 Description=Kontainer wants to change the Docker daemon configuration (/etc/docker/daemon.json)
@@ -41,7 +41,7 @@ Description[zh_CN]=Kontainer 需要修改 Docker 守护进程配置（/etc/docke
 Policy=auth_admin
 Persistence=session
 
-[org.kde.kontainer.daemon.restart]
+[org.kde.kcm.docker.daemon.restart]
 Name=Restart the Docker daemon
 Name[zh_CN]=重启 Docker 守护进程
 Description=Kontainer wants to restart the Docker service. Running containers will be stopped.
@@ -52,7 +52,7 @@ Persistence=session
 # 服务管理（B1）：三个固定 unit × 五个固定动词。
 # 会话侧与 helper 侧都会用 serviceControlArgumentError() 校验 unit/动词白名单，
 # polkit 这一层只负责"要不要管理员授权"。
-[org.kde.kontainer.service.start]
+[org.kde.kcm.docker.service.start]
 Name=Start a Docker-related service
 Name[zh_CN]=启动 Docker 相关服务
 Description=Kontainer wants to start docker.socket, docker.service or containerd.service
@@ -60,7 +60,7 @@ Description[zh_CN]=Kontainer 需要启动 docker.socket、docker.service 或 con
 Policy=auth_admin
 Persistence=session
 
-[org.kde.kontainer.service.stop]
+[org.kde.kcm.docker.service.stop]
 Name=Stop a Docker-related service
 Name[zh_CN]=停止 Docker 相关服务
 Description=Kontainer wants to stop docker.socket, docker.service or containerd.service. Running containers may be stopped.
@@ -68,7 +68,7 @@ Description[zh_CN]=Kontainer 需要停止 docker.socket、docker.service 或 con
 Policy=auth_admin
 Persistence=session
 
-[org.kde.kontainer.service.restart]
+[org.kde.kcm.docker.service.restart]
 Name=Restart a Docker-related service
 Name[zh_CN]=重启 Docker 相关服务
 Description=Kontainer wants to restart docker.socket, docker.service or containerd.service. Running containers may be stopped.
@@ -76,7 +76,7 @@ Description[zh_CN]=Kontainer 需要重启 docker.socket、docker.service 或 con
 Policy=auth_admin
 Persistence=session
 
-[org.kde.kontainer.service.enable]
+[org.kde.kcm.docker.service.enable]
 Name=Enable a Docker-related service
 Name[zh_CN]=启用 Docker 相关服务
 Description=Kontainer wants to enable docker.socket, docker.service or containerd.service at boot
@@ -84,7 +84,7 @@ Description[zh_CN]=Kontainer 需要让 docker.socket、docker.service 或 contai
 Policy=auth_admin
 Persistence=session
 
-[org.kde.kontainer.service.disable]
+[org.kde.kcm.docker.service.disable]
 Name=Disable a Docker-related service
 Name[zh_CN]=禁用 Docker 相关服务
 Description=Kontainer wants to disable docker.socket, docker.service or containerd.service at boot

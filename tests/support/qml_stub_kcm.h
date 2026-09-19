@@ -86,7 +86,7 @@ public:
     /*!
      * 挂载预设存储（指向临时目录）。
      *
-     * 绝不用用户真实的 `~/.config/kontainerrc`：测试会往里加/删预设。
+     * 绝不用用户真实的 `~/.config/kcm_dockerrc`：测试会往里加/删预设。
      */
     MountPresetStore *mountPresets() const
     {

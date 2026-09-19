@@ -294,4 +294,4 @@ void KontainerHelperTest::dryRunStillRejectsUnknownKeys()
 
 QTEST_MAIN(KontainerHelperTest)
 
-#include "tst_kontainer_helper.moc"
+#include "tst_kcm_docker_helper.moc"

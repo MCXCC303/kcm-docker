@@ -15,6 +15,11 @@ namespace Kontainer
 namespace
 {
 /*! 钱包条目只允许这两个字段；读到别的内容一律当损坏（不猜）。 */
+/*
+ * KWallet 的**目录名刻意保持旧值**：软件从 kontainer 更名为 kcm-docker，但用户已经存进去的
+ * 仓库凭据就在这个目录下——改名字等于让它们凭空消失（还得重新登录每个仓库）。
+ * 名字本身不影响功能，因此不动。
+ */
 constexpr auto kFolder = "Kontainer";
 } // namespace
 

@@ -1,10 +1,10 @@
-# Kontainer
+# kcm-docker
 
-Kontainer is a Docker dashboard for KDE Plasma 6: containers, images, networks, volumes and engine status, all inside System Settings.
+kcm-docker is a Docker dashboard for KDE Plasma 6: containers, images, networks, volumes and engine status, all inside System Settings.
 
 ## Introduction
 
-Kontainer is a KCM (KDE Configuration Module) that brings a complete Docker dashboard into System Settings:
+kcm-docker is a KCM (KDE Configuration Module) that brings a complete Docker dashboard into System Settings:
 
 - **Reading is always safe.** Connection state, containers, images, networks, volumes, container logs, resource usage and disk usage.
 - **Writing follows the actual permissions of the Docker socket.** Start, stop and remove containers, pull and build images, create networks and volumes — those entries only appear when the socket is writable for the current user. Otherwise the UI explains why instead of failing silently.
@@ -51,13 +51,14 @@ cmake --install build          # installs into CMAKE_INSTALL_PREFIX
 
 ```sh
 sudo build/install-privileged-helper.sh            # install
+                                                   # (also removes the files of the former name, kontainer)
 sudo build/install-privileged-helper.sh uninstall  # remove
 ```
 
 Distributions install everything in one go instead, using KAuth's own macros:
 
 ```sh
-cmake -B build -DCMAKE_INSTALL_PREFIX=/usr -DKONTAINER_INSTALL_PRIVILEGED_HELPER=ON
+cmake -B build -DCMAKE_INSTALL_PREFIX=/usr -DKCM_DOCKER_INSTALL_PRIVILEGED_HELPER=ON
 sudo cmake --install build
 ```
 
@@ -91,11 +92,11 @@ The helper accepts **whitelisted actions on whitelisted units only**, and both t
 
 ## License
 
-Kontainer is released under the **GPL-2.0-or-later**. Every source file carries an SPDX header:
+kcm-docker is released under the **GPL-2.0-or-later**. Every source file carries an SPDX header:
 
 ```cpp
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
 
     SPDX-License-Identifier: GPL-2.0-or-later
 */

@@ -6,9 +6,9 @@
 
     它只做两件事，而且只按固定路径做：
 
-      1. `org.kde.kontainer.daemon.save`：把白名单键的编辑合并进
+      1. `org.kde.kcm.docker.daemon.save`：把白名单键的编辑合并进
          `/etc/docker/daemon.json`（读取由 helper 自己做，调用方给不了任意内容）
-      2. `org.kde.kontainer.daemon.restart`：通过 **systemd 的 D-Bus 接口**重启 `docker.service`
+      2. `org.kde.kcm.docker.daemon.restart`：通过 **systemd 的 D-Bus 接口**重启 `docker.service`
 
     槽名不是随便起的：KAuth 按"动作名去掉 helper id 前缀、`.` 换成 `_`"来查槽
     （见 KAuth 的 DBusHelperProxy），所以上面两个动作对应 daemon_save / daemon_restart。
@@ -75,7 +75,7 @@ private:
     ActionReply runServiceAction(ServiceVerb verb, const QVariantMap &arguments);
 
 public Q_SLOTS:
-    /*! 写入 daemon.json（白名单键的编辑意图）。对应动作 org.kde.kontainer.daemon.save。 */
+    /*! 写入 daemon.json（白名单键的编辑意图）。对应动作 org.kde.kcm.docker.daemon.save。 */
     ActionReply daemon_save(const QVariantMap &arguments)
     {
         PrivilegedConfigRequest request;
@@ -142,7 +142,7 @@ public Q_SLOTS:
 
     /*! 通过 systemd D-Bus 重启 docker.service（不调用 systemctl 二进制）。
 
-        对应动作 org.kde.kontainer.daemon.restart。 */
+        对应动作 org.kde.kcm.docker.daemon.restart。 */
     ActionReply daemon_restart(const QVariantMap &arguments)
     {
         if (!arguments.isEmpty() && !arguments.contains(QStringLiteral("confirm"))) {
@@ -237,4 +237,4 @@ ActionReply KontainerHelper::runServiceAction(ServiceVerb verb, const QVariantMa
 // D-Bus 系统策略的 allow own 必须是同一个字符串
 KAUTH_HELPER_MAIN(Kontainer::kHelperId, Kontainer::KontainerHelper)
 
-#include "kontainer_helper.moc"
+#include "kcm_docker_helper.moc"

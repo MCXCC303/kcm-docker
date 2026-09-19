@@ -26,20 +26,20 @@ namespace Kontainer
  *
  * `tst_kauth_wiring` 把这四处钉在一起。
  */
-inline constexpr auto kHelperId = "org.kde.kontainer";
+inline constexpr auto kHelperId = "org.kde.kcm.docker";
 
 /*!
- * 动作 id（必须与 `kauth/org.kde.kontainer.actions` 的段名一致）。
+ * 动作 id（必须与 `kauth/org.kde.kcm.docker.actions` 的段名一致）。
  *
  * 命名只能用**小写字母与数字**（分层用 `.`）：这是官方教程的要求，
  * 而且 KAuth 自带的 kauth-policy-gen 会直接拒绝大写与下划线
  * （`Wrong action syntax`），所以这里不能用 `write_daemon_config` 这类名字。
  *
  * 动作名 → helper 槽名：去掉 helper id 前缀后把 `.` 换成 `_`
- * （`org.kde.kontainer.daemon.save` → `daemon_save`）。
+ * （`org.kde.kcm.docker.daemon.save` → `daemon_save`）。
  */
-inline constexpr auto kSaveActionName = "org.kde.kontainer.daemon.save";
-inline constexpr auto kRestartActionName = "org.kde.kontainer.daemon.restart";
+inline constexpr auto kSaveActionName = "org.kde.kcm.docker.daemon.save";
+inline constexpr auto kRestartActionName = "org.kde.kcm.docker.daemon.restart";
 
 /*!
  * 提权请求的受限语义（ARCH_V5_V8 §2.4）。

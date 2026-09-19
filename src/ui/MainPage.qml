@@ -16,7 +16,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 
 import org.kde.kirigami as Kirigami
-import org.kde.kontainer as Kontainer
+import org.kde.kcm.docker as Kontainer
 
 import "components" as Components
 
@@ -157,7 +157,7 @@ Kirigami.Page {
     /*!
      * 调试用起始标签页（默认 0 = 容器）。
      *
-     * 由宿主注入（`kcmshell6` 侧读 `KONTAINER_START_TAB`）：只是为了"打开就能看到某一页"
+     * 由宿主注入（`kcmshell6` 侧读 `KCM_DOCKER_START_TAB`）：只是为了"打开就能看到某一页"
      * 以便截图复核 / 排查，默认行为完全不变。
      */
     property int startTab: 0

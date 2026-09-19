@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(kontainer
+project(kcm-docker
     VERSION 0.9.0
     DESCRIPTION "Docker/容器的 KDE 系统设置模块 (KCM)"
     LANGUAGES CXX
@@ -42,15 +42,15 @@ endif()
 execute_process(
     COMMAND git rev-parse --short HEAD
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    OUTPUT_VARIABLE KONTAINER_GIT_HASH
+    OUTPUT_VARIABLE KCM_DOCKER_GIT_HASH
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
 )
-if(NOT KONTAINER_GIT_HASH)
-    set(KONTAINER_GIT_HASH "unknown")
+if(NOT KCM_DOCKER_GIT_HASH)
+    set(KCM_DOCKER_GIT_HASH "unknown")
 endif()
-string(TIMESTAMP KONTAINER_BUILD_TIME "%Y-%m-%d %H:%M" UTC)
-set(KONTAINER_BUILD_STAMP "${PROJECT_VERSION}+${KONTAINER_GIT_HASH} (${KONTAINER_BUILD_TIME} UTC)")
+string(TIMESTAMP KCM_DOCKER_BUILD_TIME "%Y-%m-%d %H:%M" UTC)
+set(KCM_DOCKER_BUILD_STAMP "${PROJECT_VERSION}+${KCM_DOCKER_GIT_HASH} (${KCM_DOCKER_BUILD_TIME} UTC)")
 
 # 翻译：po/<lang>/<domain>.po 会被编译并安装到 ${KDE_INSTALL_LOCALEDIR}
 # （KLocalizedString 从 XDG_DATA_DIRS 下的 locale/ 目录读取，prefix.sh 已包含本前缀）
@@ -64,10 +64,10 @@ include(CTest)
 # 为什么不各自维护一份：漏加一个文件时，源码目录下的测试仍然通过，
 # 只有安装后的插件会失败——这是一类只在打包后才暴露的问题
 # （ARCH_V3 附录 A 记录过同样的陷阱）。
-set(KONTAINER_QML_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ui")
+set(KCM_DOCKER_QML_BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/ui")
 # 使用绝对路径：qt_add_resources 的别名按 BASE 计算，不受调用目录影响，
 # 因此 src/ 与 tests/ 可以共用同一份清单。
-set(KONTAINER_QML_FILES
+set(KCM_DOCKER_QML_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/main.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/MainPage.qml"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/ContainerCard.qml"

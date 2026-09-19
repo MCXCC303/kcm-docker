@@ -331,7 +331,7 @@ void QmlLoadTest::delegateActivationIsWired()
     controller->refresh();
     m_backend->completeRefresh();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -404,7 +404,7 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
     QVERIFY(controller);
 
     QQmlComponent component(m_engine.get(),
-                            QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
+                            QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
     initial.insert(QStringLiteral("scope"), QStringLiteral("user")); // 用户级：不需要解锁就能编辑
@@ -504,7 +504,7 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
     user->setEngineInfo(info);
 
     QQmlComponent component(m_engine.get(),
-                            QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
+                            QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
 
     // ---- 系统级：受保护、未解锁 → 一切编辑控件禁用 ----
@@ -595,7 +595,7 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
  */
 void QmlLoadTest::topologyConnectionColorsAreStablePerContainer()
 {
-    const QString componentsPath = QStringLiteral("file://") + QStringLiteral(KONTAINER_SOURCE_DIR) + QStringLiteral("/src/ui/components");
+    const QString componentsPath = QStringLiteral("file://") + QStringLiteral(KCM_DOCKER_SOURCE_DIR) + QStringLiteral("/src/ui/components");
 
     // 直接问色板：同一个种子两次求值必须一致，不同种子（不同映射）应当能取到不同色位
     QQmlComponent component(m_engine.get());
@@ -643,7 +643,7 @@ void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
     config.close();
     qputenv("DOCKER_CONFIG", cliDir.path().toUtf8());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/RegistryAuthPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/RegistryAuthPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -705,7 +705,7 @@ void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
     failed.active = false;
     m_stubKcm->controller()->operations()->pulls()->setEntries({failed});
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullProgressList.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PullProgressList.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
     initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
@@ -724,7 +724,7 @@ void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
     QTRY_VERIFY(!loginButton->property("visible").toBool());
 
     // 拉取对话框：该仓库没有凭据时给提示与「去登录…」
-    QQmlComponent dialogComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml")));
+    QQmlComponent dialogComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml")));
     QVERIFY2(!dialogComponent.isError(), qPrintable(dialogComponent.errorString()));
     QVariantMap dialogInitial;
     dialogInitial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
@@ -768,7 +768,7 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
     networks.append(app);
     m_backend->setNetworks(networks);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -860,7 +860,7 @@ void QmlLoadTest::networkDetailShowsMembersAndJumpsToContainers()
     networks.append(app);
     m_backend->setNetworks(networks);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/NetworkDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/NetworkDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -908,7 +908,7 @@ void QmlLoadTest::createNetworkDialogValidatesBeforeSubmitting()
     networks.append(bridge);
     m_backend->setNetworks(networks);
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/CreateNetworkDialog.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/CreateNetworkDialog.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
     initial.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
@@ -989,7 +989,7 @@ void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
 
     const auto loadPage = [this](const QString &networkId) {
         auto component = std::make_unique<QQmlComponent>(m_engine.get(),
-                                                        QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/NetworkDetail.qml")));
+                                                        QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/NetworkDetail.qml")));
         if (component->isError()) {
             return std::unique_ptr<QObject>();
         }
@@ -1028,7 +1028,7 @@ void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
     m_stubKcm->controller()->operations()->refreshWriteAccess();
     QVERIFY(!m_stubKcm->controller()->operations()->writeAllowed());
-    QQmlComponent mainComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QQmlComponent mainComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml")));
     QVERIFY2(!mainComponent.isError(), qPrintable(mainComponent.errorString()));
     QScopedPointer<QObject> mainObject(mainComponent.create(m_engine->rootContext()));
     auto *mainPage = qobject_cast<QQuickItem *>(mainObject.data());
@@ -1074,7 +1074,7 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
                         QStringLiteral("fd00::4"), QStringLiteral("02:42:ac:11:00:04"), QStringLiteral("172.17.0.1")}};
     m_backend->setContainerDetail(detail);
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("containerId"), QStringLiteral("cid-1")}},
                                                                         m_engine->rootContext()));
@@ -1201,7 +1201,7 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
     volumes.append(unknown);
     m_backend->setVolumes(volumes);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -1280,7 +1280,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     m_backend->setNetworks(networks);
     m_stubKcm->controller()->refreshNetworks();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -1449,7 +1449,7 @@ void QmlLoadTest::presetPanelManagesPresets()
                                        QStringLiteral("数据目录"));
     QVERIFY(!firstId.isEmpty());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/MountPresetManager.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/MountPresetManager.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -1548,7 +1548,7 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     m_stubKcm->controller()->operations()->refreshWriteAccess();
     QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/BuildImagePanel.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/BuildImagePanel.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     // required property 必须在创建时给：创建后再 setProperty 会先报"未初始化"
@@ -1641,7 +1641,7 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
         localImage.repoTags = {QStringLiteral("alpine:3.19")};
         m_backend->setImages({localImage});
 
-        const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+        const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
         QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
         QVERIFY2(!component.isError(), qPrintable(component.errorString()));
         QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -1703,7 +1703,7 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
 
     // ② 键值对编辑器的"删除"按钮
     {
-        const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
+        const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
         QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
         QVERIFY2(!component.isError(), qPrintable(component.errorString()));
         QVariantList entries;
@@ -1761,7 +1761,7 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
     localImage.repoTags = {QStringLiteral("alpine:3.19")};
     m_backend->setImages({localImage});
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -1850,7 +1850,7 @@ void QmlLoadTest::pauseAndResumeButtonsFollowTheState()
     runningDetail.state = ContainerState::Running;
     m_backend->setContainerDetail(runningDetail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -1919,7 +1919,7 @@ void QmlLoadTest::openingTheWizardRefreshesNetworks()
     m_backend->completeRefresh();
 
     // 向导自己也会保一次险（打开时若列表仍为空就再刷）
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     const int beforeWizard = m_backend->networkRefreshCount();
@@ -1938,7 +1938,7 @@ void QmlLoadTest::commandFieldAndExitHint()
     localImage.repoTags = {QStringLiteral("alpine:latest")};
     m_backend->setImages({localImage});
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -1987,7 +1987,7 @@ void QmlLoadTest::commandFieldAndExitHint()
  */
 void QmlLoadTest::stepButtonsNeverLookMultiSelected()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -2054,7 +2054,7 @@ void QmlLoadTest::privilegedNeedsTypedConfirmation()
     localImage.repoTags = {QStringLiteral("alpine:3.19")};
     m_backend->setImages({localImage});
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/CreateContainer.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -2128,7 +2128,7 @@ void QmlLoadTest::detailOffersCopyForCommandAndEntrypoint()
     detail.entrypoint = {QStringLiteral("/usr/bin/env"), QStringLiteral("sh")};
     m_backend->setContainerDetail(detail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -2180,7 +2180,7 @@ void QmlLoadTest::topologyAlignsTheContainerChipWithTheFirstBinding()
     m_backend->setContainerDetail(detail);
 
     QQmlComponent component(m_engine.get(),
-                            QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+                            QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
         {
@@ -2267,7 +2267,7 @@ void QmlLoadTest::portEditorColoursEachRowDifferently()
     wizard->addPortRow(443, 0, QStringLiteral("127.0.0.1"), QStringLiteral("tcp"));
     wizard->addPortRow(53, 5353, QString(), QStringLiteral("udp"));
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PortMappingEditor.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PortMappingEditor.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -2330,7 +2330,7 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
     auto *services = m_stubKcm->serviceStatus();
     QVERIFY(services);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ServiceCard.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/ServiceCard.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -2406,7 +2406,7 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
  */
 void QmlLoadTest::filteredComboBoxNarrowsAndSelects()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/FilteredComboBox.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/FilteredComboBox.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
 
@@ -2506,7 +2506,7 @@ void QmlLoadTest::imageUsedByRowsShowStateAndNavigate()
     m_backend->completeRefresh();
     QTRY_VERIFY_WITH_TIMEOUT(controller->usedByContainers()->count() == 2, 5000);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ImageDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("imageId"), imageId}},
@@ -2575,7 +2575,7 @@ void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
     QVERIFY(wrapper.open());
     wrapper.write(QStringLiteral("import QtQuick\n"
                                  "import QtQuick.Layouts\n"
-                                 "import \"file://" KONTAINER_SOURCE_DIR "/src/ui/components\"\n"
+                                 "import \"file://" KCM_DOCKER_SOURCE_DIR "/src/ui/components\"\n"
                                  "ColumnLayout {\n"
                                  "    property var kvModel\n"
                                  "    KeyValueList { Layout.fillWidth: true; model: kvModel }\n"
@@ -2686,7 +2686,7 @@ void QmlLoadTest::longCommandIsCollapsedUntilExpanded()
     detail.command = {QStringLiteral("jupyter"), QStringLiteral("notebook"), longCommand};
     m_backend->setContainerDetail(detail);
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("containerId"), QStringLiteral("cid-long")}},
                                                                         m_engine->rootContext()));
@@ -2739,7 +2739,7 @@ void QmlLoadTest::containerDetailOpensTheImage()
     detail.imageId = QStringLiteral("sha256:feedface");
     m_backend->setContainerDetail(detail);
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.createWithInitialProperties({{QStringLiteral("containerId"), QStringLiteral("cid-img")}},
                                                                         m_engine->rootContext()));
@@ -2804,7 +2804,7 @@ void QmlLoadTest::engineViewListsComponentVersions()
     m_stubKcm->controller()->refresh();
     m_backend->completeRefresh();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/EngineStatusView.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/EngineStatusView.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -2876,7 +2876,7 @@ void QmlLoadTest::topologyMergesDualStackBindings()
     controller->start();
     m_backend->completeRefresh();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PortTopology.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PortTopology.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -2948,7 +2948,7 @@ void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
     wizard->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
                          QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 9000}}});
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PortMappingEditor.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PortMappingEditor.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
@@ -3029,7 +3029,7 @@ void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
     m_stubKcm->controller()->refresh();
     m_backend->completeRefresh();
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
     QVERIFY(!object.isNull());
@@ -3148,7 +3148,7 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
     m_stubKcm->controller()->refreshPorts();
     m_backend->completeRefresh();
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
     QVERIFY(!object.isNull());
@@ -3244,7 +3244,7 @@ void QmlLoadTest::rangeMapTilesOpenTheRunningContainer()
     m_stubKcm->controller()->refreshPorts();
     m_backend->completeRefresh();
 
-    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
     QVERIFY(!object.isNull());
@@ -3328,7 +3328,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
 {
     QTest::addColumn<QString>("fileName");
 
-    const QString uiDirectory = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/");
+    const QString uiDirectory = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/");
     const QStringList files = {
         QStringLiteral("main.qml"),
         QStringLiteral("MainPage.qml"),
@@ -3406,7 +3406,7 @@ void QmlLoadTest::instantiatesPages_data()
 
     // 只有「页面」类文件可以独立创建；卡片/视图组件依赖 required property（由调用方提供），
     // 它们的编译检查已由 loadsAllQmlFiles 覆盖。
-    const QString uiDirectory = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/");
+    const QString uiDirectory = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/");
     const QStringList files = {
         QStringLiteral("main.qml"),
         QStringLiteral("MainPage.qml"),
@@ -3444,7 +3444,7 @@ void QmlLoadTest::instantiatesPages()
  */
 void QmlLoadTest::sensitiveSectionsAreCollapsedByDefault()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY(!component.isError());
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -3497,7 +3497,7 @@ void QmlLoadTest::statusChipMapsSemanticKeys()
     QFETCH(QString, semanticKey);
     QFETCH(int, expectedType);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/StatusChip.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/StatusChip.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
 
@@ -3524,7 +3524,7 @@ void QmlLoadTest::statusChipMapsSemanticKeys()
  */
 void QmlLoadTest::copyButtonFollowsValueAvailability()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/CopyButton.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/CopyButton.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
 
@@ -3572,7 +3572,7 @@ void QmlLoadTest::emptyPlaceholderDistinguishesStates()
     controller->refresh();
     m_backend->completeRefresh();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -3616,7 +3616,7 @@ void QmlLoadTest::containerDetailHasSections()
     detail.environment = {QStringLiteral("PATH=/usr/bin")};
     m_backend->setContainerDetail(detail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -3702,7 +3702,7 @@ void QmlLoadTest::imageLayersCollapseByDefault()
     }
     m_backend->setImageDetail(detail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ImageDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -3757,7 +3757,7 @@ void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
     controller->refresh();
     m_backend->completeRefresh();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -3801,7 +3801,7 @@ void QmlLoadTest::autoRefreshActionControlsTheScheduler()
     StatusController *controller = m_stubKcm->controller();
     QVERIFY(controller->autoRefreshEnabled());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/main.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -3850,7 +3850,7 @@ void QmlLoadTest::writeActionsFollowThePermissionGate()
     // 默认 mock endpoint 无效 → 不可写：写入口整体不出现，并说明原因
     QVERIFY(!controller->operations()->writeAllowed());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -3883,7 +3883,7 @@ void QmlLoadTest::containerActionsFollowStateAndBusy()
     controller->operations()->refreshWriteAccess();
     QVERIFY(controller->operations()->writeAllowed());
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
 
     // 运行中的容器：可以停止 / 重启，但不给删除（先停止再删除，别让用户撞引擎的 409）
     ContainerDetail running;
@@ -3953,7 +3953,7 @@ void QmlLoadTest::operationMessageReflectsResultState()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -3992,7 +3992,7 @@ void QmlLoadTest::pullDialogValidatesReferenceBeforeSubmitting()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4052,7 +4052,7 @@ void QmlLoadTest::pullProgressListShowsBackgroundPulls()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -4120,7 +4120,7 @@ void QmlLoadTest::pullFailureStaysVisibleInTheList()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -4159,7 +4159,7 @@ void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
 {
     StatusController *controller = m_stubKcm->controller();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/main.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -4197,7 +4197,7 @@ void QmlLoadTest::imageRefInputOwnsTheValidationRules()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ImageRefInput.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/ImageRefInput.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4246,7 +4246,7 @@ void QmlLoadTest::imageRefInputOwnsTheValidationRules()
  */
 void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/StringListEditor.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/StringListEditor.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
 
@@ -4290,7 +4290,7 @@ void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
  */
 void QmlLoadTest::keyValueListEditorMasksValuesAndDetectsDuplicates()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
@@ -4351,7 +4351,7 @@ void QmlLoadTest::keyValueListEditorMasksValuesAndDetectsDuplicates()
 
 void QmlLoadTest::confirmDialogAlwaysCarriesConsequenceText()
 {
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/ConfirmDialog.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/ConfirmDialog.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4384,7 +4384,7 @@ void QmlLoadTest::pullDialogStartsPullOnEnter()
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4430,7 +4430,7 @@ void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
     detail.repoTags = {QStringLiteral("alpine:3.19"), QStringLiteral("alpine:latest")};
     m_backend->setImageDetail(detail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ImageDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ImageDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4477,7 +4477,7 @@ void QmlLoadTest::mountRowReflectsHostPathState()
     // 路径存在：提供打开动作
     StatusController *controller = m_stubKcm->controller();
     m_stubKcm->hostPaths()->setState(HostPathState::Directory);
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4552,7 +4552,7 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     };
     m_backend->setContainerDetail(detail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4724,7 +4724,7 @@ void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
     m_backend->setContainerDetail(detail);
     m_stubKcm->hostPaths()->setState(HostPathState::Directory);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(
@@ -4793,7 +4793,7 @@ void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
 
     // 说明：无头测试里页面的宽度链条不稳定（行的实际宽度可能超过页面），
     // 因此"超长宿主路径真的出现省略号"这一条不在这里断言，而是靠渲染复核：
-    //   KONTAINER_RENDER_LONG_PATHS=1 tests/tools/render_ui.sh container-detail 1200 620 light /tmp/m.png 3
+    //   KCM_DOCKER_RENDER_LONG_PATHS=1 tests/tools/render_ui.sh container-detail 1200 620 light /tmp/m.png 3
 }
 
 /*!
@@ -4811,7 +4811,7 @@ void QmlLoadTest::unpublishedPortsAreListedWithoutLinks()
     };
     m_backend->setContainerDetail(detail);
 
-    const QString path = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
+    const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
     QScopedPointer<QObject> object(component.createWithInitialProperties(

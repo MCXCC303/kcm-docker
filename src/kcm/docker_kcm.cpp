@@ -33,7 +33,7 @@ DockerKcm::DockerKcm(QObject *parent, const KPluginMetaData &metaData)
     // 只读状态面板：没有需要保存的配置，也没有写操作按钮
     setButtons(NoAdditionalButton);
 
-    // 暴露给 QML（org.kde.kontainer）。注册代码与 QML 加载测试共用。
+    // 暴露给 QML（org.kde.kcm.docker）。注册代码与 QML 加载测试共用。
     registerKontainerQmlTypes();
 
     qCDebug(kontainerKcm) << "Kontainer KCM created; build:" << m_controller->buildStamp() << "endpoint:" << m_backend->endpointDisplayName();

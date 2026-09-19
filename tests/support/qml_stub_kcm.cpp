@@ -16,7 +16,7 @@ QmlStubKcm::QmlStubKcm(DockerBackendInterface *backend, QObject *parent)
     , m_credentialBackend(new FakeCredentialBackend())
     , m_configDir(new QTemporaryDir())
     // 凭据后端注入内存替身、预设存储指向临时目录：测试与离屏渲染都不该碰用户的真实数据
-    , m_mountPresets(new MountPresetStore(m_configDir->filePath(QStringLiteral("kontainerrc"))))
+    , m_mountPresets(new MountPresetStore(m_configDir->filePath(QStringLiteral("kcm_dockerrc"))))
     , m_directoryPicker(new FakeDirectoryPicker())
     , m_serviceStatus(new FakeServiceStatus())
     , m_privilegedClient(new FakePrivilegedClient())

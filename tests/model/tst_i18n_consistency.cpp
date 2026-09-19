@@ -49,7 +49,7 @@ namespace
 {
 QString sourceDir()
 {
-    return QStringLiteral(KONTAINER_SOURCE_DIR);
+    return QStringLiteral(KCM_DOCKER_SOURCE_DIR);
 }
 } // namespace
 
@@ -319,7 +319,7 @@ void I18nConsistencyTest::templateMatchesSources()
  */
 void I18nConsistencyTest::translationsLoadAtRuntime()
 {
-    const QString moFile = QStringLiteral(KONTAINER_BUILD_DIR) + QStringLiteral("/locale/zh_CN/LC_MESSAGES/kcm_docker.mo");
+    const QString moFile = QStringLiteral(KCM_DOCKER_BUILD_DIR) + QStringLiteral("/locale/zh_CN/LC_MESSAGES/kcm_docker.mo");
     if (!QFile::exists(moFile)) {
         QSKIP("the compiled .mo does not exist yet; build the kcm_docker target first");
     }

@@ -48,7 +48,7 @@ struct MountPreset {
 };
 
 /*!
- * 挂载预设的持久化（`~/.config/kontainerrc`，组 `[MountPresets]`）。
+ * 挂载预设的持久化（`~/.config/kcm_dockerrc`，组 `[MountPresets]`）。
  *
  * 为什么不用 KCM 的配置模块：预设是**这个工具的数据**，不是系统设置（§1.5.3）。
  *
@@ -76,7 +76,7 @@ public:
     static constexpr int kMaxRecent = 20;
 
     /*!
-     * `configPath` 为空时用 `QStandardPaths` 的 `kontainerrc`。
+     * `configPath` 为空时用 `QStandardPaths` 的 `kcm_dockerrc`。
      *
      * 测试传临时路径即可，不需要污染用户配置。
      */

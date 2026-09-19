@@ -253,7 +253,7 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
     widget.resize(900, 700);
     widget.show();
 
-    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/main.qml")));
     QVERIFY2(widget.status() != QQuickWidget::Error, qPrintable(widget.errors().isEmpty() ? QStringLiteral("failed to load main.qml") : widget.errors().constFirst().toString()));
 
     QQuickItem *root = widget.rootObject();
@@ -351,7 +351,7 @@ void KcmWidgetChurnTest::listKeepsScrollPositionOnValueRefresh()
     widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
     widget.resize(900, 700);
     widget.show();
-    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml")));
     QTest::qWait(50);
 
     QQuickItem *page = widget.rootObject();
@@ -441,7 +441,7 @@ void KcmWidgetChurnTest::delegatesSurviveDataChanges()
     widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
     widget.resize(900, 700);
     widget.show();
-    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/MainPage.qml")));
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml")));
     QTest::qWait(50);
 
     QQuickItem *page = widget.rootObject();
@@ -525,7 +525,7 @@ void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
     widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
     widget.resize(900, 700);
     widget.show();
-    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/main.qml")));
     QTest::qWait(80);
 
     QQuickItem *root = widget.rootObject();
@@ -611,7 +611,7 @@ void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
     widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
     widget.resize(900, 700);
     widget.show();
-    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/main.qml")));
     QTest::qWait(60);
 
     QQuickItem *root = widget.rootObject();
@@ -730,7 +730,7 @@ void KcmWidgetChurnTest::statsSamplesDoNotDestroyAnyItem()
     widget.engine()->rootContext()->setContextProperty(QStringLiteral("kcm"), m_stubKcm.get());
     widget.resize(900, 700);
     widget.show();
-    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/main.qml")));
+    widget.setSource(QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/main.qml")));
     QTest::qWait(60);
 
     QQuickItem *root = widget.rootObject();

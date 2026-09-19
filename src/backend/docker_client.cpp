@@ -151,7 +151,7 @@ void DockerReply::onConnected()
     }
     request += "Host: docker\r\n";
     request += "Accept: application/json\r\n";
-    request += "User-Agent: kontainer/" KONTAINER_VERSION "\r\n";
+    request += "User-Agent: kontainer/" KCM_DOCKER_VERSION "\r\n";
     const bool uploadsFile = !m_request.bodyFile.isEmpty();
     if (methodSendsBody(m_request.method)) {
         if (uploadsFile || !m_request.body.isEmpty()) {

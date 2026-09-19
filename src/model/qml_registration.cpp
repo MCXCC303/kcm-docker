@@ -34,34 +34,34 @@ namespace Kontainer
 
 void registerKontainerQmlTypes()
 {
-    qmlRegisterUncreatableType<StatusController>("org.kde.kontainer", 1, 0, "StatusController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<ContainerModel>("org.kde.kontainer", 1, 0, "ContainerModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<ImageModel>("org.kde.kontainer", 1, 0, "ImageModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<EngineStatus>("org.kde.kontainer", 1, 0, "EngineStatus", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<StorageStatus>("org.kde.kontainer", 1, 0, "StorageStatus", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<ContainerFilterModel>("org.kde.kontainer", 1, 0, "ContainerFilterModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<ImageFilterModel>("org.kde.kontainer", 1, 0, "ImageFilterModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<NetworkModel>("org.kde.kontainer", 1, 0, "NetworkModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<NetworkFilterModel>("org.kde.kontainer", 1, 0, "NetworkFilterModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<VolumeModel>("org.kde.kontainer", 1, 0, "VolumeModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<CommandHistoryStore>("org.kde.kontainer", 1, 0, "CommandHistoryStore", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<CreateContainerController>("org.kde.kontainer", 1, 0, "CreateContainerController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<DirectoryPicker>("org.kde.kontainer", 1, 0, "DirectoryPicker", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<MountPresetStore>("org.kde.kontainer", 1, 0, "MountPresetStore", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<VolumeDetailController>("org.kde.kontainer", 1, 0, "VolumeDetailController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<VolumeFilterModel>("org.kde.kontainer", 1, 0, "VolumeFilterModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<NetworkDetailController>("org.kde.kontainer", 1, 0, "NetworkDetailController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<DetailListModel>("org.kde.kontainer", 1, 0, "DetailListModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<MetricsModel>("org.kde.kontainer", 1, 0, "MetricsModel", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<ContainerDetailController>("org.kde.kontainer", 1, 0, "ContainerDetailController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<DaemonConfigController>("org.kde.kontainer", 1, 0, "DaemonConfigController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<OperationController>("org.kde.kontainer", 1, 0, "OperationController", QStringLiteral("Provided by the KCM"));
-    qmlRegisterUncreatableType<ImageDetailController>("org.kde.kontainer", 1, 0, "ImageDetailController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<StatusController>("org.kde.kcm.docker", 1, 0, "StatusController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<ContainerModel>("org.kde.kcm.docker", 1, 0, "ContainerModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<ImageModel>("org.kde.kcm.docker", 1, 0, "ImageModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<EngineStatus>("org.kde.kcm.docker", 1, 0, "EngineStatus", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<StorageStatus>("org.kde.kcm.docker", 1, 0, "StorageStatus", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<ContainerFilterModel>("org.kde.kcm.docker", 1, 0, "ContainerFilterModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<ImageFilterModel>("org.kde.kcm.docker", 1, 0, "ImageFilterModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<NetworkModel>("org.kde.kcm.docker", 1, 0, "NetworkModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<NetworkFilterModel>("org.kde.kcm.docker", 1, 0, "NetworkFilterModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<VolumeModel>("org.kde.kcm.docker", 1, 0, "VolumeModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<CommandHistoryStore>("org.kde.kcm.docker", 1, 0, "CommandHistoryStore", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<CreateContainerController>("org.kde.kcm.docker", 1, 0, "CreateContainerController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<DirectoryPicker>("org.kde.kcm.docker", 1, 0, "DirectoryPicker", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<MountPresetStore>("org.kde.kcm.docker", 1, 0, "MountPresetStore", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<VolumeDetailController>("org.kde.kcm.docker", 1, 0, "VolumeDetailController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<VolumeFilterModel>("org.kde.kcm.docker", 1, 0, "VolumeFilterModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<NetworkDetailController>("org.kde.kcm.docker", 1, 0, "NetworkDetailController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<DetailListModel>("org.kde.kcm.docker", 1, 0, "DetailListModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<MetricsModel>("org.kde.kcm.docker", 1, 0, "MetricsModel", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<ContainerDetailController>("org.kde.kcm.docker", 1, 0, "ContainerDetailController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<DaemonConfigController>("org.kde.kcm.docker", 1, 0, "DaemonConfigController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<OperationController>("org.kde.kcm.docker", 1, 0, "OperationController", QStringLiteral("Provided by the KCM"));
+    qmlRegisterUncreatableType<ImageDetailController>("org.kde.kcm.docker", 1, 0, "ImageDetailController", QStringLiteral("Provided by the KCM"));
 
-    qmlRegisterSingletonType<Format>("org.kde.kontainer", 1, 0, "Format", [](QQmlEngine *, QJSEngine *) -> QObject * {
+    qmlRegisterSingletonType<Format>("org.kde.kcm.docker", 1, 0, "Format", [](QQmlEngine *, QJSEngine *) -> QObject * {
         return new Format;
     });
-    qmlRegisterSingletonType<Presentation>("org.kde.kontainer", 1, 0, "Presentation", [](QQmlEngine *, QJSEngine *) -> QObject * {
+    qmlRegisterSingletonType<Presentation>("org.kde.kcm.docker", 1, 0, "Presentation", [](QQmlEngine *, QJSEngine *) -> QObject * {
         return new Presentation;
     });
 }

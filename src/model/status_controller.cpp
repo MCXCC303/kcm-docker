@@ -57,7 +57,7 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
-    // 挂载预设是"这个工具的数据"（~/.config/kontainerrc），不是系统设置（§1.5.3）
+    // 挂载预设是"这个工具的数据"（~/.config/kcm_dockerrc），不是系统设置（§1.5.3）
     // 挂载预设：注入时用注入的（测试/渲染用临时文件，绝不写用户真实配置）
     , m_mountPresets(mountPresetStore ? mountPresetStore : new MountPresetStore({}, this))
     , m_commandHistory(new CommandHistoryStore({}, this))
@@ -269,7 +269,7 @@ int StatusController::inUsePortCount() const
 int StatusController::startTabFromEnvironment() const
 {
     bool ok = false;
-    const int index = qEnvironmentVariable("KONTAINER_START_TAB").toInt(&ok);
+    const int index = qEnvironmentVariable("KCM_DOCKER_START_TAB").toInt(&ok);
     return ok && index > 0 ? index : 0;
 }
 
@@ -462,7 +462,7 @@ QString StatusController::listStateKeyFor(ListState state)
 
 QString StatusController::buildStamp() const
 {
-    return QStringLiteral(KONTAINER_BUILD_STAMP);
+    return QStringLiteral(KCM_DOCKER_BUILD_STAMP);
 }
 
 QString StatusController::stateKey() const

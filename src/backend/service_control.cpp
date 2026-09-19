@@ -68,7 +68,7 @@ bool isManagedServiceUnit(const QString &unit)
 
 QString serviceActionName(ServiceVerb verb)
 {
-    return QStringLiteral("org.kde.kontainer.service.") + serviceVerbKey(verb);
+    return QStringLiteral("org.kde.kcm.docker.service.") + serviceVerbKey(verb);
 }
 
 QString serviceHelperSlot(ServiceVerb verb)

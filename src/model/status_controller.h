@@ -80,7 +80,7 @@ class StatusController : public QObject
     Q_PROPERTY(QString engineStateIconName READ engineStateIconName NOTIFY engineStateChanged)
 
     /*!
-     * 调试用起始标签页（`KONTAINER_START_TAB=<索引>`）。
+     * 调试用起始标签页（`KCM_DOCKER_START_TAB=<索引>`）。
      *
      * QML 读不到环境变量，因此由这里读一次给界面：只是为了让"打开就看到某一页"
      * （截图复核 / 排查）成为可能，默认 0 = 容器页，行为不变。
@@ -603,7 +603,7 @@ private:
     /* 注意：这两个依赖 m_operations，**必须**声明在它后面——
        成员初始化顺序按声明顺序走，放在前面会让向导拿到还没构造的 OperationController。 */
     MountPresetStore *m_mountPresets = nullptr;
-    /*! 命令历史（同样是"这个工具的数据"→ ~/.config/kontainerrc）；向导依赖它，必须排在前面。 */
+    /*! 命令历史（同样是"这个工具的数据"→ ~/.config/kcm_dockerrc）；向导依赖它，必须排在前面。 */
     CommandHistoryStore *m_commandHistory = nullptr;
     CreateContainerController *m_createContainer = nullptr;
     /*! 目录选择：默认用系统原生对话框；测试/渲染注入替身。 */

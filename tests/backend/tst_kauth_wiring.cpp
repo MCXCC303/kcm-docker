@@ -47,7 +47,7 @@ namespace
 
 QString sourceDir()
 {
-    return QStringLiteral(KONTAINER_SOURCE_DIR);
+    return QStringLiteral(KCM_DOCKER_SOURCE_DIR);
 }
 
 QString readFile(const QString &path)
@@ -97,17 +97,17 @@ QHash<QString, QHash<QString, QString>> parseActions(const QString &content)
 
 QString actionsFilePath()
 {
-    return sourceDir() + QStringLiteral("/src/kauth/org.kde.kontainer.actions");
+    return sourceDir() + QStringLiteral("/src/kauth/org.kde.kcm.docker.actions");
 }
 
 QString generatedPolicyPath()
 {
-    return QStringLiteral(KONTAINER_BUILD_DIR) + QStringLiteral("/src/org.kde.kontainer.policy");
+    return QStringLiteral(KCM_DOCKER_BUILD_DIR) + QStringLiteral("/src/org.kde.kcm.docker.policy");
 }
 
 QString installScriptPath()
 {
-    return QStringLiteral(KONTAINER_BUILD_DIR) + QStringLiteral("/install-privileged-helper.sh");
+    return QStringLiteral(KCM_DOCKER_BUILD_DIR) + QStringLiteral("/install-privileged-helper.sh");
 }
 
 } // namespace
@@ -117,7 +117,7 @@ void KauthWiringTest::helperIdAndActionsAreSingleSourced()
     // helper id 与两个动作 id 都在 privileged_config_request.h 里，且动作必须挂在
     // 这个 helper 的命名空间下（KAuth 按"去掉前缀 + 点换下划线"查槽）
     const QString helperId = QString::fromLatin1(kHelperId);
-    QCOMPARE(helperId, QStringLiteral("org.kde.kontainer"));
+    QCOMPARE(helperId, QStringLiteral("org.kde.kcm.docker"));
 
     for (const char *action : {kSaveActionName, kRestartActionName}) {
         const QString name = QString::fromLatin1(action);
@@ -130,17 +130,17 @@ void KauthWiringTest::helperIdAndActionsAreSingleSourced()
     // 会话侧只能用常量，不能自己写字符串字面量（写错了不会编译失败）
     const QString client = readFile(sourceDir() + QStringLiteral("/src/backend/privileged_config_client.cpp"));
     QVERIFY(!client.isEmpty());
-    QVERIFY2(!client.contains(QLatin1String("\"org.kde.kontainer")),
+    QVERIFY2(!client.contains(QLatin1String("\"org.kde.kcm.docker")),
              "action/helper ids must come from privileged_config_request.h, not string literals");
     QVERIFY2(client.contains(QLatin1String("setHelperId")), "the client must set the helper id");
     QVERIFY2(client.contains(QLatin1String("kHelperId")), "the client must use the shared helper id constant");
 
     // helper 侧同理：helper id 由常量给出（宏的第三个参数就是总线名）
-    const QString helper = readFile(sourceDir() + QStringLiteral("/src/kauth/kontainer_helper.cpp"));
+    const QString helper = readFile(sourceDir() + QStringLiteral("/src/kauth/kcm_docker_helper.cpp"));
     QVERIFY(!helper.isEmpty());
     QVERIFY2(helper.contains(QLatin1String("KAUTH_HELPER_MAIN(Kontainer::kHelperId")),
              "the helper must take its bus name from the shared constant");
-    QVERIFY2(!helper.contains(QLatin1String("\"org.kde.kontainer")),
+    QVERIFY2(!helper.contains(QLatin1String("\"org.kde.kcm.docker")),
              "the helper must not hardcode the helper id");
 }
 
@@ -158,18 +158,18 @@ void KauthWiringTest::installScriptInstallsEveryRequiredFile()
                                   "/usr/share/dbus-1/system.d"}) {
         QVERIFY2(script.contains(QString::fromLatin1(directory)), directory);
     }
-    for (const char *fileName : {"kontainer_helper",
-                                 "org.kde.kontainer.policy",
-                                 "org.kde.kontainer.service",
-                                 "org.kde.kontainer.conf"}) {
+    for (const char *fileName : {"kcm_docker_helper",
+                                 "org.kde.kcm.docker.policy",
+                                 "org.kde.kcm.docker.service",
+                                 "org.kde.kcm.docker.conf"}) {
         QVERIFY2(script.contains(QString::fromLatin1(fileName)), fileName);
     }
 
     // 安装的必须是**生成出来的**策略（源头是 .actions）；不能去装手写 XML
-    QVERIFY2(script.contains(QStringLiteral("${KONTAINER_POLICY_FILE}"))
-                 || script.contains(QStringLiteral("build/src/org.kde.kontainer.policy")),
+    QVERIFY2(script.contains(QStringLiteral("${KCM_DOCKER_POLICY_FILE}"))
+                 || script.contains(QStringLiteral("build/src/org.kde.kcm.docker.policy")),
              qPrintable(script));
-    QVERIFY2(!script.contains(QStringLiteral("src/kauth/org.kde.kontainer.policy")),
+    QVERIFY2(!script.contains(QStringLiteral("src/kauth/org.kde.kcm.docker.policy")),
              "the script must install the generated policy, not a hand-written one");
 
     // 卸载分支必须存在，且删的是同一组变量（README 里不再抄一份路径清单）
@@ -190,9 +190,9 @@ void KauthWiringTest::installScriptInstallsEveryRequiredFile()
     }
 
     // D-Bus 系统策略的内容必须是"打洞"而不是空文件
-    QVERIFY2(script.contains(QStringLiteral("<allow own=\"org.kde.kontainer\"/>")), qPrintable(script));
-    QVERIFY2(script.contains(QStringLiteral("<allow send_destination=\"org.kde.kontainer\"/>")), qPrintable(script));
-    QVERIFY2(script.contains(QStringLiteral("Name=org.kde.kontainer")), qPrintable(script));
+    QVERIFY2(script.contains(QStringLiteral("<allow own=\"org.kde.kcm.docker\"/>")), qPrintable(script));
+    QVERIFY2(script.contains(QStringLiteral("<allow send_destination=\"org.kde.kcm.docker\"/>")), qPrintable(script));
+    QVERIFY2(script.contains(QStringLiteral("Name=org.kde.kcm.docker")), qPrintable(script));
 }
 
 void KauthWiringTest::actionsFileDefinesExactlyOurActions()
@@ -256,7 +256,7 @@ void KauthWiringTest::helperSlotsMatchActionNames()
 {
     // KAuth 用"动作名去掉 helper id 前缀、`.` 换成 `_`"来查槽（DBusHelperProxy）：
     // 名字对不上不会编译失败，只会在真机上表现为"没有这个动作"
-    const QString helper = readFile(sourceDir() + QStringLiteral("/src/kauth/kontainer_helper.cpp"));
+    const QString helper = readFile(sourceDir() + QStringLiteral("/src/kauth/kcm_docker_helper.cpp"));
     QVERIFY(!helper.isEmpty());
 
     for (const char *action : {kSaveActionName, kRestartActionName}) {
@@ -271,7 +271,7 @@ void KauthWiringTest::generatedPolicyIsNotSilentlyEmpty()
 {
     const QString policy = readFile(generatedPolicyPath());
     if (policy.isEmpty()) {
-        QSKIP("the generated policy is missing; build the kontainer_policy target first");
+        QSKIP("the generated policy is missing; build the kcm_docker_policy target first");
     }
 
     // 这就是那个真实踩过的坑：把 XML 交给 kauth-policy-gen 会"成功"生成

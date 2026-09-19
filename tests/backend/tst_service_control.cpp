@@ -80,8 +80,8 @@ void ServiceControlTest::rejectsEverythingElse()
 void ServiceControlTest::mapsVerbsToActionsAndSlots()
 {
     // 动作名与槽名必须一一对应（.actions 的注释里写了规则，改名字要同步）
-    QCOMPARE(serviceActionName(ServiceVerb::Start), QStringLiteral("org.kde.kontainer.service.start"));
-    QCOMPARE(serviceActionName(ServiceVerb::Disable), QStringLiteral("org.kde.kontainer.service.disable"));
+    QCOMPARE(serviceActionName(ServiceVerb::Start), QStringLiteral("org.kde.kcm.docker.service.start"));
+    QCOMPARE(serviceActionName(ServiceVerb::Disable), QStringLiteral("org.kde.kcm.docker.service.disable"));
     QCOMPARE(serviceHelperSlot(ServiceVerb::Start), QStringLiteral("service_start"));
     QCOMPARE(serviceHelperSlot(ServiceVerb::Disable), QStringLiteral("service_disable"));
 

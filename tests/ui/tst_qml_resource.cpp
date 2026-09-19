@@ -25,7 +25,7 @@ using namespace Kontainer;
  * 与 tst_qml_load 的分工：
  *  - tst_qml_load 读源码目录里的 .qml，检查语法、绑定与交互行为；
  *  - 本测试把同一份文件（同一份清单，见顶层 CMakeLists.txt 的
- *    KONTAINER_QML_FILES）打进 qrc，再按插件运行时的路径
+ *    KCM_DOCKER_QML_FILES）打进 qrc，再按插件运行时的路径
  *    `qrc:/kcm/kcm_docker/main.qml` 加载。
  *
  * 存在的理由：资源清单漏项、qmldir / 单例在 qrc 下解析失败、资源前缀写错
@@ -58,7 +58,7 @@ private:
 
 QString QmlResourceTest::sourceUiDir()
 {
-    return QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui");
+    return QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui");
 }
 
 void QmlResourceTest::initTestCase()
@@ -103,7 +103,7 @@ void QmlResourceTest::mainUiLoadsFromResource()
  * 源码目录里的每个界面文件（含 qmldir）都必须能在资源里找到**完全相同**的内容。
  *
  * 期望值直接从源码目录扫描得到，不维护第二份清单：
- * 新增组件时忘了加进 KONTAINER_QML_FILES 会立刻在这里失败，
+ * 新增组件时忘了加进 KCM_DOCKER_QML_FILES 会立刻在这里失败，
  * 而不是等到安装之后。
  */
 void QmlResourceTest::everySourceFileIsInTheResource_data()
@@ -135,7 +135,7 @@ void QmlResourceTest::everySourceFileIsInTheResource()
     QFile resource(QStringLiteral(":/kcm/kcm_docker/") + relativePath);
     QVERIFY2(resource.exists(),
              qPrintable(QStringLiteral("%1 is missing from the QML resource list "
-                                       "(add it to KONTAINER_QML_FILES in the top-level CMakeLists.txt)")
+                                       "(add it to KCM_DOCKER_QML_FILES in the top-level CMakeLists.txt)")
                             .arg(relativePath)));
     QVERIFY(resource.open(QIODevice::ReadOnly));
     QCOMPARE(resource.readAll(), expected);

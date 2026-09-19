@@ -5,6 +5,8 @@
 
 #include "model/command_history_store.h"
 
+#include "model/app_config_path.h"
+
 #include <KConfig>
 #include <KConfigGroup>
 #include <QJsonArray>
@@ -23,8 +25,7 @@ constexpr auto kCommandsKey = "Commands";
 
 CommandHistoryStore::CommandHistoryStore(const QString &configPath, QObject *parent)
     : QObject(parent)
-    , m_configPath(configPath.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + QStringLiteral("/kontainerrc")
-                                        : configPath)
+    , m_configPath(configPath.isEmpty() ? defaultAppConfigPath() : configPath)
 {
     load();
 }

@@ -5,6 +5,8 @@
 
 #include "model/mount_preset_store.h"
 
+#include "model/app_config_path.h"
+
 #include "logging.h"
 
 #include <KConfig>
@@ -32,8 +34,7 @@ bool MountPreset::matches(const ContainerMountRequest &request) const
 
 MountPresetStore::MountPresetStore(const QString &configPath, QObject *parent)
     : QObject(parent)
-    , m_configPath(configPath.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::ConfigLocation) + QStringLiteral("/kontainerrc")
-                                        : configPath)
+    , m_configPath(configPath.isEmpty() ? defaultAppConfigPath() : configPath)
 {
     load();
 }

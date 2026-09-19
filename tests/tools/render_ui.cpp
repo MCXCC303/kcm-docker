@@ -17,7 +17,7 @@
         render_ui <page> <width> <height> <light|dark> <output.png>
         page = main | container-detail | image-detail | engine | daemon-config | daemon-config-user
 
-    环境变量 KONTAINER_RENDER_LANG=zh_CN 时按 `po/<lang>/kcm_docker.po` 的译文渲染：
+    环境变量 KCM_DOCKER_RENDER_LANG=zh_CN 时按 `po/<lang>/kcm_docker.po` 的译文渲染：
     中文文案普遍更长，横幅折行、按钮宽度、省略号是否合理只有看中文截图才知道
     （真实会话的 LANG 就是 zh_CN，所以这其实是默认形态）。
     注意：只有 QML 里的文案会变中文。C++ 组装的文本（"3 seconds ago"、"Restarting (1)"）
@@ -70,8 +70,8 @@ void fillFixture(MockDockerBackend &backend)
     // 部署形态相关字段按本机真实情况填写（系统级 root daemon、无 rootless 标记、
     // 数据目录在家目录、live-restore 关闭）：配置页与 Engine 页的截图才具备参考价值
     engine.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
-    // KONTAINER_RENDER_ROOTLESS=1：模拟 rootless daemon（配合 HOME 覆盖可复核"用户可写"形态）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_ROOTLESS")) {
+    // KCM_DOCKER_RENDER_ROOTLESS=1：模拟 rootless daemon（配合 HOME 覆盖可复核"用户可写"形态）
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_ROOTLESS")) {
         engine.securityOptions.append(QStringLiteral("name=rootless"));
     }
     engine.dockerRootDir = QStringLiteral("/home/thf/.local/share/docker/");
@@ -212,18 +212,18 @@ void fillFixture(MockDockerBackend &backend)
     detail.pid = 41237;
     detail.platform = QStringLiteral("linux");
     detail.restartPolicy = QStringLiteral("unless-stopped");
-    // KONTAINER_RENDER_DECLARED_PORT=1：造出"声明了但没真正发布"的端口 + 一段超长区间，
+    // KCM_DOCKER_RENDER_DECLARED_PORT=1：造出"声明了但没真正发布"的端口 + 一段超长区间，
     // 用来复核端口页的 declaredNotPublished 状态与区间地图的"还有 N 个"限流
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_DECLARED_PORT")) {
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_DECLARED_PORT")) {
         detail.declaredPorts = {{4880, QStringLiteral("tcp"), QString(), 4880, 4880},
                                 {3389, QStringLiteral("tcp"), QString(), 1000, 1100}};
     }
     detail.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
                     {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
                     {QStringLiteral("::"), 9090, 0, QStringLiteral("tcp")}};
-    // KONTAINER_RENDER_MANY_PORTS=1：造一堆映射，用来复核拓扑在 20+ 行时的观感
+    // KCM_DOCKER_RENDER_MANY_PORTS=1：造一堆映射，用来复核拓扑在 20+ 行时的观感
     // （连线按 index 推导行高，行数多了不应该错位或溢出）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_MANY_PORTS")) {
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_MANY_PORTS")) {
         detail.ports.clear();
         for (int i = 0; i < 12; ++i) {
             const quint16 hostPort = quint16(20000 + i * 7);
@@ -235,9 +235,9 @@ void fillFixture(MockDockerBackend &backend)
             detail.ports.append({QString(), quint16(9000 + i), 0, QStringLiteral("tcp")});
         }
     }
-    // KONTAINER_RENDER_BRANCH_PORTS=1：一个容器端口映射到多个宿主地址（含 IPv6 通配），
+    // KCM_DOCKER_RENDER_BRANCH_PORTS=1：一个容器端口映射到多个宿主地址（含 IPv6 通配），
     // 用来复核"同一端口的多条绑定"这一形态（用户实际容器的样子）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_BRANCH_PORTS")) {
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_BRANCH_PORTS")) {
         detail.ports.clear();
         detail.ports.append({QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")});
         detail.ports.append({QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")});
@@ -263,9 +263,9 @@ void fillFixture(MockDockerBackend &backend)
                       QStringLiteral("/var/cache/frontend"),
                       QStringLiteral("rw"),
                       false}};
-    // KONTAINER_RENDER_LONG_PATHS=1：把挂载路径拉长，用来复核"宿主路径省略 + 容器路径靠右"
+    // KCM_DOCKER_RENDER_LONG_PATHS=1：把挂载路径拉长，用来复核"宿主路径省略 + 容器路径靠右"
     // 在极端长度下的表现（真实机器上 WinBoat 那类容器的宿主路径可以很长）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LONG_PATHS")) {
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_LONG_PATHS")) {
         detail.mounts = {{QStringLiteral("bind"),
                           QString(),
                           QStringLiteral("/home/someone/.local/share/containers/storage/overlay/"
@@ -285,8 +285,8 @@ void fillFixture(MockDockerBackend &backend)
                           QStringLiteral("API_BASE_URL=https://api.example.com"),
                           QStringLiteral("LOG_LEVEL=info"),
                           QStringLiteral("TZ=Asia/Shanghai")};
-    // 长命令：用来复核"折叠到 4 行 + 显示全部"的行为（KONTAINER_RENDER_LONG_COMMAND=1）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LONG_COMMAND")) {
+    // 长命令：用来复核"折叠到 4 行 + 显示全部"的行为（KCM_DOCKER_RENDER_LONG_COMMAND=1）
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_LONG_COMMAND")) {
         detail.command = {QStringLiteral("jupyter"), QStringLiteral("notebook"),
                           QStringLiteral("--ip=0.0.0.0"), QStringLiteral("--port=8888"),
                           QStringLiteral("--allow-root"), QStringLiteral("--no-browser"),
@@ -384,16 +384,16 @@ namespace
  *
  * 为什么不走 QTranslator：Qt 不认 gettext 的 .mo（实测 `QTranslator::load()` 返回 false），
  * 而 ki18n 加载译文的路径在 KQuickConfigModule 里。渲染工具只需要"界面上显示什么字"，
- * 直接读 .po 反而更贴近译者实际提交的内容。未设置 KONTAINER_RENDER_LANG 时返回空表
+ * 直接读 .po 反而更贴近译者实际提交的内容。未设置 KCM_DOCKER_RENDER_LANG 时返回空表
  * （保持英文渲染，与之前的截图可比）。
  */
 QVariantMap loadTranslations()
 {
-    const QString language = qEnvironmentVariable("KONTAINER_RENDER_LANG");
+    const QString language = qEnvironmentVariable("KCM_DOCKER_RENDER_LANG");
     if (language.isEmpty()) {
         return {};
     }
-    QFile file(QStringLiteral(KONTAINER_SOURCE_DIR "/po/%1/kcm_docker.po").arg(language));
+    QFile file(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/po/%1/kcm_docker.po").arg(language));
     if (!file.open(QIODevice::ReadOnly)) {
         qWarning("cannot read translations for %s", qPrintable(language));
         return {};
@@ -501,9 +501,9 @@ int main(int argc, char **argv)
     backend->setEndpoint(DockerEndpoint::unixSocket(socketPath));
     auto stub = std::make_unique<QmlStubKcm>(backend.get());
 
-    // KONTAINER_RENDER_STORED_CREDENTIALS=1：预置两条凭据，用于复核认证页的列表行
+    // KCM_DOCKER_RENDER_STORED_CREDENTIALS=1：预置两条凭据，用于复核认证页的列表行
     // （内存后端，不碰真实 KWallet）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_STORED_CREDENTIALS")) {
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_STORED_CREDENTIALS")) {
         auto *wallet = stub->credentialBackend();
         Kontainer::CredentialStore store(wallet);
         store.open();
@@ -523,7 +523,7 @@ int main(int argc, char **argv)
     engine.rootContext()->setContextProperty(QStringLiteral("kcm"), stub.get());
     // i18n 桩必须做 %N 替换，否则渲染出来的文案是 "%1 · created %2 ago · ID %3"，
     // 与真实运行结果不符（真实运行时由 KLocalizedString 替换）。
-    // 译文表来自 .po（KONTAINER_RENDER_LANG）：没有它就只能渲染英文，
+    // 译文表来自 .po（KCM_DOCKER_RENDER_LANG）：没有它就只能渲染英文，
     // 而真实会话是 zh_CN——中文更长，折行与截断只有看中文截图才看得出来。
     // 必须挂在 JS 全局对象上：engine.evaluate() 里定义的函数看不到 context property
     // （实测会抛 ReferenceError: ktTranslations is not defined，界面上的文案会整片消失）
@@ -546,9 +546,9 @@ int main(int argc, char **argv)
 
     // 先让 controller 完成一轮刷新，页面才有数据可渲染
     stub->controller()->refresh();
-    // KONTAINER_RENDER_PULLS=1：造出「一路进行中 + 一路失败」的拉取列表，
+    // KCM_DOCKER_RENDER_PULLS=1：造出「一路进行中 + 一路失败」的拉取列表，
     // 用于截图复核进度条、取消按钮与失败原因是否可见（ARCH_V4 §2.4）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_PULLS")) {
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_PULLS")) {
         auto *operations = stub->controller()->operations();
         operations->pullImage(QStringLiteral("quay.io/libpod/alpine:latest"));
         operations->pullImage(QStringLiteral("registry.example.com/team/app:2.4.1"));
@@ -624,7 +624,7 @@ int main(int argc, char **argv)
 
     backend->completeRefresh();
 
-    const QString sourceDir = QStringLiteral(KONTAINER_SOURCE_DIR "/src/ui/");
+    const QString sourceDir = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/");
     QString qmlFile;
     QVariantMap initialProperties;
     if (page == QLatin1String("main") || page == QLatin1String("engine")) {
@@ -685,16 +685,16 @@ int main(int argc, char **argv)
     window.show();
 
     // 可选：切到指定分区/标签页，便于逐页复核（例如容器详情的「网络」分区）
-    // KONTAINER_RENDER_REMOVE_NETWORK=1：打开删除网络的确认对话框（复核后果说明）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_REMOVE_NETWORK")) {
+    // KCM_DOCKER_RENDER_REMOVE_NETWORK=1：打开删除网络的确认对话框（复核后果说明）
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_REMOVE_NETWORK")) {
         QObject *removeDialog = item->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
         if (removeDialog) {
             QMetaObject::invokeMethod(removeDialog, "open");
         }
     }
 
-    // KONTAINER_RENDER_LOGS=1：往日志控制台灌一些输出（复核等宽控制台与状态条）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_LOGS")) {
+    // KCM_DOCKER_RENDER_LOGS=1：往日志控制台灌一些输出（复核等宽控制台与状态条）
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_LOGS")) {
         QList<Kontainer::LogLine> lines;
         const QStringList samples = {
             QStringLiteral("$ docker-entrypoint.sh node server.js"),
@@ -739,13 +739,13 @@ int main(int argc, char **argv)
                                             QStringLiteral("volume"), false, QString());
     stub->controller()->mountPresets()->setFavorite(QStringLiteral("preset-1"), true);
 
-    // KONTAINER_RENDER_WIZARD_STEP=<step key>：把创建向导直接推进到某一步（复核表单排版）
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_WIZARD_STEP")) {
+    // KCM_DOCKER_RENDER_WIZARD_STEP=<step key>：把创建向导直接推进到某一步（复核表单排版）
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_WIZARD_STEP")) {
         auto *controller = stub->controller()->createContainer();
-        const QString step = qEnvironmentVariable("KONTAINER_RENDER_WIZARD_STEP");
+        const QString step = qEnvironmentVariable("KCM_DOCKER_RENDER_WIZARD_STEP");
         controller->setImage(QStringLiteral("postgres:17-alpine"));
         controller->setName(QStringLiteral("demo-container"));
-        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_PORT_CONFLICT")) {
+        if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_PORT_CONFLICT")) {
             // 复核行内冲突提示：一行撞上运行中的容器（demo-app 占着 8080），一行空闲（不该有任何提示）
             controller->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 5432},
                                                   {QStringLiteral("hostPort"), 8080},
@@ -776,8 +776,8 @@ int main(int argc, char **argv)
         }
     }
 
-    // KONTAINER_RENDER_WIZARD_STEP=ports 时填两条端口映射，复核节点图风格的编辑器
-    if (qEnvironmentVariable("KONTAINER_RENDER_WIZARD_STEP") == QLatin1String("ports")) {
+    // KCM_DOCKER_RENDER_WIZARD_STEP=ports 时填两条端口映射，复核节点图风格的编辑器
+    if (qEnvironmentVariable("KCM_DOCKER_RENDER_WIZARD_STEP") == QLatin1String("ports")) {
         auto *controller = stub->controller()->createContainer();
         controller->clearPortRows();
         controller->addPortRow(80, 8080, QStringLiteral("0.0.0.0"), QStringLiteral("tcp"));
@@ -785,8 +785,8 @@ int main(int argc, char **argv)
         controller->addPortRow(53, 5353, QString(), QStringLiteral("udp"));
     }
 
-    // KONTAINER_RENDER_OPEN_BUILD=1：展开镜像页的构建表单，并造一条进行中与一条失败的构建
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_BUILD")) {
+    // KCM_DOCKER_RENDER_OPEN_BUILD=1：展开镜像页的构建表单，并造一条进行中与一条失败的构建
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_OPEN_BUILD")) {
         auto *controller = stub->controller();
         QQuickItem *entry = nullptr;
         std::function<void(QQuickItem *)> walkBuild = [&](QQuickItem *node) {
@@ -844,8 +844,8 @@ int main(int argc, char **argv)
         }
     }
 
-    // KONTAINER_RENDER_OPEN_PRESETS=1：展开向导里的预设管理面板
-    if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_PRESETS")) {
+    // KCM_DOCKER_RENDER_OPEN_PRESETS=1：展开向导里的预设管理面板
+    if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_OPEN_PRESETS")) {
         QQuickItem *manage = nullptr;
         std::function<void(QQuickItem *)> walkPresets = [&](QQuickItem *node) {
             if (!node || manage) {
@@ -866,8 +866,8 @@ int main(int argc, char **argv)
         }
     }
 
-    // KONTAINER_RENDER_CONNECT_NETWORK=1：展开"连接到网络"内联面板
-        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CONNECT_NETWORK")) {
+    // KCM_DOCKER_RENDER_CONNECT_NETWORK=1：展开"连接到网络"内联面板
+        if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_CONNECT_NETWORK")) {
             QQuickItem *connectEntry = nullptr;
             std::function<void(QQuickItem *)> walkConnect = [&](QQuickItem *node) {
                 if (!node || connectEntry) {
@@ -888,8 +888,8 @@ int main(int argc, char **argv)
             }
         }
 
-        // KONTAINER_RENDER_CREATE_NETWORK=1：打开创建网络对话框（复核表单排版与校验提示）
-        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_CREATE_NETWORK")) {
+        // KCM_DOCKER_RENDER_CREATE_NETWORK=1：打开创建网络对话框（复核表单排版与校验提示）
+        if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_CREATE_NETWORK")) {
             QQuickItem *createButton = nullptr;
             std::function<void(QQuickItem *)> walkCreate = [&](QQuickItem *node) {
                 if (!node || createButton) {
@@ -911,13 +911,13 @@ int main(int argc, char **argv)
         }
 
 
-        // KONTAINER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
-        if (qEnvironmentVariableIsSet("KONTAINER_RENDER_OPEN_LOGIN")) {
+        // KCM_DOCKER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
+        if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_OPEN_LOGIN")) {
             QMetaObject::invokeMethod(item, "openLoginDialog", Q_ARG(QString, QString()));
         }
 
-        // KONTAINER_RENDER_PORT_VIEW=map：端口页切到区间地图（复核聚类与限流）
-        if (qEnvironmentVariable("KONTAINER_RENDER_PORT_VIEW") == QLatin1String("map")) {
+        // KCM_DOCKER_RENDER_PORT_VIEW=map：端口页切到区间地图（复核聚类与限流）
+        if (qEnvironmentVariable("KCM_DOCKER_RENDER_PORT_VIEW") == QLatin1String("map")) {
             item->setProperty("portViewMode", QStringLiteral("map"));
         }
 

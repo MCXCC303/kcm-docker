@@ -2,19 +2,19 @@
 # SPDX-FileCopyrightText: 2026 kontainer developers
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# 离屏渲染包装脚本：准备 KDE 配色方案，再调用 kontainer_render_ui。
+# 离屏渲染包装脚本：准备 KDE 配色方案，再调用 kcm_docker_render_ui。
 #
 # 用法：
 #     tests/tools/render_ui.sh <page> <width> <height> <light|dark> <output.png>
 #     page = main | container-detail | image-detail | network-detail | engine | daemon-config | daemon-config-user | registry-auth
 #
 # 另外两个可选环境变量（只影响截图内容，不影响产品行为）：
-#     KONTAINER_RENDER_PULLS=1       在镜像标签页造出「拉取中 + 拉取失败」两条记录
-#     KONTAINER_RENDER_MANY_PORTS=1  在容器详情造出 24 条端口映射
-#     KONTAINER_RENDER_ROOTLESS=1    让 fixture 报告 rootless 部署（配置页据此走用户配置路径）
-#     KONTAINER_RENDER_LANG=zh_CN    用 po/zh_CN 的译文渲染界面（只有 QML 文案会变中文：
+#     KCM_DOCKER_RENDER_PULLS=1       在镜像标签页造出「拉取中 + 拉取失败」两条记录
+#     KCM_DOCKER_RENDER_MANY_PORTS=1  在容器详情造出 24 条端口映射
+#     KCM_DOCKER_RENDER_ROOTLESS=1    让 fixture 报告 rootless 部署（配置页据此走用户配置路径）
+#     KCM_DOCKER_RENDER_LANG=zh_CN    用 po/zh_CN 的译文渲染界面（只有 QML 文案会变中文：
 #                                    C++ 组装的文本走 ki18n，渲染工具喂不进去）
-#     KONTAINER_RENDER_LONG_PATHS=1  挂载路径换成极长的那种（复核省略与靠右对齐）
+#     KCM_DOCKER_RENDER_LONG_PATHS=1  挂载路径换成极长的那种（复核省略与靠右对齐）
 #     HOME=<临时目录>                让 daemon-config 页读到该目录下的 daemon.json
 #                                    （用于复核"用户可写"形态；默认读真实系统配置）
 #
@@ -46,10 +46,10 @@ esac
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 build_dir="$(cd "$script_dir/../../build" && pwd)"
-binary="$build_dir/bin/kontainer_render_ui"
+binary="$build_dir/bin/kcm_docker_render_ui"
 
 if [ ! -x "$binary" ]; then
-    echo "missing $binary — build it first: cmake --build build --target kontainer_render_ui" >&2
+    echo "missing $binary — build it first: cmake --build build --target kcm_docker_render_ui" >&2
     exit 1
 fi
 
