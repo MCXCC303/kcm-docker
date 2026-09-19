@@ -22,11 +22,20 @@ namespace
 /*! 步骤 key：插入或调整顺序时不要依赖下标（界面上按钮与校验都用 key）。 */
 const QStringList &stepKeyList()
 {
+    /*
+     * 步骤顺序（用户实测反馈）：镜像 → 基础 → 环境与标签 → **交互** → 端口 → 挂载 → 资源 → 总览。
+     *
+     * 依据："先确定挂载什么、再确定跑什么命令"的直觉，以及"端口属于交互之后才关心的细节"：
+     * 交互（命令/入口点/工作目录/用户 + -i/-t）从原来挤在"基础"里的几个字段独立成一步，
+     * 端口排到它后面，环境变量排在它前面。步骤用**稳定 key**，因此顺序调整不会影响
+     * 校验、总览与界面按钮的对应关系（只影响 stepKeys() 的顺序）。
+     */
     static const QStringList keys = {
         QStringLiteral("image"),
         QStringLiteral("basics"),
-        QStringLiteral("ports"),
         QStringLiteral("environment"),
+        QStringLiteral("interactive"),
+        QStringLiteral("ports"),
         QStringLiteral("mounts"),
         QStringLiteral("resources"),
         QStringLiteral("summary"),
@@ -861,6 +870,10 @@ QString CreateContainerController::validateCurrentStep() const
         if (m_operations->containerNameTaken(m_name)) {
             return QStringLiteral("nameInUse");
         }
+        return {};
+    }
+    if (key == QLatin1String("interactive")) {
+        // 交互步骤只收集字段：命令/入口点是自由文本，-i/-t 是开关，没有阻断性校验
         return {};
     }
     if (key == QLatin1String("ports")) {

@@ -354,9 +354,18 @@ void ContainerCreateTest::wizardGatesSteps()
     operations.refreshWriteAccess();
 
     CreateContainerController wizard(&operations, &presets, &backend);
-    QCOMPARE(CreateContainerController::stepKeys().size(), 7);
+    // 步骤顺序（用户实测）：镜像 → 基础 → 环境与标签 → 交互 → 端口 → 挂载 → 资源 → 总览
+    QCOMPARE(CreateContainerController::stepKeys(),
+             QStringList({QStringLiteral("image"),
+                          QStringLiteral("basics"),
+                          QStringLiteral("environment"),
+                          QStringLiteral("interactive"),
+                          QStringLiteral("ports"),
+                          QStringLiteral("mounts"),
+                          QStringLiteral("resources"),
+                          QStringLiteral("summary")}));
     QCOMPARE(wizard.stepKey(), QStringLiteral("image"));
-    QCOMPARE(wizard.stepCount(), 7);
+    QCOMPARE(wizard.stepCount(), 8);
 
     // ① 镜像：先要求填，再要求本地存在（除非勾了"先拉取"）
     QVERIFY(!wizard.nextStep());
@@ -376,7 +385,19 @@ void ContainerCreateTest::wizardGatesSteps()
     wizard.setName(QStringLiteral("worker"));
     QVERIFY(wizard.nextStep());
 
-    // ③ 端口：容器端口必填、宿主端口不能冲突（0 = 随机，不冲突）
+    // ③ 环境与标签：键名规则
+    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("1BAD")},
+                                            {QStringLiteral("value"), QStringLiteral("x")}}});
+    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("keyInvalid"));
+    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("GOOD")},
+                                            {QStringLiteral("value"), QStringLiteral("x")}}});
+    QVERIFY(wizard.nextStep());
+
+    // ④ 交互：没有阻断性校验，直接下一步
+    QCOMPARE(wizard.stepKey(), QStringLiteral("interactive"));
+    QVERIFY(wizard.nextStep());
+
+    // ⑤ 端口：容器端口必填、宿主端口不能冲突（0 = 随机，不冲突）
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 0},
                                      {QStringLiteral("hostPort"), 0}}});
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portRequired"));
@@ -387,15 +408,7 @@ void ContainerCreateTest::wizardGatesSteps()
                                      {QStringLiteral("hostPort"), 0}}});
     QVERIFY(wizard.nextStep());
 
-    // ④ 环境与标签：键名规则
-    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("1BAD")},
-                                            {QStringLiteral("value"), QStringLiteral("x")}}});
-    QCOMPARE(wizard.stepErrorKey(), QStringLiteral("keyInvalid"));
-    wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("GOOD")},
-                                            {QStringLiteral("value"), QStringLiteral("x")}}});
-    QVERIFY(wizard.nextStep());
-
-    // ⑤ 挂载：目标必须绝对、不能重复；来源格式要被校验（bind 必须绝对）
+    // ⑥ 挂载：目标必须绝对、不能重复；来源格式要被校验（bind 必须绝对）
     wizard.setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
                                       {QStringLiteral("source"), QStringLiteral("relative")},
                                       {QStringLiteral("destination"), QStringLiteral("/data")}}});
@@ -416,7 +429,7 @@ void ContainerCreateTest::wizardGatesSteps()
                                       {QStringLiteral("destination"), QStringLiteral("/data")}}});
     QVERIFY(wizard.nextStep());
 
-    // ⑥ 资源：内存下限与 CPU 非负
+    // ⑦ 资源：内存下限与 CPU 非负
     wizard.setMemoryLimitBytes(1024);
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("memoryTooSmall"));
     wizard.setMemoryLimitBytes(0);
@@ -425,7 +438,7 @@ void ContainerCreateTest::wizardGatesSteps()
     wizard.setCpus(0.0);
     QVERIFY(wizard.nextStep());
 
-    // ⑦ 总览：不能越级跳过来，也不能在总览上再"下一步"
+    // ⑧ 总览：不能越级跳过来，也不能在总览上再"下一步"
     QCOMPARE(wizard.stepKey(), QStringLiteral("summary"));
     QVERIFY(wizard.onSummary());
     QVERIFY(!wizard.nextStep());

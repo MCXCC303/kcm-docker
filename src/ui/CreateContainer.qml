@@ -106,10 +106,12 @@ Kirigami.Page {
             return i18n("Image");
         case "basics":
             return i18n("Basics");
-        case "ports":
-            return i18n("Ports");
         case "environment":
             return i18n("Environment & labels");
+        case "interactive":
+            return i18n("Interactive");
+        case "ports":
+            return i18n("Ports");
         case "mounts":
             return i18n("Mounts");
         case "resources":
@@ -425,8 +427,17 @@ Kirigami.Page {
                         onToggled: page.controller.startAfterCreate = checked
                     }
 
-                    Kirigami.Separator {
+                /* ---------------------------- ④ 交互 ---------------------------- */
+                /* 从"基础"里拆出来（用户实测）：先确定挂载/环境，再决定跑什么命令与工作区 */
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: page.controller.stepKey === "interactive"
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Kirigami.Heading {
                         Layout.fillWidth: true
+                        level: 3
+                        text: i18n("Command and entry point (optional)")
                     }
 
                     QQC2.Label {
@@ -527,7 +538,9 @@ Kirigami.Page {
 
                 }
 
-                /* ---------------------------- ③ 端口 ---------------------------- */
+                }
+
+                /* ---------------------------- ⑤ 端口 ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "ports"
@@ -547,7 +560,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ------------------------ ④ 环境变量与标签 ------------------------ */
+                /* ------------------------ ③ 环境变量与标签 ------------------------ */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "environment"
@@ -585,7 +598,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ⑤ 挂载 ---------------------------- */
+                /* ---------------------------- ⑥ 挂载 ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "mounts"
@@ -597,50 +610,20 @@ Kirigami.Page {
                         text: i18n("Mounts")
                     }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
+                    // 预设改成**可搜索下拉**（用户实测：镜像/预设多时逐个点按钮太慢）
+                    Components.FilteredComboBox {
+                        id: presetCombo
 
-                        QQC2.Label {
-                            Layout.fillWidth: true
-                            visible: presetRepeater.count > 0
-                            text: i18n("Quick add from your presets:")
-                            font.bold: true
+                        objectName: "wizardPresetCombo"
+                        Layout.fillWidth: true
+                        visible: page.controller.presets.length > 0
+                        entries: page.controller.presets
+                        textRole: "label"
+                        placeholder: i18n("Add a mount from a preset…")
+                        searchPlaceholder: i18n("Search presets…")
+                        onSelected: function (entry) {
+                            wizard.addPreset(entry.id);
                         }
-
-                    }
-
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: Kirigami.Units.smallSpacing
-
-                        Repeater {
-                            id: presetRepeater
-
-                            model: page.controller.presets
-
-                            delegate: QQC2.Button {
-                                id: presetButton
-
-                                required property var modelData
-
-                                objectName: "wizardPresetButton"
-                                text: (presetButton.modelData.favorite ? "★ " : "") + presetButton.modelData.source
-                                    + " → " + presetButton.modelData.destination
-                                onClicked: wizard.addPreset(presetButton.modelData.id)
-                            }
-                        }
-                    }
-
-                    // 预设管理搬到「挂载预设」标签页（用户实测反馈 ⑥）：向导里只留说明与快速添加
-                    QQC2.Label {
-                        objectName: "wizardPresetHint"
-                        Layout.fillWidth: true
-                        visible: presetRepeater.count === 0
-                        text: i18n("No presets yet — add some in the “Mount presets” tab to get one-click mounts here.")
-                        font: Kirigami.Theme.smallFont
-                        opacity: 0.75
-                        wrapMode: Text.WordWrap
                     }
 
                     Repeater {
@@ -706,16 +689,17 @@ Kirigami.Page {
                         }
                     }
 
+                    // 手动输入：点一下加一行可编辑的挂载（与预设两条路都可用）
                     QQC2.Button {
                         objectName: "wizardAddMount"
-                        text: i18n("Add mount")
+                        text: i18n("Add mount manually")
                         icon.name: "list-add"
                         onClicked: wizard.addMount()
                     }
 
                 }
 
-                /* ---------------------------- ⑥ 资源 ---------------------------- */
+                /* ---------------------------- ⑦ 资源 ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "resources"
@@ -808,7 +792,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ⑦ 总览 ---------------------------- */
+                /* ---------------------------- ⑧ 总览 ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "summary"

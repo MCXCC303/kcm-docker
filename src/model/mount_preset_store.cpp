@@ -95,6 +95,9 @@ QVariantList MountPresetStore::summaries() const
     for (const MountPreset &preset : list) {
         result.append(QVariantMap {
             {QStringLiteral("id"), preset.id},
+            // 下拉显示用的一行文案（收藏加星标）；界面不再自己拼字符串，避免两处格式不一致
+            {QStringLiteral("label"),
+             (preset.favorite ? QStringLiteral("★ ") : QString()) + preset.source + QStringLiteral(" → ") + preset.destination},
             {QStringLiteral("source"), preset.source},
             {QStringLiteral("destination"), preset.destination},
             {QStringLiteral("type"), preset.type},

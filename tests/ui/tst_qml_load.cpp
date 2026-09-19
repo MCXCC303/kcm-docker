@@ -1281,7 +1281,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QTRY_VERIFY(!nextButton->property("enabled").toBool());
     nameField->setProperty("text", QStringLiteral("worker"));
     QTRY_VERIFY(nextButton->property("enabled").toBool());
-    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // ports
+    // 步骤顺序（用户实测）：基础 → 环境与标签 → 交互 → 端口 → 挂载 → 资源 → 总览
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // environment
     QCOMPARE(wizard->stepKey(), QStringLiteral("environment"));
 
@@ -1297,6 +1297,10 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QVERIFY(QMetaObject::invokeMethod(environmentEditor, "setEntries", Q_ARG(QVariant, entriesArg)));
     QTRY_COMPARE(m_stubKcm->controller()->createContainer()->environmentRows().size(), 1);
 
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // interactive
+    QCOMPARE(wizard->stepKey(), QStringLiteral("interactive"));
+    QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // ports
+    QCOMPARE(wizard->stepKey(), QStringLiteral("ports"));
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // mounts
     QCOMPARE(wizard->stepKey(), QStringLiteral("mounts"));
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // resources
@@ -1692,13 +1696,24 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
     wizard->setName(QStringLiteral("mount-demo"));
     QVERIFY(wizard->goToStep(QStringLiteral("mounts")));
 
-    // 从预设添加
-    QQuickItem *presetButton = nullptr;
+    // 从预设添加：现在是**可搜索下拉**（用户实测 F3/本轮：预设多时按钮流太慢）
+    // 注意：页面里有多个可搜索下拉（镜像 / 预设 / 命令历史），
+    // 因此必须在**预设下拉内部**找它的列表，不能从整页里取第一个 filteredComboBoxList
+    QQuickItem *presetCombo = nullptr;
+    QQuickItem *presetList = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
-        presetButton = findItemDeep(window.contentItem(), QStringLiteral("wizardPresetButton"));
-        return presetButton != nullptr;
+        presetCombo = findItemDeep(window.contentItem(), QStringLiteral("wizardPresetCombo"));
+        if (!presetCombo) {
+            return false;
+        }
+        presetList = findItemDeep(presetCombo, QStringLiteral("filteredComboBoxList"));
+        return presetList != nullptr && presetList->property("count").toInt() == 1;
     }(), 5000);
-    QVERIFY(QMetaObject::invokeMethod(presetButton, "clicked"));
+    const QVariantList presetEntries = store->summaries();
+    QVERIFY(!presetEntries.isEmpty());
+    QVERIFY2(!presetEntries.first().toMap().value(QStringLiteral("label")).toString().isEmpty(),
+             "the dropdown needs a display label");
+    QVERIFY(QMetaObject::invokeMethod(presetList, "activated", Q_ARG(int, 0)));
     QTRY_COMPARE(wizard->mountRows().size(), 1);
     QCOMPARE(wizard->mountRows().first().toMap().value(QStringLiteral("source")).toString(), QStringLiteral("/srv/data"));
 
