@@ -92,7 +92,8 @@ ColumnLayout {
         case "inUse":
             return i18n("A running container publishes this port.");
         case "declaredNotPublished":
-            return i18n("The container is running, but this declared mapping is not actually bound on the host.");
+            // 用户给的措辞
+            return i18n("The container is running, but this port mapping did not take effect.");
         case "reservedTaken":
             return i18n("This port is currently used by another container, so this container will fail to start with a port conflict.");
         default:

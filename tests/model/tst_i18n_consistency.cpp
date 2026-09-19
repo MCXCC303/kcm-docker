@@ -42,6 +42,7 @@ private Q_SLOTS:
     void developmentPluginPathFindsTheCatalog();
     void noUnwrappedUiStrings();
     void translationsDoNotInventArguments();
+    void noFuzzyEntriesInTheCatalog();
 };
 
 namespace
@@ -501,6 +502,41 @@ void I18nConsistencyTest::translationsDoNotInventArguments()
     }
     QVERIFY2(offenders == 0,
              qPrintable(QStringLiteral("%1 translated entries use %N that the source string does not have").arg(offenders)));
+}
+
+
+/*!
+ * `.po` 里不得残留 `#, fuzzy`。
+ *
+ * 真实事故（用户两次遇到"这两条字符串没翻译"）：`msgmerge` 会把改动过的条目标成 fuzzy，
+ * 而 **fuzzy 条目不会编进 `.mo`** —— 于是 `i18n()` 静默回退英文，界面上半中半英，
+ * 而 `.po` 里明明写着译文。这条断言把这类"看起来翻译了、实际没生效"直接挡住。
+ */
+void I18nConsistencyTest::noFuzzyEntriesInTheCatalog()
+{
+    const QString poFile = sourceDir() + QStringLiteral("/po/zh_CN/kcm_docker.po");
+    QFile file(poFile);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QStringList lines = QString::fromUtf8(file.readAll()).split(QLatin1Char('\n'));
+
+    QStringList fuzzyMsgids;
+    for (int i = 0; i < lines.size(); ++i) {
+        if (lines.at(i).trimmed() != QLatin1String("#, fuzzy")) {
+            continue;
+        }
+        // 往下找这条的 msgid，报错时能直接看出是哪一条
+        for (int j = i + 1; j < lines.size() && j < i + 8; ++j) {
+            if (lines.at(j).startsWith(QLatin1String("msgid "))) {
+                fuzzyMsgids.append(lines.at(j).mid(6));
+                break;
+            }
+        }
+    }
+    QVERIFY2(fuzzyMsgids.isEmpty(),
+             qPrintable(QStringLiteral("%1 fuzzy entries (they are NOT compiled into the .mo, so i18n() "
+                                       "silently falls back to English): %2")
+                            .arg(fuzzyMsgids.size())
+                            .arg(fuzzyMsgids.join(QStringLiteral(", ")))));
 }
 
 

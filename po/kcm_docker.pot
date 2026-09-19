@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 23:35+0800\n"
+"POT-Creation-Date: 2026-09-19 23:41+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -196,7 +196,7 @@ msgid "less than a minute"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:1004
-#: src/ui/components/HostPortList.qml:175 src/ui/ImageDetail.qml:114
+#: src/ui/components/HostPortList.qml:176 src/ui/ImageDetail.qml:114
 #: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr ""
@@ -1434,7 +1434,7 @@ msgid "Host"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:155
-#: src/ui/components/HostPortList.qml:166 src/ui/ContainerDetail.qml:310
+#: src/ui/components/HostPortList.qml:167 src/ui/ContainerDetail.qml:310
 #: src/ui/ContainerDetail.qml:908
 msgid "Container"
 msgstr ""
@@ -1444,12 +1444,12 @@ msgid "Host address"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:221
-#: src/ui/components/HostPortList.qml:130
+#: src/ui/components/HostPortList.qml:131
 msgid "Host port"
 msgstr ""
 
 #: src/ui/components/PortMappingEditor.qml:292
-#: src/ui/components/HostPortList.qml:148
+#: src/ui/components/HostPortList.qml:149
 msgid "Container port"
 msgstr ""
 
@@ -1523,31 +1523,29 @@ msgstr ""
 msgid "A running container publishes this port."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:95
-msgid ""
-"The container is running, but this declared mapping is not actually bound on "
-"the host."
+#: src/ui/components/HostPortList.qml:96
+msgid "The container is running, but this port mapping did not take effect."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:97
+#: src/ui/components/HostPortList.qml:98
 msgid ""
 "This port is currently used by another container, so this container will "
 "fail to start with a port conflict."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:99
+#: src/ui/components/HostPortList.qml:100
 msgid "This container needs to publish this port when it starts."
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:139
+#: src/ui/components/HostPortList.qml:140
 msgid "Bind address"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:157
+#: src/ui/components/HostPortList.qml:158
 msgid "State"
 msgstr ""
 
-#: src/ui/components/HostPortList.qml:233
+#: src/ui/components/HostPortList.qml:234
 msgid "All interfaces"
 msgstr ""
 
