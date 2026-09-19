@@ -273,7 +273,6 @@ target_link_libraries(kontainer_helper PRIVATE
     Qt6::DBus
     KF6::AuthCore
 )
-install(TARGETS kontainer_helper ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
 # 提权组件的系统集成：polkit 策略、helper 的 D-Bus 服务文件、D-Bus 系统策略。
 #
@@ -295,11 +294,20 @@ option(KONTAINER_INSTALL_PRIVILEGED_HELPER
        "Install the polkit policy and the helper D-Bus service into system paths (requires root)" OFF)
 
 if(KONTAINER_INSTALL_PRIVILEGED_HELPER)
+    # helper 必须装到 KAUTH_HELPER_INSTALL_DIR：D-Bus 激活文件里的 Exec 就是
+    # <KAUTH_HELPER_INSTALL_DIR>/kontainer_helper，装到别处（例如 /usr/bin）时
+    # 包里其它文件都对，但一提权就报"找不到 helper"（KAuth 官方宏的注释里也明确要求这一点；
+    # 我们的 PKGBUILD 会在打包时自检这四个文件是否齐全）。
+    install(TARGETS kontainer_helper RUNTIME DESTINATION ${KAUTH_HELPER_INSTALL_DIR})
+
     # 官方宏：生成并安装 <helper_id>.conf（D-Bus 系统策略：放行 root own 该名字）、
     # <helper_id>.service（D-Bus 激活）、以及由 .actions 生成的 polkit .policy
     kauth_install_helper_files(kontainer_helper org.kde.kontainer root)
     kauth_install_actions(org.kde.kontainer "${KONTAINER_ACTIONS_FILE}")
 else()
+    # 开发前缀安装：helper 进 bin（install-privileged-helper.sh 从 build/bin 取它）。
+    install(TARGETS kontainer_helper ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
+
     # 同一套官方工具与输入格式，只是不往系统路径装（由 install-privileged-helper.sh 提权安装）。
     # 少了这一步，下面的脚本就没有策略文件可装——所以生成目标是 ALL。
     add_custom_command(OUTPUT "${KONTAINER_POLICY_FILE}"
