@@ -177,7 +177,12 @@ KCM.SimpleKCM {
 
             /* ---------------- Overview ---------------- */
             Kirigami.FormLayout {
-                Layout.fillWidth: true
+                /*
+                 * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，撑满整行时
+                 * 标签+值这一组会被推到右半边（实测反馈）。
+                 */
+                Layout.fillWidth: false
+                Layout.alignment: Qt.AlignLeft
 
                 Components.CopyableText {
                     Kirigami.FormData.label: i18n("Repository:")

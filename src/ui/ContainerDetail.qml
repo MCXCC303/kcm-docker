@@ -421,7 +421,13 @@ KCM.AbstractKCM {
 
                     /* ---------------- 一级信息 ---------------- */
                     Kirigami.FormLayout {
-                        Layout.fillWidth: true
+                        /*
+                         * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，
+                         * 一旦它撑满整行，标签+值这一组就被推到右半边（实测反馈：
+                         * 「运行时 / 配置」整体太靠右）。让它按内容宽度收缩、整体左对齐。
+                          */
+                        Layout.fillWidth: false
+                        Layout.alignment: Qt.AlignLeft
 
                         RowLayout {
                             Kirigami.FormData.label: i18n("State:")
@@ -487,7 +493,13 @@ KCM.AbstractKCM {
                     }
 
                     Kirigami.FormLayout {
-                        Layout.fillWidth: true
+                        /*
+                         * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，
+                         * 一旦它撑满整行，标签+值这一组就被推到右半边（实测反馈：
+                         * 「运行时 / 配置」整体太靠右）。让它按内容宽度收缩、整体左对齐。
+                          */
+                        Layout.fillWidth: false
+                        Layout.alignment: Qt.AlignLeft
 
                         QQC2.Label {
                             Kirigami.FormData.label: i18n("Restart count:")
@@ -530,7 +542,13 @@ KCM.AbstractKCM {
                     }
 
                     Kirigami.FormLayout {
-                        Layout.fillWidth: true
+                        /*
+                         * **不要** fillWidth：Kirigami 的 FormLayout 会把标签列右对齐，
+                         * 一旦它撑满整行，标签+值这一组就被推到右半边（实测反馈：
+                         * 「运行时 / 配置」整体太靠右）。让它按内容宽度收缩、整体左对齐。
+                          */
+                        Layout.fillWidth: false
+                        Layout.alignment: Qt.AlignLeft
 
                         // 入口点与命令：可以一键复制（用户实测反馈 A2：命令经常要拿去别处复用）
                         RowLayout {
