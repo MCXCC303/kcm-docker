@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 23:41+0800\n"
+"POT-Creation-Date: 2026-09-20 00:14+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -33,7 +33,7 @@ msgid "Restarting"
 msgstr "重启中"
 
 #: src/model/state_text.cpp:21 src/ui/components/ServiceCard.qml:58
-#: src/ui/components/HostPortRangeMap.qml:70
+#: src/ui/components/HostPortRangeMap.qml:73
 #: src/ui/components/HostPortList.qml:80 src/ui/MainPage.qml:88
 #: src/ui/MainPage.qml:530
 msgid "Running"
@@ -308,13 +308,13 @@ msgstr "该宿主路径不存在。"
 msgid "The host path is not a directory."
 msgstr "该宿主路径不是目录。"
 
-#: src/model/status_controller.cpp:674
+#: src/model/status_controller.cpp:685
 msgid ""
 "Docker stopped responding; the pending request was given up. Retry when the "
 "service is available again."
 msgstr "Docker 一直没有响应，已放弃这次请求。等服务恢复后再重试。"
 
-#: src/model/status_controller.cpp:907
+#: src/model/status_controller.cpp:918
 msgid "Opening host paths is not available in this environment."
 msgstr "当前环境不支持打开宿主路径。"
 
@@ -1481,49 +1481,53 @@ msgid ""
 "No published ports. The container will only be reachable on its networks."
 msgstr "没有发布端口。容器只能通过它所在的网络访问。"
 
-#: src/ui/components/HostPortRangeMap.qml:48
+#: src/ui/components/HostPortRangeMap.qml:51
 msgid "Next free host port: %1"
 msgstr "下一个空闲宿主端口：%1"
 
-#: src/ui/components/HostPortRangeMap.qml:54
+#: src/ui/components/HostPortRangeMap.qml:57
 msgid "next free host port"
 msgstr "下一个空闲宿主端口"
 
-#: src/ui/components/HostPortRangeMap.qml:71
+#: src/ui/components/HostPortRangeMap.qml:74
 #: src/ui/components/HostPortList.qml:87
 msgid "Not started"
 msgstr "未启动"
 
-#: src/ui/components/HostPortRangeMap.qml:72
+#: src/ui/components/HostPortRangeMap.qml:75
 #: src/ui/components/HostPortList.qml:85
 msgid "Taken"
 msgstr "被占用"
 
-#: src/ui/components/HostPortRangeMap.qml:73
+#: src/ui/components/HostPortRangeMap.qml:76
 #: src/ui/components/HostPortList.qml:82 src/ui/MainPage.qml:1213
 msgid "Not bound"
 msgstr "未占用"
 
-#: src/ui/components/HostPortRangeMap.qml:74
+#: src/ui/components/HostPortRangeMap.qml:77
 msgid "Free"
 msgstr "空闲"
 
-#: src/ui/components/HostPortRangeMap.qml:134
+#: src/ui/components/HostPortRangeMap.qml:137
 msgid "%1 port used by containers"
 msgid_plural "%1 ports used by containers"
 msgstr[0] "有 %1 个端口被容器使用"
 
-#: src/ui/components/HostPortRangeMap.qml:147
+#: src/ui/components/HostPortRangeMap.qml:150
 msgid "%1 more not shown"
 msgstr "还有 %1 个未显示"
 
-#: src/ui/components/HostPortRangeMap.qml:183
-msgid "Port %1: %2"
-msgstr "端口 %1：%2"
-
-#: src/ui/components/HostPortRangeMap.qml:184
+#: src/ui/components/HostPortRangeMap.qml:207
 msgid "Port %1: free"
 msgstr "端口 %1：空闲"
+
+#: src/ui/components/HostPortRangeMap.qml:211
+msgid "Port %1: used by %2"
+msgstr "端口 %1：被容器 %2 占用"
+
+#: src/ui/components/HostPortRangeMap.qml:213
+msgid "Port %1: %2"
+msgstr "端口 %1：%2"
 
 #: src/ui/components/HostPortList.qml:93
 msgid "A running container publishes this port."
@@ -3257,15 +3261,15 @@ msgstr "没有匹配「%1」的端口。"
 msgid "No host port is currently used by a running container."
 msgstr "当前没有运行中的容器占用宿主端口。"
 
-#: src/ui/MainPage.qml:1291
+#: src/ui/MainPage.qml:1292
 msgid "Mount presets"
 msgstr "挂载预设"
 
-#: src/ui/MainPage.qml:1314
+#: src/ui/MainPage.qml:1315
 msgid "User configuration…"
 msgstr "用户级配置…"
 
-#: src/ui/MainPage.qml:1321
+#: src/ui/MainPage.qml:1322
 msgid "System configuration…"
 msgstr "系统级配置…"
 

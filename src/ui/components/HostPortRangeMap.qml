@@ -183,7 +183,15 @@ Item {
                                         color: Local.StatusPalette.portTileTextColor(modelData.stateKey)
                                     }
 
-                                    /* 点击跳转：只有"运行中"的端口能跳（容器唯一） */
+                                    /*
+                                     * 点击跳转：只有"运行中"的端口能跳（容器唯一）。
+                                     *
+                                     * 这里**不放悬停提示**：`QQC2.ToolTip.text/visible` 是附着属性，
+                                     * 一个窗口共用同一个提示框，而地图里同时存在几十个方块、
+                                     * 切筛选/切视图时 delegate 还会被销毁重建 —— 实测会出现
+                                     * "鼠标停在哪都显示同一个容器名、切回列表还在"的残留提示。
+                                     * 容器名改由 `Accessible.name` 提供（读屏可见，不会残留）。
+                                     */
                                     MouseArea {
                                         objectName: "portMapTileClick"
                                         anchors.fill: parent
@@ -191,15 +199,19 @@ Item {
                                             && String(tile.modelData.containerId).length > 0
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         onClicked: root.containerRequested(tile.modelData.containerId, tile.modelData.containerName)
-
-                                        QQC2.ToolTip.text: tile.modelData.containerName
-                                        QQC2.ToolTip.visible: hovered && enabled
                                     }
 
                                     Accessible.role: Accessible.StaticText
-                                    Accessible.name: modelData.occupied
-                                        ? i18n("Port %1: %2", modelData.port, modelData.stateKey)
-                                        : i18n("Port %1: free", modelData.port)
+                                    Accessible.name: {
+                                        if (!modelData.occupied) {
+                                            return i18n("Port %1: free", modelData.port);
+                                        }
+                                        if (tile.modelData.containerId !== undefined
+                                                && String(tile.modelData.containerId).length > 0) {
+                                            return i18n("Port %1: used by %2", modelData.port, tile.modelData.containerName);
+                                        }
+                                        return i18n("Port %1: %2", modelData.port, modelData.stateKey);
+                                    }
                                 }
                             }
                         }

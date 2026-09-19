@@ -261,9 +261,11 @@ ColumnLayout {
                             iconName: root.iconNameFor(row.stateKey)
                             text: root.stateText(row.stateKey)
 
-                            // 短文案 + 悬停看完整含义（用户要求状态要短，但含义不能丢）
+                            // 短文案 + 悬停看完整含义（用户要求状态要短，但含义不能丢）。
+                            // timeout 是兜底：附着型提示一旦因为 delegate 重建而残留，也会自己消失。
                             QQC2.ToolTip.text: root.stateHint(row.stateKey)
                             QQC2.ToolTip.visible: hovered
+                            QQC2.ToolTip.timeout: 5000
                         }
                     }
 

@@ -410,6 +410,34 @@ void SourceConventionsTest::kcmMetadataIsCompleteForSystemSettings()
     QVERIFY2(keywords.contains(QLatin1String("docker")), "english keywords are needed for search");
     QVERIFY2(keywords.contains(QStringLiteral("容器")), "chinese keywords are needed for search");
 
+    /*
+     * 区间地图里不得再用附着式悬停提示。
+     *
+     * 真实事故（用户实测）：`QQC2.ToolTip.text/visible` 是**附着属性**，一个窗口共用同一个
+     * 提示框；地图里同时有几十个方块、切筛选/切视图时 delegate 还会被销毁重建，
+     * 结果"鼠标停在哪都显示同一个容器名，切回列表还在"。容器名改由 `Accessible.name` 提供，
+     * 因此整个文件里不该再出现 ToolTip。
+     */
+    const QString mapPath = sourceDir() + QStringLiteral("/src/ui/components/HostPortRangeMap.qml");
+    QFile mapFile(mapPath);
+    QVERIFY2(mapFile.open(QIODevice::ReadOnly), qPrintable(mapPath));
+    const QString mapSource = QString::fromUtf8(mapFile.readAll());
+    // 只看代码，不看注释（这条规则本身就得在注释里解释清楚为什么）
+    QString mapCode;
+    {
+        static const QRegularExpression blockComment(QStringLiteral("/\\*.*?\\*/"), QRegularExpression::DotMatchesEverythingOption);
+        QString stripped = mapSource;
+        stripped.remove(blockComment);
+        const QStringList lines = stripped.split(QLatin1Char('\n'));
+        for (const QString &line : lines) {
+            const int comment = line.indexOf(QLatin1String("//"));
+            mapCode += (comment >= 0 ? line.left(comment) : line);
+            mapCode += QLatin1Char('\n');
+        }
+    }
+    QVERIFY2(!mapCode.contains(QLatin1String("ToolTip")),
+             "the range map must not use attached tooltips (they leak across delegate rebuilds)");
+
     // 翻译域必须与 po/ 里的域一致，否则文案不翻译
     QCOMPARE(root.value(QStringLiteral("KLocalizedString")).toObject().value(QStringLiteral("TranslationDomain")).toString(),
              QStringLiteral("kcm_docker"));

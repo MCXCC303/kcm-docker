@@ -3308,6 +3308,9 @@ void QmlLoadTest::rangeMapTilesOpenTheRunningContainer()
     QQuickItem *clickArea = childByObjectName(runningTile, QStringLiteral("portMapTileClick"));
     QVERIFY2(clickArea, "a running tile must be clickable");
     QVERIFY(clickArea->property("enabled").toBool());
+    // 方块上**不再**挂悬停提示（附着属性测试里读不到，改由 tst_source_conventions 守住）
+    // 容器名走无障碍名（附着属性，测试里读不到），这里改断言方块数据里带着它
+    QCOMPARE(tileData.value(QStringLiteral("containerName")).toString(), QStringLiteral("ml-medai"));
 
     QSignalSpy openSpy(page, SIGNAL(portContainerActivated(QString)));
     QVERIFY(openSpy.isValid());
