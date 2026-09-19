@@ -26,6 +26,8 @@ KDE Plasma 6 / System Settings 里的 **Docker 状态面板 / Dashboard**（KCM�
 
 ---
 
+> 排查问题、在系统设置里观察程序行为、崩溃取证：见 [DEBUGGING.md](DEBUGGING.md)。
+
 ## 能力一览
 
 | 区域 | 内容 |
