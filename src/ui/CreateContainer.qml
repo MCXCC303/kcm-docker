@@ -57,6 +57,15 @@ Kirigami.Page {
         // 控制器是唯一事实来源：它变了就把视图对齐
         function onChanged() {
             page.privilegedVisual = page.controller.privileged;
+            /*
+             * 同时清掉"跳转被拒绝"的原因。
+             *
+             * 用户实测：镜像已经选好了，"请选择一个镜像"还一直挂着（只有点标签页才消失）。
+             * 原因是那条提示来自 stepJumpErrorKey，而它原来只在**点击步骤按钮成功**时才清；
+             * 用"下一步"前进或直接改表单都不会清它。现在表单一有变化就清，
+             * 横幅因此回落到当前步骤的真实状态（stepErrorKey）——该消失时立刻消失。
+             */
+            page.stepJumpErrorKey = "";
         }
     }
 
@@ -164,6 +173,13 @@ Kirigami.Page {
             return i18n("The CPU limit cannot be negative.");
         default:
             return "";
+        }
+    }
+
+    Connections {
+        target: page.controller
+        function onStepChanged() {
+            page.stepJumpErrorKey = "";
         }
     }
 
@@ -426,6 +442,7 @@ Kirigami.Page {
                         text: i18n("Start the container after creating it")
                         onToggled: page.controller.startAfterCreate = checked
                     }
+                }
 
                 /* ---------------------------- ④ 交互 ---------------------------- */
                 /* 从"基础"里拆出来（用户实测）：先确定挂载/环境，再决定跑什么命令与工作区 */
@@ -471,12 +488,6 @@ Kirigami.Page {
                         }
                     }
 
-
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Command and entry point (optional)")
-                        font.bold: true
-                    }
 
                     // 命令历史（F3）：本地记录 + 已有容器的命令，挑一条直接填进下面的输入框
                     Components.FilteredComboBox {
@@ -535,9 +546,6 @@ Kirigami.Page {
                             onTextChanged: page.controller.user = text
                         }
                     }
-
-                }
-
                 }
 
                 /* ---------------------------- ⑤ 端口 ---------------------------- */

@@ -1269,8 +1269,33 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     imageField->setProperty("text", QStringLiteral("busybox:latest"));
     QTRY_VERIFY(stepError->property("visible").toBool());
     QCOMPARE(stepError->property("text").toString().contains(QStringLiteral("Pull")), true);
+    // 复现用户路径：先点**步骤按钮**试图跳过去（被拒绝，"交互被拒绝的原因"被记下来）……
+    {
+        QList<QQuickItem *> stepButtons;
+        std::function<void(QQuickItem *)> collectSteps = [&](QQuickItem *node) {
+            if (!node) {
+                return;
+            }
+            if (node->objectName() == QLatin1String("wizardStepButton")) {
+                stepButtons.append(node);
+            }
+            for (QQuickItem *child : node->childItems()) {
+                collectSteps(child);
+            }
+        };
+        collectSteps(window.contentItem());
+        QTRY_VERIFY_WITH_TIMEOUT(stepButtons.size() >= 8, 5000);
+        QVERIFY(QMetaObject::invokeMethod(stepButtons.at(7), "click")); // 总览：会被拒绝
+        QTest::qWait(20);
+        QTRY_VERIFY(stepError->property("visible").toBool());
+    }
+
     imageField->setProperty("text", QStringLiteral("alpine:3.19"));
     QTRY_VERIFY(nextButton->property("enabled").toBool());
+    // 提示必须跟着消失：跳转被拒绝的原因原来只在"点击步骤按钮成功"时才清，
+    // 于是选好镜像后"请选择一个镜像"仍然挂着（用户实测：只有点标签页才会消失）
+    QTRY_VERIFY2(!stepError->property("visible").toBool(),
+             "the step error must disappear as soon as the image is chosen");
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked"));
     QCOMPARE(wizard->stepKey(), QStringLiteral("basics"));
 
@@ -1282,6 +1307,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     nameField->setProperty("text", QStringLiteral("worker"));
     QTRY_VERIFY(nextButton->property("enabled").toBool());
     // 步骤顺序（用户实测）：基础 → 环境与标签 → 交互 → 端口 → 挂载 → 资源 → 总览
+    // （交互步骤曾经被嵌进"基础"里，导致它整页空白——见下面的 visible 断言）
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // environment
     QCOMPARE(wizard->stepKey(), QStringLiteral("environment"));
 
@@ -1299,6 +1325,15 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
 
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // interactive
     QCOMPARE(wizard->stepKey(), QStringLiteral("interactive"));
+    // 交互步骤的内容必须真的可见（曾经因为嵌套层级错了一层而整页空白）
+    {
+        QQuickItem *commandField = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandField"));
+        QVERIFY2(commandField, "the interactive step must expose the command field");
+        QQuickItem *openStdin = findItemDeep(window.contentItem(), QStringLiteral("wizardOpenStdinCheck"));
+        QVERIFY2(openStdin, "the interactive step must expose the -i switch");
+        QTRY_VERIFY2(commandField->property("visible").toBool() && openStdin->property("visible").toBool(),
+                     "the interactive step was blank: its fields must be visible on that step");
+    }
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // ports
     QCOMPARE(wizard->stepKey(), QStringLiteral("ports"));
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // mounts

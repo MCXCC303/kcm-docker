@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:00+0800\n"
+"POT-Creation-Date: 2026-09-19 16:08+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -545,7 +545,7 @@ msgid "less than a minute"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:934 src/ui/ImageDetail.qml:112
-#: src/ui/CreateContainer.qml:106
+#: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr ""
 
@@ -554,19 +554,19 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:938 src/ui/CreateContainer.qml:501
+#: src/model/create_container_controller.cpp:938 src/ui/CreateContainer.qml:512
 msgid "Command"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:941 src/ui/CreateContainer.qml:512
+#: src/model/create_container_controller.cpp:941 src/ui/CreateContainer.qml:523
 msgid "Entry point"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:944 src/ui/CreateContainer.qml:525
+#: src/model/create_container_controller.cpp:944 src/ui/CreateContainer.qml:536
 msgid "Working directory"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:947 src/ui/CreateContainer.qml:533
+#: src/model/create_container_controller.cpp:947 src/ui/CreateContainer.qml:544
 msgid "User"
 msgstr ""
 
@@ -583,22 +583,22 @@ msgstr ""
 msgid "random"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:965 src/ui/CreateContainer.qml:114
+#: src/model/create_container_controller.cpp:965 src/ui/CreateContainer.qml:123
 msgid "Ports"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:976 src/ui/CreateContainer.qml:116
-#: src/ui/CreateContainer.qml:610
+#: src/model/create_container_controller.cpp:976 src/ui/CreateContainer.qml:125
+#: src/ui/CreateContainer.qml:618
 msgid "Mounts"
 msgstr ""
 
-#: src/model/create_container_controller.cpp:988 src/ui/CreateContainer.qml:572
+#: src/model/create_container_controller.cpp:988 src/ui/CreateContainer.qml:580
 msgid "Environment variables"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:991
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:589
+#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:597
 msgid "Labels"
 msgstr ""
 
@@ -633,7 +633,7 @@ msgid "Terminal (-t)"
 msgstr ""
 
 #: src/model/create_container_controller.cpp:1011
-#: src/ui/CreateContainer.qml:112 src/ui/CreateContainer.qml:445
+#: src/ui/CreateContainer.qml:121 src/ui/CreateContainer.qml:462
 msgid "Interactive"
 msgstr ""
 
@@ -716,7 +716,7 @@ msgstr ""
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
 #: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:640
-#: src/ui/CreateContainer.qml:958
+#: src/ui/CreateContainer.qml:966
 msgid "Cancel"
 msgstr ""
 
@@ -817,7 +817,7 @@ msgstr ""
 msgid "This image is already being pulled."
 msgstr ""
 
-#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:284
+#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:300
 msgid "Image reference"
 msgstr ""
 
@@ -1012,7 +1012,7 @@ msgstr ""
 msgid "Enter a name for the network."
 msgstr ""
 
-#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:134
+#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:143
 msgid ""
 "Use letters, digits, underscore, dot or dash, and do not start with a "
 "separator."
@@ -1069,7 +1069,7 @@ msgstr ""
 msgid "Allow containers to be attached at runtime"
 msgstr ""
 
-#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:946
+#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:954
 #: src/ui/MainPage.qml:1009
 msgid "Create"
 msgstr ""
@@ -1296,8 +1296,8 @@ msgid "New preset source"
 msgstr ""
 
 #: src/ui/components/MountPresetManager.qml:109
-#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:671
-#: src/ui/CreateContainer.qml:672
+#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
+#: src/ui/CreateContainer.qml:680
 msgid "Container path"
 msgstr ""
 
@@ -1321,7 +1321,7 @@ msgstr ""
 msgid "Remove this preset"
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:653
+#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
 msgid "Named volume"
 msgstr ""
 
@@ -1335,7 +1335,7 @@ msgid ""
 "volume)."
 msgstr ""
 
-#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:150
+#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:159
 msgid "The container path must be absolute."
 msgstr ""
 
@@ -1441,7 +1441,7 @@ msgstr ""
 msgid "Clear the search"
 msgstr ""
 
-#: src/ui/components/FilteredComboBox.qml:108
+#: src/ui/components/FilteredComboBox.qml:109
 msgid "Nothing matches the search."
 msgstr ""
 
@@ -1519,7 +1519,7 @@ msgstr ""
 #: src/ui/ImageDetail.qml:159 src/ui/ContainerDetail.qml:331 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:928
+#: src/ui/CreateContainer.qml:936
 msgid "Back"
 msgstr ""
 
@@ -2004,7 +2004,7 @@ msgctxt "@info data rate per second"
 msgid "%1/s"
 msgstr ""
 
-#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:118
+#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:127
 msgid "Resources"
 msgstr ""
 
@@ -2733,178 +2733,178 @@ msgstr ""
 msgid "The volume and the data inside it are deleted. This cannot be undone."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:108
+#: src/ui/CreateContainer.qml:117
 msgid "Basics"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:110
+#: src/ui/CreateContainer.qml:119
 msgid "Environment & labels"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:120
+#: src/ui/CreateContainer.qml:129
 msgid "Review"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:128
+#: src/ui/CreateContainer.qml:137
 msgid "Choose an image."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:130
+#: src/ui/CreateContainer.qml:139
 msgid ""
 "This image is not available locally. Pull it first, or tick “Pull it first”."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:132
+#: src/ui/CreateContainer.qml:141
 msgid "Enter a name for the container."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:136
+#: src/ui/CreateContainer.qml:145
 msgid "A container with this name already exists."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:138
+#: src/ui/CreateContainer.qml:147
 msgid "Every port row needs a container port."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:140
+#: src/ui/CreateContainer.qml:149
 msgid "Host ports must be between 1 and 65535 (leave empty for a random port)."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:142
+#: src/ui/CreateContainer.qml:151
 msgid "This host port is already published by another container."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:144
+#: src/ui/CreateContainer.qml:153
 msgid "Every environment or label row needs a key."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:146
+#: src/ui/CreateContainer.qml:155
 msgid ""
 "Keys may contain letters, digits and underscore, and must not start with a "
 "digit."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:148
+#: src/ui/CreateContainer.qml:157
 msgid "Every mount needs a container path."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:152
+#: src/ui/CreateContainer.qml:161
 msgid "The same container path is used twice."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:154
+#: src/ui/CreateContainer.qml:163
 msgid "Every mount needs a source (host path or volume name)."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:156
+#: src/ui/CreateContainer.qml:165
 msgid "Bind mounts need an absolute host path."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:158
+#: src/ui/CreateContainer.qml:167
 msgid "Volume names may contain letters, digits, underscore, dot or dash."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:160
+#: src/ui/CreateContainer.qml:169
 msgid "The memory limit must be at least 6 MiB (or empty for no limit)."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:162
+#: src/ui/CreateContainer.qml:171
 msgid "The memory limit cannot be negative."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:164
+#: src/ui/CreateContainer.qml:173
 msgid "The CPU limit cannot be negative."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:275
+#: src/ui/CreateContainer.qml:291
 msgid "Which image should the container use?"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:283
+#: src/ui/CreateContainer.qml:299
 msgid "Image reference, for example alpine:3.19"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:292
+#: src/ui/CreateContainer.qml:308
 msgid "Pull it first if it is missing locally"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:298
+#: src/ui/CreateContainer.qml:314
 msgid "Local images:"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:312
+#: src/ui/CreateContainer.qml:328
 msgid "Search images…"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:322
+#: src/ui/CreateContainer.qml:338
 msgid "No local images. Pull one from the Images tab first."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:336
+#: src/ui/CreateContainer.qml:352
 msgid "Name, network and restart policy"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:348 src/ui/CreateContainer.qml:349
+#: src/ui/CreateContainer.qml:364 src/ui/CreateContainer.qml:365
 msgid "Container name"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:356
+#: src/ui/CreateContainer.qml:372
 msgid "Suggest"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:400
+#: src/ui/CreateContainer.qml:416
 msgid "Network aliases (optional, comma separated)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:401
+#: src/ui/CreateContainer.qml:417
 msgid "Network aliases"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:414
+#: src/ui/CreateContainer.qml:430
 msgid "Do not restart automatically"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:415
+#: src/ui/CreateContainer.qml:431
 msgid "Always"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:416
+#: src/ui/CreateContainer.qml:432
 msgid "Unless stopped"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:417
+#: src/ui/CreateContainer.qml:433
 msgid "On failure"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:426
+#: src/ui/CreateContainer.qml:442
 msgid "Start the container after creating it"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:440 src/ui/CreateContainer.qml:477
+#: src/ui/CreateContainer.qml:457
 msgid "Command and entry point (optional)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:456
+#: src/ui/CreateContainer.qml:473
 msgid "Keep standard input open (-i)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:462
+#: src/ui/CreateContainer.qml:479
 msgid "Allocate a terminal (-t)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:468
+#: src/ui/CreateContainer.qml:485
 msgid "Close stdin after the first client disconnects"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:489
+#: src/ui/CreateContainer.qml:500
 msgid "Search previous commands…"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:490
+#: src/ui/CreateContainer.qml:501
 msgid "Reuse a previous command…"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:500
+#: src/ui/CreateContainer.qml:511
 msgid ""
 "One argument per line, for example:\n"
 "sh\n"
@@ -2912,112 +2912,112 @@ msgid ""
 "sleep 3600"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:511
+#: src/ui/CreateContainer.qml:522
 msgid "Entry point (optional, one argument per line)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:524
+#: src/ui/CreateContainer.qml:535
 msgid "Working directory (optional)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:532
+#: src/ui/CreateContainer.qml:543
 msgid "User (optional, name or uid:gid)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:552
+#: src/ui/CreateContainer.qml:560
 msgid "Published ports"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:622
+#: src/ui/CreateContainer.qml:630
 msgid "Add a mount from a preset…"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:623
+#: src/ui/CreateContainer.qml:631
 msgid "Search presets…"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:652 src/ui/CreateContainer.qml:663
+#: src/ui/CreateContainer.qml:660 src/ui/CreateContainer.qml:671
 msgid "Host path"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:654
+#: src/ui/CreateContainer.qml:662
 msgid "tmpfs"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:663 src/ui/MainPage.qml:1003
+#: src/ui/CreateContainer.qml:671 src/ui/MainPage.qml:1003
 #: src/ui/MainPage.qml:1004
 msgid "Volume name"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:664
+#: src/ui/CreateContainer.qml:672
 msgid "Mount source"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:678
+#: src/ui/CreateContainer.qml:686
 msgid "Read-only"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:686
+#: src/ui/CreateContainer.qml:694
 msgid "Remove this mount"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:695
+#: src/ui/CreateContainer.qml:703
 msgid "Add mount manually"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:711
+#: src/ui/CreateContainer.qml:719
 msgid "Resources and privileges"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:719
+#: src/ui/CreateContainer.qml:727
 msgid "Memory limit (MiB):"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:730 src/ui/CreateContainer.qml:754
+#: src/ui/CreateContainer.qml:738 src/ui/CreateContainer.qml:762
 msgid "No limit"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:741
+#: src/ui/CreateContainer.qml:749
 msgid "CPU limit (cores):"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:774
+#: src/ui/CreateContainer.qml:782
 msgid "Run with extended privileges (--privileged)"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:791
+#: src/ui/CreateContainer.qml:799
 msgid ""
 "This container runs with the same access as root on the host. Only use it "
 "when you know why."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:804
+#: src/ui/CreateContainer.qml:812
 msgid "Review and create"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:912
+#: src/ui/CreateContainer.qml:920
 msgid "Run with extended privileges"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:913
+#: src/ui/CreateContainer.qml:921
 msgid "Give this container the same access as root on the host?"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:914
+#: src/ui/CreateContainer.qml:922
 msgid ""
 "The container can access all devices and host files. Only continue if you "
 "trust the image. Type the container name to confirm."
 msgstr ""
 
-#: src/ui/CreateContainer.qml:915
+#: src/ui/CreateContainer.qml:923
 msgid "Yes, run privileged"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:937
+#: src/ui/CreateContainer.qml:945
 msgid "Next"
 msgstr ""
 
-#: src/ui/CreateContainer.qml:946
+#: src/ui/CreateContainer.qml:954
 msgid "Create and start"
 msgstr ""
 

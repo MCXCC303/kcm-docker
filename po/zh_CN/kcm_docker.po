@@ -2,7 +2,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: kontainer 0.9.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-19 16:00+0800\n"
+"POT-Creation-Date: 2026-09-19 16:08+0800\n"
 "PO-Revision-Date: 2026-09-18 05:00+0800\n"
 "Last-Translator: kontainer developers\n"
 "Language-Team: Chinese (Simplified)\n"
@@ -543,7 +543,7 @@ msgid "less than a minute"
 msgstr "不到一分钟"
 
 #: src/model/create_container_controller.cpp:934 src/ui/ImageDetail.qml:112
-#: src/ui/CreateContainer.qml:106
+#: src/ui/CreateContainer.qml:115
 msgid "Image"
 msgstr "镜像"
 
@@ -552,19 +552,19 @@ msgstr "镜像"
 msgid "Name"
 msgstr "名称"
 
-#: src/model/create_container_controller.cpp:938 src/ui/CreateContainer.qml:501
+#: src/model/create_container_controller.cpp:938 src/ui/CreateContainer.qml:512
 msgid "Command"
 msgstr "命令"
 
-#: src/model/create_container_controller.cpp:941 src/ui/CreateContainer.qml:512
+#: src/model/create_container_controller.cpp:941 src/ui/CreateContainer.qml:523
 msgid "Entry point"
 msgstr "入口点"
 
-#: src/model/create_container_controller.cpp:944 src/ui/CreateContainer.qml:525
+#: src/model/create_container_controller.cpp:944 src/ui/CreateContainer.qml:536
 msgid "Working directory"
 msgstr "工作目录"
 
-#: src/model/create_container_controller.cpp:947 src/ui/CreateContainer.qml:533
+#: src/model/create_container_controller.cpp:947 src/ui/CreateContainer.qml:544
 msgid "User"
 msgstr "用户"
 
@@ -581,22 +581,22 @@ msgstr "重启策略"
 msgid "random"
 msgstr "随机"
 
-#: src/model/create_container_controller.cpp:965 src/ui/CreateContainer.qml:114
+#: src/model/create_container_controller.cpp:965 src/ui/CreateContainer.qml:123
 msgid "Ports"
 msgstr "端口"
 
-#: src/model/create_container_controller.cpp:976 src/ui/CreateContainer.qml:116
-#: src/ui/CreateContainer.qml:610
+#: src/model/create_container_controller.cpp:976 src/ui/CreateContainer.qml:125
+#: src/ui/CreateContainer.qml:618
 msgid "Mounts"
 msgstr "挂载"
 
-#: src/model/create_container_controller.cpp:988 src/ui/CreateContainer.qml:572
+#: src/model/create_container_controller.cpp:988 src/ui/CreateContainer.qml:580
 msgid "Environment variables"
 msgstr "环境变量"
 
 #: src/model/create_container_controller.cpp:991
 #: src/ui/components/CreateNetworkDialog.qml:190 src/ui/NetworkDetail.qml:245
-#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:589
+#: src/ui/VolumeDetail.qml:181 src/ui/CreateContainer.qml:597
 msgid "Labels"
 msgstr "标签"
 
@@ -630,7 +630,7 @@ msgid "Terminal (-t)"
 msgstr "终端（-t）"
 
 #: src/model/create_container_controller.cpp:1011
-#: src/ui/CreateContainer.qml:112 src/ui/CreateContainer.qml:445
+#: src/ui/CreateContainer.qml:121 src/ui/CreateContainer.qml:462
 msgid "Interactive"
 msgstr "交互"
 
@@ -713,7 +713,7 @@ msgstr "输入“%1”以确认"
 #: src/ui/components/PullProgressList.qml:123
 #: src/ui/components/BuildImagePanel.qml:254
 #: src/ui/components/BuildImagePanel.qml:430 src/ui/ContainerDetail.qml:640
-#: src/ui/CreateContainer.qml:958
+#: src/ui/CreateContainer.qml:966
 msgid "Cancel"
 msgstr "取消"
 
@@ -814,7 +814,7 @@ msgstr "未指定标签，将拉取 “latest”：%1"
 msgid "This image is already being pulled."
 msgstr "该镜像正在拉取中。"
 
-#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:284
+#: src/ui/components/ImageRefInput.qml:118 src/ui/CreateContainer.qml:300
 msgid "Image reference"
 msgstr "镜像引用"
 
@@ -1010,7 +1010,7 @@ msgstr "创建网络"
 msgid "Enter a name for the network."
 msgstr "请填写网络名称。"
 
-#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:134
+#: src/ui/components/CreateNetworkDialog.qml:44 src/ui/CreateContainer.qml:143
 msgid ""
 "Use letters, digits, underscore, dot or dash, and do not start with a "
 "separator."
@@ -1068,7 +1068,7 @@ msgstr "内部网络（无外部访问）"
 msgid "Allow containers to be attached at runtime"
 msgstr "允许容器在运行时加入"
 
-#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:946
+#: src/ui/components/CreateNetworkDialog.qml:205 src/ui/CreateContainer.qml:954
 #: src/ui/MainPage.qml:1009
 msgid "Create"
 msgstr "创建"
@@ -1297,8 +1297,8 @@ msgid "New preset source"
 msgstr "新预设的来源"
 
 #: src/ui/components/MountPresetManager.qml:109
-#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:671
-#: src/ui/CreateContainer.qml:672
+#: src/ui/components/MountPresetManager.qml:172 src/ui/CreateContainer.qml:679
+#: src/ui/CreateContainer.qml:680
 msgid "Container path"
 msgstr "容器路径"
 
@@ -1322,7 +1322,7 @@ msgstr "收藏"
 msgid "Remove this preset"
 msgstr "删除这个预设"
 
-#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:653
+#: src/ui/components/MountPresetManager.qml:212 src/ui/CreateContainer.qml:661
 msgid "Named volume"
 msgstr "命名卷"
 
@@ -1336,7 +1336,7 @@ msgid ""
 "volume)."
 msgstr "bind 挂载需要绝对宿主路径（命名卷请直接填卷名）。"
 
-#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:150
+#: src/ui/components/MountPresetManager.qml:238 src/ui/CreateContainer.qml:159
 msgid "The container path must be absolute."
 msgstr "容器路径必须是绝对路径。"
 
@@ -1442,7 +1442,7 @@ msgstr "请选择…"
 msgid "Clear the search"
 msgstr "清空搜索"
 
-#: src/ui/components/FilteredComboBox.qml:108
+#: src/ui/components/FilteredComboBox.qml:109
 msgid "Nothing matches the search."
 msgstr "没有匹配的条目。"
 
@@ -1519,7 +1519,7 @@ msgstr "仓库登录…"
 #: src/ui/ImageDetail.qml:159 src/ui/ContainerDetail.qml:331 src/ui/main.qml:37
 #: src/ui/DaemonConfigPage.qml:165 src/ui/RegistryAuthPage.qml:153
 #: src/ui/NetworkDetail.qml:59 src/ui/VolumeDetail.qml:46
-#: src/ui/CreateContainer.qml:928
+#: src/ui/CreateContainer.qml:936
 msgid "Back"
 msgstr "返回"
 
@@ -2000,7 +2000,7 @@ msgctxt "@info data rate per second"
 msgid "%1/s"
 msgstr "%1/秒"
 
-#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:118
+#: src/ui/ResourceView.qml:48 src/ui/CreateContainer.qml:127
 msgid "Resources"
 msgstr "资源"
 
@@ -2738,178 +2738,178 @@ msgstr "数据卷及其中的数据都会被删除。正在使用它的容器需
 msgid "The volume and the data inside it are deleted. This cannot be undone."
 msgstr "数据卷及其中的数据都会被删除，且无法撤销。"
 
-#: src/ui/CreateContainer.qml:108
+#: src/ui/CreateContainer.qml:117
 msgid "Basics"
 msgstr "基础"
 
-#: src/ui/CreateContainer.qml:110
+#: src/ui/CreateContainer.qml:119
 msgid "Environment & labels"
 msgstr "环境变量与标签"
 
-#: src/ui/CreateContainer.qml:120
+#: src/ui/CreateContainer.qml:129
 msgid "Review"
 msgstr "总览"
 
-#: src/ui/CreateContainer.qml:128
+#: src/ui/CreateContainer.qml:137
 msgid "Choose an image."
 msgstr "请选择一个镜像。"
 
-#: src/ui/CreateContainer.qml:130
+#: src/ui/CreateContainer.qml:139
 msgid ""
 "This image is not available locally. Pull it first, or tick “Pull it first”."
 msgstr "本地没有这个镜像。请先拉取，或勾选“本地没有时先拉取”。"
 
-#: src/ui/CreateContainer.qml:132
+#: src/ui/CreateContainer.qml:141
 msgid "Enter a name for the container."
 msgstr "请填写容器名称。"
 
-#: src/ui/CreateContainer.qml:136
+#: src/ui/CreateContainer.qml:145
 msgid "A container with this name already exists."
 msgstr "已经有同名的容器了。"
 
-#: src/ui/CreateContainer.qml:138
+#: src/ui/CreateContainer.qml:147
 msgid "Every port row needs a container port."
 msgstr "每一行端口都要填容器端口。"
 
-#: src/ui/CreateContainer.qml:140
+#: src/ui/CreateContainer.qml:149
 msgid "Host ports must be between 1 and 65535 (leave empty for a random port)."
 msgstr "宿主端口必须在 1–65535 之间（留空表示随机分配）。"
 
-#: src/ui/CreateContainer.qml:142
+#: src/ui/CreateContainer.qml:151
 msgid "This host port is already published by another container."
 msgstr "这个宿主端口已经被其它容器占用了。"
 
-#: src/ui/CreateContainer.qml:144
+#: src/ui/CreateContainer.qml:153
 msgid "Every environment or label row needs a key."
 msgstr "每一行环境变量或标签都要填键名。"
 
-#: src/ui/CreateContainer.qml:146
+#: src/ui/CreateContainer.qml:155
 msgid ""
 "Keys may contain letters, digits and underscore, and must not start with a "
 "digit."
 msgstr "键名只能包含字母、数字与下划线，且不能以数字开头。"
 
-#: src/ui/CreateContainer.qml:148
+#: src/ui/CreateContainer.qml:157
 msgid "Every mount needs a container path."
 msgstr "每个挂载都要填容器路径。"
 
-#: src/ui/CreateContainer.qml:152
+#: src/ui/CreateContainer.qml:161
 msgid "The same container path is used twice."
 msgstr "同一个容器路径被用了两次。"
 
-#: src/ui/CreateContainer.qml:154
+#: src/ui/CreateContainer.qml:163
 msgid "Every mount needs a source (host path or volume name)."
 msgstr "每个挂载都要填来源（宿主路径或卷名）。"
 
-#: src/ui/CreateContainer.qml:156
+#: src/ui/CreateContainer.qml:165
 msgid "Bind mounts need an absolute host path."
 msgstr "bind 挂载需要绝对宿主路径。"
 
-#: src/ui/CreateContainer.qml:158
+#: src/ui/CreateContainer.qml:167
 msgid "Volume names may contain letters, digits, underscore, dot or dash."
 msgstr "卷名只能包含字母、数字、下划线、点或短横线。"
 
-#: src/ui/CreateContainer.qml:160
+#: src/ui/CreateContainer.qml:169
 msgid "The memory limit must be at least 6 MiB (or empty for no limit)."
 msgstr "内存上限至少 6 MiB（留空表示不限制）。"
 
-#: src/ui/CreateContainer.qml:162
+#: src/ui/CreateContainer.qml:171
 msgid "The memory limit cannot be negative."
 msgstr "内存上限不能是负数。"
 
-#: src/ui/CreateContainer.qml:164
+#: src/ui/CreateContainer.qml:173
 msgid "The CPU limit cannot be negative."
 msgstr "CPU 上限不能是负数。"
 
-#: src/ui/CreateContainer.qml:275
+#: src/ui/CreateContainer.qml:291
 msgid "Which image should the container use?"
 msgstr "容器用哪个镜像？"
 
-#: src/ui/CreateContainer.qml:283
+#: src/ui/CreateContainer.qml:299
 msgid "Image reference, for example alpine:3.19"
 msgstr "镜像引用，例如 alpine:3.19"
 
-#: src/ui/CreateContainer.qml:292
+#: src/ui/CreateContainer.qml:308
 msgid "Pull it first if it is missing locally"
 msgstr "本地没有时先拉取"
 
-#: src/ui/CreateContainer.qml:298
+#: src/ui/CreateContainer.qml:314
 msgid "Local images:"
 msgstr "本地镜像："
 
-#: src/ui/CreateContainer.qml:312
+#: src/ui/CreateContainer.qml:328
 msgid "Search images…"
 msgstr "搜索镜像…"
 
-#: src/ui/CreateContainer.qml:322
+#: src/ui/CreateContainer.qml:338
 msgid "No local images. Pull one from the Images tab first."
 msgstr "本地没有镜像。请先在“镜像”页拉取一个。"
 
-#: src/ui/CreateContainer.qml:336
+#: src/ui/CreateContainer.qml:352
 msgid "Name, network and restart policy"
 msgstr "名称、网络与重启策略"
 
-#: src/ui/CreateContainer.qml:348 src/ui/CreateContainer.qml:349
+#: src/ui/CreateContainer.qml:364 src/ui/CreateContainer.qml:365
 msgid "Container name"
 msgstr "容器名称"
 
-#: src/ui/CreateContainer.qml:356
+#: src/ui/CreateContainer.qml:372
 msgid "Suggest"
 msgstr "用建议名称"
 
-#: src/ui/CreateContainer.qml:400
+#: src/ui/CreateContainer.qml:416
 msgid "Network aliases (optional, comma separated)"
 msgstr "网络别名（可选，用逗号分隔）"
 
-#: src/ui/CreateContainer.qml:401
+#: src/ui/CreateContainer.qml:417
 msgid "Network aliases"
 msgstr "网络别名"
 
-#: src/ui/CreateContainer.qml:414
+#: src/ui/CreateContainer.qml:430
 msgid "Do not restart automatically"
 msgstr "不自动重启"
 
-#: src/ui/CreateContainer.qml:415
+#: src/ui/CreateContainer.qml:431
 msgid "Always"
 msgstr "总是"
 
-#: src/ui/CreateContainer.qml:416
+#: src/ui/CreateContainer.qml:432
 msgid "Unless stopped"
 msgstr "除非手动停止"
 
-#: src/ui/CreateContainer.qml:417
+#: src/ui/CreateContainer.qml:433
 msgid "On failure"
 msgstr "失败时"
 
-#: src/ui/CreateContainer.qml:426
+#: src/ui/CreateContainer.qml:442
 msgid "Start the container after creating it"
 msgstr "创建后启动容器"
 
-#: src/ui/CreateContainer.qml:440 src/ui/CreateContainer.qml:477
+#: src/ui/CreateContainer.qml:457
 msgid "Command and entry point (optional)"
 msgstr "命令与入口点（可选）"
 
-#: src/ui/CreateContainer.qml:456
+#: src/ui/CreateContainer.qml:473
 msgid "Keep standard input open (-i)"
 msgstr "保持标准输入打开（-i）"
 
-#: src/ui/CreateContainer.qml:462
+#: src/ui/CreateContainer.qml:479
 msgid "Allocate a terminal (-t)"
 msgstr "分配终端（-t）"
 
-#: src/ui/CreateContainer.qml:468
+#: src/ui/CreateContainer.qml:485
 msgid "Close stdin after the first client disconnects"
 msgstr "第一个客户端断开后关闭标准输入"
 
-#: src/ui/CreateContainer.qml:489
+#: src/ui/CreateContainer.qml:500
 msgid "Search previous commands…"
 msgstr "搜索用过的命令…"
 
-#: src/ui/CreateContainer.qml:490
+#: src/ui/CreateContainer.qml:501
 msgid "Reuse a previous command…"
 msgstr "复用之前用过的命令…"
 
-#: src/ui/CreateContainer.qml:500
+#: src/ui/CreateContainer.qml:511
 msgid ""
 "One argument per line, for example:\n"
 "sh\n"
@@ -2921,98 +2921,98 @@ msgstr ""
 "-c\n"
 "sleep 3600"
 
-#: src/ui/CreateContainer.qml:511
+#: src/ui/CreateContainer.qml:522
 msgid "Entry point (optional, one argument per line)"
 msgstr "入口点（可选，一行一个参数）"
 
-#: src/ui/CreateContainer.qml:524
+#: src/ui/CreateContainer.qml:535
 msgid "Working directory (optional)"
 msgstr "工作目录（可选）"
 
-#: src/ui/CreateContainer.qml:532
+#: src/ui/CreateContainer.qml:543
 msgid "User (optional, name or uid:gid)"
 msgstr "用户（可选，名称或 uid:gid）"
 
-#: src/ui/CreateContainer.qml:552
+#: src/ui/CreateContainer.qml:560
 msgid "Published ports"
 msgstr "端口映射"
 
-#: src/ui/CreateContainer.qml:622
+#: src/ui/CreateContainer.qml:630
 msgid "Add a mount from a preset…"
 msgstr "从预设添加挂载…"
 
-#: src/ui/CreateContainer.qml:623
+#: src/ui/CreateContainer.qml:631
 msgid "Search presets…"
 msgstr "搜索预设…"
 
-#: src/ui/CreateContainer.qml:652 src/ui/CreateContainer.qml:663
+#: src/ui/CreateContainer.qml:660 src/ui/CreateContainer.qml:671
 msgid "Host path"
 msgstr "宿主路径"
 
-#: src/ui/CreateContainer.qml:654
+#: src/ui/CreateContainer.qml:662
 msgid "tmpfs"
 msgstr "tmpfs"
 
-#: src/ui/CreateContainer.qml:663 src/ui/MainPage.qml:1003
+#: src/ui/CreateContainer.qml:671 src/ui/MainPage.qml:1003
 #: src/ui/MainPage.qml:1004
 msgid "Volume name"
 msgstr "数据卷名称"
 
-#: src/ui/CreateContainer.qml:664
+#: src/ui/CreateContainer.qml:672
 msgid "Mount source"
 msgstr "挂载来源"
 
-#: src/ui/CreateContainer.qml:678
+#: src/ui/CreateContainer.qml:686
 msgid "Read-only"
 msgstr "只读"
 
-#: src/ui/CreateContainer.qml:686
+#: src/ui/CreateContainer.qml:694
 msgid "Remove this mount"
 msgstr "移除这个挂载"
 
-#: src/ui/CreateContainer.qml:695
+#: src/ui/CreateContainer.qml:703
 msgid "Add mount manually"
 msgstr "手动添加挂载"
 
-#: src/ui/CreateContainer.qml:711
+#: src/ui/CreateContainer.qml:719
 msgid "Resources and privileges"
 msgstr "资源与特权"
 
-#: src/ui/CreateContainer.qml:719
+#: src/ui/CreateContainer.qml:727
 msgid "Memory limit (MiB):"
 msgstr "内存上限（MiB）："
 
-#: src/ui/CreateContainer.qml:730 src/ui/CreateContainer.qml:754
+#: src/ui/CreateContainer.qml:738 src/ui/CreateContainer.qml:762
 msgid "No limit"
 msgstr "不限制"
 
-#: src/ui/CreateContainer.qml:741
+#: src/ui/CreateContainer.qml:749
 msgid "CPU limit (cores):"
 msgstr "CPU 上限（核）："
 
-#: src/ui/CreateContainer.qml:774
+#: src/ui/CreateContainer.qml:782
 msgid "Run with extended privileges (--privileged)"
 msgstr "以扩展特权运行（--privileged）"
 
-#: src/ui/CreateContainer.qml:791
+#: src/ui/CreateContainer.qml:799
 msgid ""
 "This container runs with the same access as root on the host. Only use it "
 "when you know why."
 msgstr "这个容器拥有与宿主 root 相同的访问权限。请只在明确知道原因时使用。"
 
-#: src/ui/CreateContainer.qml:804
+#: src/ui/CreateContainer.qml:812
 msgid "Review and create"
 msgstr "确认并创建"
 
-#: src/ui/CreateContainer.qml:912
+#: src/ui/CreateContainer.qml:920
 msgid "Run with extended privileges"
 msgstr "以扩展特权运行"
 
-#: src/ui/CreateContainer.qml:913
+#: src/ui/CreateContainer.qml:921
 msgid "Give this container the same access as root on the host?"
 msgstr "要让这个容器拥有与宿主 root 相同的访问权限吗？"
 
-#: src/ui/CreateContainer.qml:914
+#: src/ui/CreateContainer.qml:922
 msgid ""
 "The container can access all devices and host files. Only continue if you "
 "trust the image. Type the container name to confirm."
@@ -3020,15 +3020,15 @@ msgstr ""
 "容器可以访问所有设备与宿主文件。只有在信任该镜像时才继续。请把容器名原样输入"
 "以确认。"
 
-#: src/ui/CreateContainer.qml:915
+#: src/ui/CreateContainer.qml:923
 msgid "Yes, run privileged"
 msgstr "是，以特权运行"
 
-#: src/ui/CreateContainer.qml:937
+#: src/ui/CreateContainer.qml:945
 msgid "Next"
 msgstr "下一步"
 
-#: src/ui/CreateContainer.qml:946
+#: src/ui/CreateContainer.qml:954
 msgid "Create and start"
 msgstr "创建并启动"
 

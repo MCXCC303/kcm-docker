@@ -104,7 +104,8 @@ ColumnLayout {
     QQC2.Label {
         objectName: "filteredComboBoxEmpty"
         Layout.fillWidth: true
-        visible: root.filteredEntries.length === 0
+        // 只在**搜索没匹配上**时提示；列表本来就是空的（例如还没有命令历史）不必多说一句
+        visible: root.filteredEntries.length === 0 && searchField.text.trim().length > 0
         text: i18n("Nothing matches the search.")
         font: Kirigami.Theme.smallFont
         opacity: 0.7
