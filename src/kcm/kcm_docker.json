@@ -18,6 +18,6 @@
         "TranslationDomain": "kcm_docker"
     },
     "X-KDE-Keywords": "docker,container,containers,image,images,kontainer,status,状态,容器,镜像",
-    "X-KDE-System-Settings-Parent-Category": "hardware",
+    "X-KDE-System-Settings-Parent-Category": "system-administration",
     "X-KDE-Weight": 50
 }

@@ -90,6 +90,7 @@ private Q_SLOTS:
     void externalProcessesStayForbidden();
     void qmlUsesOnlyQmlIdentifiers();
     void pluginMetadataVersionMatchesProject();
+    void kcmMetadataIsCompleteForSystemSettings();
 };
 
 /*!
@@ -356,6 +357,64 @@ void SourceConventionsTest::pluginMetadataVersionMatchesProject()
     QVERIFY2(!plugin.isEmpty(), "the metadata must have a KPlugin section");
     QCOMPARE(plugin.value(QStringLiteral("Version")).toString(), QString::fromLatin1(KONTAINER_VERSION));
 }
+
+/*!
+ * 模块要出现在「系统设置」里，元数据必须齐全（ARCH §5.18）。
+ *
+ * 这一条是**安装路径之外**的全部要求：System Settings 只按 `KPluginMetaData` 分组与搜索，
+ * 因此 Id / 名称 / 描述 / 图标 / 关键词 / 父分类 / 翻译域 少一个都会以不同方式"看起来没装上"：
+ *   - 没有 `X-KDE-System-Settings-Parent-Category` → 落到默认分组，用户找不到；
+ *   - 分组名拼错（例如写成 `systemadmin`）→ 同样落到默认分组；
+ *   - 没有 `X-KDE-Keywords` → 在系统设置里搜"容器/docker"搜不到；
+ *   - 没有 `KLocalizedString.TranslationDomain` → 界面文案不翻译。
+ */
+void SourceConventionsTest::kcmMetadataIsCompleteForSystemSettings()
+{
+    QFile file(sourceDir() + QStringLiteral("/src/kcm/kcm_docker.json"));
+    QVERIFY2(file.open(QIODevice::ReadOnly), qPrintable(file.fileName()));
+    const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
+    const QJsonObject plugin = root.value(QStringLiteral("KPlugin")).toObject();
+
+    // 模块名就是用户在 `systemsettings <module>` 里敲的那个
+    QCOMPARE(plugin.value(QStringLiteral("Id")).toString(), QStringLiteral("kcm_docker"));
+    // 名称与描述都要有中英两份（本项目的界面是双语的）
+    for (const QString &key : {QStringLiteral("Name"), QStringLiteral("Description"),
+                               QStringLiteral("Name[zh_CN]"), QStringLiteral("Description[zh_CN]")}) {
+        QVERIFY2(!plugin.value(key).toString().isEmpty(), qPrintable(QStringLiteral("missing %1").arg(key)));
+    }
+    // 图标必须给（breeze 里有 folder-docker；名字写错在界面上就是空白图标）
+    QCOMPARE(plugin.value(QStringLiteral("Icon")).toString(), QStringLiteral("folder-docker"));
+
+    // 父分类必须是 Plasma 6 真实存在的分组之一，否则不会出现在预期位置
+    const QStringList knownCategories {QStringLiteral("system-administration"),
+                                       QStringLiteral("hardware"),
+                                       QStringLiteral("network"),
+                                       QStringLiteral("security-privacy"),
+                                       QStringLiteral("appearance"),
+                                       QStringLiteral("applications"),
+                                       QStringLiteral("session"),
+                                       QStringLiteral("search"),
+                                       QStringLiteral("themes"),
+                                       QStringLiteral("windowmanagement"),
+                                       QStringLiteral("keyboard"),
+                                       QStringLiteral("display"),
+                                       QStringLiteral("input-devices"),
+                                       QStringLiteral("pointing-devices"),
+                                       QStringLiteral("regionalsettings")};
+    const QString category = root.value(QStringLiteral("X-KDE-System-Settings-Parent-Category")).toString();
+    QVERIFY2(knownCategories.contains(category),
+             qPrintable(QStringLiteral("unknown system settings category: '%1'").arg(category)));
+
+    // 搜索关键词：中英文都要有，用户在系统设置里搜得到
+    const QString keywords = root.value(QStringLiteral("X-KDE-Keywords")).toString();
+    QVERIFY2(keywords.contains(QLatin1String("docker")), "english keywords are needed for search");
+    QVERIFY2(keywords.contains(QStringLiteral("容器")), "chinese keywords are needed for search");
+
+    // 翻译域必须与 po/ 里的域一致，否则文案不翻译
+    QCOMPARE(root.value(QStringLiteral("KLocalizedString")).toObject().value(QStringLiteral("TranslationDomain")).toString(),
+             QStringLiteral("kcm_docker"));
+}
+
 
 QTEST_GUILESS_MAIN(SourceConventionsTest)
 
