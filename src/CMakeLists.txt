@@ -127,6 +127,10 @@ add_library(kontainer_core STATIC
     model/image_filter_model.h
     model/network_detail_controller.cpp
     model/network_detail_controller.h
+    model/host_port_usage.cpp
+    model/host_port_usage.h
+    model/port_binding_rules.cpp
+    model/port_binding_rules.h
     model/row_sync_plan.cpp
     model/row_sync_plan.h
     model/command_history_store.cpp

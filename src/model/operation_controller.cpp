@@ -5,6 +5,8 @@
 
 #include "model/operation_controller.h"
 
+#include "model/host_port_usage.h"
+
 #include <cstring>
 
 #include "model/format.h"
@@ -644,64 +646,10 @@ bool OperationController::containerNameTaken(const QString &name) const
     return false;
 }
 
-namespace
-{
-/*!
- * 该状态的容器是否**真的占着**宿主端口。
- *
- * 只有跑着的容器才持有端口：没启动（Created）、已退出（Exited）、已死（Dead）的都不占，
- * 状态读不出来（`Unknown`）时也按**不占**算——用户明确要求这样：
- * 没运行自然不会占用，按"占用"拦下来反而会挡住其它应用使用它真正需要的端口。
- * 代价是极端情况下会漏报，那种情况由启动时的错误文案兜底（见 `failureText()`）。
- */
-bool holdsHostPorts(ContainerState state)
-{
-    switch (state) {
-    case ContainerState::Running:
-    case ContainerState::Paused:
-    case ContainerState::Restarting:
-        return true;
-    default:
-        return false;
-    }
-}
-
-/*! 两个绑定地址是否有交集（0.0.0.0 与任何地址都冲突；IPv6 通配同理）。 */
-bool hostBindingsOverlap(const QString &lhs, const QString &rhs)
-{
-    const QString left = lhs.isEmpty() ? QStringLiteral("0.0.0.0") : lhs;
-    const QString right = rhs.isEmpty() ? QStringLiteral("0.0.0.0") : rhs;
-    const auto isWildcard = [](const QString &value) {
-        return value == QLatin1String("0.0.0.0") || value == QLatin1String("::") || value == QLatin1String("[::]");
-    };
-    if (isWildcard(left) || isWildcard(right)) {
-        /*
-         * 通配之间也要按协议族看：`0.0.0.0:8100` 与 `[::]:8100` 在 Linux 上默认
-         * 是**互相冲突**的（除非 net.ipv6.bindv6only=1），因此一律算冲突——
-         * 宁可提示得保守一点，也好过让用户在运行时报"port is already allocated"。
-         */
-        return true;
-    }
-    return left == right;
-}
-} // namespace
-
 QString OperationController::hostPortHolder(const QString &hostIp, int hostPort) const
 {
-    if (hostPort <= 0) {
-        return {}; // 0 = 随机分配，不冲突
-    }
-    for (const Container &container : m_backend->containers()) {
-        if (!holdsHostPorts(container.state)) {
-            continue;
-        }
-        for (const Port &port : container.ports) {
-            if (port.isPublished() && port.publicPort == hostPort && hostBindingsOverlap(port.ip, hostIp)) {
-                return container.name.isEmpty() ? container.shortId() : container.name;
-            }
-        }
-    }
-    return {};
+    // 判定规则统一在 HostPortUsage 里（谁都不许再抄第二份，见 ARCH_next_ports.md §3）
+    return HostPortUsage::holderFor(m_backend->containers(), hostIp, hostPort);
 }
 
 bool OperationController::hostPortInUse(const QString &hostIp, int hostPort) const

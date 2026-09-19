@@ -5,6 +5,7 @@
 
 #include "model/create_container_controller.h"
 
+#include "model/port_binding_rules.h"
 #include "model/port_mapping_model.h"
 
 #include "domain/container.h"
@@ -792,26 +793,6 @@ void CreateContainerController::removeMountAt(int row)
     touch();
 }
 
-namespace
-{
-/*!
- * 两个宿主绑定地址是否有交集（与 `OperationController::hostBindingsOverlap()` 同一套语义）：
- * 通配与任何地址都冲突；两个具体地址只有完全相同才冲突。
- */
-bool hostPortsOverlap(const QString &lhs, const QString &rhs)
-{
-    const QString left = lhs.isEmpty() ? QStringLiteral("0.0.0.0") : lhs;
-    const QString right = rhs.isEmpty() ? QStringLiteral("0.0.0.0") : rhs;
-    const auto isWildcard = [](const QString &value) {
-        return value == QLatin1String("0.0.0.0") || value == QLatin1String("::") || value == QLatin1String("[::]");
-    };
-    if (isWildcard(left) || isWildcard(right)) {
-        return true;
-    }
-    return left == right;
-}
-} // namespace
-
 QString CreateContainerController::validatePorts() const
 {
     /*
@@ -836,7 +817,7 @@ QString CreateContainerController::validatePorts() const
         // 与本次请求里已经接受的行比较（0 = 随机分配，不参与冲突判断）
         if (hostPort != 0) {
             for (const PortMappingEntry &other : accepted) {
-                if (other.hostPort == hostPort && hostPortsOverlap(other.hostIp, hostIp)) {
+                if (other.hostPort == hostPort && PortBindingRules::hostBindingsOverlap(other.hostIp, hostIp)) {
                     return QStringLiteral("portDuplicateInRequest");
                 }
             }
