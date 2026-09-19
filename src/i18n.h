@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <QStringList>
+
 namespace Kontainer
 {
 
@@ -22,5 +24,13 @@ inline constexpr auto kTranslationDomain = "kcm_docker";
  * 翻译域。KCM 启动时（以及测试 main()）调用一次即可。
  */
 void setupTranslationDomain();
+
+/*!
+ * 除 `$XDG_DATA_DIRS/share/locale` 之外，还应该去哪里找 `kcm_docker.mo`。
+ *
+ * 覆盖"开发时用 `QT_PLUGIN_PATH` 指向构建目录"这种用法（实测：这样启动时界面是英文，
+ * 因为构建目录与安装前缀都不在 XDG_DATA_DIRS 里）。只返回**存在**的目录。
+ */
+QStringList translationLocaleDirs();
 
 } // namespace Kontainer

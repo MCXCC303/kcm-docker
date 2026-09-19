@@ -440,6 +440,14 @@ public Q_SLOTS:
     Q_INVOKABLE void requestAutomaticRefreshForTesting();
     Q_INVOKABLE int inFlightWatchdogMs() const;
 
+    /*!
+     * 首次进入页面时把低频列表（网络、数据卷）读一次。
+     *
+     * 它们的数量显示在标签页标题上，不能等用户点进去才对（实测反馈：没进标签页前
+     * 一直显示 0，进去才变成 4）。幂等：只读一次，之后仍由切页与变更驱动。
+     */
+    void loadLowFrequencyListsOnce();
+
     Q_INVOKABLE void refreshNetworks();
     /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
     void refreshVolumes(bool includeUsage = true);
@@ -523,6 +531,8 @@ private:
      * 在途看门狗：busy 持续过久时放弃在途请求（用户实测 B3/B4：永久"正在加载/backend busy"）。
      */
     QTimer *m_busyWatchdog = nullptr;
+    /*! 低频列表（网络/数据卷）是否已读过一次。 */
+    bool m_lowFrequencyLoaded = false;
     /*! 服务状态来源（默认 systemd D-Bus 只读查询；测试注入替身）。 */
     ServiceStatusBackend *m_services = nullptr;
     HostPathService *m_hostPaths = nullptr;

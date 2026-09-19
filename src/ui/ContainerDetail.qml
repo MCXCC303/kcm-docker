@@ -102,8 +102,41 @@ KCM.AbstractKCM {
     property string connectAliases: ""
 
     /*! 这个网络能不能连（已经连上的当然不能再连一次）。 */
+    /*
+     * 可连接的网络（属性，不是函数）。
+     *
+     * 实测反馈：断开某个网络后，面板里它仍显示"已连接"、按钮还是灰的——因为原来是
+     * 函数调用，绑定不跟踪数据变化（本项目第五次踩这个坑）。改成 `readonly property`
+     * 的绑定块后，`connectedNetworkNames`（属性）或网络模型一变就会重新求值。
+     */
+    readonly property var connectedNetworkNameList: page.controller.connectedNetworkNames
+
+    /*!
+     * 还能连的网络（整表 + 数量都是属性，界面直接用）。
+     *
+     * 这里**故意**在读 `model.summaries()` 之外显式读一次 `model.count`：
+     * C++ 的 Q_INVOKABLE 调用不产生依赖，只有读到带 NOTIFY 的属性，
+     * 这个绑定才会在网络列表变化时重新求值（踩过多次的同一个坑）。
+     */
+    readonly property var connectableNetworks: {
+        const model = kcm.controller.networkModel;
+        const connected = page.connectedNetworkNameList;
+        const result = [];
+        const rowCount = model ? model.count : 0; // ← 建立依赖，别删
+        if (!model || rowCount === 0) {
+            return result;
+        }
+        for (const summary of model.summaries()) {
+            if (connected.indexOf(summary.name) < 0) {
+                result.push(summary);
+            }
+        }
+        return result;
+    }
+    readonly property int connectableNetworkCount: page.connectableNetworks.length
+
     function isConnectable(networkName: string): bool {
-        return page.controller.connectedNetworkNames().indexOf(networkName) < 0;
+        return page.connectedNetworkNameList.indexOf(networkName) < 0;
     }
 
     /*! 提交内联面板上的连接（失败原因由控制器给出用户文案）。 */
@@ -125,24 +158,7 @@ KCM.AbstractKCM {
      * （QML 不追踪函数调用，必须显式读一个属性建立依赖）。
      */
     /*! 还能连的网络数（0 = 没有可连的，面板据此给出说明）。 */
-    function connectableNetworkCount(): int {
-        const summaries = page.networkSummaries();
-        let count = 0;
-        for (let i = 0; i < summaries.length; ++i) {
-            if (page.isConnectable(summaries[i].name)) {
-                ++count;
-            }
-        }
-        return count;
-    }
 
-    function networkSummaries(): var {
-        const model = kcm.controller.networkModel;
-        if (!model || model.count === 0) {
-            return [];
-        }
-        return model.summaries();
-    }
 
     Component.onCompleted: {
         // 必须无条件 start()：容器 id 相同时（A → 返回 → 再进 A）也要重新 inspect、
@@ -672,40 +688,44 @@ KCM.AbstractKCM {
                         Kirigami.InlineMessage {
                             objectName: "connectNetworkEmptyMessage"
                             Layout.fillWidth: true
-                            visible: page.connectableNetworkCount() === 0
+                            visible: page.connectableNetworkCount === 0
                             type: Kirigami.MessageType.Information
                             text: i18n("This container is already connected to every network. Create another network first.")
                         }
 
                         QQC2.Label {
                             Layout.fillWidth: true
-                            visible: page.connectableNetworkCount() > 0
+                            visible: page.connectableNetworkCount > 0
                             text: i18n("Choose a network:")
                             font.bold: true
                         }
 
                         Repeater {
-                            model: page.networkSummaries()
+                            // 直接用模型（属性）：模型变化时列表跟着更新，不再是函数快照
+                            model: kcm.controller.networkModel
 
                             delegate: QQC2.RadioButton {
                                 id: networkOption
 
-                                required property var modelData
+                                required property string name
+                                required property string id
+                                required property string driver
+                                required property bool predefined
 
                                 objectName: "connectNetworkOption"
                                 Layout.fillWidth: true
                                 // 已经连上的网络：标注出来但不可再选（避免"再连一次"这种无意义操作）
-                                enabled: page.isConnectable(networkOption.modelData.name)
-                                text: networkOption.modelData.name + " · " + networkOption.modelData.driver
+                                enabled: page.isConnectable(networkOption.name)
+                                text: networkOption.name + " · " + networkOption.driver
                                     + (networkOption.enabled ? "" : " — " + i18n("already connected"))
-                                onClicked: page.connectNetworkId = networkOption.modelData.id
+                                onClicked: page.connectNetworkId = networkOption.id
                             }
                         }
 
                         QQC2.TextField {
                             objectName: "connectNetworkAliasesField"
                             Layout.fillWidth: true
-                            visible: page.connectableNetworkCount() > 0
+                            visible: page.connectableNetworkCount > 0
                             placeholderText: i18n("Aliases (optional, comma separated)")
                             Accessible.name: i18n("Aliases")
                             onTextChanged: page.connectAliases = text

@@ -99,6 +99,15 @@ class ContainerDetailController : public QObject
     /*! 日志控制台（§3.1）：文本、状态与暂停/清空都在它身上。 */
     Q_PROPERTY(Kontainer::ContainerLogController *logs READ logs CONSTANT)
 
+    /*!
+     * 已连接的网络名（**属性**，不是函数）。
+     *
+     * 实测反馈：断开某个网络后，"连接网络"面板里那个网络仍标着"已连接"、按钮还是灰的。
+     * 根因是这里原来只有 `Q_INVOKABLE`：QML 里 `isConnectable(name)` 是**函数调用**，
+     * 不建立依赖，数据变了绑定不会重新求值（本项目第五次踩这个坑）。
+     */
+    Q_PROPERTY(QStringList connectedNetworkNames READ connectedNetworkNames NOTIFY changed)
+
 public:
     /*!
      * `hostPaths` 由组合根（DockerKcm）注入；测试传 Fake，因此单测不会真的弹出文件管理器。
@@ -278,7 +287,9 @@ public Q_SLOTS:
      * 名字来自 inspect 的 `NetworkSettings.Networks`（以名字为键）；
      * 连接/断开用的网络 Id 由 `NetworkModel::idForName()` 转换。
      */
-    Q_INVOKABLE QStringList connectedNetworkNames() const;
+
+    /*! 同上（供 C++/旧调用点使用；QML 请用同名属性）。 */
+    QStringList connectedNetworkNames() const;
 
     Q_INVOKABLE void startLogs();
     Q_INVOKABLE void stopLogs();

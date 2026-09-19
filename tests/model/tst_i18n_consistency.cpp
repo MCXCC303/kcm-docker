@@ -38,6 +38,7 @@ private Q_SLOTS:
     void translationsExistAndAreComplete();
     void templateMatchesSources();
     void translationsLoadAtRuntime();
+    void developmentPluginPathFindsTheCatalog();
     void noUnwrappedUiStrings();
 };
 
@@ -379,6 +380,48 @@ void I18nConsistencyTest::noUnwrappedUiStrings()
     QVERIFY2(violations.isEmpty(),
              qPrintable(QStringLiteral("user-visible text must go through i18n():\n%1").arg(violations.join(QLatin1Char('\n')))));
 }
+
+/*!
+ * 开发时用 `QT_PLUGIN_PATH=<build>/bin` 启动（不带 XDG_DATA_DIRS）也要能翻译。
+ *
+ * 实测反馈：`QT_PLUGIN_PATH=$PWD/build/bin systemsettings kcm_docker` 在中文环境下显示英文——
+ * 因为译文只在 `$XDG_DATA_DIRS/share/locale` 里找，而构建目录与安装前缀都不在其中。
+ * `translationLocaleDirs()` 就是为此补的候选目录表：从 `QT_PLUGIN_PATH` 推出
+ * `<build>/locale` 与 `<build>/share/locale`，从 Qt 插件目录与可执行文件位置推出
+ * `<prefix>/share/locale`。这里用临时目录钉死"推得对、只返回存在的目录"。
+ */
+void I18nConsistencyTest::developmentPluginPathFindsTheCatalog()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    // 模拟构建树：<tmp>/bin（插件）与 <tmp>/locale/zh_CN/LC_MESSAGES/kcm_docker.mo
+    QVERIFY(QDir().mkpath(dir.filePath(QStringLiteral("bin"))));
+    const QString localeDir = dir.filePath(QStringLiteral("locale/zh_CN/LC_MESSAGES"));
+    QVERIFY(QDir().mkpath(localeDir));
+    QFile catalog(localeDir + QStringLiteral("/kcm_docker.mo"));
+    QVERIFY(catalog.open(QIODevice::WriteOnly));
+    catalog.write("dummy"); // 只要存在即可：这里测的是"目录推导"，不测翻译内容
+    catalog.close();
+
+    const QByteArray previous = qgetenv("QT_PLUGIN_PATH");
+    qputenv("QT_PLUGIN_PATH", dir.filePath(QStringLiteral("bin")).toUtf8());
+    const QStringList dirs = translationLocaleDirs();
+    qputenv("QT_PLUGIN_PATH", previous);
+
+    QVERIFY2(dirs.contains(dir.filePath(QStringLiteral("locale"))),
+             qPrintable(QStringLiteral("missing build-tree locale dir, got: %1").arg(dirs.join(QLatin1Char(' ')))));
+    // 不存在的目录不能被注册（避免把无效路径塞给 KLocalizedString）
+    QVERIFY(!dirs.contains(dir.filePath(QStringLiteral("share/locale"))));
+
+    // 负例方向：没有 .mo 的目录不算数（列表只包含"确实存在"的目录）
+    QTemporaryDir empty;
+    QVERIFY(empty.isValid());
+    qputenv("QT_PLUGIN_PATH", empty.filePath(QStringLiteral("bin")).toUtf8());
+    const QStringList emptyDirs = translationLocaleDirs();
+    qputenv("QT_PLUGIN_PATH", previous);
+    QVERIFY(!emptyDirs.contains(empty.filePath(QStringLiteral("locale"))));
+}
+
 
 QTEST_GUILESS_MAIN(I18nConsistencyTest)
 #include "tst_i18n_consistency.moc"

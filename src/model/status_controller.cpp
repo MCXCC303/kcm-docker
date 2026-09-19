@@ -188,6 +188,21 @@ bool StatusController::stale() const
     return m_scheduler->isStale();
 }
 
+void StatusController::loadLowFrequencyListsOnce()
+{
+    /*
+     * 网络与数据卷不进 5 秒轮询（低频数据），但它们的**数量**显示在标签页上——
+     * 用户实测："没进标签页之前一直显示 0，进去才变成 4"。
+     * 因此页面初始化时读一次，之后仍按原来的按需刷新（切页 / 变更后）。
+     */
+    if (m_lowFrequencyLoaded) {
+        return;
+    }
+    m_lowFrequencyLoaded = true;
+    m_backend->refreshNetworks();
+    m_backend->refreshVolumes(false);
+}
+
 void StatusController::refreshNetworks()
 {
     m_backend->refreshNetworks();
@@ -200,6 +215,7 @@ void StatusController::refreshVolumes(bool includeUsage)
 
 void StatusController::refresh()
 {
+    loadLowFrequencyListsOnce();
     qCDebug(kontainerModel) << "refresh requested";
     // 用户主动刷新后，"上一次操作成功"这类提示已经过时（A7）：
     // 失败类信息保留，因为它往往是用户唯一能看到的"为什么"（dismissResultIfObsolete 里判断）

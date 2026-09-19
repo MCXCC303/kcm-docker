@@ -1100,7 +1100,12 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectable),
                                       Q_ARG(QString, QStringLiteral("app_default"))));
     QVERIFY(connectable);
-    QCOMPARE(page->property("connectableNetworkCount").isValid(), false); // 它是函数，不是属性
+    // 必须是**属性**：函数（或只读函数式绑定）不会随数据变化重新求值，
+    // 正是"断开后仍显示已连接、无法选择"的根因
+    QCOMPARE(page->property("connectableNetworkCount").isValid(), true);
+    QCOMPARE(page->property("connectableNetworkCount").toInt(), 1); // 只剩 app_default 可连
+    QVERIFY2(!page->property("connectedNetworkNameList").toStringList().isEmpty(),
+             "the connected list must be exposed as a property so bindings track it");
 
     // 选中未连接的网络并提交：请求带上网络 Id、容器 Id 与别名
     page->setProperty("connectNetworkId", app.id);
@@ -1112,6 +1117,37 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QCOMPARE(m_backend->lastNetworkConnect().first, app.id);
     QCOMPARE(m_backend->lastNetworkConnectAliases(), QStringList({QStringLiteral("demo"), QStringLiteral("api")}));
     QVERIFY2(!page->property("connectPanelOpen").toBool(), "the panel closes after a successful connect");
+
+    /*
+     * 用户实测的回归场景：在容器网络分区断开某个网络后，再打开"连接网络"，
+     * 那个网络仍显示为"已连接"、无法选择。
+     *
+     * 现在断开后容器详情会重新 inspect，且连接面板的可用性来自**属性**绑定，
+     * 因此不需要重开面板：那个网络必须立刻重新可选。
+     */
+    // 详情里去掉 bridge（模拟断开之后引擎的真实状态）
+    ContainerDetail afterDisconnect = detail;
+    afterDisconnect.networks.clear();
+    m_backend->setContainerDetail(afterDisconnect);
+
+    // 断开动作本身：对话框按**网络名**发起（名字 → Id 的转换只有一处实现）
+    page->setProperty("pendingNetworkName", QStringLiteral("bridge"));
+    QVERIFY(QMetaObject::invokeMethod(disconnectDialog, "confirmed"));
+    QCOMPARE(m_backend->lastNetworkDisconnect().first, bridge.id);
+    QCOMPARE(m_backend->lastNetworkDisconnect().second, QStringLiteral("cid-1"));
+
+    // 让这次变更"完成"：控制器随后会走"写后即读"重新 inspect（真正的刷新由它触发）
+    m_backend->completeMutations();
+    m_backend->completeRefresh();
+    QTRY_VERIFY2(m_stubKcm->controller()->containerDetail()->connectedNetworkNames().isEmpty(),
+                 "the detail must be re-read after a disconnect");
+
+    // 关键断言：不需要重开面板，两个网络都可选，且计数跟着变
+    QTRY_COMPARE(page->property("connectableNetworkCount").toInt(), 2);
+    bool connectableAfter = false;
+    QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectableAfter),
+                                      Q_ARG(QString, QStringLiteral("bridge"))));
+    QVERIFY2(connectableAfter, "a disconnected network must become selectable again");
 }
 
 /*!
