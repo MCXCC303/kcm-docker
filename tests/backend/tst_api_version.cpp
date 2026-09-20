@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -9,7 +9,7 @@
 
 using namespace Kontainer;
 
-/*! API 版本策略测试（ARCH_V1 §8）。 */
+/*! API version policy tests (ARCH_V1 §8). */
 class ApiVersionTest : public QObject
 {
     Q_OBJECT
@@ -74,17 +74,17 @@ void ApiVersionTest::rejectsInvalidVersions()
 
 void ApiVersionTest::negotiatesWithinClientRange()
 {
-    // 服务端比客户端上限新：使用客户端上限，且不得低于服务端最低要求
+    // Server newer than the client maximum: use the client maximum, never below the server minimum
     const auto newer = ApiVersion::negotiate(ApiVersion(1, 60), ApiVersion(1, 44));
     QVERIFY(newer.has_value());
     QCOMPARE(newer->minor(), ApiVersion::clientMaxMinor());
 
-    // 服务端在区间内：直接使用服务端版本
+    // Server inside the range: use the server version as is
     const auto inside = ApiVersion::negotiate(ApiVersion(1, 47), ApiVersion(1, 40));
     QVERIFY(inside.has_value());
     QCOMPARE(inside->minor(), 47);
 
-    // 没有 MinAPIVersion 信息时也要能协商
+    // Negotiation must also work without MinAPIVersion
     const auto withoutMinimum = ApiVersion::negotiate(ApiVersion(1, 56), std::nullopt);
     QVERIFY(withoutMinimum.has_value());
     QCOMPARE(withoutMinimum->minor(), 56);
@@ -104,7 +104,7 @@ void ApiVersionTest::rejectsServerWhoseMinimumIsTooNew()
 
 void ApiVersionTest::pathPrefixIsTheOnlyVersionStringSource()
 {
-    // 版本前缀格式集中在这里，其他源文件不得散落 "v1.xx"
+    // The version prefix format lives here only; no other source file may hardcode "v1.xx"
     QCOMPARE(ApiVersion(1, 56).pathPrefix(), QStringLiteral("v1.56"));
     QCOMPARE(ApiVersion(1, 56).toString(), QStringLiteral("1.56"));
     QVERIFY(ApiVersion().isValid() == false);

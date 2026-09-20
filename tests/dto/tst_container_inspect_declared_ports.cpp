@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -10,10 +10,11 @@
 using namespace Kontainer;
 
 /*!
- * inspect 的 `HostConfig.PortBindings`（ARCH_next_ports.md §1，里程碑 M1d）。
+ * inspect's `HostConfig.PortBindings` (ARCH_next_ports.md §1, milestone M1d).
  *
- * 这是"声明 vs 实际发布"里**声明**那一半：Docker 在容器停止后依然保留它，
- * 而 `NetworkSettings.Ports`（实际发布）会是空的。实测 `WinBoat` 还用了端口区间。
+ * This is the **declared** half of "declared vs actually published": Docker keeps it even after a
+ * container stops, while `NetworkSettings.Ports` (published) is empty. `WinBoat` really uses
+ * port ranges.
  */
 class ContainerInspectDeclaredPortsTest : public QObject
 {
@@ -42,7 +43,7 @@ void ContainerInspectDeclaredPortsTest::parsesDeclaredBindingsWithRanges()
     const ContainerDetail detail = containerDetailFromDto(*dto);
 
     QCOMPARE(detail.declaredPorts.size(), 3);
-    // 顺序稳定：按容器端口、宿主端口（QJsonObject 的键序不可依赖）
+    // Stable order: by container port, then host port (QJsonObject key order is not reliable)
     const DeclaredPortBinding range = detail.declaredPorts.at(0);
     const DeclaredPortBinding first = detail.declaredPorts.at(1);
     QCOMPARE(first.containerPort, quint16(8888));
@@ -57,11 +58,11 @@ void ContainerInspectDeclaredPortsTest::parsesDeclaredBindingsWithRanges()
     QVERIFY2(range.isRange(), "the declared binding must keep its range");
     QCOMPARE(range.hostIp, QStringLiteral("127.0.0.1"));
 
-    // 声明了但**没有**实际发布：published（NetworkSettings.Ports）为空
+    // Declared but **not** published: published (NetworkSettings.Ports) is empty
     QVERIFY2(detail.ports.isEmpty(), "a declared-only binding must not appear as published");
 }
 
-/*! 两个来源必须分开：实际发布的进 `ports`，声明的进 `declaredPorts`。 */
+/*! The two sources must stay separate: published goes to `ports`, declared to `declaredPorts`. */
 void ContainerInspectDeclaredPortsTest::keepsPublishedAndDeclaredSeparate()
 {
     const QByteArray json = R"({
@@ -79,7 +80,7 @@ void ContainerInspectDeclaredPortsTest::keepsPublishedAndDeclaredSeparate()
     QCOMPARE(detail.declaredPorts.first().hostPort, quint16(8100));
 }
 
-/*! 坏输入（空串 = 随机分配、非数字、区间颠倒）不进模型。 */
+/*! Bad input (empty string = random assignment, non-numeric, reversed range) never enters the model. */
 void ContainerInspectDeclaredPortsTest::rejectsUnparsableHostPorts()
 {
     const QByteArray json = R"({

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -10,10 +10,10 @@
 using namespace Kontainer;
 
 /*!
- * 镜像引用解析（ARCH_V4 §2.4 / §5.1）。
+ * Image reference parsing (ARCH_V4 §2.4 / §5.1).
  *
- * 这个解析有两个消费者：backend 用它拼 `fromImage` / `tag`，
- * QML 用它做提交前校验。因此用例同时覆盖「必须接受」与「必须拒绝」两侧。
+ * Two consumers: the backend builds `fromImage` / `tag` from it, QML pre-validates with it.
+ * So these cases cover both sides, what must be accepted and what must be rejected.
  */
 class ImageReferenceTest : public QObject
 {
@@ -66,7 +66,7 @@ void ImageReferenceTest::acceptsCommonForms()
     QCOMPARE(parts->tag, tag);
     QCOMPARE(parts->registry, registry);
     QVERIFY(ImageReference::isValid(reference));
-    // fromImage 不带 tag（tag 走独立参数），digest 才带 @
+    // fromImage carries no tag (tag is a separate parameter); only a digest carries @
     QCOMPARE(parts->fromImage(), repository);
 }
 
@@ -93,7 +93,7 @@ void ImageReferenceTest::rejectsInvalidInput()
     QFETCH(QString, reference);
     QVERIFY2(!ImageReference::isValid(reference), qPrintable(reference));
     QVERIFY(!ImageReference::parse(reference).has_value());
-    // 归一化对非法输入不抛异常、不静默改写
+    // Normalisation neither throws nor silently rewrites invalid input
     QCOMPARE(ImageReference::normalized(reference), reference.trimmed());
 }
 
@@ -114,7 +114,7 @@ void ImageReferenceTest::digestSkipsTagNormalisation()
     QCOMPARE(parts->tag, QString());
     QCOMPARE(parts->repository, QStringLiteral("alpine"));
     QVERIFY(!parts->digest.isEmpty());
-    // digest 形式必须原样出现在 fromImage 里，且不补 latest
+    // The digest form must reach fromImage verbatim, with no latest appended
     QCOMPARE(parts->fromImage(), reference);
     QCOMPARE(ImageReference::normalized(reference), reference);
 }
@@ -127,8 +127,8 @@ void ImageReferenceTest::shortFormDropsRegistryOnly()
 }
 
 /*!
- * 粘贴输入常常带首尾空格：解析会 trim，因此这种输入算合法
- * （但内部空白仍然非法——那通常是拼错了）。
+ * Pasted input often has surrounding whitespace: parsing trims it, so such input is valid
+ * (inner whitespace is still invalid - it usually means a typo).
  */
 void ImageReferenceTest::trimsSurroundingWhitespace()
 {

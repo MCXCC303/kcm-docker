@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: 2026 kontainer developers
+# SPDX-FileCopyrightText: 2026 kcm-docker developers
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""最小 VNC(RFB) 客户端：抓取 Qt 'vnc' platform 插件的虚拟屏并保存为 PNG。
+"""Minimal VNC (RFB) client: grab the Qt 'vnc' platform plugin's virtual screen to a PNG.
 
-用途：在完全隔离的虚拟屏里渲染 KCM，避免截取用户桌面上的其他窗口。
+Purpose: render the KCM on a fully isolated virtual screen instead of capturing the
+user's desktop.
 
     QT_QPA_PLATFORM="vnc:port=5999:size=1200x900" kcmshell6 kcm_docker &
     tests/tools/vnc_grab.py 127.0.0.1 5999 out.png
@@ -32,7 +33,7 @@ def recv_exact(sock: socket.socket, count: int) -> bytes:
 def grab(host: str, port: int, output: str, delay: float) -> None:
     with socket.create_connection((host, port), timeout=15) as sock:
         server_version = recv_exact(sock, 12)
-        # Qt 的 vnc platform 插件使用 RFB 3.3：安全类型是 4 字节整数，而不是类型列表
+        # Qt's vnc platform plugin speaks RFB 3.3: security type is a 4-byte int, not a list
         try:
             major = int(server_version[4:7])
             minor = int(server_version[8:11])
@@ -53,7 +54,7 @@ def grab(host: str, port: int, output: str, delay: float) -> None:
             security_type = struct.unpack(">I", recv_exact(sock, 4))[0]
             if security_type != 1:
                 raise RuntimeError(f"unsupported VNC security type {security_type}")
-            # RFB 3.3 + None 没有 SecurityResult
+            # RFB 3.3 + None sends no SecurityResult
         sock.sendall(b"\x01")  # shared
 
         width, height = struct.unpack(">HH", recv_exact(sock, 4))
@@ -67,9 +68,9 @@ def grab(host: str, port: int, output: str, delay: float) -> None:
         if not true_color or bits_per_pixel not in (16, 32):
             raise RuntimeError(f"unsupported pixel format: bpp={bits_per_pixel} trueColor={true_color}")
 
-        # 只请求 Raw 编码
+        # Raw encoding only
         sock.sendall(struct.pack(">BBHI", 2, 0, 1, 0))
-        # 第一次抓取前等待 UI 渲染完成
+        # Let the UI finish rendering before the first grab
         time.sleep(delay)
         sock.sendall(struct.pack(">BBHHHH", 3, 0, 0, 0, width, height))
 

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,13 +16,11 @@
 using namespace Kontainer;
 
 /*!
- * 数据卷列表（ARCH_V5_V8 §3.5）。
+ * Volume list (ARCH_V5_V8 §3.5).
  *
- * 这里钉三件事：
- *   1. **"未知"不等于 0**：引擎没给 UsageData 时，大小与引用数都是未知（-1），
- *      界面必须显示"—"；把它当成 0 会让用户以为"可以安全清理"；
- *   2. 过滤与排序：未使用（prune 的目标）能单独筛出来，未知使用情况**不混进去**；
- *   3. 载荷形态：`/volumes` 是对象（`{Volumes: [...] | null}`），空列表时 Volumes 是 null。
+ * Three pins: **"unknown" is not 0** (no engine UsageData → size and ref count are -1, the UI shows "—",
+ * because 0 would read as "safe to prune"); unused volumes filter separately with unknown usage **excluded**;
+ * `/volumes` is an object (`{Volumes: [...] | null}`), null when the list is empty.
  */
 class VolumeModelTest : public QObject
 {
@@ -106,7 +104,7 @@ void VolumeModelTest::parsesUsageAndUnknownUsage()
     const QList<Volume> volumes = volumesFromDto(DockerVolumeDTO::listFromPayload(payload, &warnings, &error, &skipped));
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QCOMPARE(skipped, 0);
-    QCOMPARE(warnings.size(), 1); // 引擎的提醒要透出，不能吞掉
+    QCOMPARE(warnings.size(), 1); // engine warnings must surface, never be swallowed
     QCOMPARE(volumes.size(), 2);
 
     const Volume &used = volumes.at(0);
@@ -117,9 +115,9 @@ void VolumeModelTest::parsesUsageAndUnknownUsage()
     QCOMPARE(used.refCount, 2);
     QVERIFY(used.createdAt.isValid());
     QCOMPARE(used.labels.size(), 1);
-    QCOMPARE(used.options.first().first, QStringLiteral("device")); // 按键排序
+    QCOMPARE(used.options.first().first, QStringLiteral("device")); // sorted by key
 
-    // 没有 UsageData = 未知，不是 0
+    // No UsageData means unknown, not 0
     const Volume &unknown = volumes.at(1);
     QVERIFY2(!unknown.sizeKnown(), "missing UsageData must stay unknown");
     QVERIFY2(!unknown.usageKnown(), "missing RefCount must stay unknown");
@@ -130,7 +128,7 @@ void VolumeModelTest::parsesUsageAndUnknownUsage()
 
 void VolumeModelTest::parsesNullVolumeList()
 {
-    // 本机实测：没有数据卷时 Volumes 是 null（不是空数组）
+    // Observed locally: with no volumes, Volumes is null (not an empty array)
     QString error;
     int skipped = 0;
     const QList<Volume> volumes = volumesFromDto(DockerVolumeDTO::listFromPayload(QByteArrayLiteral("{\"Volumes\":null,\"Warnings\":null}"),
@@ -138,19 +136,19 @@ void VolumeModelTest::parsesNullVolumeList()
     QVERIFY2(error.isEmpty(), qPrintable(error));
     QVERIFY(volumes.isEmpty());
 
-    // 坏载荷：不是对象 → 报错
+    // Bad payload: not an object → error
     error.clear();
     QVERIFY(DockerVolumeDTO::listFromPayload(QByteArrayLiteral("[]"), nullptr, &error, nullptr).isEmpty());
     QVERIFY(!error.isEmpty());
 
-    // 坏条目跳过、好的保留
+    // Bad entries are skipped, good ones kept
     const QByteArray mixed = R"({"Volumes": [{"Name": "good"}, {"Driver": "local"}, "not-an-object"]})";
     skipped = 0;
     const QList<Volume> parsed = volumesFromDto(DockerVolumeDTO::listFromPayload(mixed, nullptr, nullptr, &skipped));
     QCOMPARE(skipped, 2);
     QCOMPARE(parsed.size(), 1);
     QCOMPARE(parsed.first().name, QStringLiteral("good"));
-    QCOMPARE(parsed.first().driver, QStringLiteral("local")); // 缺驱动按 local
+    QCOMPARE(parsed.first().driver, QStringLiteral("local")); // missing driver defaults to local
 }
 
 void VolumeModelTest::exposesRolesAndLooksUpByName()
@@ -176,7 +174,7 @@ void VolumeModelTest::exposesRolesAndLooksUpByName()
     QCOMPARE(model.rowForName(QStringLiteral("cache")), 1);
     QCOMPARE(model.rowForName(QStringLiteral("nope")), -1);
     QCOMPARE(model.names().size(), 4);
-    // prune 的目标：**只**包含确定未使用的（未知的不算）
+    // Prune targets: **only** certainly unused ones (unknown excluded)
     QCOMPARE(model.unusedNames(), QStringList {QStringLiteral("cache")});
     QVERIFY(model.summaries().first().toMap().contains(QStringLiteral("mountpoint")));
 }
@@ -188,9 +186,9 @@ void VolumeModelTest::unchangedVolumesDoNotResetTheModel()
 
     QSignalSpy resetSpy(&model, &QAbstractItemModel::modelReset);
     model.setVolumes(sampleVolumes());
-    QCOMPARE(resetSpy.count(), 0); // 内容未变：不重建 delegate
+    QCOMPARE(resetSpy.count(), 0); // unchanged content: no delegate rebuild
 
-    // 值变化（引用数）：只发 dataChanged，不重置模型（同容器列表的体验修复）
+    // Value change (ref count): dataChanged only, no reset (same UX fix as the container list)
     QList<Volume> changed = sampleVolumes();
     changed[1].refCount = 3;
     QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
@@ -200,7 +198,7 @@ void VolumeModelTest::unchangedVolumesDoNotResetTheModel()
 
     model.clear();
     QVERIFY(model.empty());
-    QCOMPARE(resetSpy.count(), 0); // 清空是"逐行删除"，不是整表重置
+    QCOMPARE(resetSpy.count(), 0); // clear removes rows one by one, it is not a model reset
 }
 
 void VolumeModelTest::filtersUnusedAndInUseSeparately()
@@ -212,7 +210,7 @@ void VolumeModelTest::filtersUnusedAndInUseSeparately()
 
     QCOMPARE(filter.count(), 4);
 
-    // 未使用：只有 cache（legacy 的引用数未知，不能算进"可清理"）
+    // Unused: only cache (legacy's ref count is unknown, so it is not "prunable")
     filter.setUsageFilter(QStringLiteral("unused"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("cache"));
@@ -223,7 +221,7 @@ void VolumeModelTest::filtersUnusedAndInUseSeparately()
     filter.setUsageFilter(QStringLiteral("all"));
     QCOMPARE(filter.count(), 4);
 
-    // 搜索覆盖名称 / 驱动 / 挂载点
+    // Search covers name / driver / mountpoint
     filter.setSearchText(QStringLiteral("NFS"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("nfs_share"));
@@ -232,7 +230,7 @@ void VolumeModelTest::filtersUnusedAndInUseSeparately()
     QCOMPARE(filter.count(), 1);
 
     filter.setSearchText(QString());
-    // 后台刷新不重置用户条件
+    // A background refresh does not reset user criteria
     filter.setUsageFilter(QStringLiteral("unused"));
     model.setVolumes(sampleVolumes());
     QCOMPARE(filter.usageFilter(), QStringLiteral("unused"));
@@ -247,10 +245,10 @@ void VolumeModelTest::sortsBySizeAndRefs()
     filter.setSourceModel(&model);
 
     filter.setSortKey(QStringLiteral("size"));
-    QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("cache")); // 最大
+    QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("cache")); // largest
 
     filter.setSortKey(QStringLiteral("refs"));
-    QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("app_data")); // 2 个容器
+    QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("app_data")); // refs=2
 
     filter.setSortKey(QStringLiteral("name"));
     QCOMPARE(filter.index(0, 0).data(VolumeModel::NameRole).toString(), QStringLiteral("app_data"));
@@ -273,12 +271,12 @@ void VolumeModelTest::controllerWiresVolumesSection()
     QCOMPARE(controller.volumesStateKey(), QStringLiteral("ready"));
     QVERIFY(backend.lastVolumesRefreshUsedUsage());
 
-    // 只要名字时可以关掉占用统计（大环境里那一步很慢）
+    // Usage stats can be skipped when only names are needed (that step is slow on big hosts)
     controller.refreshVolumes(false);
     backend.completeRefresh();
     QVERIFY(!backend.lastVolumesRefreshUsedUsage());
 
-    // 读失败：保留上一次的列表，只把状态标成失败
+    // Read failure: keep the last list, only mark the state failed
     backend.setNextFailure(DockerBackendInterface::Section::Volumes,
                            DockerError(DockerError::Kind::DockerUnavailable, QStringLiteral("socket gone")));
     controller.refreshVolumes();

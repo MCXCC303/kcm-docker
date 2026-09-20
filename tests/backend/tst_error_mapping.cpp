@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,7 +12,7 @@
 
 using namespace Kontainer;
 
-/*! 错误映射单元测试（ARCH_V1 §28 Error mapping / §23 分层错误）。 */
+/*! Error-mapping unit tests (ARCH_V1 §28 Error mapping / §23 layered errors). */
 class ErrorMappingTest : public QObject
 {
     Q_OBJECT
@@ -51,8 +51,8 @@ void ErrorMappingTest::mapsHttpStatusCodes_data()
 
 void ErrorMappingTest::mapsHttpStatusCodes()
 {
-    // 注意：这台 Qt（6.11）只执行「无参测试函数 + QFETCH」形式的数据驱动用例，
-    // 带参数的测试函数会被静默跳过，因此统一使用 QFETCH。
+    // Note: this Qt (6.11) only runs data-driven cases shaped as a no-argument test function
+    // plus QFETCH; test functions taking parameters are silently skipped, so QFETCH everywhere.
     QFETCH(int, status);
     QFETCH(int, expectedKind);
 
@@ -110,8 +110,8 @@ void ErrorMappingTest::everyErrorHasUserText()
 }
 
 /*!
- * 409 的三类语义必须能区分（ARCH_V4 §2.2.2）：引擎只在 message 里说明原因，
- * 而用户需要知道下一步做什么。
+ * The three 409 meanings must stay distinguishable (ARCH_V4 §2.2.2): the engine states the
+ * reason only in the message, while the user needs to know what to do next.
  */
 void ErrorMappingTest::conflictsExplainWhatToDo()
 {
@@ -132,14 +132,14 @@ void ErrorMappingTest::conflictsExplainWhatToDo()
     QVERIFY2(runningText != inUseText && inUseText != tagsText && runningText != tagsText,
              "the three 409 meanings must not collapse into one sentence");
 
-    // 未知措辞退化为通用文案，而不是空字符串
+    // Unknown wording degrades to generic text, not an empty string
     const DockerError unknown = DockerError::fromHttpStatus(409, QStringLiteral("something new"));
     QVERIFY(!dockerErrorText(unknown).isEmpty());
 }
 
 /*!
- * 错误分级（ARCH_V4 §2.2.2）：分级决定 UI 用警告还是错误样式，
- * 因此它必须与所解决的「谁的错」一致。
+ * Error categorisation (ARCH_V4 §2.2.2): the category decides whether the UI uses warning or
+ * error styling, so it must match the underlying "whose fault" reading.
  */
 void ErrorMappingTest::categorisesErrorsForTheUi()
 {
@@ -151,7 +151,7 @@ void ErrorMappingTest::categorisesErrorsForTheUi()
     QCOMPARE(dockerErrorCategoryKey(DockerError::Kind::UnexpectedPayload), QStringLiteral("unexpected"));
     QCOMPARE(dockerErrorCategoryKey(DockerError::Kind::None), QStringLiteral("none"));
 
-    // 「目标已经消失」是唯一带引导动作的分级：刷新即可恢复
+    // "Target is gone" is the only category with a guided action: refresh recovers it
     QCOMPARE(dockerErrorActionKey(DockerError(DockerError::Kind::NotFound, QString())), QStringLiteral("refresh"));
     QVERIFY(dockerErrorActionKey(DockerError(DockerError::Kind::EngineError, QString())).isEmpty());
     QVERIFY(dockerErrorActionKey(DockerError(DockerError::Kind::PermissionDenied, QString())).isEmpty());

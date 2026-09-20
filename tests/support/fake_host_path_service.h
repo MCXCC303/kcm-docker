@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,10 +14,11 @@ namespace Kontainer
 {
 
 /*!
- * 测试用的宿主路径服务（ARCH_V4 §2.1.1）。
+ * Host path service for tests (ARCH_V4 §2.1.1).
  *
- * 生产实现会真的拉起文件管理器，测试显然不能这么干：
- * 这里记录「谁被请求打开」，并允许注入探测结果（路径存在 / 缺失 / 不是目录）。
+ * The production implementation really launches a file manager, which tests must not do: this
+ * records which paths were asked to open and allows injecting probe results (exists / missing /
+ * not a directory).
  */
 class FakeHostPathService : public HostPathService
 {
@@ -30,7 +31,7 @@ public:
     {
         m_state = state;
     }
-    /*! 下一次 openDirectory 的失败结果；None 表示成功。 */
+    /*! Failure for the next openDirectory; None means success. */
     void setNextOpenError(HostPathError error)
     {
         m_nextOpenError = error;

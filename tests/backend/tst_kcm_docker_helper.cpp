@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,12 +12,12 @@
 using namespace Kontainer;
 
 /*!
- * 提权助手的安全边界（ARCH_V5_V8 §2.4 / §6.1）。
+ * Security boundary of the privileged helper (ARCH_V5_V8 §2.4 / §6.1).
  *
- * 这是整个项目**唯一**以 root 运行的入口，因此这里的每一条拒绝都对应一种
- * "如果放过去就会变成提权后门"的情形：任意路径、任意键、任意内容、任意命令。
- * 校验逻辑与 helper 共用同一个实现，所以这些断言等价于对 helper 的断言
- * （不需要 root 就能跑，也不需要真的安装 polkit policy）。
+ * The project's **only** root entry point, so every rejection here maps to a
+ * privilege-escalation backdoor if allowed: arbitrary path, key, content or
+ * command. Validation shares its implementation with the helper, so these
+ * assertions describe the helper too (no root, no installed polkit policy).
  */
 class KontainerHelperTest : public QObject
 {
@@ -68,13 +68,13 @@ void KontainerHelperTest::rejectsUnknownKeys()
     PrivilegedConfigRequest request;
     QString errorKey;
 
-    // data-root 会改变容器数据目录：界面都不能改，helper 更不能
+    // data-root moves the container data directory: not even the UI may set it, let alone the helper
     QVariantMap arguments = mirrorsRequest({QStringLiteral("https://mirror.example.com")});
     arguments.insert(QStringLiteral("data-root"), QStringLiteral("/tmp/evil"));
     QVERIFY2(!PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey), "unknown keys must be rejected");
     QCOMPARE(errorKey, QStringLiteral("unknownKey"));
 
-    // 路径参数这种"看起来合理"的键同样拒绝
+    // Plausible-looking keys such as a path argument are rejected just the same
     QVariantMap pathAttempt;
     pathAttempt.insert(QStringLiteral("path"), QStringLiteral("/etc/shadow"));
     QVERIFY(!PrivilegedConfigRequest::fromArguments(pathAttempt, &request, &errorKey));
@@ -87,7 +87,7 @@ void KontainerHelperTest::rejectsInvalidMirrorValues()
     QString errorKey;
 
     const QStringList bad = {
-        QStringLiteral("mirror.example.com"), // 没有 scheme
+        QStringLiteral("mirror.example.com"), // no scheme
         QStringLiteral("ftp://mirror.example.com"),
         QStringLiteral("https://mirror.example.com/path"),
         QStringLiteral("https://mirror.example.com?q=1"),
@@ -106,7 +106,7 @@ void KontainerHelperTest::rejectsInjectionAttempts()
     QString errorKey;
 
     const QStringList attacks = {
-        QStringLiteral("https://mirror.example.com/\n{\"data-root\":\"/tmp\"}"), // 试图注入 JSON
+        QStringLiteral("https://mirror.example.com/\n{\"data-root\":\"/tmp\"}"), // tries to inject JSON
         QStringLiteral("https://mirror.example.com;rm -rf /"),
         QStringLiteral("https://mirror.example.com$(id)"),
         QStringLiteral("../../etc/shadow"),
@@ -127,7 +127,7 @@ void KontainerHelperTest::rejectsInvalidInsecureRegistries()
     QVERIFY2(!PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey), "a scheme is not allowed here");
     QCOMPARE(errorKey, QStringLiteral("invalidValue"));
 
-    // 合法形态：host[:port]
+    // Valid form: host[:port]
     QVariantMap good;
     good.insert(QStringLiteral("insecure-registries"), QStringList {QStringLiteral("registry.local:5000")});
     QVERIFY(PrivilegedConfigRequest::fromArguments(good, &request, &errorKey));
@@ -172,7 +172,7 @@ void KontainerHelperTest::rejectsEmptyRequest()
 {
     PrivilegedConfigRequest request;
     QString errorKey;
-    // 空请求意味着"什么都没改"：让调用方以为生效了是最坏的结果，因此明确拒绝
+    // An empty request means "nothing changed": a caller believing it applied is worst, so reject it
     QVERIFY(!PrivilegedConfigRequest::fromArguments(QVariantMap(), &request, &errorKey));
     QCOMPARE(errorKey, QStringLiteral("noEdits"));
 }
@@ -199,7 +199,7 @@ void KontainerHelperTest::refusesToMergeIntoUnparsableContent()
     QString errorKey;
     QVERIFY(PrivilegedConfigRequest::fromArguments(mirrorsRequest({QStringLiteral("https://mirror.example.com")}), &request, &errorKey));
 
-    // 现有文件是坏 JSON：helper 必须拒绝写（否则会把用户可用的配置换成起不来的）
+    // Existing file is bad JSON: refuse to write, else a working config is replaced by a broken one
     QVERIFY2(request.mergeInto(QByteArrayLiteral("{ broken")).isEmpty(), "must not overwrite an unparsable config");
 }
 
@@ -212,13 +212,13 @@ void KontainerHelperTest::acceptsRemovalOfManagedKeys()
     QString errorKey;
     QVERIFY(PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey));
     QCOMPARE(request.removeKeys(), QStringList({QStringLiteral("log-driver"), QStringLiteral("max-concurrent-downloads")}));
-    // 纯删除不是"空请求"：否则界面点保存会被 noEdits 拒掉
+    // Remove-only is not an "empty request", else saving from the UI would be rejected with noEdits
     QVERIFY(!request.isEmpty());
 }
 
 void KontainerHelperTest::rejectsRemovalOfUnmanagedKeys()
 {
-    // helper 只能删它管得着的键：data-root / 任意路径都不行
+    // The helper may only remove keys it manages: not data-root or an arbitrary path
     for (const QString &key : {QStringLiteral("data-root"),
                                QStringLiteral("storage-driver"),
                                QStringLiteral("features"),
@@ -234,7 +234,7 @@ void KontainerHelperTest::rejectsRemovalOfUnmanagedKeys()
 
 void KontainerHelperTest::rejectsConflictingSetAndRemove()
 {
-    // 同一个键既赋值又要求删除：拒绝，而不是替调用方猜哪个优先
+    // Same key both set and removed: reject instead of guessing which one wins
     QVariantMap arguments;
     arguments.insert(QStringLiteral("log-driver"), QStringLiteral("json-file"));
     arguments.insert(QStringLiteral("remove"), QStringList {QStringLiteral("log-driver")});
@@ -267,14 +267,14 @@ void KontainerHelperTest::dryRunIsAcceptedWithoutEdits()
     PrivilegedConfigRequest request;
     QString errorKey;
 
-    // 「解锁」按钮：用户还没改任何东西，但需要一次针对同一 action 的授权
+    // "Unlock" button: the user changed nothing yet, but needs one authorization for the same action
     QVariantMap arguments;
     arguments.insert(QStringLiteral("dryRun"), true);
     QVERIFY2(PrivilegedConfigRequest::fromArguments(arguments, &request, &errorKey), qPrintable(errorKey));
     QVERIFY(request.dryRun());
     QVERIFY2(request.isEmpty(), "a dry run carries no edits");
 
-    // 没有 dryRun 的空请求仍然拒绝（避免"什么都没改却报告成功"）
+    // An empty request without dryRun is still rejected (never report success for no change)
     QVERIFY(!PrivilegedConfigRequest::fromArguments(QVariantMap(), &request, &errorKey));
     QCOMPARE(errorKey, QStringLiteral("noEdits"));
 }
@@ -284,7 +284,7 @@ void KontainerHelperTest::dryRunStillRejectsUnknownKeys()
     PrivilegedConfigRequest request;
     QString errorKey;
 
-    // dryRun 不是"放宽校验"的开关：越权键在解锁路径上同样被拒
+    // dryRun is not a "relax validation" switch: out-of-scope keys are rejected on the unlock path too
     QVariantMap arguments;
     arguments.insert(QStringLiteral("dryRun"), true);
     arguments.insert(QStringLiteral("data-root"), QStringLiteral("/tmp/evil"));

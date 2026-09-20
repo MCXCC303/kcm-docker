@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,11 @@
 using namespace Kontainer;
 
 /*!
- * 端口映射模型（ARCH_V4 §2.1.2 / §5.1）。
+ * Port mapping model (ARCH_V4 §2.1.2 / §5.1).
  *
- * 拓扑图按行画连线，因此模型的两件事必须钉死：
- *  - 已发布 / 未发布的分组（未发布的端口没有宿主端点，不能进拓扑）
- *  - 排序稳定（顺序抖动会让图形每次刷新都在跳）
+ * The topology draws one line per row, so two things must hold:
+ *  - published / unpublished split (unpublished ports have no host endpoint, they cannot enter the topology)
+ *  - stable order (jitter makes the graph jump on every refresh)
  */
 class PortMappingModelTest : public QObject
 {
@@ -64,7 +64,7 @@ void PortMappingModelTest::splitsPublishedFromUnpublished()
 
     backend.setContainerDetail(detailWithPorts({
         Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
-        Port {QString(), 9000, 0, QStringLiteral("tcp")}, // 只 EXPOSE
+        Port {QString(), 9000, 0, QStringLiteral("tcp")}, // EXPOSE only
     }));
 
     controller.setContainerId(QStringLiteral("cid-1"));
@@ -75,7 +75,7 @@ void PortMappingModelTest::splitsPublishedFromUnpublished()
     QCOMPARE(controller.unpublishedPorts()->count(), 1);
     QVERIFY(controller.publishedPorts()->index(0, 0).data(PortMappingModel::PublishedRole).toBool());
     QVERIFY(!controller.unpublishedPorts()->index(0, 0).data(PortMappingModel::PublishedRole).toBool());
-    // 未发布的端口没有宿主端点：宿主侧文本必须为空，界面才好显示「未发布」
+    // Unpublished ports have no host endpoint: the host chip text stays empty so the UI can say "unpublished"
     QVERIFY(controller.unpublishedPorts()->index(0, 0).data(PortMappingModel::HostChipTextRole).toString().isEmpty());
 }
 
@@ -84,7 +84,7 @@ void PortMappingModelTest::keepsOneToManyMappings()
     MockDockerBackend backend;
     ContainerDetailController controller(&backend);
 
-    // 同一个容器端口绑定到两个宿主地址：拓扑里必须是两条线，不能合并
+    // One container port bound to two host addresses: two topology lines, never merged
     backend.setContainerDetail(detailWithPorts({
         Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
         Port {QStringLiteral("127.0.0.1"), 80, 8080, QStringLiteral("tcp")},
@@ -115,14 +115,14 @@ void PortMappingModelTest::sortsByContainerPortThenProtocol()
     controller.start();
     backend.completeRefresh();
 
-    // 引擎给的顺序是不可依赖的；界面按容器端口升序、同端口按协议排
+    // The engine's order is unreliable; sort by container port ascending, then protocol
     QCOMPARE(controller.publishedPorts()->index(0, 0).data(PortMappingModel::ContainerPortRole).toInt(), 53);
     QCOMPARE(controller.publishedPorts()->index(0, 0).data(PortMappingModel::ProtocolRole).toString(), QStringLiteral("tcp"));
     QCOMPARE(controller.publishedPorts()->index(1, 0).data(PortMappingModel::ProtocolRole).toString(), QStringLiteral("udp"));
     QCOMPARE(controller.publishedPorts()->index(2, 0).data(PortMappingModel::ContainerPortRole).toInt(), 443);
     QCOMPARE(controller.publishedPorts()->index(3, 0).data(PortMappingModel::ContainerPortRole).toInt(), 8443);
 
-    // 重复刷新不改变顺序（否则拓扑图每次刷新都会重排）
+    // Repeated refreshes do not reorder (else the topology re-lays out every time)
     const QList<PortMappingEntry> before = controller.publishedPorts()->mappings();
     controller.refresh();
     backend.completeRefresh();
@@ -139,14 +139,14 @@ void PortMappingModelTest::chipTextsAreStable()
     QCOMPARE(published.containerChipText(), QStringLiteral("80/tcp"));
     QCOMPARE(published.hostChipText(), QStringLiteral("0.0.0.0:8080"));
 
-    // 协议缺失时按 tcp 处理（引擎偶尔省略 Type）
+    // Missing protocol means tcp (the engine sometimes omits Type)
     PortMappingEntry noProtocol;
     noProtocol.containerPort = 53;
     noProtocol.hostIp = QStringLiteral("0.0.0.0");
     noProtocol.hostPort = 53;
     QCOMPARE(noProtocol.containerChipText(), QStringLiteral("53/tcp"));
 
-    // 宿主 IP 缺失时按 0.0.0.0 处理：不能显示成 ":8080"
+    // Missing host IP means 0.0.0.0: never render ":8080"
     PortMappingEntry noIp;
     noIp.containerPort = 80;
     noIp.hostIp = QString();
@@ -174,8 +174,8 @@ void PortMappingModelTest::unchangedPortsDoNotResetTheModels()
 }
 
 /*!
- * 分组（ARCH_V5_V8 §2.1 拓扑形态修订）：同一个容器端口的多条绑定合成一组，
- * 左列只出现一枚芯片，右侧按绑定数分支。
+ * Grouping (ARCH_V5_V8 §2.1 topology revision): bindings of one container port form a group,
+ * so the left column shows a single chip and the right side branches per binding.
  */
 void PortMappingModelTest::groupsBindingsOfTheSameContainerPort()
 {
@@ -196,7 +196,7 @@ void PortMappingModelTest::groupsBindingsOfTheSameContainerPort()
     PortMappingGroupModel *groups = controller.portGroups();
     QVERIFY(groups);
     QCOMPARE(groups->count(), 2);
-    // 4 条原始映射里，`0.0.0.0:20004` 与 `::20004` 是同一份映射的 IPv4/IPv6 两条 → 合并
+    // Of the 4 raw mappings, "0.0.0.0:20004" and "::20004" are the IPv4/IPv6 halves of one mapping → merged
     QCOMPARE(groups->bindingCount(), 3);
 
     const QModelIndex first = groups->index(0, 0);
@@ -206,10 +206,10 @@ void PortMappingModelTest::groupsBindingsOfTheSameContainerPort()
     const QModelIndex second = groups->index(1, 0);
     QCOMPARE(second.data(PortMappingGroupModel::ContainerChipTextRole).toString(), QStringLiteral("8888/tcp"));
     QCOMPARE(second.data(PortMappingGroupModel::BindingCountRole).toInt(), 2);
-    // 组内顺序确定：按宿主端口、宿主地址（刷新时行不会跳）
+    // Deterministic in-group order: host port, then host address (rows do not jump on refresh)
     QCOMPARE(second.data(PortMappingGroupModel::HostChipTextsRole).toStringList(),
              QStringList({QStringLiteral("20004"), QStringLiteral("127.0.0.1:20204")}));
-    // 合并后的那条标记为双栈（界面据此画双环）
+    // The merged binding is flagged dual-stack (the UI draws a double ring for it)
     QCOMPARE(second.data(PortMappingGroupModel::DualStackFlagsRole).toList(),
              QVariantList({true, false}));
 }
@@ -219,7 +219,7 @@ void PortMappingModelTest::groupingKeepsProtocolsApartAndIgnoresUnpublished()
     MockDockerBackend backend;
     ContainerDetailController controller(&backend);
 
-    // 同号但协议不同 = 两个不同的端口；未发布的端口没有宿主端点，不进拓扑
+    // Same number, different protocol = two distinct ports; unpublished ports have no host endpoint
     backend.setContainerDetail(detailWithPorts({
         Port {QStringLiteral("0.0.0.0"), 53, 53, QStringLiteral("tcp")},
         Port {QStringLiteral("0.0.0.0"), 53, 53, QStringLiteral("udp")},
@@ -234,7 +234,7 @@ void PortMappingModelTest::groupingKeepsProtocolsApartAndIgnoresUnpublished()
     QCOMPARE(controller.portGroups()->index(0, 0).data(PortMappingGroupModel::ProtocolRole).toString(), QStringLiteral("tcp"));
     QCOMPARE(controller.portGroups()->index(1, 0).data(PortMappingGroupModel::ProtocolRole).toString(), QStringLiteral("udp"));
     QCOMPARE(controller.portGroups()->bindingCount(), 2);
-    // 未发布的仍然出现在它自己的模型里（页面单独成组说明）
+    // Unpublished ones still appear in their own model (the page groups them separately)
     QCOMPARE(controller.unpublishedPorts()->count(), 1);
 }
 
@@ -254,7 +254,7 @@ void PortMappingModelTest::groupsDoNotResetWhenUnchanged()
 
     QSignalSpy resetSpy(controller.portGroups(), &QAbstractItemModel::modelReset);
     QCOMPARE(resetSpy.count(), 0);
-    // 再刷新一次同样的数据：不重建模型（delegate 不会被销毁重建）
+    // Refresh with identical data again: no model rebuild (no delegate destruction/re-creation)
     backend.setContainerDetail(detail);
     controller.refresh();
     backend.completeRefresh();
@@ -264,10 +264,10 @@ void PortMappingModelTest::groupsDoNotResetWhenUnchanged()
 }
 
 /*!
- * IPv4/IPv6 通配合并必须"挑剔"：只有**同一容器端口 + 同一宿主端口 + 两种通配**才合并。
+ * The IPv4/IPv6 wildcard merge must be picky: only **same container port, same host port, both wildcards**.
  *
- * 否则会把"真的映射了两次"（例如两个不同的宿主端口、或通配 + 具体地址）
- * 错并成一条，用户就看不到自己实际有两条映射了。
+ * Otherwise genuinely distinct mappings (two host ports, or wildcard + specific address) get fused
+ * into one, hiding from the user that they really have two.
  */
 void PortMappingModelTest::dualStackMergeIsPicky()
 {
@@ -275,16 +275,16 @@ void PortMappingModelTest::dualStackMergeIsPicky()
     ContainerDetailController controller(&backend);
 
     backend.setContainerDetail(detailWithPorts({
-        // 同一个容器端口 → 两个**不同**的宿主端口：不合
+        // Same container port → two **different** host ports: no merge
         Port {QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
         Port {QStringLiteral("::"), 80, 8081, QStringLiteral("tcp")},
-        // 两种通配但宿主端口不同：不合
+        // Both wildcards but different host ports: no merge
         Port {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
         Port {QStringLiteral("::"), 443, 9443, QStringLiteral("tcp")},
-        // 通配 + 具体地址（同一端口）：不合——用户确实绑了两个地址
+        // Wildcard + specific address (same port): no merge — the user did bind two addresses
         Port {QStringLiteral("0.0.0.0"), 53, 5353, QStringLiteral("udp")},
         Port {QStringLiteral("127.0.0.1"), 53, 5353, QStringLiteral("udp")},
-        // 真正的一对：唯一会被合并的
+        // The real pair: the only merge
         Port {QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
         Port {QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")},
     }));
@@ -295,7 +295,7 @@ void PortMappingModelTest::dualStackMergeIsPicky()
 
     PortMappingGroupModel *groups = controller.portGroups();
     QVERIFY(groups);
-    // 8 条原始映射 - 1 次合并 = 7
+    // 8 raw mappings - 1 merge = 7
     QCOMPARE(groups->bindingCount(), 7);
     int dualStackCount = 0;
     for (int row = 0; row < groups->count(); ++row) {

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,7 +18,7 @@ QString sourceDir()
     return QStringLiteral(KCM_DOCKER_SOURCE_DIR);
 }
 
-/*! 递归收集某个目录下的文件内容（`relativePath -> content`）。 */
+/*! Recursively collect file contents under a directory (`relativePath -> content`). */
 QMap<QString, QString> collectFiles(const QString &directory, const QStringList &nameFilters)
 {
     QMap<QString, QString> files;
@@ -38,7 +38,7 @@ QMap<QString, QString> collectFiles(const QString &directory, const QStringList 
 }
 
 /*!
- * 命中给定模式的行（跳过注释行：注释里提到某个 token 名字不算真的在使用它）。
+ * Lines matching a pattern (comments are skipped: naming a token in a comment is not using it).
  */
 QStringList linesMatching(const QString &content, const QRegularExpression &pattern)
 {
@@ -69,11 +69,10 @@ QStringList linesMatching(const QString &content, const QRegularExpression &patt
 } // namespace
 
 /*!
- * 源码约定测试（ARCH_V3 §2.1 的验收条件）。
+ * Source convention tests (the acceptance criteria of ARCH_V3 §2.1).
  *
- * 这些约定靠代码评审很容易漏：一次复制粘贴就能让「状态配色只有一处实现」
- * 或「只读边界」悄悄失效，而它们在界面上不会立刻表现出来。
- * 因此把它们写成可执行的断言。
+ * Review misses these easily: one copy-paste can silently break "status colours have one implementation"
+ * or "the read-only boundary", and the UI shows nothing. So they are executable assertions.
  */
 class SourceConventionsTest : public QObject
 {
@@ -94,7 +93,7 @@ private Q_SLOTS:
 };
 
 /*!
- * 复制动作只允许有一个实现（CopyButton）：以前这段逻辑在两个详情页里手写了 6 遍。
+ * Copying has one implementation only (CopyButton): it was hand-written 6× across two detail pages.
  */
 void SourceConventionsTest::copyActionHasSingleImplementation()
 {
@@ -115,23 +114,23 @@ void SourceConventionsTest::copyActionHasSingleImplementation()
 }
 
 /*!
- * 状态语义色只允许出现在 StatusPalette 里（ARCH_V2 §12 / ARCH_V3 §2.1）。
- * 数据可视化使用 ChartPalette 的固定取色，两者不得混用。
+ * Semantic status colours live in StatusPalette only (ARCH_V2 §12 / ARCH_V3 §2.1).
+ * Charts use ChartPalette's fixed colours; the two must not be mixed.
  */
 /*!
- * QML 属性声明必须是合法写法（`property bool foo: false`）。
+ * QML property declarations must use valid syntax (`property bool foo: false`).
  *
- * 这条是拿一次真实事故换来的：`property bool foo: bool = false` 这种写法在**运行时**才报
- * `Error: Invalid write to global property "bool"`，属性根本没被声明成功（界面上的开关因此
- * 静默失效），而单元测试与编译都不会报错——因为它是合法 JSON 意义上的"表达式"，
- * 要跑起来才炸。这里用源码扫描把它挡在提交之前。
+ * Paid for with a real incident: `property bool foo: bool = false` only fails at **runtime** with
+ * `Error: Invalid write to global property "bool"`, the property is never declared (switches silently
+ * stop working), and neither compile nor unit tests catch it — textually it is a valid "expression".
+ * This source scan catches it before commit.
  */
 void SourceConventionsTest::qmlPropertiesUseValidSyntax()
 {
     const QMap<QString, QString> files = collectFiles(sourceDir() + QStringLiteral("/src/ui"), {QStringLiteral("*.qml")});
     QVERIFY(!files.isEmpty());
 
-    // property <type> <name>: <type> = ...  ← 冒号后面又写了一次类型，是错的
+    // property <type> <name>: <type> = ...  ← the type repeated after the colon is wrong
     static const QRegularExpression suspicious(
         QStringLiteral(R"(^\s*property\s+\w+\s+\w+\s*:\s*(bool|int|real|string|var|double|url|color)\s*=)"));
     QStringList violations;
@@ -169,19 +168,19 @@ void SourceConventionsTest::statusColorsStayInPalettes()
 }
 
 /*!
- * 写操作的咽喉点（ARCH_V4 §1.5 / §2.2.1）。
+ * The write choke point (ARCH_V4 §1.5 / §2.2.1).
  *
- * 三期用一条「生产代码不得出现任何写动词」的断言把只读边界钉死。四期打开写操作时，
- * 这条断言**不是被删掉，而是换成更精确的形状**：写动词与 REST 路径都必须收敛到
- * 唯一一处，界面层完全碰不到传输层。这样「打开写操作」仍然是一次显式、被审阅、
- * 能被测试发现的改动，只是审查对象从「有没有写动词」变成「写动词在哪里」。
+ * Phase 3 pinned the read-only boundary with "no write verb in production code". Phase 4 opened writes,
+ * so the assertion was **not deleted but reshaped**: write verbs and REST paths must both funnel into one
+ * place and the UI never touches the transport. Enabling writes stays an explicit, reviewable,
+ * test-visible change — only the question moves from "any write verb?" to "where is it?".
  */
 void SourceConventionsTest::mutationsHaveSingleChokePoint()
 {
     const QMap<QString, QString> sources = collectFiles(sourceDir() + QStringLiteral("/src"), {QStringLiteral("*.cpp"), QStringLiteral("*.h"), QStringLiteral("*.qml")});
     QVERIFY2(!sources.isEmpty(), "no production sources found");
 
-    // 写动词只允许出现在传输层：方法名在那里被写进请求行
+    // Write verbs belong to the transport layer only: the method goes into the request line there
     const QRegularExpression writeVerb(QStringLiteral("\"(POST|PUT|PATCH|DELETE)\""));
     QStringList offenders;
     for (auto it = sources.constBegin(); it != sources.constEnd(); ++it) {
@@ -197,10 +196,10 @@ void SourceConventionsTest::mutationsHaveSingleChokePoint()
 }
 
 /*!
- * REST 路径只允许出现在 docker_api_paths.h（ARCH_V4 §2.2.1）。
+ * REST paths live in docker_api_paths.h only (ARCH_V4 §2.2.1).
  *
- * 路径散落在多个 .cpp 里时，「这个程序到底会调用哪些端点」就没人能一眼答上来——
- * 对现在有写操作的项目来说，这个问题必须能一眼答上来。
+ * Scattered paths make "which endpoints does this program call" unanswerable at a glance — with writes
+ * in the picture, that question must be answerable at a glance.
  */
 void SourceConventionsTest::restPathsStayInOneHeader()
 {
@@ -221,19 +220,19 @@ void SourceConventionsTest::restPathsStayInOneHeader()
 }
 
 /*!
- * 界面层不认识传输层（ARCH_V4 §1.5）：QML 里出现 http / 动词 / socket 路径，
- * 说明有请求逻辑漏到了界面里。
+ * The UI does not know the transport (ARCH_V4 §1.5): http / verbs / socket paths in QML mean request
+ * logic leaked into the UI.
  */
 void SourceConventionsTest::qmlNeverTalksHttp()
 {
     const QMap<QString, QString> qmlFiles = collectFiles(sourceDir() + QStringLiteral("/src/ui"), {QStringLiteral("*.qml")});
     QVERIFY2(!qmlFiles.isEmpty(), "no QML sources found");
 
-    // 只拦"真的在碰传输层"的写法：
-    //  - 请求 API（XMLHttpRequest / fetch）
-    //  - HTTP 方法字面量与 REST 路径片段、socket 地址
-    // 示例地址（例如镜像加速器占位符 `https://mirror.example.com`）是数据而不是请求，
-    // 因此不再把 `http(s)://` 一律当成违规——那会把"校验用户输入"也误判成越界。
+    // Only real transport touches are blocked:
+    //  - request APIs (XMLHttpRequest / fetch)
+    //  - HTTP method literals, REST path fragments, socket addresses
+    // Example addresses (e.g. the mirror placeholder `https://mirror.example.com`) are data, not requests,
+    // so `http(s)://` is no longer an offence — that flagged input validation as a leak.
     const QRegularExpression transport(QStringLiteral("(XMLHttpRequest|fetch\\(|\"GET |\"POST|\"DELETE|unix://|/containers/|/images/)"));
     QStringList offenders;
     for (auto it = qmlFiles.constBegin(); it != qmlFiles.constEnd(); ++it) {
@@ -246,8 +245,8 @@ void SourceConventionsTest::qmlNeverTalksHttp()
 }
 
 /*!
- * 打开宿主目录是四期唯一新增的「非 Docker 外部动作」，
- * 因此它必须被限制在一个实现文件里，而不是散落到各个页面。
+ * Opening a host directory is phase 4's only new non-Docker external action, so it must stay in one
+ * implementation file instead of spreading over the pages.
  */
 void SourceConventionsTest::kioStaysInHostPathService()
 {
@@ -268,22 +267,22 @@ void SourceConventionsTest::kioStaysInHostPathService()
 }
 
 /*!
- * 外部进程与提权的边界（ARCH_V3 §1.3 → **ARCH_V5_V8 §1.5.1 有条件放宽**）。
+ * Boundary of external processes and privilege escalation (ARCH_V3 §1.3 → **ARCH_V5_V8 §1.5.1 relaxed**).
  *
- * 五期引入了第一个受限提权组件（用户已批准，理由见 ARCH_V5_V8 §1.5.1：
- * 系统级部署下 `/etc/docker/daemon.json` 用户不可写，配置镜像源没有不提权的实现方式）。
- * 因此这条断言从"KAuth 全面禁止"改成**白名单**：
+ * Phase 5 added the first restricted privileged component (user-approved; ARCH_V5_V8 §1.5.1: with a
+ * system-wide deployment `/etc/docker/daemon.json` is not user-writable, so configuring mirrors needs
+ * escalation). The assertion therefore moved from "KAuth banned outright" to a **whitelist**:
  *
- *  - `QProcess` 仍然全面禁止（我们从不 shell out；重启走 systemd D-Bus）
- *  - `KAuth` 只允许出现在被审阅过的提权文件里：客户端与 helper
- *  - 其他任何文件引入 KAuth / 提权机制 → 直接失败
+ *  - `QProcess` stays banned everywhere (we never shell out; restart goes through systemd D-Bus)
+ *  - `KAuth` only in the reviewed privileged files: the client and the helper
+ *  - any other file pulling in KAuth / escalation → hard failure
  */
 void SourceConventionsTest::externalProcessesStayForbidden()
 {
     const QMap<QString, QString> sources = collectFiles(sourceDir() + QStringLiteral("/src"), {QStringLiteral("*.cpp"), QStringLiteral("*.h"), QStringLiteral("*.qml")});
     QVERIFY2(!sources.isEmpty(), "no production sources found");
 
-    // 允许出现 KAuth 的文件（提权边界：改动这里必须是一次显式、被审阅的设计变更）
+    // Files allowed to use KAuth (privilege boundary: extending this list must be a reviewed change)
     const QStringList privilegedFiles = {
         QStringLiteral("backend/privileged_config_client.cpp"),
         QStringLiteral("backend/privileged_config_client.h"),
@@ -292,8 +291,8 @@ void SourceConventionsTest::externalProcessesStayForbidden()
         QStringLiteral("kauth/privileged_config_request.h"),
     };
 
-    // 只拦"真的会执行外部程序"的写法：`systemctl` 这类词会出现在给用户复制的命令文本里，
-    // 那不是我们在执行（重启走 systemd D-Bus），因此不按关键词拦。
+    // Only real process execution is blocked: words like `systemctl` appear in command text we show the
+    // user for copying, which we do not execute (restart goes through systemd D-Bus).
     const QRegularExpression externalProcess(QStringLiteral("(QProcess|popen\\(|execv|/bin/sh)"));
     const QRegularExpression privilegeEscalation(QStringLiteral("(KAuth|polkit)"));
 
@@ -315,12 +314,12 @@ void SourceConventionsTest::externalProcessesStayForbidden()
 }
 
 /*!
- * QML 里不许出现 C++ 侧的名字（`QStringLiteral` / `QString` / …）。
+ * No C++-side names in QML (`QStringLiteral` / `QString` / …).
  *
- * 真实踩过：把 `i18n("… %1", QStringLiteral("https://…"))` 写进 QML —— C++ 里
- * 完全正常，QML 里则抛 `ReferenceError: QStringLiteral is not defined`，
- * 而且只在**那条分支真的被执行**时才报（添加空行触发校验），编译与页面加载都看不出来。
- * 这类错误的代价是"看起来只是校验没生效"。
+ * Seen for real: `i18n("… %1", QStringLiteral("https://…"))` in QML works fine in C++ but throws
+ * `ReferenceError: QStringLiteral is not defined`, and only when **that branch actually runs**
+ * (adding a blank line triggers validation) — neither compile nor page load shows it. The cost is
+ * a feature that merely "seems not to work".
  */
 void SourceConventionsTest::qmlUsesOnlyQmlIdentifiers()
 {
@@ -343,10 +342,10 @@ void SourceConventionsTest::qmlUsesOnlyQmlIdentifiers()
 }
 
 /*!
- * 插件元数据里的版本必须与 `project VERSION` 一致。
+ * The plugin metadata version must match `project VERSION`.
  *
- * 两处版本号一旦漂移，用户看到的"关于"版本与实际构建的版本就对不上，
- * 而这类错误在发布流程里极难被发现（没人会去比对两个文件）。
+ * Once the two drift, the "About" version the user sees no longer matches the built one, and release
+ * reviews rarely catch it (nobody compares two files).
  */
 void SourceConventionsTest::pluginMetadataVersionMatchesProject()
 {
@@ -359,14 +358,15 @@ void SourceConventionsTest::pluginMetadataVersionMatchesProject()
 }
 
 /*!
- * 模块要出现在「系统设置」里，元数据必须齐全（ARCH §5.18）。
+ * The module must show up in System Settings, so the metadata must be complete (ARCH §5.18).
  *
- * 这一条是**安装路径之外**的全部要求：System Settings 只按 `KPluginMetaData` 分组与搜索，
- * 因此 Id / 名称 / 描述 / 图标 / 关键词 / 父分类 / 翻译域 少一个都会以不同方式"看起来没装上"：
- *   - 没有 `X-KDE-System-Settings-Parent-Category` → 落到默认分组，用户找不到；
- *   - 分组名拼错（例如写成 `systemadmin`）→ 同样落到默认分组；
- *   - 没有 `X-KDE-Keywords` → 在系统设置里搜"容器/docker"搜不到；
- *   - 没有 `KLocalizedString.TranslationDomain` → 界面文案不翻译。
+ * All requirements **beyond the install path**: System Settings groups and searches by `KPluginMetaData`
+ * only, so a missing Id / name / description / icon / keywords / parent category / translation domain
+ * each looks "not installed" in its own way:
+ *   - no `X-KDE-System-Settings-Parent-Category` → lands in the default group, users cannot find it;
+ *   - a misspelled category (e.g. `systemadmin`) → same default group;
+ *   - no `X-KDE-Keywords` → searching "container/docker" in System Settings finds nothing;
+ *   - no `KLocalizedString.TranslationDomain` → the UI strings stay untranslated.
  */
 void SourceConventionsTest::kcmMetadataIsCompleteForSystemSettings()
 {
@@ -375,17 +375,17 @@ void SourceConventionsTest::kcmMetadataIsCompleteForSystemSettings()
     const QJsonObject root = QJsonDocument::fromJson(file.readAll()).object();
     const QJsonObject plugin = root.value(QStringLiteral("KPlugin")).toObject();
 
-    // 模块名就是用户在 `systemsettings <module>` 里敲的那个
+    // The module id is what the user types in `systemsettings <module>`
     QCOMPARE(plugin.value(QStringLiteral("Id")).toString(), QStringLiteral("kcm_docker"));
-    // 名称与描述都要有中英两份（本项目的界面是双语的）
+    // Name and description need both English and Chinese (this project's UI is bilingual)
     for (const QString &key : {QStringLiteral("Name"), QStringLiteral("Description"),
                                QStringLiteral("Name[zh_CN]"), QStringLiteral("Description[zh_CN]")}) {
         QVERIFY2(!plugin.value(key).toString().isEmpty(), qPrintable(QStringLiteral("missing %1").arg(key)));
     }
-    // 图标必须给（breeze 里有 folder-docker；名字写错在界面上就是空白图标）
+    // The icon is required (breeze has folder-docker; a typo shows as a blank icon)
     QCOMPARE(plugin.value(QStringLiteral("Icon")).toString(), QStringLiteral("folder-docker"));
 
-    // 父分类必须是 Plasma 6 真实存在的分组之一，否则不会出现在预期位置
+    // The parent category must be one of Plasma 6's real groups, else it lands in the wrong place
     const QStringList knownCategories {QStringLiteral("system-administration"),
                                        QStringLiteral("hardware"),
                                        QStringLiteral("network"),
@@ -405,24 +405,24 @@ void SourceConventionsTest::kcmMetadataIsCompleteForSystemSettings()
     QVERIFY2(knownCategories.contains(category),
              qPrintable(QStringLiteral("unknown system settings category: '%1'").arg(category)));
 
-    // 搜索关键词：中英文都要有，用户在系统设置里搜得到
+    // Search keywords in both languages, so users find it in System Settings
     const QString keywords = root.value(QStringLiteral("X-KDE-Keywords")).toString();
     QVERIFY2(keywords.contains(QLatin1String("docker")), "english keywords are needed for search");
     QVERIFY2(keywords.contains(QStringLiteral("容器")), "chinese keywords are needed for search");
 
     /*
-     * 区间地图里不得再用附着式悬停提示。
+     * The range map must not use attached tooltips.
      *
-     * 真实事故（用户实测）：`QQC2.ToolTip.text/visible` 是**附着属性**，一个窗口共用同一个
-     * 提示框；地图里同时有几十个方块、切筛选/切视图时 delegate 还会被销毁重建，
-     * 结果"鼠标停在哪都显示同一个容器名，切回列表还在"。容器名改由 `Accessible.name` 提供，
-     * 因此整个文件里不该再出现 ToolTip。
+     * Real incident (user-reported): `QQC2.ToolTip.text/visible` are **attached properties** — one tooltip
+     * per window; the map has dozens of blocks and filter/view switches rebuild the delegates, so "the same
+     * container name shows wherever the mouse is, and it survives switching back to the list". The container
+     * name now comes from `Accessible.name`, so no ToolTip may appear in the file.
      */
     const QString mapPath = sourceDir() + QStringLiteral("/src/ui/components/HostPortRangeMap.qml");
     QFile mapFile(mapPath);
     QVERIFY2(mapFile.open(QIODevice::ReadOnly), qPrintable(mapPath));
     const QString mapSource = QString::fromUtf8(mapFile.readAll());
-    // 只看代码，不看注释（这条规则本身就得在注释里解释清楚为什么）
+    // Code only, not comments (this very rule has to be explained in a comment)
     QString mapCode;
     {
         static const QRegularExpression blockComment(QStringLiteral("/\\*.*?\\*/"), QRegularExpression::DotMatchesEverythingOption);
@@ -438,7 +438,7 @@ void SourceConventionsTest::kcmMetadataIsCompleteForSystemSettings()
     QVERIFY2(!mapCode.contains(QLatin1String("ToolTip")),
              "the range map must not use attached tooltips (they leak across delegate rebuilds)");
 
-    // 翻译域必须与 po/ 里的域一致，否则文案不翻译
+    // The translation domain must match the one in po/, else no string is translated
     QCOMPARE(root.value(QStringLiteral("KLocalizedString")).toObject().value(QStringLiteral("TranslationDomain")).toString(),
              QStringLiteral("kcm_docker"));
 }

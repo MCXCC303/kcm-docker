@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -19,11 +19,11 @@
 using namespace Kontainer;
 
 /*!
- * 构建请求与进度（ARCH_V5_V8 §5.3）。
+ * Build request and progress (ARCH_V5_V8 §5.3).
  *
- * 三件事各自有用例：① 构建流行里的**失败 step 定位**（解析层）；
- * ② 控制器把上下文打包后交给后端、并把进度写进构建列表；
- * ③ 构建列表"内容没变不发信号"（进度行很密，重复行不该打扰视图）。
+ * Three cases: (1) locating the failing step in the build stream (parsing layer); (2) the
+ * controller packing the context for the backend and writing progress into the build list;
+ * (3) the build list staying silent on unchanged content (progress lines are dense).
  */
 class ImageBuildTest : public QObject
 {
@@ -38,7 +38,7 @@ private Q_SLOTS:
     void prunesTheBuildCacheAndReportsReclaimedSpace();
 
 private:
-    /*! 一个"看起来可写"的 socket：写权限门靠它放行（与操作控制器用例同一手法）。 */
+    /*! A socket that looks writable so the write gate accepts it (same trick as the operation tests). */
     static QString writableSocketPath(const QString &directory);
 };
 
@@ -65,30 +65,30 @@ void ImageBuildTest::parsesStepLinesAndFailures()
         return DockerImageBuildLineDTO::fromJson(QJsonDocument::fromJson(json).object());
     };
 
-    // `Step 3/7 : RUN make` 要能解析出步骤号、总步数与命令
+    // `Step 3/7 : RUN make` must parse into step number, total steps and command
     const DockerImageBuildLineDTO step = lineFrom(R"({"stream":"Step 3/7 : RUN make -j4\n"})");
     QCOMPARE(step.stepIndex, 3);
     QCOMPARE(step.totalSteps, 7);
     QCOMPARE(step.stepCommand, QStringLiteral("RUN make -j4"));
     QVERIFY(!step.cached);
 
-    // 缓存提示单独成行
+    // Cache hints come on their own line
     const DockerImageBuildLineDTO cache = lineFrom(R"({"stream":" ---> Using cache\n"})");
     QCOMPARE(cache.stepIndex, 0);
     QVERIFY(cache.cached);
 
-    // 普通输出行：不算步骤
+    // Plain output line: not a step
     const DockerImageBuildLineDTO output = lineFrom(R"({"stream":"Successfully built abc123\n"})");
     QCOMPARE(output.stepIndex, 0);
     QVERIFY(output.stepCommand.isEmpty());
 
-    // 流内错误（HTTP 仍是 200）与 aux id
+    // In-stream error (HTTP is still 200) and the aux id
     const DockerImageBuildLineDTO failure = lineFrom(R"({"errorDetail":{"message":"The command '/bin/sh -c exit 1' returned a non-zero code: 1"},"error":"The command '/bin/sh -c exit 1' returned a non-zero code: 1"})");
     QVERIFY2(failure.errorDetail.contains(QStringLiteral("non-zero code")), qPrintable(failure.errorDetail));
     const DockerImageBuildLineDTO aux = lineFrom(R"({"aux":{"ID":"sha256:deadbeef"}})");
     QCOMPARE(aux.auxImageId, QStringLiteral("sha256:deadbeef"));
 
-    // 进度行（有些引擎用 status + progressDetail）
+    // Progress line (some engines use status + progressDetail)
     const DockerImageBuildLineDTO progress = lineFrom(R"({"status":"Downloading","progressDetail":{"current":50,"total":100}})");
     QVERIFY(progress.hasProgress);
     QCOMPARE(progress.current, 50);
@@ -111,11 +111,11 @@ void ImageBuildTest::packsContextAndBuildsThroughTheController()
     operations.refreshWriteAccess();
     QVERIFY2(operations.writeAllowed(), "these tests need the write path to be enabled");
 
-    // 没有标签：本地就挡住（不发请求）
+    // No tag: rejected locally, no request sent
     QVERIFY(!operations.buildImage(dir.path(), {}));
     QCOMPARE(operations.resultDetailText(), QStringLiteral("tagRequired"));
 
-    // 正常路径：上下文被打包、查询参数与请求都传下去了
+    // Happy path: the context is packed and query parameters plus request are handed down
     QVERIFY(operations.buildImage(dir.path(),
                                   {QStringLiteral("app:1.0")},
                                   QStringLiteral("Dockerfile"),
@@ -136,7 +136,7 @@ void ImageBuildTest::packsContextAndBuildsThroughTheController()
     QVERIFY(QFile::exists(request.contextArchive));
     QVERIFY2(!request.id.isEmpty(), "every build needs a stable id");
 
-    // 列表里立刻出现一条"进行中"
+    // A "running" entry shows up in the list immediately
     QCOMPARE(operations.builds()->count(), 1);
     QCOMPARE(operations.builds()->activeCount(), 1);
     QCOMPARE(operations.builds()->entries().first().tags, QStringList {QStringLiteral("app:1.0")});
@@ -158,7 +158,7 @@ void ImageBuildTest::buildListKeepsFailuresAndStepText()
     QVERIFY(operations.buildImage(dir.path(), {QStringLiteral("app:1.0")}));
     const QString buildId = operations.builds()->entries().first().id;
 
-    // 进度：step 行会更新进度与命令
+    // Progress: step lines update progress and command
     ImageBuildUpdate update;
     update.statusText = QStringLiteral("Step 2/4 : RUN make");
     update.stepIndex = 2;
@@ -170,7 +170,7 @@ void ImageBuildTest::buildListKeepsFailuresAndStepText()
     QCOMPARE(operations.builds()->entries().first().stepIndex, 2);
     QCOMPARE(operations.builds()->entries().first().progress, 0.5);
 
-    // 失败：detail 里的失败步骤必须保留下来（不能只剩一句"构建失败"）
+    // Failure: the failing step from the detail must survive, not just "build failed"
     update.errorText = QStringLiteral("Step 2/4 (RUN make) failed: The command returned a non-zero code: 2");
     backend.emitBuildProgress(buildId, update);
     backend.emitBuildFinished(buildId,
@@ -184,9 +184,9 @@ void ImageBuildTest::buildListKeepsFailuresAndStepText()
     QVERIFY2(entry.detailText.contains(QStringLiteral("RUN make")), qPrintable(entry.detailText));
     QVERIFY2(!operations.resultText().isEmpty(), "the failure must also be reported as a result");
 
-    // 成功：记录镜像 id，并且"清掉已结束"能真的清掉
+    // Success: the image id is recorded and "clear finished" really clears
     QVERIFY(operations.buildImage(dir.path(), {QStringLiteral("app:2.0")}));
-    // 列表把"进行中"排在前面，因此新的那一路在 first()（这个顺序本身就是被断言的行为）
+    // Running builds sort first, so the new one is first() (that order is itself asserted)
     const QString secondId = operations.builds()->entries().first().id;
     QVERIFY(operations.builds()->entries().first().active);
     backend.emitBuildFinished(secondId,
@@ -201,7 +201,8 @@ void ImageBuildTest::buildListKeepsFailuresAndStepText()
 }
 
 /*!
- * 清理构建缓存（§5.5）：请求发出去、回收字节数如实说出来（0 也要说清楚）。
+ * Pruning the build cache (§5.5): the request goes out and the reclaimed bytes are reported
+ * honestly (including 0).
  */
 void ImageBuildTest::prunesTheBuildCacheAndReportsReclaimedSpace()
 {
@@ -222,7 +223,7 @@ void ImageBuildTest::prunesTheBuildCacheAndReportsReclaimedSpace()
     QVERIFY2(operations.resultText().contains(QStringLiteral("3")), qPrintable(operations.resultText()));
     QVERIFY2(operations.resultText().contains(QStringLiteral("MiB")), qPrintable(operations.resultText()));
 
-    // 没有可回收的：也要明确说"没有"，而不是显示"已回收 0"
+    // Nothing to reclaim: say "none" instead of showing "reclaimed 0"
     operations.pruneBuildCache();
     backend.completeBuildCachePrune(0);
     backend.completeMutation(QStringLiteral("buildCache:"), DockerBackendInterface::MutationOutcome::Succeeded);

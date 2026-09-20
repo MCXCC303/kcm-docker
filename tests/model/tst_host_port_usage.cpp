@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,13 +15,14 @@
 using namespace Kontainer;
 
 /*!
- * 宿主端口占用表（ARCH_next_ports.md §3，里程碑 M1）。
+ * Host port usage table (ARCH_next_ports.md §3, milestone M1).
  *
- * 这是端口页、区间地图与创建表单冲突检测**共用**的一份实现，因此用例的重点是：
- *   - 只算跑着的容器（用户已确认：没运行的自然不占用）；
- *   - IPv4/IPv6 通配合并成一条（界面据此画双环）；
- *   - 地址重叠语义（通配与任何地址冲突；两个具体地址只有相同才冲突）；
- *   - 建议端口（`nextFreePort`）跳开已占用的端口与特权端口。
+ * One implementation shared by the ports page, the range map and the create form's conflict
+ * detection, so the tests focus on:
+ *   - only running containers count (user-confirmed: a stopped one holds nothing);
+ *   - IPv4/IPv6 wildcard bindings merge into one entry (the UI draws a double ring from it);
+ *   - overlap semantics (a wildcard conflicts with anything; two concrete addresses only if equal);
+ *   - the suggested port (`nextFreePort`) skips used and privileged ports.
  */
 class HostPortUsageTest : public QObject
 {
@@ -54,7 +55,7 @@ void HostPortUsageTest::initTestCase()
     qRegisterMetaType<Kontainer::DockerError>("Kontainer::DockerError");
 }
 
-/*! 共享的地址判定（原来有两份实现，这里守住语义）。 */
+/*! Shared address logic (there used to be two copies; this pins the semantics). */
 void HostPortUsageTest::bindingRulesAreSharedAndStrict()
 {
     using namespace PortBindingRules;
@@ -65,17 +66,17 @@ void HostPortUsageTest::bindingRulesAreSharedAndStrict()
     QVERIFY(isWildcardAddress(QStringLiteral("[::]")));
     QVERIFY(!isWildcardAddress(QStringLiteral("127.0.0.1")));
 
-    // 通配与任何地址都冲突（含 IPv4 通配 vs IPv6 通配：Linux 默认互斥）
+    // A wildcard conflicts with every address (IPv4 vs IPv6 wildcards are mutually exclusive on Linux)
     QVERIFY(hostBindingsOverlap(QStringLiteral("0.0.0.0"), QStringLiteral("127.0.0.1")));
     QVERIFY(hostBindingsOverlap(QStringLiteral("0.0.0.0"), QStringLiteral("::")));
     QVERIFY(hostBindingsOverlap(QString(), QStringLiteral("192.168.1.5")));
-    // 两个具体地址：只有相同才冲突
+    // Two concrete addresses: only identical ones conflict
     QVERIFY(hostBindingsOverlap(QStringLiteral("127.0.0.1"), QStringLiteral("127.0.0.1")));
     QVERIFY2(!hostBindingsOverlap(QStringLiteral("127.0.0.1"), QStringLiteral("192.168.1.5")),
              "two different concrete addresses can share the same port");
 }
 
-/*! 声明的宿主端口可以是区间（实测 WinBoat 用 `47300-47309`）。 */
+/*! A declared host port may be a range (WinBoat really uses `47300-47309`). */
 void HostPortUsageTest::parsesSinglePortsAndRanges()
 {
     quint16 first = 0;
@@ -89,7 +90,7 @@ void HostPortUsageTest::parsesSinglePortsAndRanges()
     QCOMPARE(first, quint16(47300));
     QCOMPARE(last, quint16(47309));
 
-    // 坏输入一律拒绝：空、非数字、范围颠倒、越界
+    // Bad input is always rejected: empty, non-numeric, inverted range, out of range
     QVERIFY(!PortBindingRules::parseHostPortSpec(QString(), &first, &last));
     QVERIFY(!PortBindingRules::parseHostPortSpec(QStringLiteral("abc"), &first, &last));
     QVERIFY(!PortBindingRules::parseHostPortSpec(QStringLiteral("900-100"), &first, &last));
@@ -97,7 +98,7 @@ void HostPortUsageTest::parsesSinglePortsAndRanges()
     QVERIFY(!PortBindingRules::parseHostPortSpec(QStringLiteral("0"), &first, &last));
 }
 
-/*! 没跑起来的容器不占端口（用户已确认的语义）。 */
+/*! A container that is not running holds no port (user-confirmed semantics). */
 void HostPortUsageTest::collectsOnlyRunningContainers()
 {
     Container running;
@@ -122,7 +123,7 @@ void HostPortUsageTest::collectsOnlyRunningContainers()
     exposed.id = QStringLiteral("exposed");
     exposed.name = QStringLiteral("expose-only");
     exposed.state = ContainerState::Running;
-    exposed.ports = {{QString(), 443, 0, QStringLiteral("tcp")}}; // 只 EXPOSE、未发布
+    exposed.ports = {{QString(), 443, 0, QStringLiteral("tcp")}}; // EXPOSE only, not published
 
     const QList<Container> containers {running, stopped, unknown, exposed};
     const QList<HostPortEntry> entries = HostPortUsage::entriesFor(containers);
@@ -138,7 +139,7 @@ void HostPortUsageTest::collectsOnlyRunningContainers()
     QVERIFY(HostPortUsage::holderFor(containers, QStringLiteral("0.0.0.0"), 8300).isEmpty());
 }
 
-/*! IPv4 + IPv6 通配的同端口绑定合并成一条（界面据此画双环）。 */
+/*! IPv4 + IPv6 wildcard bindings on the same port merge into one entry (the UI draws two rings). */
 void HostPortUsageTest::mergesDualStackWildcardBindings()
 {
     Container container;
@@ -148,7 +149,7 @@ void HostPortUsageTest::mergesDualStackWildcardBindings()
     container.ports = {
         {QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
         {QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")},
-        // 另一个具体地址：不参与合并
+        // another concrete address: never merged
         {QStringLiteral("127.0.0.1"), 8888, 20204, QStringLiteral("tcp")},
     };
 
@@ -166,13 +167,13 @@ void HostPortUsageTest::mergesDualStackWildcardBindings()
     QVERIFY(!specific.dualStack);
     QCOMPARE(specific.displayAddress(), QStringLiteral("127.0.0.1:20204"));
 
-    // 具体地址与通配同端口冲突；不同具体地址不冲突
+    // A concrete address conflicts with a wildcard on the same port; two concrete addresses do not
     QVERIFY(!HostPortUsage::holderFor({container}, QStringLiteral("172.16.0.1"), 20004).isEmpty());
     QVERIFY2(HostPortUsage::holderFor({container}, QStringLiteral("172.16.0.1"), 20204).isEmpty(),
              "a wildcard binding must not be reported as the holder of a different concrete address");
 }
 
-/*! 建议端口：跳过已占用的端口，且不从特权端口开始。 */
+/*! Suggested port: skip the used ones and never start below the privileged range. */
 void HostPortUsageTest::suggestsAPortOutsideTheUsedOnes()
 {
     Container container;
@@ -182,17 +183,18 @@ void HostPortUsageTest::suggestsAPortOutsideTheUsedOnes()
     container.ports = {{QStringLiteral("0.0.0.0"), 80, 8000, QStringLiteral("tcp")},
                        {QStringLiteral("0.0.0.0"), 81, 8001, QStringLiteral("tcp")}};
 
-    QCOMPARE(HostPortUsage::nextFreePort({container}, 7999), 8000 + 2); // 8000/8001 都被占
-    QCOMPARE(HostPortUsage::nextFreePort({container}, 0), 8002); // 起点从 8000 开始，跳开占用的
+    QCOMPARE(HostPortUsage::nextFreePort({container}, 7999), 8000 + 2); // 8000/8001 are both taken
+    QCOMPARE(HostPortUsage::nextFreePort({container}, 0), 8002); // start from 8000 and skip the taken ones
     QVERIFY2(HostPortUsage::nextFreePort({container}, 0) >= 1024, "never suggest a privileged port");
-    QCOMPARE(HostPortUsage::nextFreePort({}, 9000), 9001); // 没有容器时就是下一个端口
+    QCOMPARE(HostPortUsage::nextFreePort({}, 9000), 9001); // with no containers it is simply the next port
 }
 
 /*!
- * "声明 vs 实际发布"（ARCH_next_ports.md 决定 3）。
+ * "Declared vs actually published" (ARCH_next_ports.md decision 3).
  *
- * 实测 `alpine-82dc`：运行中、`HostConfig.PortBindings` 有绑定、`NetworkSettings.Ports` 是空的
- * —— 端口页要能解释"为什么显示占用了却连不上"。已经真的发布了的声明不重复出现。
+ * Real case `alpine-82dc`: running, `HostConfig.PortBindings` has bindings, `NetworkSettings.Ports`
+ * is empty -- the ports page must explain "why does it look taken but nothing connects". A
+ * declaration that really was published is not listed twice.
  */
 void HostPortUsageTest::declaredBindingsShowUpOnlyWhenTheyDidNotTakeEffect()
 {
@@ -200,21 +202,21 @@ void HostPortUsageTest::declaredBindingsShowUpOnlyWhenTheyDidNotTakeEffect()
     running.id = QStringLiteral("cid-1");
     running.name = QStringLiteral("alpine-82dc");
     running.state = ContainerState::Running;
-    // 实际发布：只有 8100
+    // actually published: only 8100
     running.ports = {{QStringLiteral("0.0.0.0"), 80, 8100, QStringLiteral("tcp")}};
 
     QHash<QString, QList<DeclaredPortBinding>> declared;
-    DeclaredPortBinding published; // 声明了 8100，而且真的发布了
+    DeclaredPortBinding published; // declared 8100 and really published
     published.containerPort = 80;
     published.protocol = QStringLiteral("tcp");
     published.hostPort = 8100;
     published.hostPortEnd = 8100;
-    DeclaredPortBinding missing; // 声明了 4880，但没发布（实际情形）
+    DeclaredPortBinding missing; // declared 4880 but never published (the real case)
     missing.containerPort = 4880;
     missing.protocol = QStringLiteral("tcp");
     missing.hostPort = 4880;
     missing.hostPortEnd = 4880;
-    DeclaredPortBinding range; // 声明的是区间
+    DeclaredPortBinding range; // a range was declared
     range.containerPort = 3389;
     range.protocol = QStringLiteral("tcp");
     range.hostIp = QStringLiteral("127.0.0.1");
@@ -223,7 +225,7 @@ void HostPortUsageTest::declaredBindingsShowUpOnlyWhenTheyDidNotTakeEffect()
     declared.insert(running.id, {published, missing, range});
 
     const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running}, declared);
-    QCOMPARE(entries.size(), 3); // 8100（发布）+ 4880（没生效）+ 47300-47309（区间）
+    QCOMPARE(entries.size(), 3); // 8100 (published) + 4880 (no effect) + 47300-47309 (range)
 
     QCOMPARE(entries.at(0).hostPort, quint16(4880));
     QCOMPARE(entries.at(0).stateKey, QStringLiteral("declaredNotPublished"));
@@ -239,12 +241,12 @@ void HostPortUsageTest::declaredBindingsShowUpOnlyWhenTheyDidNotTakeEffect()
     QCOMPARE(ranged.displayAddress(), QStringLiteral("127.0.0.1:47300-47309"));
     QCOMPARE(ranged.stateKey, QStringLiteral("declaredNotPublished"));
 
-    // 没给声明时，行为与单参数版本一致（M1/M2 不受影响）
+    // Without declarations the behavior matches the single-argument version (M1/M2 unaffected)
     QCOMPARE(HostPortUsage::entriesFor({running}).size(), 1);
 }
 
 
-/*! 端口页模型：role 齐备（端口是第一视觉焦点，容器只是其中一列）。 */
+/*! Ports page model: every role present (the port is the visual focus, the container just one column). */
 void HostPortUsageTest::modelExposesRowsForThePage()
 {
     Container dual;
@@ -283,7 +285,7 @@ void HostPortUsageTest::modelExposesRowsForThePage()
     QVERIFY2(second.data(HostPortModel::ActionableRole).toBool(), "an in-use port can stop its holder");
 }
 
-/*! 搜索（端口 / 容器 / 镜像 / 地址都算）与状态过滤。 */
+/*! Search (port / container / image / address) and state filtering. */
 void HostPortUsageTest::filterSearchesAndSeparatesTheTwoStates()
 {
     Container running;
@@ -308,21 +310,21 @@ void HostPortUsageTest::filterSearchesAndSeparatesTheTwoStates()
     filter.setSourceModel(&model);
     QCOMPARE(filter.count(), 2);
 
-    // 搜容器名
+    // search by container name
     filter.setSearchText(QStringLiteral("frontend"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("web-frontend"));
 
-    // 搜端口号
+    // search by port number
     filter.setSearchText(QStringLiteral("4880"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(HostPortModel::StateKeyRole).toString(), QStringLiteral("declaredNotPublished"));
 
-    // 搜镜像
+    // search by image
     filter.setSearchText(QStringLiteral("registry.example.com"));
     QCOMPARE(filter.count(), 1);
 
-    // 过滤：只看"运行中占用"
+    // filter: only "held by a running container"
     filter.setSearchText(QString());
     filter.setStateFilter(QStringLiteral("inUse"));
     QCOMPARE(filter.count(), 1);
@@ -331,16 +333,16 @@ void HostPortUsageTest::filterSearchesAndSeparatesTheTwoStates()
     filter.setStateFilter(QStringLiteral("all"));
     QCOMPARE(filter.count(), 2);
 
-    // 排序：默认端口升序
+    // Sorting: default is port ascending
     QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 4880);
     filter.setSortKey(QStringLiteral("container"));
     QVERIFY(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString() < filter.index(1, 0).data(HostPortModel::ContainerNameRole).toString());
 }
 
 /*!
- * 刷新不得重置模型（本项目的老问题：整表重置会把滚动位置拉回顶部）。
+ * A refresh must not reset the model (this project's old problem: a full reset scrolls back to top).
  *
- * 键相同、只有值变化时只发 `dataChanged`，不发 `beginResetModel`。
+ * With unchanged keys and only changed values, emit `dataChanged`, never `beginResetModel`.
  */
 void HostPortUsageTest::refreshKeepsTheModelIntact()
 {
@@ -357,7 +359,7 @@ void HostPortUsageTest::refreshKeepsTheModelIntact()
     QSignalSpy resetSpy(&model, &QAbstractItemModel::modelReset);
     QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
 
-    running.image = QStringLiteral("alpine:3.21"); // 只有值变化，键不变
+    running.image = QStringLiteral("alpine:3.21"); // only a value changes, the key does not
     model.setEntries(HostPortUsage::entriesFor({running}));
     QCOMPARE(resetSpy.count(), 0);
     QCOMPARE(model.count(), 1);
@@ -366,10 +368,10 @@ void HostPortUsageTest::refreshKeepsTheModelIntact()
 
 
 /*!
- * 区间聚类（ARCH_next_ports.md §4.B，里程碑 M4）。
+ * Range clustering (ARCH_next_ports.md §4.B, milestone M4).
  *
- * 边界要稳：紧挨着的端口算一段，间隔超过 gap 就断开；每段还会向两侧留几个空闲端口，
- * 这样用户能直接看出"这一段附近哪里空着"。
+ * Boundaries must be stable: adjacent ports form one range, a gap larger than `gap` splits it, and
+ * each range keeps a few free ports on both sides so the user sees where room is left nearby.
  */
 void HostPortUsageTest::rangeClusteringGroupsNearbyPorts()
 {
@@ -377,7 +379,7 @@ void HostPortUsageTest::rangeClusteringGroupsNearbyPorts()
     container.id = QStringLiteral("cid-1");
     container.name = QStringLiteral("medai");
     container.state = ContainerState::Running;
-    // 20001-20004 紧邻 → 一段；8000 与它们相距很远 → 另一段
+    // 20001-20004 are adjacent -> one range; 8000 is far away -> another
     container.ports = {{QStringLiteral("0.0.0.0"), 8888, 20001, QStringLiteral("tcp")},
                        {QStringLiteral("0.0.0.0"), 8888, 20002, QStringLiteral("tcp")},
                        {QStringLiteral("0.0.0.0"), 8888, 20003, QStringLiteral("tcp")},
@@ -388,33 +390,33 @@ void HostPortUsageTest::rangeClusteringGroupsNearbyPorts()
     const QList<HostPortRange> ranges = HostPortUsage::clusterRanges(entries, 5, 2, 64);
     QCOMPARE(ranges.size(), 2);
 
-    // 第一段：8000 前后各留 2 个空闲端口
+    // First range: 2 free ports on each side of 8000
     QCOMPARE(ranges.at(0).first, quint16(7998));
     QCOMPARE(ranges.at(0).last, quint16(8002));
     QCOMPARE(ranges.at(0).tileCount, 5);
     QCOMPARE(ranges.at(0).hiddenCount, 0);
     QCOMPARE(ranges.at(0).usedCount, 1);
 
-    // 第二段：20001-20004 合并成一段，两侧各留 2 个
+    // Second range: 20001-20004 merge, 2 free on each side
     QCOMPARE(ranges.at(1).first, quint16(19999));
     QCOMPARE(ranges.at(1).last, quint16(20006));
     QCOMPARE(ranges.at(1).usedCount, 4);
 
-    // 间隔 6（> gap=5）时断开
+    // A gap of 6 (> gap=5) splits
     Container spaced;
     spaced.id = QStringLiteral("cid-2");
     spaced.name = QStringLiteral("spaced");
     spaced.state = ContainerState::Running;
     spaced.ports = {{QStringLiteral("0.0.0.0"), 80, 9000, QStringLiteral("tcp")},
-                    {QStringLiteral("0.0.0.0"), 81, 9007, QStringLiteral("tcp")}}; // 9000 与 9007 之间空 6 个
+                    {QStringLiteral("0.0.0.0"), 81, 9007, QStringLiteral("tcp")}}; // gap of 6 (> 5)
     QCOMPARE(HostPortUsage::clusterRanges(HostPortUsage::entriesFor({spaced}), 5, 0, 64).size(), 2);
     QCOMPARE(HostPortUsage::clusterRanges(HostPortUsage::entriesFor({spaced}), 6, 0, 64).size(), 1);
 
-    // 每个方块的状态：空闲为空、占用是 inUse
+    // Tile state: free is empty, taken is inUse
     QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003), QStringLiteral("inUse"));
     QVERIFY(HostPortUsage::stateKeyForPort(entries, 20005).isEmpty());
 
-    // 区间（47300-47309）按整段算被占
+    // A range (47300-47309) counts as taken across its whole span
     Container ranged;
     ranged.id = QStringLiteral("cid-3");
     ranged.name = QStringLiteral("winboat");
@@ -428,9 +430,9 @@ void HostPortUsageTest::rangeClusteringGroupsNearbyPorts()
 }
 
 /*!
- * 很长的区间必须限流：1000-1100 这种段不能渲染 101 个方块。
+ * Very long ranges must be throttled: 1000-1100 must not render 101 tiles.
  *
- * 超出上限的部分记进 `hiddenCount`，界面显示"还有 N 个"。
+ * Everything beyond the cap is counted into `hiddenCount`, which the UI shows as "N more".
  */
 void HostPortUsageTest::rangeClusteringCapsVeryLongRanges()
 {
@@ -438,7 +440,7 @@ void HostPortUsageTest::rangeClusteringCapsVeryLongRanges()
     container.id = QStringLiteral("cid-long");
     container.name = QStringLiteral("range-holder");
     container.state = ContainerState::Running;
-    // 声明 1000-1100（101 个端口）——用一个区间式的声明最省事
+    // Declare 1000-1100 (101 ports) -- a range-style declaration is the easiest way
     QHash<QString, QList<DeclaredPortBinding>> declared;
     DeclaredPortBinding binding;
     binding.containerPort = 80;
@@ -459,10 +461,11 @@ void HostPortUsageTest::rangeClusteringCapsVeryLongRanges()
 
 
 /*!
- * 未运行容器声明过的端口 = `reserved`（用户实测反馈要求能看到）。
+ * Ports declared by a stopped container = `reserved` (user feedback asked to see them).
  *
- * 语义（与"占用"区分开）：端口**现在是空的**，但那个容器一起来就会要回去；
- * 因此它不能参与创建表单的冲突判断（`holderFor` 只算运行中的容器，另有负例守着）。
+ * Semantics, distinct from "in use": the port is FREE right now, but that container will take it
+ * back once started; so it must not take part in the create form's conflict check (`holderFor`
+ * counts running containers only, and a negative case guards that).
  */
 void HostPortUsageTest::stoppedContainersKeepTheirDeclaredPortsAsReserved()
 {
@@ -488,11 +491,12 @@ void HostPortUsageTest::stoppedContainersKeepTheirDeclaredPortsAsReserved()
 
     const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running, stopped}, declared);
     /*
-     * 3 条：8100（运行中占用）+ 8810 的**两条**声明。
+     * 3 entries: 8100 (in use) + BOTH declarations of 8810.
      *
-     * 后者就是真实容器的样子：`alpine-82dc` 把 8810 同时声明给了 80/81/82 三个容器端口
-     * （正是"一个宿主端口映射到多个容器端口"那个必然会启动失败的写法）。端口页如实列出两条，
-     * 用户一眼就能看出这个容器起了会炸——不要在这里"帮"他合并成一条。
+     * The latter is what the real container looks like: `alpine-82dc` declares 8810 for the three
+     * container ports 80/81/82 (exactly the "one host port mapped to several container ports" form
+     * that is bound to fail at start). The ports page lists both entries so the user sees at a
+     * glance that starting it will blow up -- do not "helpfully" merge them here.
      */
     QCOMPARE(entries.size(), 3);
     QCOMPARE(entries.at(0).hostPort, quint16(8100));
@@ -504,27 +508,27 @@ void HostPortUsageTest::stoppedContainersKeepTheirDeclaredPortsAsReserved()
     QCOMPARE(entries.at(2).hostPort, quint16(8810));
     QCOMPARE(entries.at(2).containerPort, quint16(81));
 
-    // 关键：reserved 不算"占用"——创建表单不能因为它拦住用户
+    // Key point: reserved does not count as "in use" -- the create form must not block on it
     QVERIFY2(HostPortUsage::holderFor({running, stopped}, QStringLiteral("0.0.0.0"), 8810).isEmpty(),
              "a stopped container must not block a port for new containers");
 
-    // 模型里 reserved 不给"停止容器"（它没在跑），但仍可跳转
+    // The model offers no "stop container" for reserved (nothing runs), but the row stays navigable
     HostPortModel model;
     model.setEntries(entries);
     const QModelIndex reservedRow = model.index(1, 0);
     QVERIFY2(!reservedRow.data(HostPortModel::ActionableRole).toBool(), "reserved rows cannot be stopped");
     QCOMPARE(reservedRow.data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("alpine-82dc"));
 
-    // 地图：未运行的声明也点亮（用保留色）
+    // Map: declarations from stopped containers light up too (in the reserved color)
     QCOMPARE(HostPortUsage::stateKeyForPort(entries, 8810), QStringLiteral("reserved"));
 }
 
 
 /*!
- * 区间里的"被占用"数量必须按**端口个数**算（用户实测：WinBoat 的情况）。
+ * A range's "used" count must count PORTS, not declarations (user-reported: the WinBoat case).
  *
- * 它声明了 5 段、每段 10 个端口，落在同一个区间里，其中两段还重叠
- * （47268-47278 与 47270-47279）：原来按"声明条数"显示 5，而图上亮着几十个格子。
+ * It declares 5 ranges of 10 ports each inside one range, two of them overlapping
+ * (47268-47278 and 47270-47279): counting declarations showed 5 while dozens of tiles were lit.
  */
 void HostPortUsageTest::rangeUsedCountCountsPortsNotDeclarations()
 {
@@ -542,11 +546,11 @@ void HostPortUsageTest::rangeUsedCountCountsPortsNotDeclarations()
                      DeclaredPortBinding {8006, QStringLiteral("tcp"), QStringLiteral("127.0.0.1"), 47300, 47309}});
 
     const QList<HostPortEntry> entries = HostPortUsage::entriesFor({stopped}, declared);
-    QCOMPARE(entries.size(), 5); // 五条声明（两条重叠）
+    QCOMPARE(entries.size(), 5); // five declarations (two of them overlapping)
 
     const QList<HostPortRange> ranges = HostPortUsage::clusterRanges(entries, 5, 0, 64);
     QCOMPARE(ranges.size(), 1);
-    // 并集 = 47268..47309 → 42 个端口（不是 5，也不是 50：重叠只算一次）
+    // Union = 47268..47309 -> 42 ports (neither 5 nor 50: overlaps count once)
     QCOMPARE(ranges.first().first, quint16(47268));
     QCOMPARE(ranges.first().last, quint16(47309));
     QCOMPARE(ranges.first().usedCount, 42);
@@ -554,10 +558,11 @@ void HostPortUsageTest::rangeUsedCountCountsPortsNotDeclarations()
 
 
 /*!
- * 未运行容器的声明端口如果**已被别的容器占着**，要单独标出来（用户要求红色的"被占用"）。
+ * A declared port of a stopped container that is ALREADY held by another container is marked
+ * separately (the user asked for a red "taken" state).
  *
- * 语义差别很实在：`reserved` 只是"现在是空的，它一起来会要回去"；
- * `reservedTaken` 是"它一起来就会端口冲突、直接启动失败"。
+ * The difference is real: `reserved` means "free now, taken back as soon as it starts";
+ * `reservedTaken` means "starting it will conflict and fail outright".
  */
 void HostPortUsageTest::reservedPortThatIsTakenByAnotherContainerIsMarked()
 {
@@ -573,14 +578,14 @@ void HostPortUsageTest::reservedPortThatIsTakenByAnotherContainerIsMarked()
     stopped.state = ContainerState::Exited;
 
     QHash<QString, QList<DeclaredPortBinding>> declared;
-    // 同一台机器上：一个未运行的容器声明了**已经被别人占着**的 20002，另一个声明的是空闲的 20003
+    // On one host: a stopped container declares the already held 20002 and the free 20003
     declared.insert(stopped.id, {DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20002, 20002},
                                  DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20003, 20003}});
 
     const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running, stopped}, declared);
     QCOMPARE(entries.size(), 3);
 
-    // 同一端口上会有两条（占着的那个 + 声明它的那个），顺序是"端口 → 容器名"
+    // Two entries share a port (the holder and the declarer); the order is port -> container name
     const auto stateOf = [&entries](const QString &containerName, quint16 port) {
         for (const HostPortEntry &entry : entries) {
             if (entry.containerName == containerName && entry.hostPort == port) {
@@ -590,10 +595,10 @@ void HostPortUsageTest::reservedPortThatIsTakenByAnotherContainerIsMarked()
         return QString();
     };
     QCOMPARE(stateOf(QStringLiteral("noreva-medai"), 20002), QStringLiteral("inUse"));
-    QCOMPARE(stateOf(QStringLiteral("ml-medai"), 20002), QStringLiteral("reservedTaken")); // 未运行 + 端口被占
-    QCOMPARE(stateOf(QStringLiteral("ml-medai"), 20003), QStringLiteral("reserved")); // 未运行 + 端口空着
+    QCOMPARE(stateOf(QStringLiteral("ml-medai"), 20002), QStringLiteral("reservedTaken")); // stopped + held
+    QCOMPARE(stateOf(QStringLiteral("ml-medai"), 20003), QStringLiteral("reserved")); // stopped + free
 
-    // "未启动"这个过滤项要把两种都选进来
+    // The "not started" filter must select both of them
     HostPortModel model;
     model.setEntries(entries);
     HostPortFilterModel filter;
@@ -605,11 +610,11 @@ void HostPortUsageTest::reservedPortThatIsTakenByAnotherContainerIsMarked()
 }
 
 /*!
- * 排序必须真的生效（用户实测"排序功能失效"）。
+ * Sorting must really take effect (user-reported "sorting is broken").
  *
- * 之前 `updateSorting()` 只调 `sort(0, AscendingOrder)`：列与方向都没变时
- * Qt 认为无事可做，换了排序键也不重排。这里用**两种顺序不一致**的数据守住它：
- * 端口最小的那个容器名反而排在后面。
+ * `updateSorting()` used to call only `sort(0, AscendingOrder)`: with the same column and order Qt
+ * considers there is nothing to do, so changing the sort key did not reorder. The guard here uses
+ * data whose two orders differ: the container with the lowest port sorts last by name.
  */
 void HostPortUsageTest::sortingByContainerReallyReordersRows()
 {
@@ -630,27 +635,28 @@ void HostPortUsageTest::sortingByContainerReallyReordersRows()
     HostPortFilterModel filter;
     filter.setSourceModel(&model);
 
-    // 默认按端口：8000（zulu）在前
+    // Default is by port: 8000 (zulu) first
     QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 8000);
     QCOMPARE(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("zulu"));
 
-    // 换成按容器名：alpha（端口 9000）必须排到前面——只调 sort() 是不够的
+    // Switch to container name: alpha (port 9000) must come first -- calling sort() alone is not enough
     filter.setSortKey(QStringLiteral("container"));
     QCOMPARE(filter.index(0, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("alpha"));
     QCOMPARE(filter.index(1, 0).data(HostPortModel::ContainerNameRole).toString(), QStringLiteral("zulu"));
 
-    // 换回端口排序也要立即生效
+    // Switching back to port order must take effect immediately too
     filter.setSortKey(QStringLiteral("port"));
     QCOMPARE(filter.index(0, 0).data(HostPortModel::HostPortRole).toInt(), 8000);
 }
 
 
 /*!
- * 区间地图的数据构建必须是"能扛住真实规模"的（用户实测：切筛选会卡 1-2 秒）。
+ * Range map construction must cope with real scale (user-reported: switching a filter stalled 1-2 s).
  *
- * 造 40 个容器 × 每个 40 个端口（含区间），断言：构建耗时可接受、方块数受上限约束。
- * 这不是精确的性能测试，而是防止有人再把去重改回 `QList::contains()` 这类平方级写法
- * （本用例在优化前需要几百毫秒，优化后是个位数毫秒）。
+ * 40 containers x 40 ports each (ranges included): construction stays acceptable and the tile count
+ * stays capped. This is not a precise benchmark, it only keeps deduplication from turning back into
+ * a quadratic `QList::contains()` (this case needed hundreds of ms before the fix, single-digit ms
+ * after).
  */
 void HostPortUsageTest::rangeBuildingScalesWithManyPorts()
 {
@@ -663,8 +669,8 @@ void HostPortUsageTest::rangeBuildingScalesWithManyPorts()
         container.image = QStringLiteral("alpine:latest");
         container.state = i % 3 == 0 ? ContainerState::Exited : ContainerState::Running;
         for (int p = 0; p < 20; ++p) {
-            // 每个容器一段 20 个端口的区间（展开后 40 个端口）
-            const quint16 base = quint16(1000 + i * 1200 + p * 12); // 各容器互相隔开 → 形成很多段
+            // One 20-port range per container (40 ports after expansion)
+            const quint16 base = quint16(1000 + i * 1200 + p * 12); // containers spaced apart -> many ranges
             declared[container.id].append(DeclaredPortBinding {quint16(8000 + p), QStringLiteral("tcp"), QString(),
                                                                 base, quint16(base + 9)});
         }
@@ -683,19 +689,22 @@ void HostPortUsageTest::rangeBuildingScalesWithManyPorts()
         QVERIFY2(range.tileCount <= 64, "each range must stay capped");
     }
     qInfo() << "range building took" << elapsed << "ms for" << entries.size() << "entries →" << ranges.size() << "ranges";
-    // 实测：优化前（QList::contains 平方级去重）129 ms，优化后 16 ms；
-    // 门限取 60 ms——比实测慢 4 倍仍然会失败，但不会因为机器慢而误报
+    // Measured: 129 ms before the fix (quadratic QList::contains dedup), 16 ms after;
+    // 60 ms still fails at 4x the measurement but does not misfire on a slow machine
     QVERIFY2(elapsed < 60, qPrintable(QStringLiteral("range building too slow: %1 ms").arg(elapsed)));
 }
 
 
 /*!
- * 地图方块的状态解析（用户给的两个真实场景）。
+ * Tile state resolution for the map (two real scenarios reported by the user).
  *
- * 机器上的实际情况：
- *   - 20003：`alpine-9239` 运行中但映射没生效（未占用），`ml-medai` 运行中确实占着（运行中）
- *   - 20004：`dl-medai` 已停止但声明过（未启动/被占用），同时那个端口被运行中的容器占着
- * 要求：**"全部端口"里运行中优先**，被占用/未占用只有在选中对应筛选时才显示成那样。
+ * On the actual machine:
+ *   - 20003: `alpine-9239` runs but its mapping never took effect (not published), while `ml-medai`
+ *     runs and really holds it (in use)
+ *   - 20004: `dl-medai` is stopped but declared it (not started / taken), and that port is held by a
+ *     running container
+ * Requirement: in "all ports" a running holder wins; taken/not-published states appear only when
+ * their filter is selected.
  */
 void HostPortUsageTest::mapTileStatePrefersRunningUnlessFiltered()
 {
@@ -708,7 +717,7 @@ void HostPortUsageTest::mapTileStatePrefersRunningUnlessFiltered()
     Container notBound;
     notBound.id = QStringLiteral("alpine-id");
     notBound.name = QStringLiteral("alpine-9239");
-    notBound.state = ContainerState::Running; // 在跑，但什么都没发布
+    notBound.state = ContainerState::Running; // running, but nothing published
 
     Container stopped;
     stopped.id = QStringLiteral("dl-id");
@@ -720,26 +729,26 @@ void HostPortUsageTest::mapTileStatePrefersRunningUnlessFiltered()
     declared.insert(stopped.id, {DeclaredPortBinding {8888, QStringLiteral("tcp"), QString(), 20003, 20003}});
 
     const QList<HostPortEntry> entries = HostPortUsage::entriesFor({running, notBound, stopped}, declared);
-    // 20003 上有三条：运行中（ml-medai）、未占用（alpine-9239）、未启动/被占用（dl-medai）
+    // Three entries on 20003: in use (ml-medai), not published (alpine-9239), reserved-taken (dl-medai)
     QCOMPARE(entries.size(), 3);
 
-    // 全部端口：运行中优先
+    // All ports: a running holder wins
     QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003), QStringLiteral("inUse"));
     QCOMPARE(HostPortUsage::entryForPort(entries, 20003).containerName, QStringLiteral("ml-medai"));
 
-    // 选中"未占用"筛选：显示成未占用（否则地图里永远看不到它）
+    // "Not published" filter selected: show it as not published (otherwise it is invisible on the map)
     QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003, {QStringLiteral("declaredNotPublished")}),
              QStringLiteral("declaredNotPublished"));
     QCOMPARE(HostPortUsage::entryForPort(entries, 20003, {QStringLiteral("declaredNotPublished")}).containerName,
              QStringLiteral("alpine-9239"));
 
-    // 选中"未启动 / 被占用"筛选：显示成被占用（同一个端口被运行中的容器占着）
+    // "Not started / taken" filter selected: show it as taken (a running container holds that port)
     QCOMPARE(HostPortUsage::stateKeyForPort(entries, 20003, {QStringLiteral("reserved")}),
              QStringLiteral("reservedTaken"));
     QCOMPARE(HostPortUsage::entryForPort(entries, 20003, {QStringLiteral("reserved")}).containerName,
              QStringLiteral("dl-medai"));
 
-    // 只有"未启动"（端口空着）的端口，在全部端口视图里仍然显示为未启动
+    // A port that is only "not started" (free) still shows as reserved in the all-ports view
     Container stoppedOnly;
     stoppedOnly.id = QStringLiteral("gt-id");
     stoppedOnly.name = QStringLiteral("gt-medai");

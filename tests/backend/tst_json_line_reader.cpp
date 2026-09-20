@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,9 +11,10 @@
 using namespace Kontainer;
 
 /*!
- * 镜像拉取流的行解析（ARCH_V4 §2.2.1 / §5.1）：
- * TCP 分片与 JSON 行边界无关，这里覆盖「一行跨多 chunk」「一个 chunk 多行」
- * 「半行缓存」「畸形行不中断流」「超长行防御」四种情况。
+ * Line parsing for the image pull stream (ARCH_V4 §2.2.1 / §5.1):
+ * TCP chunking is unrelated to JSON line boundaries. Covers one line across
+ * chunks, many lines in one chunk, partial-line buffering, malformed lines not
+ * stopping the stream, and oversized-line defense.
  */
 class JsonLineReaderTest : public QObject
 {
@@ -43,7 +44,7 @@ void JsonLineReaderTest::parsesOneObjectPerLine()
 void JsonLineReaderTest::joinsLineSplitAcrossChunks()
 {
     JsonLineReader reader;
-    // 一个 JSON 对象被切成三段，中间还夹着下一个对象的开头
+    // One JSON object split across three chunks, with the next object's head tagged on
     QVERIFY(reader.feed("{\"progressDetail\":{\"cur").isEmpty());
     QVERIFY(reader.feed("rent\":50,\"total\":100},\"id\":\"ab").isEmpty());
 
@@ -88,7 +89,7 @@ void JsonLineReaderTest::malformedLinesDoNotStopTheStream()
     QCOMPARE(objects.size(), 2);
     QVERIFY(objects.at(0).value(QStringLiteral("ok")).toBool());
     QVERIFY(objects.at(1).value(QStringLiteral("also")).toBool());
-    // 两行非法：一行不是 JSON，一行是数组（不是对象）
+    // Two bad lines: one is not JSON, one is an array (not an object)
     QCOMPARE(reader.malformedLines(), 2);
 }
 
@@ -103,7 +104,7 @@ void JsonLineReaderTest::toleratesCarriageReturnsAndBlankLines()
 void JsonLineReaderTest::oversizedLineIsDroppedAndStreamContinues()
 {
     JsonLineReader reader;
-    // 超过上限且没有换行的垃圾数据：整行丢弃，但后续正常行仍要解析出来
+    // Oversized garbage with no newline: drop the whole line, but keep parsing later good lines
     const QByteArray garbage(JsonLineReader::kMaxLineBytes + 16, 'x');
     QVERIFY(reader.feed(garbage).isEmpty());
 

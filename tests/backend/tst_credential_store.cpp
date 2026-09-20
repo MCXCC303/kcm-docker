@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,16 +15,19 @@
 using namespace Kontainer;
 
 /*!
- * 凭据存储（ARCH_V5_V8 §2.6）。
+ * Credential store (ARCH_V5_V8 §2.6).
  *
- * 覆盖三件容易出错的事：
- *   1. **索引键**：用户可能用 `https://Index.Docker.io/v1/`、`docker.io`、
- *      `registry-1.docker.io` 三种写法指同一个仓库，必须是同一个条目；
- *   2. **条目格式**：密码里可以有冒号/引号/换行，必须能原样取回（JSON 而不是拼接）；
- *   3. **可用性**：钱包被禁用或用户拒绝解锁是正常路径，必须明确失败而不是静默丢数据。
+ * Covers three error-prone areas:
+ *   1. **Index key**: `https://Index.Docker.io/v1/`, `docker.io` and
+ *      `registry-1.docker.io` all name one registry and must be one entry;
+ *   2. **Entry format**: passwords may contain colons/quotes/newlines and must
+ *      come back verbatim (JSON, not string concatenation);
+ *   3. **Availability**: a disabled wallet or a user refusing to unlock is a
+ *      normal path and must fail explicitly instead of silently losing data.
  *
- * 钱包本身用内存后端替身；`KWalletBackend` 只断言"未打开时不可用"这类不需要钱包的事实，
- * 真正的钱包读写放在人工验收清单里（无桌面/无钱包的环境跑不了）。
+ * The wallet itself uses an in-memory backend double; `KWalletBackend` only
+ * asserts wallet-free facts such as unavailable before open. Real wallet I/O
+ * lives in the manual acceptance checklist (no desktop / no wallet = no run).
  */
 class CredentialStoreTest : public QObject
 {
@@ -66,7 +69,7 @@ void CredentialStoreTest::storesAndReadsCredentials()
     QString errorKey;
     QVERIFY(store.store(credentialFor(QStringLiteral("registry.example.com:5000")), &errorKey));
     QVERIFY(errorKey.isEmpty());
-    QCOMPARE(changed.count(), 2); // 打开（Ready）+ 写入
+    QCOMPARE(changed.count(), 2); // open (Ready) + write
 
     QCOMPARE(store.serverAddresses(), QStringList {QStringLiteral("registry.example.com:5000")});
     QVERIFY(store.hasCredential(QStringLiteral("registry.example.com:5000")));
@@ -75,7 +78,7 @@ void CredentialStoreTest::storesAndReadsCredentials()
     QCOMPARE(loaded.password, QStringLiteral("s3cret"));
     QCOMPARE(loaded.serverAddress, QStringLiteral("registry.example.com:5000"));
 
-    // 覆盖：同一个仓库第二次保存必须替换而不是新增
+    // Overwrite: a second save for the same registry must replace, not add
     QVERIFY(store.store(credentialFor(QStringLiteral("registry.example.com:5000"), QStringLiteral("bob"))));
     QCOMPARE(store.serverAddresses().size(), 1);
     QCOMPARE(store.credential(QStringLiteral("registry.example.com:5000")).username, QStringLiteral("bob"));
@@ -91,16 +94,16 @@ void CredentialStoreTest::indexKeyIsNormalizedOnEveryPath()
     CredentialStore store(&backend);
     store.open();
 
-    // 用 config.json 里的历史写法保存
+    // Store it under the legacy config.json spelling
     QVERIFY(store.store(credentialFor(QStringLiteral("https://index.docker.io/v1/"))));
-    // 用 docker.io / registry-1.docker.io / index.docker.io 都能取到同一条
+    // docker.io / registry-1.docker.io / index.docker.io all find the same entry
     for (const char *alias : {"docker.io", "registry-1.docker.io", "index.docker.io", "https://INDEX.docker.io"}) {
         QVERIFY2(store.hasCredential(QString::fromLatin1(alias)), alias);
         QCOMPARE(store.credential(QString::fromLatin1(alias)).username, QStringLiteral("alice"));
     }
     QCOMPARE(store.serverAddresses(), QStringList {QStringLiteral("index.docker.io")});
 
-    // 主机名大小写/末尾斜杠不同也只算一个条目
+    // Host case and trailing slash differ too, still one entry
     QVERIFY(store.store(credentialFor(QStringLiteral("https://Registry.Example.com/"))));
     QVERIFY(store.store(credentialFor(QStringLiteral("registry.example.com"), QStringLiteral("bob"))));
     QCOMPARE(store.serverAddresses(), QStringList({QStringLiteral("index.docker.io"), QStringLiteral("registry.example.com")}));
@@ -130,21 +133,21 @@ void CredentialStoreTest::damagedEntriesAreReportedAsMissing()
     CredentialStore store(&backend);
     store.open();
 
-    // 旧版本/手工编辑留下的坏条目：不能返回半条凭据，也不能崩
+    // Entries damaged by old versions or hand editing: no half credential, no crash
     backend.entries.insert(QStringLiteral("broken.example.com"), QByteArrayLiteral("{not json"));
     backend.entries.insert(QStringLiteral("empty.example.com"), QByteArrayLiteral("{}"));
     for (const char *address : {"broken.example.com", "empty.example.com"}) {
         const RegistryCredential loaded = store.credential(QString::fromLatin1(address));
         QVERIFY2(loaded.isEmpty(), address);
     }
-    // 但"存在性"仍然如实回答（条目在，只是不可用），界面据此提示重新登录
+    // Existence is still reported truthfully (entry present, just unusable), so the UI can prompt a re-login
     QVERIFY(store.hasCredential(QStringLiteral("broken.example.com")));
 }
 
 void CredentialStoreTest::unavailableWalletIsAnExplicitFailure()
 {
     FakeCredentialBackend backend;
-    backend.enabled = false; // 用户关掉了钱包子系统
+    backend.enabled = false; // user turned the wallet subsystem off
     CredentialStore store(&backend);
     QSignalSpy stateSpy(&store, &CredentialStore::stateChanged);
     store.open();
@@ -173,7 +176,7 @@ void CredentialStoreTest::writeFailuresAreReported()
     QVERIFY(!store.store(credentialFor(QStringLiteral("registry.example.com")), &errorKey));
     QCOMPARE(errorKey, QStringLiteral("writeFailed"));
 
-    // 参数错误要在碰钱包之前就被拒绝
+    // Reject bad arguments before touching the wallet.
     QVERIFY(!store.store(credentialFor(QString()), &errorKey));
     QCOMPARE(errorKey, QStringLiteral("invalidServerAddress"));
     RegistryCredential nameless;
@@ -181,7 +184,7 @@ void CredentialStoreTest::writeFailuresAreReported()
     QVERIFY(!store.store(nameless, &errorKey));
     QCOMPARE(errorKey, QStringLiteral("noCredentials"));
 
-    // 只有用户名没有密码也不算：存进去只会得到一条"看起来有、其实用不了"的条目
+    // Username without password does not count: that would store an entry that looks usable but is not
     RegistryCredential noPassword;
     noPassword.serverAddress = QStringLiteral("registry.example.com");
     noPassword.username = QStringLiteral("alice");
@@ -205,7 +208,7 @@ void CredentialStoreTest::openingIsIdempotent()
 void CredentialStoreTest::asynchronousOpenIsHonoured()
 {
     FakeCredentialBackend backend;
-    backend.synchronousOpen = false; // 模拟 KWallet：等用户解锁
+    backend.synchronousOpen = false; // like KWallet: wait for the user to unlock
     CredentialStore store(&backend);
     QSignalSpy stateSpy(&store, &CredentialStore::stateChanged);
     store.open();
@@ -226,14 +229,14 @@ void CredentialStoreTest::removingUnknownEntryIsNotAnError()
     QString errorKey;
     QVERIFY2(store.remove(QStringLiteral("never-stored.example.com"), &errorKey), "removing nothing must succeed");
     QVERIFY(errorKey.isEmpty());
-    // 没删掉东西就不该发 changed()：否则界面会莫名其妙地重建列表
+    // Removing nothing must not emit changed(), or the UI needlessly rebuilds the list
     QCOMPARE(changed.count(), 0);
 }
 
 void CredentialStoreTest::kwalletBackendNeedsAnOpenWallet()
 {
-    // 只断言"还没打开时不可用"这类不需要钱包守护进程的事实：
-    // 真正打开会弹解锁框，不能出现在自动化测试里（人工验收清单里有这一步）
+    // Only assert facts that don't need the wallet daemon, e.g. unavailable before open:
+    // a real open pops an unlock dialog, which no automated test may trigger (manual checklist covers it)
     KWalletBackend backend;
     QVERIFY2(!backend.isAvailable(), "the wallet is not open before open() is called");
     QCOMPARE(KWalletBackend::folderName(), QStringLiteral("Kontainer"));

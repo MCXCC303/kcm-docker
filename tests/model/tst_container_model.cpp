@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,7 +12,7 @@
 
 using namespace Kontainer;
 
-/*! 状态映射与 Qt model 测试（ARCH_V1 §13/§28 State mapping）。 */
+/*! State mapping and Qt model tests (ARCH_V1 §13/§28 State mapping). */
 class ContainerModelTest : public QObject
 {
     Q_OBJECT
@@ -77,7 +77,7 @@ void ContainerModelTest::mapsHealthStates_data()
     QTest::newRow("starting") << QStringLiteral("starting") << int(HealthState::Starting) << QStringLiteral("starting");
     QTest::newRow("healthy") << QStringLiteral("healthy") << int(HealthState::Healthy) << QStringLiteral("healthy");
     QTest::newRow("unhealthy") << QStringLiteral("unhealthy") << int(HealthState::Unhealthy) << QStringLiteral("unhealthy");
-    // 引擎未提供 Health 字段时必须是 Unknown（与 none 语义不同）
+    // A missing Health field must map to Unknown, which differs from none
     QTest::newRow("missing") << QString() << int(HealthState::Unknown) << QStringLiteral("unknown");
 }
 
@@ -93,7 +93,7 @@ void ContainerModelTest::mapsHealthStates()
 
 void ContainerModelTest::unknownStateIsNotLost()
 {
-    // 未来 Docker 新增状态时不能崩溃，也不能丢掉这条记录
+    // A state added by a future Docker must neither crash nor drop the record
     QCOMPARE(int(containerStateFromString(QStringLiteral("hibernating"))), int(ContainerState::Unknown));
     QCOMPARE(containerStateKey(ContainerState::Unknown), QStringLiteral("unknown"));
 }
@@ -125,7 +125,7 @@ void ContainerModelTest::containerModelExposesRoles()
     QVERIFY(model.data(index, ContainerModel::CreatedRole).toDateTime().isValid());
     QCOMPARE(model.data(index, ContainerModel::PortCountRole).toInt(), 1);
 
-    // role 名称必须稳定
+    // Role names must stay stable
     const QHash<int, QByteArray> roles = model.roleNames();
     QCOMPARE(roles.value(ContainerModel::NameRole), QByteArray("name"));
     QCOMPARE(roles.value(ContainerModel::StateKeyRole), QByteArray("stateKey"));
@@ -196,14 +196,16 @@ void ContainerModelTest::emptyModelsHaveZeroCount()
 }
 
 /*!
- * §32/§34：后台刷新如果数据没有变化，就不应该重置模型
- * （否则每 5 秒列表都会重建、滚动位置丢失）。
+ * §32/§34: a background refresh with unchanged data must not reset the model
+ * (otherwise the list is rebuilt every 5 seconds and the scroll position is lost).
  */
 /*!
- * 值变化不重置模型（用户实测：点启动/停止或从详情页返回后列表被拉回最上方）。
+ * A value change must not reset the model (users reported the list jumping back to the top
+ * after starting/stopping a container or returning from the detail page).
  *
- * 旧实现是"任何变化都 beginResetModel()"，而**模型重置必然让 ListView 跳回顶部**。
- * 现在：键序列不变 → 只发 `dataChanged`；行数/顺序变了才动视图位置。
+ * The old code called beginResetModel() for any change, and a reset always scrolls a ListView
+ * to the top. Now an unchanged key sequence emits only `dataChanged`; only a changed row count
+ * or order touches the view position.
  */
 void ContainerModelTest::identicalDataDoesNotResetModel()
 {
@@ -218,7 +220,7 @@ void ContainerModelTest::identicalDataDoesNotResetModel()
 
     QSignalSpy resetSpy(&model, &QAbstractItemModel::modelReset);
     model.setContainers({first});
-    QCOMPARE(resetSpy.count(), 0); // 数据相同 → 不发信号
+    QCOMPARE(resetSpy.count(), 0); // identical data -> no signal
 
     QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
     first.status = QStringLiteral("Up 2 hours");
@@ -227,7 +229,7 @@ void ContainerModelTest::identicalDataDoesNotResetModel()
     QCOMPARE(dataSpy.count(), 1);
     QCOMPARE(model.data(model.index(0, 0), ContainerModel::StatusRole).toString(), QStringLiteral("Up 2 hours"));
 
-    // 新增一行：只发 rowsInserted（视图不会跳回顶部）
+    // Adding a row emits only rowsInserted, so the view does not jump back to the top
     Container second;
     second.id = QStringLiteral("bbb");
     second.name = QStringLiteral("second");
@@ -237,7 +239,7 @@ void ContainerModelTest::identicalDataDoesNotResetModel()
     QCOMPARE(insertSpy.count(), 1);
     QCOMPARE(model.count(), 2);
 
-    // 删除一行：只发 rowsRemoved
+    // Removing a row emits only rowsRemoved
     QSignalSpy removeSpy(&model, &QAbstractItemModel::rowsRemoved);
     model.setContainers({second});
     QCOMPARE(resetSpy.count(), 0);
@@ -245,13 +247,13 @@ void ContainerModelTest::identicalDataDoesNotResetModel()
     QCOMPARE(model.count(), 1);
     QCOMPARE(model.data(model.index(0, 0), ContainerModel::IdRole).toString(), QStringLiteral("bbb"));
 
-    // 把 aaa 加回来（这是"插入"，不是"移动"）
+    // Adding aaa back is an insertion, not a move
     QSignalSpy insertAgainSpy(&model, &QAbstractItemModel::rowsInserted);
     model.setContainers({first, second});
     QCOMPARE(insertAgainSpy.count(), 1);
     QCOMPARE(resetSpy.count(), 0);
 
-    // 两行交换顺序：发 rowsMoved，且数据顺序正确
+    // Swapping the two rows emits rowsMoved, with the data in the right order
     QSignalSpy moveSpy(&model, &QAbstractItemModel::rowsMoved);
     model.setContainers({second, first});
     QCOMPARE(moveSpy.count(), 1);

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,11 @@
 using namespace Kontainer;
 
 /*!
- * 仓库凭据的编解码与索引键（ARCH_V5_V8 §2.6）。
+ * Registry credential encoding/decoding and index keys (ARCH_V5_V8 §2.6).
  *
- * 这里的每一条都对应一个"看起来能用、实际会被 Docker 拒绝或索引错位"的坑：
- * URL-safe 字母表、padding、Docker Hub 的历史 serveraddress、
- * 以及 config.json 与请求头两种完全不同的 base64 内容。
+ * Each case is a pitfall that looks usable but is rejected or misindexed by
+ * Docker: URL-safe alphabet, padding, Docker Hub's historical serveraddress,
+ * and the two different base64 payloads for config.json vs. the request header.
  */
 class RegistryAuthTest : public QObject
 {
@@ -63,7 +63,7 @@ void RegistryAuthTest::normalizesServerAddresses()
     QCOMPARE(RegistryAuth::normalizeServerAddress(QStringLiteral("REgistry.Example.COM")), QStringLiteral("registry.example.com"));
     QCOMPARE(RegistryAuth::normalizeServerAddress(QStringLiteral("localhost:5000")), QStringLiteral("localhost:5000"));
     QCOMPARE(RegistryAuth::normalizeServerAddress(QString()), QString());
-    // 大小写不同的主机名必须落到同一个索引键，否则钱包里会出现两条互不相干的凭据
+    // Host names differing only in case must share one index key, else the wallet gets two entries
     QCOMPARE(RegistryAuth::normalizeServerAddress(QStringLiteral("https://Registry.Example.com/")),
              RegistryAuth::normalizeServerAddress(QStringLiteral("registry.example.com")));
 }
@@ -79,20 +79,20 @@ void RegistryAuthTest::normalizesDockerHubVariants()
                                 "DOCKER.IO"}) {
         QCOMPARE(RegistryAuth::normalizeServerAddress(QString::fromLatin1(variant)), QString::fromLatin1(RegistryAuth::hubHost));
     }
-    // 请求头里 Hub 必须写成 Docker 的历史值，否则引擎匹配不上
+    // Hub must be written as Docker's historical value in the header, or the engine won't match it
     QCOMPARE(RegistryAuth::headerServerAddress(QString::fromLatin1(RegistryAuth::hubHost)), QString::fromLatin1(RegistryAuth::hubServerAddress));
     QCOMPARE(RegistryAuth::headerServerAddress(QStringLiteral("registry.example.com")), QStringLiteral("registry.example.com"));
 }
 
 void RegistryAuthTest::serverAddressFollowsTheImageReference()
 {
-    // 没写 registry 的引用（含 library/xxx 形式）都属于 Docker Hub
+    // References without a registry (including library/xxx) all belong to Docker Hub
     QCOMPARE(RegistryAuth::serverAddressForImage(QStringLiteral("alpine:3.19")), QString::fromLatin1(RegistryAuth::hubHost));
     QCOMPARE(RegistryAuth::serverAddressForImage(QStringLiteral("library/alpine")), QString::fromLatin1(RegistryAuth::hubHost));
     QCOMPARE(RegistryAuth::serverAddressForImage(QStringLiteral("docker.io/library/alpine:3.19")), QString::fromLatin1(RegistryAuth::hubHost));
     QCOMPARE(RegistryAuth::serverAddressForImage(QStringLiteral("registry.example.com:5000/team/app:1.2.3")), QStringLiteral("registry.example.com:5000"));
     QCOMPARE(RegistryAuth::serverAddressForImage(QStringLiteral("ghcr.io/team/app")), QStringLiteral("ghcr.io"));
-    // 非法引用不给索引键，避免拿它去查钱包
+    // Invalid references get no index key, so they never reach the wallet
     QCOMPARE(RegistryAuth::serverAddressForImage(QStringLiteral("has space")), QString());
     QCOMPARE(RegistryAuth::serverAddressForImage(QString()), QString());
 }
@@ -101,7 +101,7 @@ void RegistryAuthTest::encodeUsesUrlSafeBase64AndTheHubAddress()
 {
     const QByteArray header = RegistryAuth::encode(passwordCredential());
     QVERIFY(!header.isEmpty());
-    // URL-safe 字母表 + 保留 padding（与 docker CLI 一致）：不含 + /，且以 = 补足 4 的倍数
+    // URL-safe alphabet + kept padding (like the docker CLI): no + /, and = pads to a multiple of 4
     QVERIFY2(!header.contains('+') && !header.contains('/'), header.constData());
     QVERIFY2(header.size() % 4 == 0, header.constData());
 
@@ -144,16 +144,16 @@ void RegistryAuthTest::decodeAcceptsBothAlphabetsAndMissingPadding()
     QCOMPARE(decoded.password, original.password);
     QCOMPARE(decoded.serverAddress, original.serverAddress);
 
-    // 标准 base64（config.json 里就是这种）也要能解
+    // Standard base64 (what config.json holds) must decode too
     const QByteArray json = QByteArrayLiteral("{\"username\":\"alice\",\"password\":\"s3cret\",\"serveraddress\":\"registry.example.com\"}");
     QCOMPARE(RegistryAuth::decode(json.toBase64()).username, QStringLiteral("alice"));
-    // 去掉 padding 同样接受（有些客户端会省掉）
+    // Missing padding is accepted too (some clients omit it)
     QByteArray unpadded = header;
     while (unpadded.endsWith('=')) {
         unpadded.chop(1);
     }
     QCOMPARE(RegistryAuth::decode(unpadded).username, QStringLiteral("alice"));
-    // 折行的 base64（配置文件里常见）不该解析失败
+    // Wrapped base64 (common in config files) must not fail to parse
     QByteArray wrapped = header.left(8) + "\n" + header.mid(8) + "\r\n";
     QCOMPARE(RegistryAuth::decode(wrapped).username, QStringLiteral("alice"));
 }
@@ -170,7 +170,7 @@ void RegistryAuthTest::decodeRejectsBrokenInput()
     QVERIFY(RegistryAuth::decode(QByteArrayLiteral("bm90IGpzb24="), &errorKey).isEmpty()); // "not json"
     QCOMPARE(errorKey, QStringLiteral("invalidJson"));
 
-    // 合法 JSON 但没有可用凭据：不能当成"登录成功"
+    // Valid JSON but no usable credentials: must not count as a successful login
     const QByteArray empty = QByteArrayLiteral("{\"serveraddress\":\"registry.example.com\"}").toBase64();
     QVERIFY(RegistryAuth::decode(empty, &errorKey).isEmpty());
     QCOMPARE(errorKey, QStringLiteral("noCredentials"));
@@ -184,10 +184,10 @@ void RegistryAuthTest::configAuthParsesUserPassword()
     QVERIFY(errorKey.isEmpty());
     QCOMPARE(credential.username, QStringLiteral("alice"));
     QCOMPARE(credential.password, QStringLiteral("s3cret"));
-    // 索引键必须是规范化后的形式，否则和界面里选中的仓库对不上
+    // Index key must be the normalized form, else it won't match the registry selected in the UI
     QCOMPARE(credential.serverAddress, QString::fromLatin1(RegistryAuth::hubHost));
 
-    // 密码里带冒号：只按第一个冒号切分
+    // Password contains colons: split on the first colon only
     const RegistryCredential colons = RegistryAuth::decodeConfigAuth(QStringLiteral("ghcr.io"), QByteArrayLiteral("bob:a:b:c").toBase64());
     QCOMPARE(colons.username, QStringLiteral("bob"));
     QCOMPARE(colons.password, QStringLiteral("a:b:c"));
@@ -199,19 +199,19 @@ void RegistryAuthTest::configAuthRejectsBrokenFields()
     QVERIFY(RegistryAuth::decodeConfigAuth(QStringLiteral("ghcr.io"), QByteArray(), &errorKey).isEmpty());
     QCOMPARE(errorKey, QStringLiteral("invalidBase64"));
 
-    // 没有冒号 → 不是 `用户名:密码`
+    // No colon → not `user:password`
     QVERIFY(RegistryAuth::decodeConfigAuth(QStringLiteral("ghcr.io"), QByteArrayLiteral("nocolon").toBase64(), &errorKey).isEmpty());
     QCOMPARE(errorKey, QStringLiteral("invalidAuthField"));
 
-    // 空用户名
+    // Empty username
     QVERIFY(RegistryAuth::decodeConfigAuth(QStringLiteral("ghcr.io"), QByteArrayLiteral(":pw").toBase64(), &errorKey).isEmpty());
     QCOMPARE(errorKey, QStringLiteral("invalidAuthField"));
 }
 
 void RegistryAuthTest::encodedHeaderIsAlwaysSafeForHandWrittenHttp()
 {
-    // 手写 HTTP 请求：头值里出现 CR/LF 就是请求头注入。
-    // 凭据来自用户输入/钱包，因此这里用恶意输入验证"编出来的头永远安全"
+    // Hand-written HTTP requests: CR/LF in a header value is header injection.
+    // Credentials come from user input/the wallet, so hostile input must still encode safely
     RegistryCredential credential;
     credential.serverAddress = QStringLiteral("registry.example.com");
     credential.username = QStringLiteral("alice\r\nX-Evil: 1");

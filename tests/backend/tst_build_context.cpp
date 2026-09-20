@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -19,10 +19,11 @@
 using namespace Kontainer;
 
 /*!
- * 构建上下文打包（ARCH_V5_V8 §5.2）。
+ * Build-context packing (ARCH_V5_V8 §5.2).
  *
- * 这一层的错误都会变成"构建莫名其妙失败"，因此用例覆盖：内容真的进了 tar、
- * `.dockerignore` 的常用子集、**越界符号链接必须被挡掉**、上限与失败时不留临时文件。
+ * Failures here surface as a mysteriously failing build, so these cases cover: content really
+ * reaches the tar, the common `.dockerignore` subset, **escaping symlinks must be blocked**,
+ * and no temp file left behind on a limit violation or failure.
  */
 class BuildContextTest : public QObject
 {
@@ -37,7 +38,7 @@ private Q_SLOTS:
 
 private:
     static QString writeFile(const QString &directory, const QString &relative, const QByteArray &content);
-    /*! 读出 tar 里的条目名 → 内容（目录条目值为空）。 */
+    /*! Read tar entry name → content (empty for directory entries). */
     static QMap<QString, QByteArray> readArchive(const QString &path);
 };
 
@@ -65,7 +66,7 @@ QMap<QString, QByteArray> BuildContextTest::readArchive(const QString &path)
     if (!root) {
         return entries;
     }
-    // 递归：KArchiveDirectory::entries() 只给第一层
+    // Recurse: KArchiveDirectory::entries() lists only the first level
     std::function<void(const KArchiveDirectory *, const QString &)> walk = [&](const KArchiveDirectory *directory,
                                                                               const QString &prefix) {
         const QStringList names = directory->entries();
@@ -113,7 +114,7 @@ void BuildContextTest::packsTheDirectoryIntoATar()
     QCOMPARE(entries.value(QStringLiteral("app/main.js")), QByteArrayLiteral("console.log(1)\n"));
     QCOMPARE(entries.value(QStringLiteral("app/nested/data.txt")), QByteArrayLiteral("nested\n"));
 
-    // 上传完删掉：文件真的没了
+    // Deleted after upload: the file is really gone
     const QString archivePath = result.archivePath;
     removeArchive(archivePath);
     QVERIFY(!QFile::exists(archivePath));
@@ -148,16 +149,16 @@ void BuildContextTest::honoursTheDockerignoreSubset()
     const QStringList names = entries.keys();
     QVERIFY2(names.contains(QStringLiteral("Dockerfile")), qPrintable(names.join(QLatin1Char(','))));
     QVERIFY2(names.contains(QStringLiteral("keep.txt")), qPrintable(names.join(QLatin1Char(','))));
-    // 通配规则命中的文件不进上下文
+    // Files matched by a glob rule stay out of the context
     QVERIFY2(!names.contains(QStringLiteral("secret.key")), "an ignored file must not be packed");
-    // 目录规则：整棵子树被排除
+    // Directory rule: the whole subtree is excluded
     QVERIFY2(!names.contains(QStringLiteral("logs/app.log")), "an ignored directory must not be packed");
     QVERIFY2(!names.contains(QStringLiteral("node_modules/dep/index.js")), "an ignored directory must not be packed");
-    // 父目录被排除时子文件**不会**被取反规则救回来（与 Docker 的语义一致）
+    // A negation rule does **not** rescue a file under an excluded parent (same as Docker)
     QVERIFY2(!names.contains(QStringLiteral("logs/keep.log")),
              "a file inside an excluded directory cannot be re-included (same as Docker)");
 
-    // 取反规则只在"父目录没被排除"时生效
+    // A negation rule only applies when the parent directory is not excluded
     writeFile(context, QStringLiteral("ignored.tmp"), QByteArrayLiteral("tmp\n"));
     writeFile(context, QStringLiteral(".dockerignore"), QByteArrayLiteral("*.tmp\n!keep.tmp\n"));
     writeFile(context, QStringLiteral("keep.tmp"), QByteArrayLiteral("keep\n"));
@@ -167,7 +168,7 @@ void BuildContextTest::honoursTheDockerignoreSubset()
     QVERIFY2(!negatedEntries.contains(QStringLiteral("ignored.tmp")), "a matching file stays ignored");
     QVERIFY2(negatedEntries.contains(QStringLiteral("keep.tmp")), "the negated file must be packed");
     removeArchive(negated.archivePath);
-    // 忽略规则本身不占上下文
+    // The ignore file itself is not part of the context
     QVERIFY2(!names.contains(QStringLiteral(".dockerignore")), "the ignore file itself is not needed");
 }
 
@@ -181,10 +182,10 @@ void BuildContextTest::skipsSymlinksThatEscapeTheContext()
     writeFile(context, QStringLiteral("inside.txt"), QByteArrayLiteral("inside\n"));
     writeFile(workspace.path(), QStringLiteral("outside.txt"), QByteArrayLiteral("outside\n"));
 
-    // 指向上下文之外：必须跳过（防目录穿越），并且如实报告
+    // Points outside the context: must be skipped (path-traversal guard) and reported
     QVERIFY(QFile::link(workspace.filePath(QStringLiteral("outside.txt")),
                         context + QStringLiteral("/escape.txt")));
-    // 指向上下文之内：可以进 tar
+    // Points inside the context: may enter the tar
     QVERIFY(QFile::link(context + QStringLiteral("/inside.txt"), context + QStringLiteral("/inside-link.txt")));
 
     BuildContextOptions options;
@@ -207,12 +208,12 @@ void BuildContextTest::rejectsMissingDockerfileAndOversizedContexts()
     QVERIFY(QDir().mkpath(context));
     const QString temp = workspace.filePath(QStringLiteral("tmp"));
 
-    // 目录不存在
+    // Directory does not exist
     BuildContextOptions missing;
     missing.directory = workspace.filePath(QStringLiteral("nope"));
     QCOMPARE(packBuildContext(missing, temp).errorKey, QStringLiteral("contextMissing"));
 
-    // 目录里没有 Dockerfile：本地就给出比引擎 500 更清楚的提示
+    // No Dockerfile in the directory: fail locally with a clearer hint than the engine's 500
     BuildContextOptions noDockerfile;
     noDockerfile.directory = context;
     const BuildContextResult noFile = packBuildContext(noDockerfile, temp);
@@ -222,7 +223,7 @@ void BuildContextTest::rejectsMissingDockerfileAndOversizedContexts()
     writeFile(context, QStringLiteral("Dockerfile"), QByteArrayLiteral("FROM alpine:3.19\n"));
     writeFile(context, QStringLiteral("big.bin"), QByteArray(4096, 'b'));
 
-    // 大小上限：失败并且**不留临时文件**
+    // Size limit: fails and **leaves no temp file**
     BuildContextOptions tooLarge;
     tooLarge.directory = context;
     tooLarge.maxBytes = 1024;
@@ -232,7 +233,7 @@ void BuildContextTest::rejectsMissingDockerfileAndOversizedContexts()
     const QStringList leftovers = QDir(temp).entryList({QStringLiteral("*.tar")}, QDir::Files);
     QVERIFY2(leftovers.isEmpty(), qPrintable(leftovers.join(QLatin1Char(','))));
 
-    // 文件数上限
+    // File count limit
     BuildContextOptions tooMany;
     tooMany.directory = context;
     tooMany.maxFiles = 1;
@@ -249,7 +250,7 @@ void BuildContextTest::writesAnInlineDockerfile()
 
     BuildContextOptions options;
     options.directory = context;
-    // 目录里没有 Dockerfile，但界面可以贴一份内联内容
+    // No Dockerfile on disk, but the UI can paste an inline one
     options.inlineDockerfile = QStringLiteral("FROM alpine:3.19\nRUN echo hello\n");
     const BuildContextResult result = packBuildContext(options, workspace.filePath(QStringLiteral("tmp")));
     QVERIFY2(result.ok, qPrintable(result.errorKey));

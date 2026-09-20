@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -23,11 +23,12 @@
 using namespace Kontainer;
 
 /*!
- * i18n 一致性测试。
+ * i18n consistency tests.
  *
- * 防止踩过的坑再次出现：KCM 的翻译域必须等于插件 id（KDE 惯例），
- * 元数据里的 TranslationDomain、po/ 目录名与 kTranslationDomain 必须一致，
- * 否则界面会静默退回英文（QML 与 C++ 可能一半中文一半英文）。
+ * Guards against a trap already hit: the KCM's translation domain must equal the plugin id (KDE
+ * convention), and TranslationDomain in the metadata, the po/ directory name and
+ * kTranslationDomain must all agree, otherwise the UI silently falls back to English (QML and C++
+ * may even show half Chinese, half English).
  */
 class I18nConsistencyTest : public QObject
 {
@@ -55,8 +56,8 @@ QString sourceDir()
 
 void I18nConsistencyTest::domainMatchesPluginId()
 {
-    // 译文安装为 share/locale/<lang>/LC_MESSAGES/<domain>.mo，
-    // KCM 的 QML 侧使用插件 id 作为域，因此两者必须相同。
+    // Translations install to share/locale/<lang>/LC_MESSAGES/<domain>.mo and the KCM's QML side
+    // uses the plugin id as its domain, so the two must match.
     QCOMPARE(QString::fromLatin1(kTranslationDomain), QStringLiteral("kcm_docker"));
 }
 
@@ -82,8 +83,8 @@ void I18nConsistencyTest::translationsExistAndAreComplete()
     QVERIFY(file.open(QIODevice::ReadOnly));
     const QString content = QString::fromUtf8(file.readAll());
 
-    // 逐条检查：msgid 非空但 msgstr（或 msgstr[0]）为空的条目即为未翻译
-    // 注意：跳过文件头部那条 msgid "" 的元数据条目
+    // Check entry by entry: a non-empty msgid with an empty msgstr (or msgstr[0]) is untranslated
+    // Note: skip the header metadata entry, whose msgid is ""
     const QRegularExpression emptyTranslation(QStringLiteral("^msgstr(?:\\[0\\])? \"\"$"), QRegularExpression::MultilineOption);
     const QStringList entries = content.split(QStringLiteral("\n\n"));
     int untranslated = 0;
@@ -99,25 +100,25 @@ void I18nConsistencyTest::translationsExistAndAreComplete()
 }
 
 /*!
- * ARCH_V3 §2.6：界面里的用户可见文本不得直接写成字符串字面量。
+ * ARCH_V3 §2.6: user-visible UI text must not be a plain string literal.
  *
- * 只检查**明确承载用户可见文本**的属性（text / title / 无障碍名称 / 工具提示 …），
- * 不检查 objectName、icon.name、source、font.family 这些非文本属性，
- * 因此几乎不会误报。
+ * Only properties that definitely carry user-visible text are checked (text / title / accessible
+ * names / tooltips ...), not non-text ones like objectName, icon.name, source or font.family, so
+ * false positives are rare.
  *
- * 确实需要字面量时（例如纯符号占位），在该行加注释 `i18n-lint: allow <理由>`。
- * 这说明该例外是被审阅过的，而不是漏网。
+ * When a literal really is needed (e.g. a pure symbol placeholder), add the comment
+ * `i18n-lint: allow <reason>` on that line, marking the exception as reviewed rather than missed.
  */
 namespace
 {
 
 /*!
- * 把注释替换成空格（保持行号与字符串内容不变）。
+ * Replace comments with spaces (keeping line numbers and string contents intact).
  *
- * 为什么需要它：lint 是逐行正则，而文档注释里经常出现示例代码
- * （例如组件用法里写 `text: "80/tcp"`）。那不是真的界面文案，
- * 但如果不过滤注释，它会被当成违规——断言一旦开始误报，
- * 下一个人就会选择把它关掉，而不是修它。
+ * Why: the lint is a per-line regex, and doc comments often contain example code (e.g. a component
+ * usage writing `text: "80/tcp"`). That is not real UI text, but unfiltered it counts as a
+ * violation -- and once an assertion starts misfiring, the next person switches it off instead of
+ * fixing it.
  */
 QString stripComments(const QString &content)
 {
@@ -185,22 +186,23 @@ QString stripComments(const QString &content)
 } // namespace
 
 /*!
- * 模板必须覆盖源码里的全部待译字符串。
+ * The template must cover every translatable string in the sources.
  *
- * 为什么要有这条：五期一次就漏了 90 多条（新增界面文案没进 `po/`），
- * 而"漏了"在界面上表现为英文与中文混排——只有真的有人切到中文才看得见。
- * 这里直接跑一次 xgettext（与 `po/README.md` 里给译者的命令一致），
- * 只比较 **msgctxt + msgid + msgid_plural** 集合，不比行号引用
- * （引用行每次改代码都会变，比它只会制造噪音）。
+ * Why: phase five dropped over 90 of them at once (new UI text never reached `po/`), and a missing
+ * string shows up as mixed English and Chinese -- visible only if someone really switches to
+ * Chinese. This runs xgettext (the same command `po/README.md` gives translators) and compares only
+ * the **msgctxt + msgid + msgid_plural** set, not line references (those change with every code edit
+ * and only add noise).
  */
 namespace
 {
 
 /*!
- * 把 po/pot 解析成 `msgctxt\x1fmsgid\x1fmsgid_plural` 字符串集合。
+ * Parse a po/pot into a set of `msgctxt\x1fmsgid\x1fmsgid_plural` strings.
  *
- * 只做这一个测试需要的事：按空行切块 → 取三个字段 → 去掉引号与续行。
- * 不做通用解析（那需要一个完整的 gettext 实现，而这里的输入是我们自己的文件）。
+ * Only what this test needs: split on blank lines -> take three fields -> strip quotes and
+ * continuations. No general parser (that would need a full gettext implementation, and the input
+ * here is our own file).
  */
 QSet<QString> potKeys(const QString &path)
 {
@@ -230,12 +232,12 @@ QSet<QString> potKeys(const QString &path)
     const QStringList blocks = content.split(QStringLiteral("\n\n"));
     for (const QString &raw : blocks) {
         if (raw.startsWith(QLatin1String("#~"))) {
-            continue; // 已废弃的条目
+            continue; // obsolete entry
         }
         const QStringList block = raw.split(QLatin1Char('\n'));
         const QString id = field(block, QStringLiteral("msgid"));
         if (id.isEmpty()) {
-            continue; // 头部元数据条目
+            continue; // header metadata entry
         }
         keys.insert(field(block, QStringLiteral("msgctxt")) + QChar(0x1f) + id + QChar(0x1f)
                     + field(block, QStringLiteral("msgid_plural")));
@@ -266,7 +268,7 @@ void I18nConsistencyTest::templateMatchesSources()
     }
     QVERIFY(!sources.isEmpty());
 
-    // 与 po/README.md 里写给译者的命令保持一致（否则两边会得出不同的集合）
+    // Match the command written for translators in po/README.md (otherwise both sides see different sets)
     QStringList arguments{QStringLiteral("--language=C++"),
                           QStringLiteral("--from-code=UTF-8"),
                           QStringLiteral("--keyword=i18n"),
@@ -311,11 +313,12 @@ void I18nConsistencyTest::templateMatchesSources()
 }
 
 /*!
- * 译文真的能被 ki18n 读出来吗？
+ * Can ki18n really read the translations back?
  *
- * 前三个用例查的是"文件里有没有"，这个用例查的是"运行时会显示什么"：
- * 域、语言、安装目录、.mo 内容任何一环错了，界面都会静默退回英文，
- * 而那种失败在 CI 里看不出来（除非有人真的切到中文看一眼）。
+ * The first three cases check "is it in the file"; this one checks "what will be displayed at
+ * runtime": any mistake in domain, language, install directory or .mo content makes the UI silently
+ * fall back to English, a failure invisible in CI (unless someone really switches to Chinese and
+ * looks).
  */
 void I18nConsistencyTest::translationsLoadAtRuntime()
 {
@@ -324,33 +327,33 @@ void I18nConsistencyTest::translationsLoadAtRuntime()
         QSKIP("the compiled .mo does not exist yet; build the kcm_docker target first");
     }
 
-    // 语言显式钉住：测试不该随开发者机器的 LANG 变化
-    // （XDG_DATA_DIRS 与 LANGUAGE 由 tests/CMakeLists.txt 注入进程环境，
-    //  QStandardPaths 在进程启动后只初始化一次，所以不能在测试体里 qputenv）
+    // Pin the language explicitly: the test must not follow the developer's LANG
+    // (XDG_DATA_DIRS and LANGUAGE are injected by tests/CMakeLists.txt, and QStandardPaths
+    //  initializes only once per process, so qputenv inside the test body is too late)
     KLocalizedString::setLanguages({QStringLiteral("zh_CN")});
     setupTranslationDomain();
 
-    // 抽三条覆盖不同来源（QML/C++、普通条目、复数条目）
+    // Pick three covering different sources (QML/C++, plain entry, plural entry)
     QCOMPARE(i18n("Save"), QStringLiteral("保存"));
     QCOMPARE(i18n("Unlock to edit"), QStringLiteral("解锁以编辑"));
     QCOMPARE(i18ncp("@info image layer count", "Layers (%1)", "Layers (%1)", 3), QStringLiteral("层（3）"));
 
-    // 详情页的"关联容器/网络成员"用 Presentation 取状态文案：必须和容器列表同一份译文
+    // Detail-page related containers / network members take state text from the same catalog as the list
     Presentation presentation;
     QCOMPARE(presentation.stateText(QStringLiteral("running")), QStringLiteral("运行中"));
     QCOMPARE(presentation.stateText(QStringLiteral("paused")), QStringLiteral("已暂停"));
 
-    // 没有译文的字符串必须原样返回：返回空串会让界面出现空白按钮
+    // A string without a translation must be returned as is: an empty string would show blank buttons
     const char *untranslated = "this string is intentionally not translated";
     QCOMPARE(i18n(untranslated), QString::fromLatin1(untranslated));
 }
 
 void I18nConsistencyTest::noUnwrappedUiStrings()
 {
-    // 用普通字符串而不是原始字符串：正则本身以 )" 结尾，原始字符串容易踩到分隔符问题
+    // Plain string, not a raw string: the regex itself ends with )" and raw strings trip over delimiters
     const QRegularExpression textProperty(
-        // 允许带限定前缀（例如 Kirigami.FormData.label、Accessible.name、QQC2.ToolTip.text），
-        // 但叶子名必须是明确承载用户可见文本的属性——这样 icon.name / objectName 不会误报。
+        // Qualified prefixes are allowed (Kirigami.FormData.label, Accessible.name, QQC2.ToolTip.text),
+        // but the leaf must be a property that carries user-visible text, so icon.name never misfires
         QStringLiteral("(?:^|[ \\t])(?:[A-Za-z_][A-Za-z0-9_]*\\.)*(text|title|explanation|placeholderText|displayText|Accessible\\.name|Accessible\\.description|ToolTip\\.text|FormData\\.label)[ \\t]*:[ \\t]*\"([^\"]*)\""));
     const QRegularExpression userVisible(QStringLiteral("[A-Za-z\\x{4e00}-\\x{9fff}]"));
 
@@ -363,8 +366,8 @@ void I18nConsistencyTest::noUnwrappedUiStrings()
         if (!file.open(QIODevice::ReadOnly)) {
             continue;
         }
-        // 两份内容：raw 用于识别「豁免标记」（标记本身就在注释里，剥掉注释就看不见了），
-        // stripped 用于匹配真正的代码属性赋值（避免文档注释里的示例代码误报）
+        // Two views of the content: raw to spot the exemption marker (it lives in a comment, which
+        // stripping would hide), stripped to match real property assignments, not doc-comment examples
         const QString rawContent = QString::fromUtf8(file.readAll());
         const QStringList rawLines = rawContent.split(QLatin1Char('\n'));
         const QStringList lines = stripComments(rawContent).split(QLatin1Char('\n'));
@@ -390,25 +393,26 @@ void I18nConsistencyTest::noUnwrappedUiStrings()
 }
 
 /*!
- * 开发时用 `QT_PLUGIN_PATH=<build>/bin` 启动（不带 XDG_DATA_DIRS）也要能翻译。
+ * Translations must also work when developing via `QT_PLUGIN_PATH=<build>/bin` (no XDG_DATA_DIRS).
  *
- * 实测反馈：`QT_PLUGIN_PATH=$PWD/build/bin systemsettings kcm_docker` 在中文环境下显示英文——
- * 因为译文只在 `$XDG_DATA_DIRS/share/locale` 里找，而构建目录与安装前缀都不在其中。
- * `translationLocaleDirs()` 就是为此补的候选目录表：从 `QT_PLUGIN_PATH` 推出
- * `<build>/locale` 与 `<build>/share/locale`，从 Qt 插件目录与可执行文件位置推出
- * `<prefix>/share/locale`。这里用临时目录钉死"推得对、只返回存在的目录"。
+ * User-reported: `QT_PLUGIN_PATH=$PWD/build/bin systemsettings kcm_docker` showed English in a
+ * Chinese locale, because translations are looked up only in `$XDG_DATA_DIRS/share/locale` and
+ * neither the build directory nor the install prefix is listed there. `translationLocaleDirs()` is
+ * the candidate list added for this: `<build>/locale` and `<build>/share/locale` derived from
+ * `QT_PLUGIN_PATH`, plus `<prefix>/share/locale` from the Qt plugin directory and the executable
+ * location. The temporary directory pins "derived correctly, only existing directories returned".
  */
 void I18nConsistencyTest::developmentPluginPathFindsTheCatalog()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    // 模拟构建树：<tmp>/bin（插件）与 <tmp>/locale/zh_CN/LC_MESSAGES/kcm_docker.mo
+    // Simulate a build tree: <tmp>/bin (plugins) and <tmp>/locale/zh_CN/LC_MESSAGES/kcm_docker.mo
     QVERIFY(QDir().mkpath(dir.filePath(QStringLiteral("bin"))));
     const QString localeDir = dir.filePath(QStringLiteral("locale/zh_CN/LC_MESSAGES"));
     QVERIFY(QDir().mkpath(localeDir));
     QFile catalog(localeDir + QStringLiteral("/kcm_docker.mo"));
     QVERIFY(catalog.open(QIODevice::WriteOnly));
-    catalog.write("dummy"); // 只要存在即可：这里测的是"目录推导"，不测翻译内容
+    catalog.write("dummy"); // existing is enough: this tests directory derivation, not translation content
     catalog.close();
 
     const QByteArray previous = qgetenv("QT_PLUGIN_PATH");
@@ -418,10 +422,10 @@ void I18nConsistencyTest::developmentPluginPathFindsTheCatalog()
 
     QVERIFY2(dirs.contains(dir.filePath(QStringLiteral("locale"))),
              qPrintable(QStringLiteral("missing build-tree locale dir, got: %1").arg(dirs.join(QLatin1Char(' ')))));
-    // 不存在的目录不能被注册（避免把无效路径塞给 KLocalizedString）
+    // Non-existent directories must not be registered (do not feed invalid paths to KLocalizedString)
     QVERIFY(!dirs.contains(dir.filePath(QStringLiteral("share/locale"))));
 
-    // 负例方向：没有 .mo 的目录不算数（列表只包含"确实存在"的目录）
+    // Negative direction: a directory without a .mo does not count (the list holds only existing ones)
     QTemporaryDir empty;
     QVERIFY(empty.isValid());
     qputenv("QT_PLUGIN_PATH", empty.filePath(QStringLiteral("bin")).toUtf8());
@@ -432,12 +436,13 @@ void I18nConsistencyTest::developmentPluginPathFindsTheCatalog()
 
 
 /*!
- * 译文不得凭空多出参数占位符。
+ * Translations must not invent argument placeholders.
  *
- * 背景（真实事故）：给 zh_CN 的 .po 批量填译文时，脚本只替换了 `msgstr` 的**第一行**，
- * 旧译文的多行续行留了下来 —— 中文于是变成"两句拼接"，运行时 `%!I(18N_ARGUMENT_MISSING)`
- * 直接显示在悬停提示里（用户截图发现）。判据：`msgstr` 里的 `%N` 必须也出现在
- * 对应的 `msgid` / `msgid_plural` 里。
+ * Background (real incident): while bulk-filling zh_CN translations a script replaced only the FIRST
+ * line of each `msgstr` and left the old continuation lines, so the Chinese became "two sentences
+ * glued together" and `%!I(18N_ARGUMENT_MISSING)` showed up in a tooltip (caught in a user
+ * screenshot). Rule: every `%N` in a `msgstr` must also appear in the matching `msgid` /
+ * `msgid_plural`.
  */
 void I18nConsistencyTest::translationsDoNotInventArguments()
 {
@@ -446,7 +451,7 @@ void I18nConsistencyTest::translationsDoNotInventArguments()
     QVERIFY(file.open(QIODevice::ReadOnly));
     const QString content = QString::fromUtf8(file.readAll());
 
-    // 取出某个字段的完整文本（含多行续行）
+    // Collect a field's full text, continuation lines included
     const auto fieldText = [](const QString &entry, const QString &key) {
         QString collected;
         bool collecting = false;
@@ -462,7 +467,7 @@ void I18nConsistencyTest::translationsDoNotInventArguments()
             }
             if (collecting) {
                 QString value = line.mid(line.indexOf(QLatin1Char('"')) + 1);
-                value.chop(1); // 去掉结尾引号
+                value.chop(1); // drop the trailing quote
                 collected += value;
             }
         }
@@ -506,11 +511,12 @@ void I18nConsistencyTest::translationsDoNotInventArguments()
 
 
 /*!
- * `.po` 里不得残留 `#, fuzzy`。
+ * No `#, fuzzy` markers may remain in the `.po`.
  *
- * 真实事故（用户两次遇到"这两条字符串没翻译"）：`msgmerge` 会把改动过的条目标成 fuzzy，
- * 而 **fuzzy 条目不会编进 `.mo`** —— 于是 `i18n()` 静默回退英文，界面上半中半英，
- * 而 `.po` 里明明写着译文。这条断言把这类"看起来翻译了、实际没生效"直接挡住。
+ * Real incident (users twice saw "these two strings are not translated"): `msgmerge` marks changed
+ * entries fuzzy, and **fuzzy entries are not compiled into the `.mo`** -- so `i18n()` silently falls
+ * back to English and the UI is half Chinese, half English even though the `.po` does contain the
+ * translation. This assertion blocks that "looks translated, never took effect" class outright.
  */
 void I18nConsistencyTest::noFuzzyEntriesInTheCatalog()
 {
@@ -524,7 +530,7 @@ void I18nConsistencyTest::noFuzzyEntriesInTheCatalog()
         if (lines.at(i).trimmed() != QLatin1String("#, fuzzy")) {
             continue;
         }
-        // 往下找这条的 msgid，报错时能直接看出是哪一条
+        // Find this entry's msgid so the failure names the culprit directly
         for (int j = i + 1; j < lines.size() && j < i + 8; ++j) {
             if (lines.at(j).startsWith(QLatin1String("msgid "))) {
                 fuzzyMsgids.append(lines.at(j).mid(6));

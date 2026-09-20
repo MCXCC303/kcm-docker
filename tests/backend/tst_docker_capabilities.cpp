@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,10 +14,11 @@
 using namespace Kontainer;
 
 /*!
- * 写权限门（ARCH_V4 §2.2.3 / §5.1）。
+ * Write-access gate (ARCH_V4 §2.2.3 / §5.1).
  *
- * 判定必须便宜、可预测，并且**在拿不准时倾向于只读**：
- * 写入口少出现一次只是不方便，多出现一次可能让用户在没权限的环境里反复撞墙。
+ * The check must be cheap, predictable and **biased to read-only when unsure**: hiding a write
+ * entry point once is only inconvenient, showing one wrongly makes users without permission
+ * keep hitting a wall.
  */
 class DockerCapabilitiesTest : public QObject
 {
@@ -35,7 +36,7 @@ private Q_SLOTS:
 namespace
 {
 
-/*! 建一个真实文件当 socket 用（判定只看权限位，不看文件类型）。 */
+/*! Create a real file to stand in for a socket (the check only reads permission bits). */
 QString makeSocketFile(const QTemporaryDir &dir, QFile::Permissions permissions)
 {
     const QString path = dir.path() + QStringLiteral("/docker.sock");
@@ -66,7 +67,7 @@ void DockerCapabilitiesTest::readOnlySocketIsDenied()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    const QString path = makeSocketFile(dir, QFile::ReadOwner); // 只有读权限
+    const QString path = makeSocketFile(dir, QFile::ReadOwner); // read permission only
     QVERIFY(!path.isEmpty());
 
     QCOMPARE(writeAccessFor(DockerEndpoint::unixSocket(path)), WriteAccess::SocketNotWritable);
@@ -89,8 +90,8 @@ void DockerCapabilitiesTest::remoteOrInvalidEndpointIsUnsupported()
 }
 
 /*!
- * 远程 endpoint 的只读不变式（ARCH_V3 §1.3）：四期不实现远程连接，
- * 但这条判断必须先写死，未来加 TCP endpoint 时自动继承。
+ * Read-only invariant for remote endpoints (ARCH_V3 §1.3): phase 4 does not implement remote
+ * connections, but the rule is pinned now so a future TCP endpoint inherits it.
  */
 void DockerCapabilitiesTest::remoteEndpointsNeverBecomeWritable()
 {
@@ -106,7 +107,7 @@ void DockerCapabilitiesTest::remoteEndpointsNeverBecomeWritable()
 
 void DockerCapabilitiesTest::keysAreStable()
 {
-    // QML 依赖这三个 key 决定是否渲染写入口，改名必须是显式决定
+    // QML gates the write entry points on these three keys; renaming must be deliberate
     QCOMPARE(writeAccessKey(WriteAccess::Allowed), QStringLiteral("allowed"));
     QCOMPARE(writeAccessKey(WriteAccess::SocketMissing), QStringLiteral("denied"));
     QCOMPARE(writeAccessKey(WriteAccess::SocketNotWritable), QStringLiteral("denied"));

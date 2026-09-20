@@ -1,32 +1,33 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    离屏渲染工具（开发用，不参与 ctest）：把界面渲染成 PNG，用于人工视觉复核。
+    Offscreen render tool (dev only, not part of ctest): renders the UI to PNG for manual review.
 
-    为什么需要它：
-      - Qt 的 vnc platform 插件在本机不可用（渲染期间段错误 / 不响应
-        FramebufferUpdateRequest），无法用它截图；
-      - 直接在用户桌面上开窗口截图会干扰用户，而且只能看到当前主题。
+    Why it exists:
+      - Qt's vnc platform plugin is unusable here (segfaults while rendering / never answers
+        FramebufferUpdateRequest), so it cannot take screenshots;
+      - grabbing a window on the user's desktop disturbs them and shows only the current theme.
 
-    本工具完全离屏：使用确定性 fixture（MockDockerBackend）+ 显式注入的
-    Breeze 亮色 / 暗色配色，因此可以稳定复现两种主题下的排版与配色，
-    用来核对 ARCH_V3_pre §1.4/§1.8 的对比度与 §1.2/§1.5 的排版要求。
+    Fully offscreen: a deterministic fixture (MockDockerBackend) plus explicitly injected Breeze
+    light/dark colors reproduce layout and colors in both themes, for checking the contrast
+    requirements of ARCH_V3_pre §1.4/§1.8 and the layout requirements of §1.2/§1.5.
 
-    用法：
+    Usage:
         render_ui <page> <width> <height> <light|dark> <output.png>
         page = main | container-detail | image-detail | engine | daemon-config | daemon-config-user
 
-    环境变量 KCM_DOCKER_RENDER_LANG=zh_CN 时按 `po/<lang>/kcm_docker.po` 的译文渲染：
-    中文文案普遍更长，横幅折行、按钮宽度、省略号是否合理只有看中文截图才知道
-    （真实会话的 LANG 就是 zh_CN，所以这其实是默认形态）。
-    注意：只有 QML 里的文案会变中文。C++ 组装的文本（"3 seconds ago"、"Restarting (1)"）
-    在截图里仍是英文——ki18n 不经过 `QCoreApplication` 的 translator 链（安装自定义
-    QTranslator 实测无效），而 Qt 的 QTranslator 又不认 gettext 的 .mo。
-    C++ 侧译文的正确性由 `tst_i18n_consistency` 的运行时用例负责（真的加载 .mo 并断言译文）。
+    With KCM_DOCKER_RENDER_LANG=zh_CN, strings come from `po/<lang>/kcm_docker.po`: Chinese text
+    is longer, and banner wrapping, button widths and ellipses only prove themselves in a
+    Chinese screenshot (real sessions run LANG=zh_CN, so this is the default shape).
+    Only QML strings turn Chinese. C++-assembled text ("3 seconds ago", "Restarting (1)") stays
+    English — ki18n does not go through `QCoreApplication`'s translator chain (installing a
+    custom QTranslator provably does nothing) and Qt's QTranslator cannot read gettext .mo files.
+    C++ translations are covered at runtime by `tst_i18n_consistency`, which loads the .mo and
+    asserts the translated strings.
 
-    注意：注入的是 Kirigami.Theme 的颜色 token（Kirigami 允许应用覆盖它们），
-    不会修改任何业务代码；字体的度量仍来自当前平台。
+    Note: only Kirigami.Theme color tokens are injected (Kirigami lets applications override
+    them), so no production code is touched; font metrics still come from the current platform.
 */
 
 #include "i18n.h"
@@ -60,17 +61,17 @@ using namespace Kontainer;
 namespace
 {
 
-/*! 确定性 fixture：覆盖运行中 / 暂停 / 已退出 / 不健康、多个镜像与悬空镜像。 */
+/*! Deterministic fixture: running / paused / exited / unhealthy containers, several images (one dangling). */
 void fillFixture(MockDockerBackend &backend)
 {
     EngineInfo engine;
     engine.available = true;
     engine.countsAvailable = true;
     engine.serverVersion = QStringLiteral("29.8.0");
-    // 部署形态相关字段按本机真实情况填写（系统级 root daemon、无 rootless 标记、
-    // 数据目录在家目录、live-restore 关闭）：配置页与 Engine 页的截图才具备参考价值
+    // Deployment fields mirror this machine (system root daemon, no rootless flag, data dir
+    // under $HOME, live-restore off) so the DaemonConfig and Engine screenshots stay meaningful.
     engine.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
-    // KCM_DOCKER_RENDER_ROOTLESS=1：模拟 rootless daemon（配合 HOME 覆盖可复核"用户可写"形态）
+    // KCM_DOCKER_RENDER_ROOTLESS=1: fake a rootless daemon (HOME override = "user-writable" shape)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_ROOTLESS")) {
         engine.securityOptions.append(QStringLiteral("name=rootless"));
     }
@@ -212,8 +213,8 @@ void fillFixture(MockDockerBackend &backend)
     detail.pid = 41237;
     detail.platform = QStringLiteral("linux");
     detail.restartPolicy = QStringLiteral("unless-stopped");
-    // KCM_DOCKER_RENDER_DECLARED_PORT=1：造出"声明了但没真正发布"的端口 + 一段超长区间，
-    // 用来复核端口页的 declaredNotPublished 状态与区间地图的"还有 N 个"限流
+    // KCM_DOCKER_RENDER_DECLARED_PORT=1: a declared-but-never-published port plus a very long
+    // range, to check the ports page's declaredNotPublished state and the range map's "N more" cap
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_DECLARED_PORT")) {
         detail.declaredPorts = {{4880, QStringLiteral("tcp"), QString(), 4880, 4880},
                                 {3389, QStringLiteral("tcp"), QString(), 1000, 1100}};
@@ -221,8 +222,8 @@ void fillFixture(MockDockerBackend &backend)
     detail.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")},
                     {QStringLiteral("0.0.0.0"), 443, 8443, QStringLiteral("tcp")},
                     {QStringLiteral("::"), 9090, 0, QStringLiteral("tcp")}};
-    // KCM_DOCKER_RENDER_MANY_PORTS=1：造一堆映射，用来复核拓扑在 20+ 行时的观感
-    // （连线按 index 推导行高，行数多了不应该错位或溢出）
+    // KCM_DOCKER_RENDER_MANY_PORTS=1: many mappings, to check the topology with 20+ rows
+    // (connectors derive row height from index; many rows must not misalign or overflow)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_MANY_PORTS")) {
         detail.ports.clear();
         for (int i = 0; i < 12; ++i) {
@@ -235,8 +236,8 @@ void fillFixture(MockDockerBackend &backend)
             detail.ports.append({QString(), quint16(9000 + i), 0, QStringLiteral("tcp")});
         }
     }
-    // KCM_DOCKER_RENDER_BRANCH_PORTS=1：一个容器端口映射到多个宿主地址（含 IPv6 通配），
-    // 用来复核"同一端口的多条绑定"这一形态（用户实际容器的样子）
+    // KCM_DOCKER_RENDER_BRANCH_PORTS=1: one container port bound to several host addresses
+    // (incl. IPv6 wildcard), the shape real user containers have
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_BRANCH_PORTS")) {
         detail.ports.clear();
         detail.ports.append({QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")});
@@ -263,8 +264,8 @@ void fillFixture(MockDockerBackend &backend)
                       QStringLiteral("/var/cache/frontend"),
                       QStringLiteral("rw"),
                       false}};
-    // KCM_DOCKER_RENDER_LONG_PATHS=1：把挂载路径拉长，用来复核"宿主路径省略 + 容器路径靠右"
-    // 在极端长度下的表现（真实机器上 WinBoat 那类容器的宿主路径可以很长）
+    // KCM_DOCKER_RENDER_LONG_PATHS=1: very long mount paths, to check "host path elided +
+    // container path right-aligned" at extreme lengths (WinBoat-style containers have those)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_LONG_PATHS")) {
         detail.mounts = {{QStringLiteral("bind"),
                           QString(),
@@ -285,7 +286,7 @@ void fillFixture(MockDockerBackend &backend)
                           QStringLiteral("API_BASE_URL=https://api.example.com"),
                           QStringLiteral("LOG_LEVEL=info"),
                           QStringLiteral("TZ=Asia/Shanghai")};
-    // 长命令：用来复核"折叠到 4 行 + 显示全部"的行为（KCM_DOCKER_RENDER_LONG_COMMAND=1）
+    // Long command, to check "collapse to 4 lines + show all" (KCM_DOCKER_RENDER_LONG_COMMAND=1)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_LONG_COMMAND")) {
         detail.command = {QStringLiteral("jupyter"), QStringLiteral("notebook"),
                           QStringLiteral("--ip=0.0.0.0"), QStringLiteral("--port=8888"),
@@ -303,7 +304,7 @@ void fillFixture(MockDockerBackend &backend)
     detail.hostname = QStringLiteral("a1b2c3d4e5f6");
     detail.labels = {{QStringLiteral("com.example.stack"), QStringLiteral("frontend")},
                      {QStringLiteral("com.example.version"), QStringLiteral("2.4.1")}};
-    // 另备一份"已暂停"的详情：复核「继续」按钮（container-detail-paused 页面用）
+    // A second "paused" detail for the container-detail-paused page, to check the Resume button
     ContainerDetail pausedDetail = detail;
     pausedDetail.id = QStringLiteral("3333333333333333333333333333333333333333333333333333333333333333");
     pausedDetail.name = QStringLiteral("worker-paused");
@@ -352,23 +353,23 @@ void fillFixture(MockDockerBackend &backend)
 }
 
 /*!
-    选择图标主题。
+    Pick the icon theme.
 
-    离屏渲染默认没有图标主题（平台主题为空时 Qt 只找 hicolor），
-    结果是所有 Kirigami.Icon / 图标按钮都渲染成空白——
-    而「图标 + 颜色 + 文字」三重编码正是 ARCH_V3 §1.6/§1.8 的验收项，
-    所以这里显式指定 Breeze 图标主题，保证渲染结果能反映真实观感。
+    Offscreen rendering starts with no icon theme (with an empty platform theme Qt looks in
+    hicolor only), so every Kirigami.Icon and icon button renders blank — yet icon + color + text
+    is exactly the ARCH_V3 §1.6/§1.8 acceptance criterion. Setting Breeze explicitly keeps the
+    render representative of real sessions.
 */
 void applyIconTheme(bool dark)
 {
     const QString theme = dark ? QStringLiteral("breeze-dark") : QStringLiteral("breeze");
 
-    // QIcon 侧（QQC2 的图标按钮走这条路径）
+    // QIcon side (QQC2 icon buttons take this path)
     QIcon::setThemeName(theme);
     QIcon::setFallbackThemeName(QStringLiteral("breeze"));
 
-    // Kirigami.Icon 走 KDE 的 KIconLoader，它自己缓存主题（KIconTheme 从
-    // QIcon::themeName() 读取），因此设置 QIcon 之后必须让它重新加载配置。
+    // Kirigami.Icon goes through KDE's KIconLoader, which caches the theme (KIconTheme reads
+    // QIcon::themeName()), so it must be told to reload after QIcon is set.
     if (KIconLoader *loader = KIconLoader::global()) {
         loader->reconfigure(QStringLiteral("kontainer-render-ui"));
     }
@@ -380,12 +381,12 @@ namespace
 {
 
 /*!
- * 读 `po/<lang>/kcm_docker.po`，返回 msgid → msgstr 表。
+ * Read `po/<lang>/kcm_docker.po` into a msgid → msgstr map.
  *
- * 为什么不走 QTranslator：Qt 不认 gettext 的 .mo（实测 `QTranslator::load()` 返回 false），
- * 而 ki18n 加载译文的路径在 KQuickConfigModule 里。渲染工具只需要"界面上显示什么字"，
- * 直接读 .po 反而更贴近译者实际提交的内容。未设置 KCM_DOCKER_RENDER_LANG 时返回空表
- * （保持英文渲染，与之前的截图可比）。
+ * Not via QTranslator: Qt cannot read gettext .mo files (`QTranslator::load()` returns false),
+ * and ki18n's own lookup lives inside KQuickConfigModule. The tool only needs to know which text
+ * reaches the UI, and the .po is what translators actually commit. Without
+ * KCM_DOCKER_RENDER_LANG the map stays empty, keeping English renders comparable to older ones.
  */
 QVariantMap loadTranslations()
 {
@@ -400,7 +401,7 @@ QVariantMap loadTranslations()
     }
 
     const QString content = QString::fromUtf8(file.readAll());
-    // 去掉首尾引号；`msgstr[0] "..."` 这类行要先切掉 key 本身
+    // Strip the surrounding quotes; for lines like `msgstr[0] "..."` drop the key itself first
     const auto unquote = [](const QString &raw) {
         const QString text = raw.trimmed();
         if (text.size() >= 2 && text.startsWith(QLatin1Char('"')) && text.endsWith(QLatin1Char('"'))) {
@@ -433,14 +434,14 @@ QVariantMap loadTranslations()
         const QStringList block = raw.split(QLatin1Char('\n'));
         const QString id = field(block, QStringLiteral("msgid"));
         if (id.isEmpty()) {
-            continue; // 头部元数据
+            continue; // header metadata
         }
-        // 复数条目在 zh_CN 里只有一种形式，单复数都用它
+        // zh_CN has a single plural form; use it for both singular and plural
         const QString value = field(block, QStringLiteral("msgstr[0]")).isEmpty()
             ? field(block, QStringLiteral("msgstr"))
             : field(block, QStringLiteral("msgstr[0]"));
         if (value.isEmpty()) {
-            continue; // 未翻译：保持英文，与真实界面一致
+            continue; // untranslated: keep English, as the real UI does
         }
         translations.insert(id, value);
         const QString plural = field(block, QStringLiteral("msgid_plural"));
@@ -470,15 +471,14 @@ int main(int argc, char **argv)
     const int tabIndex = argc > 6 ? QString::fromLocal8Bit(argv[6]).toInt() : 0;
     const bool dark = theme == QLatin1String("dark");
 
-    // 主题必须在引擎创建之前设好：Kirigami 从应用 QPalette 推导主题色
+    // The theme must be set before the engine is created: Kirigami derives it from the QPalette
     applyIconTheme(dark);
 
-    // 必须使用 KDE 的 QQC2 样式（真实会话里 kcmshell6 就是这个）：
-    // 默认样式（Fusion/Basic）下的 Label 颜色取自 QPalette，而 Kirigami.AbstractCard
-    // 内部是 `Theme.inherit: false` + `colorSet: View`，两者不一致时会出现
-    // 「深色卡片 + 黑色文字」这种只属于离屏渲染的组合。用 KDE 样式后
-    // 控件颜色统一由 Kirigami.Theme 决定，渲染结果与真实会话一致。
-    // QQuickStyle 需要单独的 include 路径，这里直接用环境变量等价设置
+    // Must use KDE's QQC2 style (what kcmshell6 uses in real sessions): under the default
+    // Fusion/Basic style Label colors come from QPalette while Kirigami.AbstractCard is
+    // `Theme.inherit: false` + `colorSet: View`; the mismatch produces "dark card + black text",
+    // an offscreen-only combination. KDE's style routes all colors through Kirigami.Theme.
+    // Setting QQuickStyle needs another include path, so use the equivalent env var instead
     qputenv("QT_QUICK_CONTROLS_STYLE", "org.kde.desktop");
 
     setupTranslationDomain();
@@ -486,8 +486,9 @@ int main(int argc, char **argv)
 
     auto backend = std::make_unique<MockDockerBackend>();
     fillFixture(*backend);
-    // 截图要能看到四期的写入口：把 endpoint 指向一个当前进程可写的临时 socket 文件，
-    // 权限门（DockerCapabilities）才会放行。不连接它，只是让判定为「可写」。
+    // Screenshots must show the phase-4 write entry points: point the endpoint at a temp socket
+    // file this process can write, so the capability gate (DockerCapabilities) lets it through.
+    // Nothing connects to it; it only makes the socket count as writable.
     QTemporaryDir socketDir;
     const QString socketPath = socketDir.path() + QStringLiteral("/docker.sock");
     {
@@ -501,8 +502,8 @@ int main(int argc, char **argv)
     backend->setEndpoint(DockerEndpoint::unixSocket(socketPath));
     auto stub = std::make_unique<QmlStubKcm>(backend.get());
 
-    // KCM_DOCKER_RENDER_STORED_CREDENTIALS=1：预置两条凭据，用于复核认证页的列表行
-    // （内存后端，不碰真实 KWallet）
+    // KCM_DOCKER_RENDER_STORED_CREDENTIALS=1: two stored credentials to check the auth page's
+    // list rows (in-memory backend, real KWallet untouched)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_STORED_CREDENTIALS")) {
         auto *wallet = stub->credentialBackend();
         Kontainer::CredentialStore store(wallet);
@@ -521,12 +522,13 @@ int main(int argc, char **argv)
 
     QQmlEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("kcm"), stub.get());
-    // i18n 桩必须做 %N 替换，否则渲染出来的文案是 "%1 · created %2 ago · ID %3"，
-    // 与真实运行结果不符（真实运行时由 KLocalizedString 替换）。
-    // 译文表来自 .po（KCM_DOCKER_RENDER_LANG）：没有它就只能渲染英文，
-    // 而真实会话是 zh_CN——中文更长，折行与截断只有看中文截图才看得出来。
-    // 必须挂在 JS 全局对象上：engine.evaluate() 里定义的函数看不到 context property
-    // （实测会抛 ReferenceError: ktTranslations is not defined，界面上的文案会整片消失）
+    // The i18n stub must substitute %N, otherwise the rendered text stays literally
+    // "%1 · created %2 ago · ID %3" instead of what KLocalizedString produces at runtime.
+    // The translation map comes from the .po (KCM_DOCKER_RENDER_LANG); without it only English
+    // renders, while real sessions run zh_CN — longer text, and wrapping/elision only show up in
+    // a Chinese screenshot. It must live on the JS global object: functions defined inside
+    // engine.evaluate() cannot see context properties (a ReferenceError: ktTranslations is not
+    // defined makes all UI text vanish)
     engine.globalObject().setProperty(QStringLiteral("ktTranslations"), engine.toScriptValue(loadTranslations()));
     engine.evaluate(QStringLiteral("function _ktFormat(text, args) {\n"
                                    "    return String(text).replace(/%(\\d+)/g, function (match, index) {\n"
@@ -544,10 +546,10 @@ int main(int argc, char **argv)
                                    "function i18ncp(context, singular, plural, count) { return _ktFormat(_ktText(count === 1 ? singular : plural), [count]); }\n"));
 
 
-    // 先让 controller 完成一轮刷新，页面才有数据可渲染
+    // Let the controller finish one refresh first so pages have data to render
     stub->controller()->refresh();
-    // KCM_DOCKER_RENDER_PULLS=1：造出「一路进行中 + 一路失败」的拉取列表，
-    // 用于截图复核进度条、取消按钮与失败原因是否可见（ARCH_V4 §2.4）
+    // KCM_DOCKER_RENDER_PULLS=1: one in-progress plus one failed pull, to check that the
+    // progress bar, cancel button and failure reason are visible (ARCH_V4 §2.4)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_PULLS")) {
         auto *operations = stub->controller()->operations();
         operations->pullImage(QStringLiteral("quay.io/libpod/alpine:latest"));
@@ -563,13 +565,13 @@ int main(int argc, char **argv)
         progress.totalLayers = 3;
         backend->emitPullProgress(progress);
 
-        // 只让后面那一路失败：前一路保持「进行中」，这样截图里三种状态都能看到
+        // Fail only the second pull; the first stays in progress so all three states are visible
         backend->completeMutation(QStringLiteral("image:registry.example.com/team/app:2.4.1"),
                                   DockerBackendInterface::MutationOutcome::Failed,
                                   DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
     }
 
-    // 数据卷列表（六期 §3.5）：使用中 / 未使用 / 使用情况未知三种形态
+    // Volume list (phase 6 §3.5): in use / unused / usage unknown
     {
         QList<Kontainer::Volume> volumes;
         auto makeVolume = [](const QString &name, const QString &driver, qint64 size, int refs, bool usageKnown) {
@@ -592,7 +594,7 @@ int main(int argc, char **argv)
         backend->setVolumes(volumes);
     }
 
-    // 网络列表（六期 §3.2）：内置三个 + 一个 compose 建的网络（带成员）
+    // Network list (phase 6 §3.2): the three built-ins plus one compose-created network with members
     {
         QList<Kontainer::Network> networks;
         auto makeNetwork = [](const QString &name, const QString &driver, const QString &subnet, int members) {
@@ -631,7 +633,7 @@ int main(int argc, char **argv)
         qmlFile = QStringLiteral("MainPage.qml");
     } else if (page == QLatin1String("container-detail") || page == QLatin1String("container-detail-paused")) {
         qmlFile = QStringLiteral("ContainerDetail.qml");
-        // container-detail-paused：用 fixture 里那个"已暂停"的容器，复核「继续」按钮
+        // container-detail-paused: the fixture's paused container, to check the Resume button
         initialProperties.insert(QStringLiteral("containerId"),
                                  page == QLatin1String("container-detail-paused")
                                      ? QStringLiteral("3333333333333333333333333333333333333333333333333333333333333333")
@@ -643,7 +645,7 @@ int main(int argc, char **argv)
         qmlFile = QStringLiteral("CreateContainer.qml");
     } else if (page == QLatin1String("network-detail")) {
         qmlFile = QStringLiteral("NetworkDetail.qml");
-        // fixture 里 app_default 的 id 是 64 个 'a'
+        // In the fixture, app_default's id is 64 'a' characters
         initialProperties.insert(QStringLiteral("networkId"), QString(64, QLatin1Char('a')));
     } else if (page == QLatin1String("registry-auth")) {
         qmlFile = QStringLiteral("RegistryAuthPage.qml");
@@ -651,8 +653,8 @@ int main(int argc, char **argv)
         qmlFile = QStringLiteral("DaemonConfigPage.qml");
         initialProperties.insert(QStringLiteral("scope"), QStringLiteral("user"));
     } else if (page == QLatin1String("daemon-config")) {
-        // 运行时配置页（ARCH_V5_V8 §2.3）：内容来自真实文件系统，
-        // 用 HOME 指向临时目录即可构造"用户可写"的 rootless 形态（见 render_ui.sh 的说明）
+        // Daemon config page (ARCH_V5_V8 §2.3): content comes from the real filesystem, so
+        // pointing HOME at a temp dir fakes the user-writable rootless shape (see render_ui.sh)
         qmlFile = QStringLiteral("DaemonConfigPage.qml");
     } else {
         std::fprintf(stderr, "unknown page: %s\n", qPrintable(page));
@@ -684,8 +686,9 @@ int main(int argc, char **argv)
     item->setHeight(height);
     window.show();
 
-    // 可选：切到指定分区/标签页，便于逐页复核（例如容器详情的「网络」分区）
-    // KCM_DOCKER_RENDER_REMOVE_NETWORK=1：打开删除网络的确认对话框（复核后果说明）
+    // Optional: switch to a given section/tab for page-by-page review (e.g. container "network")
+    // KCM_DOCKER_RENDER_REMOVE_NETWORK=1: open the network-removal confirmation dialog
+    // (checks that the consequences are spelled out)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_REMOVE_NETWORK")) {
         QObject *removeDialog = item->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
         if (removeDialog) {
@@ -693,7 +696,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // KCM_DOCKER_RENDER_LOGS=1：往日志控制台灌一些输出（复核等宽控制台与状态条）
+    // KCM_DOCKER_RENDER_LOGS=1: feed the log console (checks the monospace console and status bar)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_LOGS")) {
         QList<Kontainer::LogLine> lines;
         const QStringList samples = {
@@ -721,32 +724,33 @@ int main(int argc, char **argv)
         backend->emitLogLines(QStringLiteral("1111111111111111111111111111111111111111111111111111111111111111"), lines);
     }
 
-    // QML 运行期警告必须看得见：截图上"少了一块"往往就是某个 delegate 没建起来，
-    // 而 qWarning 在离屏环境里可能被吞掉（这里显式打到 stderr）
+    // Runtime QML warnings must stay visible: a "missing piece" in a screenshot is usually a
+    // delegate that never instantiated, and qWarning can be swallowed offscreen (print to stderr)
     QObject::connect(&engine, &QQmlEngine::warnings, [](const QList<QQmlError> &warnings) {
         for (const QQmlError &warning : warnings) {
             std::fprintf(stderr, "QML: %s\n", qPrintable(warning.toString()));
         }
     });
 
-    // 对话框（弹层）**必须在窗口就绪之后**才打开：它的内容在打开时创建，
-    // 若此时还没有窗口，内容永远不会被布局，截图上就是一片空白（实测踩过）
+    // Dialogs (popups) **must open only after the window is ready**: their content is created
+    // on open and is never laid out without a window, leaving a blank screenshot (hit in practice)
     QTimer::singleShot(600, &app, [&]() {
-        // 挂载预设：向导的挂载步骤与"挂载预设"标签页都用它（两条覆盖 bind 与命名卷 + 收藏）
+        // Mount presets, shared by the wizard's mount step and the presets tab
+        // (one bind + one named volume, one favorite)
     stub->controller()->mountPresets()->add(QStringLiteral("/srv/data"), QStringLiteral("/data"),
                                             QStringLiteral("bind"), true, QStringLiteral("数据目录"));
     stub->controller()->mountPresets()->add(QStringLiteral("pgdata"), QStringLiteral("/var/lib/postgresql/data"),
                                             QStringLiteral("volume"), false, QString());
     stub->controller()->mountPresets()->setFavorite(QStringLiteral("preset-1"), true);
 
-    // KCM_DOCKER_RENDER_WIZARD_STEP=<step key>：把创建向导直接推进到某一步（复核表单排版）
+    // KCM_DOCKER_RENDER_WIZARD_STEP=<step key>: jump the creation wizard to a step (form layout)
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_WIZARD_STEP")) {
         auto *controller = stub->controller()->createContainer();
         const QString step = qEnvironmentVariable("KCM_DOCKER_RENDER_WIZARD_STEP");
         controller->setImage(QStringLiteral("postgres:17-alpine"));
         controller->setName(QStringLiteral("demo-container"));
         if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_PORT_CONFLICT")) {
-            // 复核行内冲突提示：一行撞上运行中的容器（demo-app 占着 8080），一行空闲（不该有任何提示）
+            // Inline conflict hints: one row hits a running container (demo-app holds 8080), one is free
             controller->setPortRows({QVariantMap {{QStringLiteral("containerPort"), 5432},
                                                   {QStringLiteral("hostPort"), 8080},
                                                   {QStringLiteral("protocol"), QStringLiteral("tcp")}},
@@ -770,13 +774,13 @@ int main(int argc, char **argv)
         const bool moved = controller->goToStep(target);
         std::fprintf(stderr, "DBG wizard target=%s moved=%d now=%s error=%s\n", qPrintable(target), int(moved),
                      qPrintable(controller->stepKey()), qPrintable(controller->stepErrorKey()));
-        // 逐步前进，找出卡在哪一步
+        // Step through to see which step blocks progress
         for (const QString &key : Kontainer::CreateContainerController::stepKeys()) {
             std::fprintf(stderr, "DBG   step %s error=%s\n", qPrintable(key), qPrintable(controller->stepErrorKeyForStep(key)));
         }
     }
 
-    // KCM_DOCKER_RENDER_WIZARD_STEP=ports 时填两条端口映射，复核节点图风格的编辑器
+    // KCM_DOCKER_RENDER_WIZARD_STEP=ports fills port rows, to check the node-graph style editor
     if (qEnvironmentVariable("KCM_DOCKER_RENDER_WIZARD_STEP") == QLatin1String("ports")) {
         auto *controller = stub->controller()->createContainer();
         controller->clearPortRows();
@@ -785,7 +789,7 @@ int main(int argc, char **argv)
         controller->addPortRow(53, 5353, QString(), QStringLiteral("udp"));
     }
 
-    // KCM_DOCKER_RENDER_OPEN_BUILD=1：展开镜像页的构建表单，并造一条进行中与一条失败的构建
+    // KCM_DOCKER_RENDER_OPEN_BUILD=1: expand the image build form, add one running and one failed build
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_OPEN_BUILD")) {
         auto *controller = stub->controller();
         QQuickItem *entry = nullptr;
@@ -805,8 +809,8 @@ int main(int argc, char **argv)
         if (entry) {
             QMetaObject::invokeMethod(entry, "clicked");
         }
-        // 造两条记录：一条进行中（第 3/7 步）、一条失败（带着失败步骤）
-        QTemporaryDir *contextDir = new QTemporaryDir(); // 进程退出时随渲染结束一起结束
+        // Two records: one running (step 3/7), one failed with its failing step
+        QTemporaryDir *contextDir = new QTemporaryDir(); // lives until the process exits
         QFile dockerfile(QDir(contextDir->path()).filePath(QStringLiteral("Dockerfile")));
         if (dockerfile.open(QIODevice::WriteOnly)) {
             dockerfile.write("FROM alpine:3.19\nRUN make\n");
@@ -844,7 +848,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // KCM_DOCKER_RENDER_OPEN_PRESETS=1：展开向导里的预设管理面板
+    // KCM_DOCKER_RENDER_OPEN_PRESETS=1: expand the wizard's preset management panel
     if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_OPEN_PRESETS")) {
         QQuickItem *manage = nullptr;
         std::function<void(QQuickItem *)> walkPresets = [&](QQuickItem *node) {
@@ -866,7 +870,7 @@ int main(int argc, char **argv)
         }
     }
 
-    // KCM_DOCKER_RENDER_CONNECT_NETWORK=1：展开"连接到网络"内联面板
+    // KCM_DOCKER_RENDER_CONNECT_NETWORK=1: expand the inline "connect to network" panel
         if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_CONNECT_NETWORK")) {
             QQuickItem *connectEntry = nullptr;
             std::function<void(QQuickItem *)> walkConnect = [&](QQuickItem *node) {
@@ -888,7 +892,7 @@ int main(int argc, char **argv)
             }
         }
 
-        // KCM_DOCKER_RENDER_CREATE_NETWORK=1：打开创建网络对话框（复核表单排版与校验提示）
+        // KCM_DOCKER_RENDER_CREATE_NETWORK=1: open the create-network dialog (form layout, validation)
         if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_CREATE_NETWORK")) {
             QQuickItem *createButton = nullptr;
             std::function<void(QQuickItem *)> walkCreate = [&](QQuickItem *node) {
@@ -911,12 +915,12 @@ int main(int argc, char **argv)
         }
 
 
-        // KCM_DOCKER_RENDER_OPEN_LOGIN=1：把认证页的登录对话框打开（复核对话框排版）
+        // KCM_DOCKER_RENDER_OPEN_LOGIN=1: open the auth page's login dialog (checks its layout)
         if (qEnvironmentVariableIsSet("KCM_DOCKER_RENDER_OPEN_LOGIN")) {
             QMetaObject::invokeMethod(item, "openLoginDialog", Q_ARG(QString, QString()));
         }
 
-        // KCM_DOCKER_RENDER_PORT_VIEW=map：端口页切到区间地图（复核聚类与限流）
+        // KCM_DOCKER_RENDER_PORT_VIEW=map: switch the ports page to the range map (clustering, capping)
         if (qEnvironmentVariable("KCM_DOCKER_RENDER_PORT_VIEW") == QLatin1String("map")) {
             item->setProperty("portViewMode", QStringLiteral("map"));
         }
@@ -942,13 +946,13 @@ int main(int argc, char **argv)
             }
         }
 
-        // 切到某个分区会触发按需刷新（例如网络页）：让假后端把这次刷新也完成掉，
-        // 否则截图上会停在"还没有数据"的中间态（真实环境里刷新是异步完成的）
+        // Switching sections triggers a refresh (e.g. the network page); let the fake backend
+        // finish it, or the screenshot freezes on "no data yet" (real refreshes are async)
         backend->completeRefresh();
 
     });
 
-    // 等布局与 delegate 完成（一次事件循环 + 一小段等待即可）
+    // Wait for layout and delegates (one event loop pass plus a short delay is enough)
     QTimer::singleShot(1200, &app, [&]() {
         const QImage image = window.grabWindow();
         if (image.isNull() || !image.save(output)) {

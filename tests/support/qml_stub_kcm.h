@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -22,10 +22,10 @@ namespace Kontainer
 {
 
 /*!
- * QML 加载测试用的 KCM 替身（ARCH_V2 §46）。
+ * KCM stub for QML load tests (ARCH_V2 §46).
  *
- * 提供 QML 里用到的 `kcm` 上下文属性（controller / name / description），
- * 让界面文件可以在没有 kcmshell6 的情况下被加载并检查错误。
+ * Provides the `kcm` context properties the QML uses (controller / name / description) so UI files
+ * can be loaded and checked for errors without kcmshell6.
  */
 class QmlStubKcm : public QObject
 {
@@ -39,16 +39,16 @@ public:
     explicit QmlStubKcm(DockerBackendInterface *backend, QObject *parent = nullptr);
 
     /*!
-     * 内存凭据后端（测试与离屏渲染都用它）。
+     * In-memory credential backend (used by tests and offscreen rendering).
      *
-     * 绝不用真实 KWallet：那会弹解锁框、并在开发者/用户的钱包里留下条目。
-     * 需要预置凭据的用例直接往 `entries` 里塞，或走控制器的登录流程。
+     * Never the real KWallet: that pops an unlock dialog and leaves entries in the user's wallet.
+     * Cases needing preset credentials insert into `entries` directly or drive the login flow.
      */
     FakeCredentialBackend *credentialBackend() const
     {
         return m_credentialBackend;
     }
-    /*! 目录选择的替身：不弹对话框，返回预设好的路径（空串模拟"用户取消"）。 */
+    /*! Directory picker double: no dialog, returns a preset path (empty string = user cancelled). */
     class FakeDirectoryPicker : public DirectoryPicker
     {
     public:
@@ -71,29 +71,29 @@ public:
         return m_directoryPicker;
     }
 
-    /*! 服务状态替身：默认三个 unit 都在运行（测试可以改成"服务未运行"）。 */
+    /*! Service status double: all three units run by default (tests can flip one to not running). */
     FakeServiceStatus *serviceStatus() const
     {
         return m_serviceStatus;
     }
 
-    /*! 提权客户端替身：服务卡片用例用它断言"确认后才发请求"。 */
+    /*! Privileged client double; service-card cases assert that requests follow confirmation only. */
     FakePrivilegedClient *privilegedClient() const
     {
         return m_privilegedClient;
     }
 
     /*!
-     * 挂载预设存储（指向临时目录）。
+     * Mount preset store (pointed at a temp dir).
      *
-     * 绝不用用户真实的 `~/.config/kcm_dockerrc`：测试会往里加/删预设。
+     * Never the real `~/.config/kcm_dockerrc`: tests add and remove presets in it.
      */
     MountPresetStore *mountPresets() const
     {
         return m_mountPresets;
     }
 
-    /*! 测试可以注入探测结果与打开失败（挂载分区的两种状态）。 */
+    /*! Tests can inject probe results and open failures (the mount section's two states). */
     FakeHostPathService *hostPaths() const
     {
         return m_hostPaths;

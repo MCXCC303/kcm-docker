@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,24 +13,24 @@
 using namespace Kontainer;
 
 /*!
- * 资源统计测试（ARCH_V2 §17–§21/§44）。
+ * Resource statistics tests (ARCH_V2 §17–§21/§44).
  *
- * 统计公式属于业务逻辑（§18），因此必须在 C++ 侧被验证：
- * 首个采样、第二个采样、零增量、计数器回绕、缺失内存上限、畸形数据。
+ * The stats formulas are business logic (§18) and must be verified on the C++ side:
+ * first sample, second sample, zero delta, counter rollback, missing memory limit, bad data.
  */
 class MetricsTest : public QObject
 {
     Q_OBJECT
 
 private Q_SLOTS:
-    // --- ContainerStats（纯计算） ---
+    // --- ContainerStats (pure computation) ---
     void computesCpuPercent();
     void cpuPercentHandlesZeroDeltaAndRollback();
     void cpuPercentNeedsOnlineCpus();
     void memoryUsedSubtractsPageCache();
     void memoryPercentRequiresRealLimit();
 
-    // --- MetricsModel（采样生命周期 + 速率） ---
+    // --- MetricsModel (sample lifecycle + rates) ---
     void firstSampleHasNoRates();
     void secondSampleComputesRates();
     void zeroDeltaYieldsZeroRate();
@@ -68,11 +68,11 @@ void MetricsTest::computesCpuPercent()
 
 void MetricsTest::cpuPercentHandlesZeroDeltaAndRollback()
 {
-    // systemDelta == 0：不能除零，也不能给 NaN
+    // systemDelta == 0: no division by zero, no NaN
     const ContainerStats zero = makeStats(100, 500, 100, 500, 4);
     QCOMPARE(zero.cpuPercent(), 0.0);
 
-    // 计数器回绕（容器重启后 cpu_total 变小）：返回 0 而不是负数/天文数字
+    // Counter rollback (cpu_total shrinks after a restart): 0, not negative or absurd
     const ContainerStats rollback = makeStats(1000, 500, 2000, 400, 4);
     QCOMPARE(rollback.cpuPercent(), 0.0);
 }
@@ -90,7 +90,7 @@ void MetricsTest::memoryUsedSubtractsPageCache()
     stats.memoryCacheBytes = 10'000'000;
     QCOMPARE(stats.memoryUsedBytes(), quint64(100'000'000));
 
-    // cache 大于 usage（异常数据）时不能出现负数
+    // cache > usage (bad data) must not produce a negative value
     stats.memoryUsageBytes = 1000;
     stats.memoryCacheBytes = 5000;
     QCOMPARE(stats.memoryUsedBytes(), quint64(0));
@@ -101,7 +101,7 @@ void MetricsTest::memoryPercentRequiresRealLimit()
     ContainerStats stats;
     stats.memoryUsageBytes = 100;
     stats.memoryLimitBytes = 0;
-    QCOMPARE(stats.memoryPercent(), -1.0); // 无上限：不给虚假百分比（§19）
+    QCOMPARE(stats.memoryPercent(), -1.0); // no limit: no fake percentage (§19)
 
     stats.memoryLimitBytes = 400;
     QVERIFY(qAbs(stats.memoryPercent() - 25.0) < 0.001);
@@ -125,7 +125,7 @@ void MetricsTest::firstSampleHasNoRates()
 
     QCOMPARE(metrics.sampleCount(), 1);
     QVERIFY(metrics.hasData());
-    // 首个采样无法计算速率：必须是“未知”而不是 0（§20/§44）
+    // The first sample cannot compute rates: unknown, not 0 (§20/§44)
     QCOMPARE(metrics.networkRxPerSecond(), -1.0);
     QCOMPARE(metrics.networkTxPerSecond(), -1.0);
     QCOMPARE(metrics.blockReadPerSecond(), -1.0);
@@ -146,14 +146,14 @@ void MetricsTest::secondSampleComputesRates()
     metrics.addSample(first);
 
     ContainerStats second = makeStats(1'000'000'000ULL, 10'000'000'000ULL, 900'000'000ULL, 9'000'000'000ULL, 4);
-    second.timestamp = first.timestamp.addSecs(5); // 5 秒后
+    second.timestamp = first.timestamp.addSecs(5); // 5 seconds later
     second.networkRxBytes = 1'500'000; // +500000 bytes / 5s = 100000 B/s
     second.networkTxBytes = 2'000'000;
     metrics.addSample(second);
 
     QCOMPARE(metrics.sampleCount(), 2);
     QVERIFY(qAbs(metrics.networkRxPerSecond() - 100000.0) < 1.0);
-    QCOMPARE(metrics.networkTxPerSecond(), 0.0); // 零增量是合法的 0，不是未知
+    QCOMPARE(metrics.networkTxPerSecond(), 0.0); // a zero delta is a legitimate 0, not unknown
 }
 
 void MetricsTest::zeroDeltaYieldsZeroRate()
@@ -189,7 +189,7 @@ void MetricsTest::counterRollbackYieldsUnknownRate()
 
     ContainerStats second = first;
     second.timestamp = first.timestamp.addSecs(5);
-    second.blockWriteBytes = 500; // 容器重启导致计数器回绕
+    second.blockWriteBytes = 500; // counter rollback because the container restarted
     metrics.addSample(second);
 
     QCOMPARE(metrics.blockWritePerSecond(), -1.0);
@@ -229,7 +229,7 @@ void MetricsTest::stopReleasesHistoryAndSampling()
     QVERIFY(!metrics.sampling());
     QCOMPARE(metrics.sampleCount(), 0);
     QVERIFY(metrics.cpuHistory().isEmpty());
-    // 离开详情页后 backend 侧也不再需要采样（§27）
+    // After leaving the detail page the backend no longer needs to sample either (§27)
     QVERIFY(backend.samplingIds().isEmpty());
 }
 
@@ -241,7 +241,7 @@ void MetricsTest::repeatedFailuresStopSampling()
     metrics.start(QStringLiteral("cid"));
     QVERIFY(metrics.sampling());
 
-    // 容器在打开详情页后停止：连续失败达阈值后自动停止采样
+    // Container stops after the detail page opened: sampling stops once failures hit the threshold
     for (int i = 0; i < 3; ++i) {
         metrics.noteFailure();
     }
@@ -253,7 +253,7 @@ void MetricsTest::memoryLimitEqualToHostMeansUnlimited()
     MockDockerBackend backend;
     EngineInfo engine;
     engine.available = true;
-    engine.memoryTotalBytes = 32LL * 1024 * 1024 * 1024; // 宿主 32 GiB
+    engine.memoryTotalBytes = 32LL * 1024 * 1024 * 1024; // host has 32 GiB
     backend.setEngineInfo(engine);
 
     MetricsModel metrics;
@@ -262,11 +262,11 @@ void MetricsTest::memoryLimitEqualToHostMeansUnlimited()
 
     ContainerStats stats = makeStats(1, 10, 0, 0, 4);
     stats.memoryUsageBytes = 100'000'000;
-    stats.memoryLimitBytes = quint64(engine.memoryTotalBytes); // Docker 在无限制时报宿主内存
+    stats.memoryLimitBytes = quint64(engine.memoryTotalBytes); // Docker reports host memory when unlimited
     metrics.addSample(stats);
 
     QVERIFY(!metrics.memoryLimitEffective());
-    QCOMPARE(metrics.memoryPercent(), -1.0); // 不显示虚假百分比（§19）
+    QCOMPARE(metrics.memoryPercent(), -1.0); // no fake percentage (§19)
 }
 
 QTEST_GUILESS_MAIN(MetricsTest)

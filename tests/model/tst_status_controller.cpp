@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,7 +13,7 @@
 
 using namespace Kontainer;
 
-/*! UI 状态机与错误隔离测试（ARCH_V1 §14/§15/§16，使用 mock backend §30）。 */
+/*! UI state machine and error isolation (ARCH_V1 §14/§15/§16, mock backend §30). */
 class StatusControllerTest : public QObject
 {
     Q_OBJECT
@@ -112,7 +112,7 @@ void StatusControllerTest::errorIsolationKeepsWorkingSections()
     controller.refresh();
     backend.completeRefresh();
 
-    // 容器仍然可用 → 不能整页不可用（§15）
+    // Containers still work → the whole page must not go unusable (§15)
     QCOMPARE(int(controller.state()), int(StatusController::State::Ready));
     QCOMPARE(controller.containers()->count(), 1);
     QVERIFY(!controller.containersError().isEmpty() == false);
@@ -157,7 +157,7 @@ void StatusControllerTest::sectionErrorsAreClearedByLaterSuccess()
     backend.completeRefresh();
     QVERIFY(!controller.containersError().isEmpty());
 
-    // 下一次成功必须清掉错误
+    // The next success must clear the error
     controller.refresh();
     backend.completeRefresh();
     QVERIFY(controller.containersError().isEmpty());
@@ -207,7 +207,7 @@ void StatusControllerTest::autoRefreshIsLowFrequencyAndCanBeDisabled()
     MockDockerBackend backend;
     StatusController controller(&backend);
 
-    // ARCH_V2 §13.1：默认 5 秒；间隔集中定义在 RefreshPolicy，测试也不再写 magic number
+    // ARCH_V2 §13.1: default is 5 s; intervals live in RefreshPolicy so tests use no magic numbers
     const int expectedFastMs = int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kDefaultRefreshInterval).count());
     const int expectedStorageMs = int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kStorageRefreshInterval).count());
     QCOMPARE(controller.autoRefreshInterval(), expectedFastMs);
@@ -225,7 +225,7 @@ void StatusControllerTest::autoRefreshIsLowFrequencyAndCanBeDisabled()
 
 
 /*!
- * §14：QML 不得用多个布尔拼装状态，因此每个数据集都必须能拿到单一枚举状态。
+ * §14: QML must not assemble state from booleans, so every data set needs one enum state.
  */
 void StatusControllerTest::exposesExplicitSectionStates()
 {
@@ -241,7 +241,7 @@ void StatusControllerTest::exposesExplicitSectionStates()
 
     StatusController controller(&backend);
 
-    // 首次刷新发起前：Engine 处于 Loading，而不是"未连接"
+    // Before the first refresh: Engine is Loading, not "disconnected"
     QCOMPARE(int(controller.engineState()), int(StatusController::EngineState::Loading));
     QCOMPARE(int(controller.containersState()), int(StatusController::ListState::Idle));
     QCOMPARE(int(controller.imagesState()), int(StatusController::ListState::Idle));
@@ -259,14 +259,14 @@ void StatusControllerTest::exposesExplicitSectionStates()
     backend.completeRefresh();
     QCOMPARE(int(controller.engineState()), int(StatusController::EngineState::Ready));
     QCOMPARE(int(controller.containersState()), int(StatusController::ListState::Ready));
-    QCOMPARE(int(controller.imagesState()), int(StatusController::ListState::Empty)); // 请求成功但列表为空
-    // QML 契约：状态 key 必须稳定（QML 通过这些字符串判断展示）
+    QCOMPARE(int(controller.imagesState()), int(StatusController::ListState::Empty)); // ok but list empty
+    // QML contract: the state keys must stay stable (QML switches on these strings)
     QCOMPARE(controller.stateKey(), QStringLiteral("ready"));
     QCOMPARE(controller.engineStateKey(), QStringLiteral("ready"));
     QCOMPARE(controller.containersStateKey(), QStringLiteral("ready"));
     QCOMPARE(controller.imagesStateKey(), QStringLiteral("empty"));
 
-    // 已有数据时再次刷新 → refreshing（UI 显示 Connected + 转圈）
+    // Refresh again with data present → refreshing (UI shows Connected + spinner)
     controller.refresh();
     QCOMPARE(controller.engineStateKey(), QStringLiteral("refreshing"));
     backend.completeRefresh();
@@ -280,7 +280,7 @@ void StatusControllerTest::emptyListShowsEmptyStateNotError()
     info.available = true;
     info.countsAvailable = true;
     backend.setEngineInfo(info);
-    backend.setContainers({}); // 空列表不是错误（§38）
+    backend.setContainers({}); // an empty list is not an error (§38)
 
     StatusController controller(&backend);
     controller.refresh();
@@ -296,8 +296,8 @@ void StatusControllerTest::reportsPartialEngineStateWhenSummaryIsMissing()
 {
     MockDockerBackend backend;
     EngineInfo info;
-    info.available = true; // /_ping 与 /version 成功
-    info.countsAvailable = false; // 但 /info 失败
+    info.available = true; // /_ping and /version succeed
+    info.countsAvailable = false; // but /info fails
     info.serverVersion = QStringLiteral("29.8.0");
     backend.setEngineInfo(info);
     backend.setNextFailure(DockerBackendInterface::Section::Engine,
@@ -315,7 +315,7 @@ void StatusControllerTest::reportsPartialEngineStateWhenSummaryIsMissing()
 }
 
 /*!
- * §15：Last Updated 必须反映真实的成功更新时间，而不是刷新尝试时间。
+ * §15: Last Updated must reflect the real last success, not the last attempt.
  */
 void StatusControllerTest::tracksLastSuccessfulUpdate()
 {
@@ -327,18 +327,18 @@ void StatusControllerTest::tracksLastSuccessfulUpdate()
     QVERIFY(!controller.stale());
 
     controller.refresh();
-    QVERIFY(!controller.lastUpdated().isValid()); // 还没成功
+    QVERIFY(!controller.lastUpdated().isValid()); // no success yet
 
     backend.completeRefresh();
     QVERIFY(controller.lastUpdated().isValid());
     QVERIFY(!controller.updateFailed());
 
     /*
-     * 连续失败达到阈值 → stale（§16）。
+     * Consecutive failures reach the threshold → stale (§16).
      *
-     * 注意：这里必须走**自动**刷新路径。手动刷新会清零失败计数（B2 的修复：
-     * 服务恢复后手动刷新不该继续显示"更新失败"），所以用 refresh() 累加失败是测不到 stale 的——
-     * 这一点本身也是那条修复的断言（见 manualRefreshClearsTheStickyFailureFlag）。
+     * This must use the **automatic** path: a manual refresh resets the failure count (fix B2 — after
+     * recovery it must not still say "update failed"), so refresh() never accumulates to stale, which
+     * is itself the assertion for that fix (see manualRefreshClearsTheStickyFailureFlag).
      */
     const DockerError failure(DockerError::Kind::EngineError, QStringLiteral("boom"));
     for (int i = 0; i < RefreshPolicy::kStaleAfterFailedCycles; ++i) {
@@ -348,12 +348,12 @@ void StatusControllerTest::tracksLastSuccessfulUpdate()
     }
     QVERIFY(controller.updateFailed());
     QVERIFY(controller.stale());
-    QVERIFY(controller.lastUpdated().isValid()); // 旧的成功时间仍然保留
+    QVERIFY(controller.lastUpdated().isValid()); // the old success time is kept
 }
 
 /*!
- * §30/§55：storage 失败后的重试入口必须只重试该数据集，
- * 而且 QML 不能直接访问 backend（§4/§43），所以走 controller 的显式方法。
+ * §30/§55: the retry entry point after a storage failure retries that data set only, and QML has no
+ * direct access to the backend (§4/§43), so it goes through an explicit controller method.
  */
 void StatusControllerTest::retryStorageOnlyRefreshesStorage()
 {
@@ -371,7 +371,7 @@ void StatusControllerTest::retryStorageOnlyRefreshesStorage()
 }
 
 /*!
- * B3：一次都没成功过、但已经尝试过并失败时，引擎状态必须是"不可用"而不是永远"正在加载"。
+ * B3: after a first attempt that failed, the engine state must be "unavailable", not stuck at "loading".
  */
 void StatusControllerTest::failedRefreshDoesNotStayInLoading()
 {
@@ -382,7 +382,7 @@ void StatusControllerTest::failedRefreshDoesNotStayInLoading()
     backend.setNextFailure(DockerBackendInterface::Section::Images, error);
 
     StatusController controller(&backend);
-    QCOMPARE(controller.engineStateKey(), QStringLiteral("loading")); // 还没请求过：加载中是合理的
+    QCOMPARE(controller.engineStateKey(), QStringLiteral("loading")); // never requested: loading is right
 
     controller.refresh();
     backend.completeRefresh();
@@ -393,7 +393,7 @@ void StatusControllerTest::failedRefreshDoesNotStayInLoading()
 }
 
 /*!
- * B2：手动刷新是一次"重新开始"——上一次的失败标记不能粘住。
+ * B2: a manual refresh is a fresh start — the previous failure flag must not stick.
  */
 void StatusControllerTest::manualRefreshClearsTheStickyFailureFlag()
 {
@@ -408,24 +408,24 @@ void StatusControllerTest::manualRefreshClearsTheStickyFailureFlag()
     backend.completeRefresh();
     QVERIFY2(controller.updateFailed(), "the first cycle failed, so the flag must be set");
 
-    // 服务恢复后用户点"刷新"：标记先清掉，再按本轮结果重算
+    // After recovery the user hits refresh: the flag clears first, then this cycle's result decides
     controller.refresh();
     QVERIFY2(!controller.updateFailed(), "a manual refresh restarts the failure accounting");
     backend.completeRefresh();
 }
 
 /*!
- * B4：请求卡住（永远不回来）时，看门狗必须放弃在途请求，让界面回到可重试的状态。
+ * B4: when a request hangs forever the watchdog must abandon it and return the UI to a retryable state.
  */
 void StatusControllerTest::watchdogAbandonsStuckRequests()
 {
     MockDockerBackend backend;
     StatusController controller(&backend);
-    // 用例里把看门狗压到 50ms（默认 20 秒，测试不能等）
+    // The watchdog is lowered to 50 ms here (default is 20 s, too slow for a test)
     controller.setInFlightWatchdogMs(50);
     QCOMPARE(controller.inFlightWatchdogMs(), 50);
 
-    backend.setStallRequests(true); // daemon 半死不活：socket 接了但不回数据
+    backend.setStallRequests(true); // half-dead daemon: socket accepted but no data comes back
     controller.refresh();
     QVERIFY2(controller.busy(), "the refresh is in flight");
 
@@ -433,7 +433,7 @@ void StatusControllerTest::watchdogAbandonsStuckRequests()
     QCOMPARE(controller.engineStateKey(), QStringLiteral("unavailable"));
     QVERIFY2(!controller.engineError().isEmpty(), "the timeout must be reported as a reason");
 
-    // 服务恢复后可以重新刷新（不会因为上一次被放弃而卡住）
+    // After recovery a new refresh works (an abandoned one does not wedge the controller)
     backend.setStallRequests(false);
     controller.refresh();
     backend.completeRefresh();
@@ -441,7 +441,8 @@ void StatusControllerTest::watchdogAbandonsStuckRequests()
 }
 
 /*!
- * B1：服务状态决定"已连接"的说法——socket 在、服务停了时不能只说"已连接"。
+ * B1: service state decides the "connected" wording — a live socket with a stopped service
+ * must not be reported as plain "connected".
  */
 void StatusControllerTest::serviceStatesShapeTheConnectionKey()
 {
@@ -454,24 +455,24 @@ void StatusControllerTest::serviceStatesShapeTheConnectionKey()
     FakeServiceStatus services;
     StatusController controller(&backend, nullptr, nullptr, nullptr, nullptr, nullptr, &services);
 
-    // 三个 unit 都在运行 + 刷新成功 → 已连接
+    // All three units running + refresh succeeded → connected
     controller.refresh();
     backend.completeRefresh();
     QCOMPARE(controller.connectionKey(), QStringLiteral("connected"));
 
-    // docker.service 停了（socket 还在：正是用户遇到的场景）→ 必须提示"服务未运行"
+    // docker.service stopped with the socket up (the user-reported case) → must say "service not running"
     services.setUnitState(QStringLiteral("docker.service"), QStringLiteral("inactive"));
     QCOMPARE(controller.connectionKey(), QStringLiteral("connectedServicesDown"));
 
-    // 服务全部停掉：即使还留着上一次读到的引擎数据，也只能说"服务未运行"
+    // All services stopped: even with cached engine data, it must still say "service not running"
     services.setUnitState(QStringLiteral("docker.socket"), QStringLiteral("inactive"));
     QCOMPARE(controller.connectionKey(), QStringLiteral("connectedServicesDown"));
 
     /*
-     * 从未连上过（引擎数据不可用）+ 服务未运行 → "未连接 + 服务未运行"。
+     * Never connected (no engine data) + services down → "disconnected, services down".
      *
-     * 注意：控制器会**保留**上一次读到的引擎数据（错误隔离），所以这里必须用一个
-     * 全新的控制器，而不是把老控制器的引擎数据清掉——后者不会发生（也不该发生）。
+     * The controller **keeps** the last engine data (error isolation), so this needs a fresh controller;
+     * clearing the old one's engine data cannot happen and should not.
      */
     {
         MockDockerBackend freshBackend;
@@ -484,12 +485,12 @@ void StatusControllerTest::serviceStatesShapeTheConnectionKey()
         QCOMPARE(fresh.connectionKey(), QStringLiteral("disconnectedServicesDown"));
     }
 
-    // 服务恢复：手里还有上一次读到的引擎数据，可以如实说"已连接"（刷新正在进行）
+    // Services recover: with cached engine data, "connected" is honest (a refresh is in flight)
     services.setUnitState(QStringLiteral("docker.socket"), QStringLiteral("active"));
     services.setUnitState(QStringLiteral("docker.service"), QStringLiteral("active"));
     QCOMPARE(controller.connectionKey(), QStringLiteral("connected"));
 
-    // 刷新失败之后不能再自称"已连接"（缓存的数据还在，但用户点什么都失败）
+    // After a failed refresh it must not claim "connected" (cache is stale, every action fails)
     backend.setNextFailure(DockerBackendInterface::Section::Containers,
                            DockerError(DockerError::Kind::DockerUnavailable, QStringLiteral("daemon went away")));
     controller.requestAutomaticRefreshForTesting();
@@ -497,19 +498,19 @@ void StatusControllerTest::serviceStatesShapeTheConnectionKey()
     QVERIFY(controller.updateFailed());
     QCOMPARE(controller.connectionKey(), QStringLiteral("disconnected"));
 
-    // 手动刷新（重新开始）成功后：回到已连接
+    // After a successful manual refresh: back to connected
     controller.refresh();
     backend.completeRefresh();
     QVERIFY(!controller.updateFailed());
     QCOMPARE(controller.connectionKey(), QStringLiteral("connected"));
 
-    // 状态 key 的映射（systemd 的 ActiveState → 稳定 key）
+    // State key mapping (systemd ActiveState → stable key)
     QCOMPARE(services.stateKeyFor(QStringLiteral("docker.service")), QStringLiteral("running"));
     services.setUnitState(QStringLiteral("docker.service"), QStringLiteral("failed"));
     QCOMPARE(services.stateKeyFor(QStringLiteral("docker.service")), QStringLiteral("failed"));
     services.setUnitState(QStringLiteral("docker.service"), QString());
     QCOMPARE(services.stateKeyFor(QStringLiteral("docker.service")), QStringLiteral("unknown"));
-    // 白名单之外的 unit 一律 unknown（不接受任意名字）
+    // Units outside the allow-list are always unknown (no arbitrary names)
     QCOMPARE(services.stateKeyFor(QStringLiteral("sshd.service")), QStringLiteral("unknown"));
 }
 

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,7 +15,7 @@ namespace Kontainer
 {
 
 /*!
- * 可控的服务状态来源（测试用）：默认"三个 unit 都在运行"，用例可以逐项设置。
+ * Controllable service status source (for tests): all three units run by default, tests set units.
  */
 class FakeServiceStatus : public ServiceStatusBackend
 {
@@ -46,7 +46,7 @@ public:
         return m_services;
     }
 
-    /*! 设置某个 unit 的状态（`activeState` 传空表示"systemd 查不到"）。 */
+    /*! Set a unit's state (`activeState` empty = systemd cannot find it). */
     void setUnitState(const QString &unit, const QString &activeState, const QString &unitFileState = QStringLiteral("enabled"))
     {
         for (ServiceState &state : m_services) {
@@ -66,12 +66,13 @@ private:
 };
 
 /*!
- * 测试用的 backend（ARCH_V1 §30）。
+ * Backend for tests (ARCH_V1 §30).
  *
- * 让 model / controller 的测试不依赖真实 Docker daemon：
- *  - 测试设置“将要读到”的数据
- *  - refresh*() 只记录请求并进入 loading，由测试调用 completeRefresh() 决定何时完成
- *  - 可以为某个 dataset 注入失败，用来验证错误隔离
+ * Keeps model / controller tests independent of a real Docker daemon:
+ *  - the test sets the data "to be read"
+ *  - refresh*() only records the request and enters loading; the test decides when it finishes by
+ *    calling completeRefresh()
+ *  - a failure can be injected per dataset, to verify error isolation
  */
 class MockDockerBackend : public DockerBackendInterface
 {
@@ -85,50 +86,50 @@ public:
     void setImages(const QList<Image> &images);
     void setNetworks(const QList<Network> &networks);
     void setVolumes(const QList<Volume> &volumes);
-    /*! 最近一次刷新是否要求统计占用（界面在"只要名字"时可以关掉）。 */
+    /*! Whether the last refresh asked for usage stats (the UI can skip it when it only needs names). */
     bool lastVolumesRefreshUsedUsage() const
     {
         return m_lastVolumesIncludeUsage;
     }
-    /*! 最近一次创建网络请求（断言校验与请求内容）。 */
+    /*! Last network-create request (asserts validation and request content). */
     NetworkCreateRequest lastNetworkCreate() const
     {
         return m_lastNetworkCreate;
     }
-    /*! 最近一次删除的网络 id。 */
+    /*! Id of the last removed network. */
     QString lastRemovedNetwork() const
     {
         return m_lastRemovedNetwork;
     }
     void setStorageUsage(const StorageUsage &usage);
     void setContainerDetail(const ContainerDetail &detail);
-    /*! 按 id 存一份详情（渲染工具会同时准备"运行中"与"已暂停"两个页面）。 */
+    /*! Store a detail per id (the render tool prepares both the running and the paused page). */
     void setContainerDetailForId(const QString &id, const ContainerDetail &detail);
     void setImageDetail(const ImageDetail &detail);
     void setContainerStats(const ContainerStats &stats);
     void setEndpointName(const QString &name);
-    /*! 权限门（DockerCapabilities）会读这个 endpoint；测试用它构造可写 / 不可写场景。 */
+    /*! The capability gate (DockerCapabilities) reads this endpoint; tests build writable/read-only cases. */
     void setEndpoint(const DockerEndpoint &endpoint);
 
-    /*! 让指定 dataset 的下一次刷新失败。 */
+    /*! Make the next refresh of the given dataset fail. */
     void setNextFailure(Section section, const DockerError &error);
     void clearFailures();
 
-    /* --- 写操作（ARCH_V4 §2.2.4） --- */
+    /* --- Write operations (ARCH_V4 §2.2.4) --- */
     struct MutationCall {
         Mutation mutation = Mutation::StartContainer;
         QString targetKey;
-        /*! 删除镜像时的 force 标记。 */
+        /*! force flag when removing an image. */
         bool force = false;
     };
-    /*! 已发出但还没结束的写操作。 */
+    /*! Mutations issued but not yet finished. */
     QList<MutationCall> mutationCalls() const
     {
         return m_mutationCalls;
     }
     int mutationCount(Mutation mutation) const;
     QString lastMutationTarget(Mutation mutation) const;
-    /*! 被请求取消的引用（按引用取消，ARCH_V4 §2.4）。 */
+    /*! References requested for cancellation (cancel by reference, ARCH_V4 §2.4). */
     QStringList cancelledPulls() const
     {
         return m_cancelledPulls;
@@ -137,18 +138,18 @@ public:
     {
         return m_cancelAllCount;
     }
-    /*! 结束全部在途写操作（默认成功）；可指定结果与错误。 */
+    /*! Finish all in-flight mutations (success by default); outcome and error can be given. */
     void completeMutations(MutationOutcome outcome = MutationOutcome::Succeeded, const DockerError &error = DockerError());
-    /*! 只结束某一个目标的操作（用于「一路拉取结束、另一路继续」这类场景）。 */
+    /*! Finish only one target's mutation (e.g. one pull ends while the other keeps running). */
     void completeMutation(const QString &targetKey, MutationOutcome outcome, const DockerError &error = DockerError());
-    /*! 模拟引擎推送一条拉取进度。 */
+    /*! Simulate the engine pushing one pull progress update. */
     void emitPullProgress(const ImagePullProgress &progress);
 
-    /*! 结束当前这一轮刷新：发出 *Updated / sectionFailed / loadingChanged。 */
+    /*! Finish the current refresh round: emits *Updated / sectionFailed / loadingChanged. */
     void completeRefresh();
 
     int refreshCount(Section section) const;
-    /*! 仍在采样 stats 的容器 id（验证详情页生命周期，§27）。 */
+    /*! Container ids still being sampled (verifies detail-page lifecycle, §27). */
     QSet<QString> samplingIds() const
     {
         return m_statsWanted;
@@ -160,7 +161,7 @@ public:
     void refreshImages() override;
     void refreshNetworks() override;
 
-    /*! 网络列表被主动刷新过几次（创建容器入口/向导应当触发一次）。 */
+    /*! How often the network list was refreshed on demand (the create-container entry point must). */
     int networkRefreshCount() const
     {
         return m_networkRefreshCount;
@@ -174,12 +175,12 @@ public:
     void cancelImageBuild(const QString &buildId) override;
     void createContainer(const Kontainer::ContainerCreateRequest &request) override;
 
-    /*! 最近一次构建请求（断言查询参数与凭据头真的传下去了）。 */
+    /*! Last build request (asserts that query params and credential headers really get through). */
     ImageBuildRequest lastBuildRequest() const
     {
         return m_lastBuildRequest;
     }
-    /*! 让一路构建推进/结束（真实后端从流里读，这里由用例直接喂）。 */
+    /*! Advance/finish one build (the real backend reads the stream; here the test feeds it). */
     void emitBuildProgress(const QString &buildId, const Kontainer::ImageBuildUpdate &update);
     void emitBuildFinished(const QString &buildId,
                            DockerBackendInterface::MutationOutcome outcome,
@@ -191,17 +192,17 @@ public:
     }
     void createVolume(const QString &name, const QString &driver = {}, const QList<QPair<QString, QString>> &labels = {}) override;
 
-    /*! 最近一次创建容器的请求（断言表单字段真的传下去了）。 */
+    /*! Last container-create request (asserts that form fields really get through). */
     ContainerCreateRequest lastContainerCreate() const
     {
         return m_lastContainerCreate;
     }
-    /*! 让"创建成功"的 id 回来（真实后端在响应里拿到它，再经 containerCreated 发出）。 */
+    /*! Deliver the id of a successful create (the real backend reads it, then emits containerCreated). */
     void completeContainerCreate(const QString &id, const QString &warning = {});
     void removeVolume(const QString &name) override;
     void pruneVolumes() override;
 
-    /*! 最近一次创建的卷参数与删除的卷名（断言参数传递与校验）。 */
+    /*! Name/driver of the last created volume and the last removed volume (asserts argument passing). */
     QString lastCreatedVolumeName() const
     {
         return m_lastCreatedVolume.first;
@@ -218,7 +219,7 @@ public:
     {
         return m_pruneCalls;
     }
-    /*! 让 prune 的"成功明细"回来（真实后端在响应里拿到删除列表与回收空间）。 */
+    /*! Deliver prune's success detail (the real backend reads the removed list and reclaimed space). */
     void completePrune(const QStringList &names, qint64 reclaimedBytes);
     void refreshStorageUsage() override;
     void inspectContainer(const QString &id) override;
@@ -237,7 +238,7 @@ public:
     void connectNetwork(const QString &networkId, const QString &containerId, const QStringList &aliases = {}) override;
     void disconnectNetwork(const QString &networkId, const QString &containerId, bool force = false) override;
 
-    /*! 最近一次连接/断开请求（断言参数传递）。 */
+    /*! Last connect/disconnect request (asserts argument passing). */
     QPair<QString, QString> lastNetworkConnect() const
     {
         return m_lastNetworkConnect;
@@ -257,13 +258,13 @@ public:
     void startContainerLogs(const QString &id, bool tty, bool follow, int tailLines) override;
     void stopContainerLogs(const QString &id) override;
 
-    /* --- 日志流的注入与观察（ARCH_V5_V8 §3.1） --- */
+    /* --- Log stream injection and observation (ARCH_V5_V8 §3.1) --- */
 
-    /*! 把一段日志行当成"引擎推来的"发出去。 */
+    /*! Emit a chunk of log lines as if the engine pushed them. */
     void emitLogLines(const QString &id, const QList<Kontainer::LogLine> &lines);
-    /*! 结束日志流（默认自然结束）。 */
+    /*! End the log stream (naturally ended by default). */
     void finishLogs(const QString &id, LogStreamEnd end = LogStreamEnd::Ended, const Kontainer::DockerError &error = {});
-    /*! 最近一次 startContainerLogs 的参数。 */
+    /*! Arguments of the last startContainerLogs call. */
     QString lastLogContainerId() const
     {
         return m_lastLogContainerId;
@@ -285,21 +286,21 @@ public:
         return m_stoppedLogStreams.value(id);
     }
 
-    /* --- 认证校验的注入与观察（ARCH_V5_V8 §2.6） --- */
+    /* --- Auth check injection and observation (ARCH_V5_V8 §2.6) --- */
 
-    /*! 下线一次校验的结果（默认成功）。 */
+    /*! Set the result of one auth check (success by default). */
     void setAuthCheckResult(AuthCheckResult result, const QString &detail = {});
     /*!
-     * 是否延迟回应校验（默认 false = 立即回应）。
+     * Whether to defer the auth check response (default false = answer immediately).
      *
-     * 只有需要观察"校验进行中"的用例才打开它，否则每个用例都要记得补一次
-     * `completeAuthCheck()`，很容易写出假通过的测试。
+     * Only enable it for cases that must observe the "checking" state; otherwise every case has to
+     * remember a `completeAuthCheck()`, which easily produces false passes.
      */
     void setAuthCheckDeferred(bool deferred)
     {
         m_authCheckDeferred = deferred;
     }
-    /*! 把已排队的校验结果发出去（模拟引擎在那之后才回应）。 */
+    /*! Emit the queued auth check result (simulates the engine answering only afterwards). */
     void completeAuthCheck();
     QString lastAuthServerAddress() const
     {
@@ -313,16 +314,16 @@ public:
     {
         return m_authCheckCount;
     }
-    /*! 最近一次拉取带上的凭据（断言"钱包里的凭据真的传到了拉取路径"）。 */
+    /*! Credential attached to the last pull (asserts that wallet credentials reach the pull path). */
     RegistryCredential lastPullCredential() const
     {
         return m_lastPullCredential;
     }
     bool isLoading() const override;
-    /*! 看门狗兜底：把挂起的请求全部按失败送出（与真实后端的语义一致）。 */
+    /*! Watchdog fallback: fail every pending request (same semantics as the real backend). */
     void abandonInFlightRequests(const Kontainer::DockerError &error) override;
 
-    /*! 让请求"永远不完成"：用于验证看门狗（默认立即完成）。 */
+    /*! Make requests never complete, to exercise the watchdog (they complete immediately otherwise). */
     void setStallRequests(bool stall)
     {
         m_stallRequests = stall;

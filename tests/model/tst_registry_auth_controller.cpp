@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,13 +20,13 @@
 using namespace Kontainer;
 
 /*!
- * 认证管理控制器（ARCH_V5_V8 §2.6/§2.7）。
+ * Registry auth controller (ARCH_V5_V8 §2.6/§2.7).
  *
- * 这里钉的是**规则**而不是界面：
- *   1. 登录必须先过 `POST /auth`，失败**绝不落盘**；
- *   2. 钱包不可用时只降级（明确报错、不回退明文、不假装成功）；
- *   3. 模型里只有仓库地址与用户名——密码/令牌不进模型；
- *   4. CLI 导入只读、不覆盖，助手指管的条目不猜。
+ * These pin **rules**, not UI:
+ *   1. login must pass `POST /auth` first, a failure is **never** persisted;
+ *   2. an unavailable wallet only degrades (explicit error, no plaintext fallback, no fake success);
+ *   3. the model holds server address and username only — passwords/tokens never enter it;
+ *   4. CLI import is read-only and never overwrites, entries owned by the helper are left alone.
  */
 class RegistryAuthControllerTest : public QObject
 {
@@ -38,10 +38,10 @@ private:
 private Q_SLOTS:
     void initTestCase();
     /*!
-     * 每个用例前把 `DOCKER_CONFIG` 指到空目录。
+     * Point `DOCKER_CONFIG` at an empty directory before each case.
      *
-     * 这些用例会调 `refresh()`（静默识别 CLI 配置）与登录/移除（**写回** CLI 配置），
-     * 不隔离的话就会读改用户真实的 `~/.docker/config.json`——那是他的登录状态。
+     * The cases call `refresh()` (silent CLI detection) and login/remove (**write back** the CLI config),
+     * so without isolation they would read and rewrite the user's real `~/.docker/config.json`.
      */
     void init();
     void cleanup();
@@ -113,7 +113,7 @@ void RegistryAuthControllerTest::loginStoresOnlyAfterSuccessfulCheck()
     RegistryAuthController controller(&backend, &store);
     controller.refresh();
 
-    // 校验失败（401）：什么都不写
+    // Check fails (401): nothing is written
     backend.setAuthCheckResult(AuthResult::InvalidCredentials, QStringLiteral("unauthorized"));
     controller.login(QStringLiteral("registry.example.com"), QStringLiteral("alice"), QStringLiteral("wrong"));
     QCOMPARE(controller.lastErrorKey(), QStringLiteral("invalidCredentials"));
@@ -121,7 +121,7 @@ void RegistryAuthControllerTest::loginStoresOnlyAfterSuccessfulCheck()
     QVERIFY2(!store.hasCredential(QStringLiteral("registry.example.com")), "a failed check must not be stored");
     QVERIFY(controller.credentials()->empty());
 
-    // 校验成功：写入钱包，模型出现该仓库
+    // Check succeeds: stored in the wallet, the registry appears in the model
     backend.setAuthCheckResult(AuthResult::Succeeded);
     controller.login(QStringLiteral("https://Registry.Example.com/"), QStringLiteral("alice"), QStringLiteral("s3cret"));
     QVERIFY(controller.lastResultKey() == QStringLiteral("loginSucceeded"));
@@ -131,7 +131,7 @@ void RegistryAuthControllerTest::loginStoresOnlyAfterSuccessfulCheck()
     QCOMPARE(controller.credentials()->index(0, 0).data(RegistryCredentialModel::ServerAddressRole).toString(),
              QStringLiteral("registry.example.com"));
     QCOMPARE(controller.credentials()->index(0, 0).data(RegistryCredentialModel::UsernameRole).toString(), QStringLiteral("alice"));
-    // 传给后端的凭据就是用户输入的那条（校验用的是它，而不是别的仓库的）
+    // The backend gets exactly the entered credential (checked against it, not another registry's)
     QCOMPARE(backend.lastAuthCredential().username, QStringLiteral("alice"));
     QCOMPARE(backend.lastAuthCredential().password, QStringLiteral("s3cret"));
     QCOMPARE(backend.lastAuthServerAddress(), QStringLiteral("registry.example.com"));
@@ -151,7 +151,7 @@ void RegistryAuthControllerTest::loginRejectsIncompleteInput()
     controller.login(QStringLiteral("registry.example.com"), QStringLiteral("alice"), QString());
     QCOMPARE(controller.lastErrorKey(), QStringLiteral("noCredentials"));
 
-    // 参数不全时一个请求都不发
+    // Incomplete input sends no request at all
     QCOMPARE(backend.authCheckCount(), 0);
     QVERIFY(controller.credentials()->empty());
 }
@@ -159,7 +159,7 @@ void RegistryAuthControllerTest::loginRejectsIncompleteInput()
 void RegistryAuthControllerTest::loginRequiresAnAvailableWallet()
 {
     FakeCredentialBackend wallet;
-    wallet.enabled = false; // 用户关掉了钱包
+    wallet.enabled = false; // the user disabled the wallet
     CredentialStore store(&wallet);
     MockDockerBackend backend;
     RegistryAuthController controller(&backend, &store);
@@ -202,13 +202,13 @@ void RegistryAuthControllerTest::testCredentialDoesNotModifyAnything()
     QVERIFY(store.hasCredential(QStringLiteral("registry.example.com")));
     const QByteArray storedBefore = wallet.entries.value(QStringLiteral("registry.example.com"));
 
-    // 测试连接：用已保存的凭据校验，不改动存储
+    // Test connection: validate the stored credential without touching storage
     backend.setAuthCheckResult(AuthResult::RegistryUnreachable, QStringLiteral("dial tcp: no such host"));
     controller.testCredential(QStringLiteral("registry.example.com"));
     QCOMPARE(controller.lastErrorKey(), QStringLiteral("registryUnreachable"));
     QCOMPARE(wallet.entries.value(QStringLiteral("registry.example.com")), storedBefore);
 
-    // 没有保存过的仓库：明确说"没存过"，而不是发一个空凭据去校验
+    // Never-stored registry: say so plainly instead of validating an empty credential
     const int checksBefore = backend.authCheckCount();
     controller.testCredential(QStringLiteral("never.example.com"));
     QCOMPARE(controller.lastErrorKey(), QStringLiteral("noCredentialStored"));
@@ -233,7 +233,7 @@ void RegistryAuthControllerTest::removeDropsTheCredential()
     QVERIFY(controller.credentials()->empty());
     QCOMPARE(credentialsChanged.count(), 1);
 
-    // 移除不存在的仓库：同样成功（幂等），但不会谎报"已移除"
+    // Removing an absent registry still succeeds (idempotent) but never claims "removed"
     controller.removeCredential(QStringLiteral("ghcr.io"));
     QVERIFY(controller.lastResultKey() == QStringLiteral("removed"));
 }
@@ -247,7 +247,7 @@ void RegistryAuthControllerTest::modelNeverExposesSecrets()
     RegistryAuthController controller(&backend, &store);
     controller.login(QStringLiteral("registry.example.com"), QStringLiteral("alice"), QStringLiteral("s3cret"));
 
-    // 模型里只有地址、登录方式与用户名：密码/令牌永远不出现
+    // The model has address, auth kind and username only: password/token never appear
     const QHash<int, QByteArray> roles = controller.credentials()->roleNames();
     QVERIFY(!roles.values().contains(QByteArrayLiteral("password")));
     QVERIFY(!roles.values().contains(QByteArrayLiteral("identityToken")));
@@ -259,10 +259,10 @@ void RegistryAuthControllerTest::modelNeverExposesSecrets()
 }
 
 /*!
- * 打开页面时**静默**识别 CLI 配置里的条目（取消同步机制后的行为）。
+ * Opening the page **silently** picks up CLI-config entries (the sync mechanism was dropped).
  *
- * 用户在 CLI 里 `docker login` 过的仓库，打开这个页面就应该已经在列表里——
- * 没有任何"导入/同步"按钮。
+ * Registries the user logged into with `docker login` must already be listed when the page opens —
+ * there is no "import/sync" button.
  */
 void RegistryAuthControllerTest::cliEntriesAreRecognizedSilently()
 {
@@ -284,7 +284,7 @@ void RegistryAuthControllerTest::cliEntriesAreRecognizedSilently()
     QVERIFY(store.hasCredential(QStringLiteral("ghcr.io")));
     QVERIFY(store.hasCredential(QStringLiteral("index.docker.io")));
 
-    // 幂等：再打开一次不会重复导入，也不会覆盖钱包里的值
+    // Idempotent: opening again imports nothing and does not overwrite wallet values
     controller.refresh();
     QCOMPARE(controller.lastImportedCount(), 0);
     QCOMPARE(controller.lastAlreadyPresentCount(), 2);
@@ -293,7 +293,7 @@ void RegistryAuthControllerTest::cliEntriesAreRecognizedSilently()
 }
 
 /*!
- * 登录 / 移除都会**同步写回** CLI 配置文件（用户要求：静默维护同步）。
+ * Login and remove both **write back** the CLI config (user requirement: keep it in sync silently).
  */
 void RegistryAuthControllerTest::changesAreWrittenBackToTheCliConfig()
 {
@@ -310,8 +310,8 @@ void RegistryAuthControllerTest::changesAreWrittenBackToTheCliConfig()
     RegistryAuthController controller(&backend, &store);
     controller.refresh();
 
-    // 登录一个新仓库 → 写进 CLI 配置（docker CLI 因此也能用）
-    // 注意：登录时写入的是**明文等价**的 base64，这正是 docker CLI 自己的格式
+    // Login to a new registry → written into the CLI config (so the docker CLI can use it too)
+    // Note: what is written is **plaintext-equivalent** base64 — exactly the docker CLI's own format
     controller.login(QStringLiteral("registry.example.com"), QStringLiteral("carol"), QStringLiteral("s3cret"));
     QCOMPARE(controller.lastResultKey(), QStringLiteral("loginSucceeded"));
 
@@ -328,20 +328,20 @@ void RegistryAuthControllerTest::changesAreWrittenBackToTheCliConfig()
     const QJsonObject entry = auths.value(QStringLiteral("registry.example.com")).toObject();
     QCOMPARE(entry.value(QStringLiteral("auth")).toString(),
              QString::fromLatin1(QByteArrayLiteral("carol:s3cret").toBase64()));
-    // 文件里原有的条目必须保留，**Hub 那一条尤其不能被改**（曾经因为用了
-    // "从镜像引用推仓库"的函数做比较，把新仓库的凭据写进了 Hub 条目里）
+    // Existing entries must survive, **especially the Hub one** — a comparison that used the
+    // "registry from an image reference" helper once wrote a new registry's credential into it.
     QCOMPARE(auths.size(), 3);
     QCOMPARE(auths.value(QStringLiteral("https://index.docker.io/v1/")).toObject().value(QStringLiteral("auth")).toString(),
              QString::fromLatin1(QByteArrayLiteral("alice:hub-secret").toBase64()));
 
-    // 文件权限：等价于明文凭据，必须是 0600（目录 0700）
+    // File permissions: plaintext-equivalent credentials, so 0600 (directory 0700)
     const QFile::Permissions permissions = QFile::permissions(path);
     QVERIFY2(permissions.testFlag(QFile::ReadOwner) && permissions.testFlag(QFile::WriteOwner),
              "the config must stay readable/writable by the owner");
     QVERIFY2(!permissions.testFlag(QFile::ReadGroup) && !permissions.testFlag(QFile::ReadOther),
              "credentials must not be readable by group or others");
 
-    // 移除 → 同步从 CLI 配置里删掉
+    // Remove → also deleted from the CLI config
     controller.removeCredential(QStringLiteral("registry.example.com"));
     QVERIFY(file.open(QIODevice::ReadOnly));
     const QJsonObject afterRemove = QJsonDocument::fromJson(file.readAll()).object();
@@ -355,7 +355,7 @@ void RegistryAuthControllerTest::changesAreWrittenBackToTheCliConfig()
 void RegistryAuthControllerTest::walletLifecycleIsReportedToTheUi()
 {
     FakeCredentialBackend wallet;
-    wallet.synchronousOpen = false; // 模拟 KWallet：等用户解锁
+    wallet.synchronousOpen = false; // emulate KWallet: waits for the user to unlock
     CredentialStore store(&wallet);
     MockDockerBackend backend;
     RegistryAuthController controller(&backend, &store);

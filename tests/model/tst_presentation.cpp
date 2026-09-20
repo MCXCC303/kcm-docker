@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,10 +15,10 @@
 using namespace Kontainer;
 
 /*!
- * 展示助手里"看起来像纯逻辑"的那部分（ARCH_V2 §12）。
+ * The "seems pure logic" part of the presentation helper (ARCH_V2 §12).
  *
- * 目前只覆盖端口拓扑的连线取色下标：它必须是**纯函数**——同一个种子永远同一个下标，
- * 否则同一个容器的拓扑会在刷新后变色；同时分布要均匀，否则几十条连线会挤在一种颜色上。
+ * Only the port-topology line colour index: it must be a **pure function** (one seed, one index,
+ * else a container's topology recolours on refresh) and spread evenly across the palette.
  */
 class PresentationTest : public QObject
 {
@@ -46,14 +46,14 @@ void PresentationTest::colorIndexIsDeterministic()
 void PresentationTest::colorIndexSpreadsAcrossThePalette()
 {
     const Presentation presentation;
-    // 200 个不同的种子应当把 6 个色位都用上（FNV-1a 取模的均匀性）
+    // 200 distinct seeds must reach all 6 slots (FNV-1a modulo uniformity)
     QSet<int> used;
     for (int i = 0; i < 200; ++i) {
         used.insert(presentation.connectionColorIndex(QStringLiteral("container-%1|80/tcp|0.0.0.0:%2").arg(i).arg(20000 + i), 6));
     }
     QCOMPARE(used.size(), 6);
 
-    // 端口号变一位也要换色：种子必须包含映射自身，而不是只有容器 id
+    // A different port must recolour: the seed includes the mapping itself, not only the container id
     const int first = presentation.connectionColorIndex(QStringLiteral("cid-1|3000/tcp|0.0.0.0:20000"), 6);
     const int second = presentation.connectionColorIndex(QStringLiteral("cid-1|3001/tcp|0.0.0.0:20001"), 6);
     QVERIFY2(first != second, "different mappings must be able to take different slots");
@@ -62,7 +62,7 @@ void PresentationTest::colorIndexSpreadsAcrossThePalette()
 void PresentationTest::colorIndexHandlesDegenerateInput()
 {
     const Presentation presentation;
-    // 空种子（例如还没拿到容器 id）与非法配色长度都不能崩、不能越界
+    // Empty seed (no container id yet) or a bad palette size must neither crash nor index out of range
     QCOMPARE(presentation.connectionColorIndex(QString(), 6), 0);
     QCOMPARE(presentation.connectionColorIndex(QStringLiteral("cid"), 0), 0);
     QCOMPARE(presentation.connectionColorIndex(QStringLiteral("cid"), -3), 0);
@@ -70,25 +70,25 @@ void PresentationTest::colorIndexHandlesDegenerateInput()
 }
 
 /*!
- * 状态文案要跟着翻译域走（详情页的"关联容器/网络成员"列表用它）。
+ * State texts must follow the translation domain (detail page's linked-container/member lists).
  */
 void PresentationTest::stateTextFollowsTheDomain()
 {
     /*
-     * 语言必须在**第一次 i18n 调用之前**设好：ki18n 会缓存"域 + 语言"的查找结果，
-     * 先取过英文再切语言不会重新翻译（这个坑在本用例里实测踩到过）。
+     * The language must be set **before the first i18n call**: ki18n caches lookups per domain+language,
+     * an English lookup followed by a language switch is not retranslated (hit while writing this test).
      */
-    // 与 KCM 的启动顺序一致：先设域再做任何翻译（少了这一步 i18n 会以"无域"查找）
+    // Same order as the KCM startup: set the domain first, then translate (else i18n looks up no domain)
     setupTranslationDomain();
 
     Presentation presentation;
-    // 键就是 Docker 的状态字符串；未知键不能返回空串（界面会出现空白）
+    // The key is Docker's state string; an unknown key must not return an empty string (blank UI)
     QVERIFY(!presentation.stateText(QStringLiteral("running")).isEmpty());
     QVERIFY(!presentation.stateText(QStringLiteral("paused")).isEmpty());
     QVERIFY(!presentation.stateText(QStringLiteral("exited")).isEmpty());
     QVERIFY(!presentation.stateText(QStringLiteral("no-such-state")).isEmpty());
-    // 与容器列表用的是同一份文案（同一个 C++ 助手）；至于"是否翻成中文"——
-    // 那是 tst_i18n_consistency 的事（只有它带着译文目录与 zh_CN 环境跑）
+    // Same texts as the container list (same C++ helper); whether they turn Chinese
+    // is tst_i18n_consistency's job (only it runs with the catalogs and a zh_CN locale)
     QCOMPARE(presentation.stateText(QStringLiteral("running")), containerStateText(ContainerState::Running));
 
 }

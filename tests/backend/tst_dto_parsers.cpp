@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,8 +14,8 @@
 using namespace Kontainer;
 
 /*!
- * DTO / parser 单元测试（ARCH_V1 §28.1）：
- * 正常记录、缺少可选字段、未知字段、空列表、非法 JSON、字段类型错误。
+ * DTO / parser unit tests (ARCH_V1 §28.1):
+ * normal records, missing optional fields, unknown fields, empty lists, invalid JSON, wrong field types.
  */
 class DtoParsersTest : public QObject
 {
@@ -47,7 +47,7 @@ private Q_SLOTS:
     void versionWithoutApiVersionFails();
     void infoToleratesMissingFields();
 
-    // --- stats（§44 Metrics：畸形数据） ---
+    // --- stats (§44 Metrics: malformed payloads) ---
     void parsesStats();
     void statsWithoutCpuStatsFails();
     void statsPayloadMustBeObject();
@@ -80,7 +80,7 @@ void DtoParsersTest::parsesContainer()
 
     const DockerContainerDTO &dto = containers.first();
     QCOMPARE(dto.id, QStringLiteral("cdb609ac2a7cd0ddfc2c33cee1a71b8314052b645b9cdc2d1793fc5a8e8b2976"));
-    QCOMPARE(dto.name, QStringLiteral("dl-medai")); // 前导 '/' 已去掉
+    QCOMPARE(dto.name, QStringLiteral("dl-medai")); // leading '/' stripped
     QCOMPARE(dto.image, QStringLiteral("registry.example/practice:medai"));
     QCOMPARE(dto.state, QStringLiteral("running"));
     QCOMPARE(dto.status, QStringLiteral("Up 9 hours"));
@@ -94,7 +94,7 @@ void DtoParsersTest::parsesContainer()
 
 void DtoParsersTest::containerWithoutOptionalFields()
 {
-    // 老引擎没有 Health 字段；Ports 可以为空
+    // Old engines have no Health field; Ports may be empty
     const QByteArray payload = R"([{"Id": "abc123", "Names": ["/test"], "State": "exited"}])";
 
     QString error;
@@ -110,7 +110,7 @@ void DtoParsersTest::containerWithoutOptionalFields()
 
 void DtoParsersTest::containerWithUnknownFields()
 {
-    // 未知字段必须被忽略（§41）
+    // Unknown fields must be ignored (§41)
     const QByteArray payload = R"([{
         "Id": "abc123", "Names": ["/test"], "State": "running",
         "SomeFutureField": {"nested": [1, 2, 3]}, "ImageManifestDescriptor": {"digest": "sha256:x"}
@@ -125,7 +125,7 @@ void DtoParsersTest::containerWithUnknownFields()
 
 void DtoParsersTest::containerWithWrongFieldTypes()
 {
-    // 类型错误的可选字段不能被当作有效值，也不能让整条记录/整个响应失败
+    // Wrongly typed optional fields must neither count as values nor fail the record or response
     const QByteArray payload = R"([{
         "Id": "abc123", "Names": ["/test"], "State": "running",
         "Created": "not-a-number", "Ports": "not-an-array", "Health": 42, "Image": 7
@@ -155,9 +155,9 @@ void DtoParsersTest::containerWithoutRequiredFieldsIsSkipped()
     const QList<DockerContainerDTO> containers = DockerContainerDTO::listFromJson(payload, &error, &skipped);
 
     QVERIFY(error.isEmpty());
-    QCOMPARE(skipped, 2); // 缺 Id / 缺 State 的两条被跳过
+    QCOMPARE(skipped, 2); // the entries missing Id / State are skipped
     QCOMPARE(containers.size(), 2);
-    // 没有 Names 时用短 ID 兜底，保证容器仍然可见
+    // Without Names, fall back to the short ID so the container stays visible
     QCOMPARE(containers.at(0).id, QStringLiteral("def"));
     QCOMPARE(containers.at(0).name, QStringLiteral("def"));
     QCOMPARE(containers.at(1).id, QStringLiteral("ghi"));
@@ -221,7 +221,7 @@ void DtoParsersTest::parsesImage()
 
 void DtoParsersTest::imageWithoutTagsIsDangling()
 {
-    // RepoTags / RepoDigests 为 null 是中间层镜像的正常情况
+    // RepoTags / RepoDigests null is normal for intermediate layers
     const QByteArray payload = R"([{"Id": "sha256:deadbeef", "RepoTags": null, "RepoDigests": null, "Size": 1024}])";
 
     QString error;
@@ -229,12 +229,12 @@ void DtoParsersTest::imageWithoutTagsIsDangling()
     QVERIFY(error.isEmpty());
     QCOMPARE(images.size(), 1);
     QVERIFY(images.first().repoTags.isEmpty());
-    QCOMPARE(images.first().containers, -1); // 未提供
+    QCOMPARE(images.first().containers, -1); // not provided
 }
 
 void DtoParsersTest::imageWithMultipleTags()
 {
-    // §8.1：一个 image 可能对应多个 repository/tag，domain 必须完整保留
+    // §8.1: one image may carry several repository/tag pairs; the domain must be kept intact
     const QByteArray payload = R"([{
         "Id": "sha256:aaaa",
         "RepoTags": ["ghcr.io/dockur/windows:6.05", "windows:latest", "windows:6"],
@@ -264,7 +264,7 @@ void DtoParsersTest::imageListInvalidPayload()
 
 void DtoParsersTest::parsesVersion()
 {
-    // Docker 29 的 /version 结构（ApiVersion 是协商的唯一来源）
+    // Docker 29 /version shape (ApiVersion is the only negotiation source)
     const QByteArray payload = R"({
         "Platform": {"Name": ""},
         "Version": "29.8.0",
@@ -347,7 +347,7 @@ void DtoParsersTest::parsesStats()
     QVERIFY(dto.has_value());
     QCOMPARE(dto->onlineCpus, 4);
     QCOMPARE(dto->memoryCacheBytes, quint64(10000000));
-    QCOMPARE(dto->networkRxBytes, quint64(1500)); // 多网卡求和
+    QCOMPARE(dto->networkRxBytes, quint64(1500)); // sum over interfaces
     QCOMPARE(dto->networkTxBytes, quint64(2100));
     QCOMPARE(dto->blockReadBytes, quint64(4096));
     QCOMPARE(dto->blockWriteBytes, quint64(8192));
@@ -370,7 +370,7 @@ void DtoParsersTest::statsPayloadMustBeObject()
 
 void DtoParsersTest::statsFallsBackToPercpuUsage()
 {
-    // 老引擎没有 online_cpus：用 percpu_usage 条目数兜底
+    // Old engines have no online_cpus: fall back to the percpu_usage entry count
     const QByteArray payload = R"({
         "cpu_stats": {"cpu_usage": {"total_usage": 10, "percpu_usage": [1, 2, 3, 4, 5, 6, 7, 8]},
                       "system_cpu_usage": 100},
@@ -384,7 +384,7 @@ void DtoParsersTest::statsFallsBackToPercpuUsage()
 
 void DtoParsersTest::statsHandlesCgroupV1Cache()
 {
-    // cgroup v1 只有 cache / total_inactive_file
+    // cgroup v1 only has cache / total_inactive_file
     const QByteArray payload = R"({
         "cpu_stats": {"cpu_usage": {"total_usage": 10}, "system_cpu_usage": 100, "online_cpus": 2},
         "memory_stats": {"usage": 1000, "limit": 2000, "stats": {"total_inactive_file": 400}}
@@ -398,7 +398,7 @@ void DtoParsersTest::statsHandlesCgroupV1Cache()
 
 void DtoParsersTest::statsBlockIoToleratesSyncAsyncOnly()
 {
-    // 只有 sync/async 时不能重复计数（sync+async 视为总量）
+    // With only sync/async, do not double count (sync+async is the total)
     const QByteArray payload = R"({
         "cpu_stats": {"cpu_usage": {"total_usage": 10}, "system_cpu_usage": 100, "online_cpus": 2},
         "blkio_stats": {"io_service_bytes_recursive": [{"op": "sync", "value": 100}, {"op": "async", "value": 50}]}
@@ -411,10 +411,10 @@ void DtoParsersTest::statsBlockIoToleratesSyncAsyncOnly()
 }
 
 /*!
- * 网络列表解析（ARCH_V5_V8 §3.2）。
+ * Network list parsing (ARCH_V5_V8 §3.2).
  *
- * 样例取自本机真实 daemon 的 `GET /networks`（bridge / none / 一个 compose 建的网络 / host），
- * 字段缺失、类型不符、成员地址带子网前缀这些真实形态都要处理。
+ * Samples come from a real local daemon `GET /networks` (bridge / none / a compose network / host):
+ * missing fields, wrong types and member addresses carrying a subnet prefix must all be handled.
  */
 void DtoParsersTest::parsesNetworks()
 {
@@ -474,7 +474,7 @@ void DtoParsersTest::parsesNetworks()
     QCOMPARE(builtin.subnetText(), QStringLiteral("172.17.0.0/16"));
     QCOMPARE(builtin.primaryGateway(), QStringLiteral("172.17.0.1"));
     QCOMPARE(builtin.memberCount(), 0);
-    // 选项按 key 排序：顺序稳定，界面不会每次刷新都换顺序
+    // Options are sorted by key: stable order, the UI does not reshuffle on every refresh
     QCOMPARE(builtin.options.size(), 2);
     QCOMPARE(builtin.options.first().first, QStringLiteral("com.docker.network.bridge.name"));
 
@@ -482,7 +482,7 @@ void DtoParsersTest::parsesNetworks()
     QVERIFY2(!compose.isPredefined(), "a compose network must be deletable");
     QCOMPARE(compose.labels.size(), 1);
     QCOMPARE(compose.memberCount(), 1);
-    // 成员地址去掉子网前缀（daemon 给的是 172.18.0.2/16）
+    // Member addresses drop the subnet prefix (the daemon reports 172.18.0.2/16)
     QCOMPARE(compose.members.first().name, QStringLiteral("app"));
     QCOMPARE(compose.members.first().ipv4Address, QStringLiteral("172.18.0.2"));
     QCOMPARE(compose.members.first().macAddress, QStringLiteral("02:42:ac:12:00:02"));
@@ -490,7 +490,7 @@ void DtoParsersTest::parsesNetworks()
 
 void DtoParsersTest::networkWithoutOptionalFields()
 {
-    // host / none 这类网络没有 IPAM、没有选项：不能因为缺字段就整条丢掉
+    // host / none have no IPAM and no options: missing fields must not drop the whole entry
     const QByteArray payload = R"([
         {"Name": "host", "Id": "2222222222222222222222222222222222222222222222222222222222222222", "Driver": "host"},
         {"Name": "none", "Id": "3333333333333333333333333333333333333333333333333333333333333333", "Driver": "null",
@@ -511,7 +511,7 @@ void DtoParsersTest::networkWithoutOptionalFields()
 
 void DtoParsersTest::networkListIsRobust()
 {
-    // 坏条目跳过、好的保留；整体不是数组则报错且返回空
+    // Skip broken entries, keep good ones; a non-array payload errors out and returns empty
     const QByteArray payload = R"([
         {"Name": "good", "Id": "4444444444444444444444444444444444444444444444444444444444444444", "Driver": "bridge"},
         {"Name": "no-id"},

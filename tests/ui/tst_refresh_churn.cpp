@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -22,25 +22,25 @@
 using namespace Kontainer;
 
 /*!
- * 刷新抖动压力测试（针对真实会话里出现过的段错误）。
+ * Refresh-churn stress test for the segfault seen in a real user session.
  *
- * 背景：用户在实际会话中运行 kcmshell6 时崩溃，core dump 的栈是
+ * Background: kcmshell6 crashed in a live session; the core dump stack was
  *
  *     qmlAttachedPropertiesObject ← QQuickLayoutAttached::sizeHint
  *     ← QGridLayoutEngine::fillRowData ← QQuickLayout::effectiveSizeHints_helper
  *     ← QQuickLayout::updatePolish ← QQuickWindowPrivate::polishItems
  *
- * 即在**布局 polish 期间**访问布局条目的附加属性时踩到悬垂指针。
- * 触发条件是「布局正在重新计算尺寸时，里面的条目被销毁重建」——
- * 而 Repeater 的 model 若是一个每次刷新都会重新求值的 JS 数组，
- * 恰好每次数据变化都会重建全部 delegate。
+ * i.e. a dangling pointer while reading attached properties of layout entries
+ * during layout polish. The trigger is "entries are destroyed and recreated while
+ * the layout recomputes its sizes" -- which a Repeater hits whenever its model is
+ * a JS array re-evaluated on every refresh: each data change rebuilds all delegates.
  *
- * 本测试用真实数据变化（计数、容器列表、存储占用）+ 窗口尺寸变化 + 分区切换
- * 反复冲击这三个页面：只要再出现同类问题，进程会在这里直接崩掉，
- * 而不是等到用户会话里才暴露。
+ * This test hammers the three pages with real data changes (counts, container list,
+ * storage usage) + window resizes + section switches: a recurrence crashes the
+ * process here instead of waiting for a user session to expose it.
  *
- * 说明：断言的是「跑完全部迭代没有崩溃 / 没有 QML 运行时错误」，
- * 因此崩溃会以测试进程异常退出的形式被 ctest 捕获。
+ * It asserts "all iterations ran without a crash and without QML runtime errors",
+ * so a crash shows up as an abnormal test process exit captured by ctest.
  */
 class RefreshChurnTest : public QObject
 {
@@ -60,7 +60,7 @@ private:
     static QQuickItem *childByObjectName(QQuickItem *root, const QString &objectName);
     static QStringList takeQmlErrors();
 
-    /*! 构造一页数据，iteration 决定取值，保证每次刷新数据都真的变化。 */
+    /*! Build one page of data; iteration drives the values so every refresh really changes them. */
     void fillData(int iteration);
 
     std::unique_ptr<MockDockerBackend> m_backend;
@@ -141,15 +141,16 @@ void RefreshChurnTest::cleanup()
 }
 
 /*!
- * 每次迭代都让数据真的变化：计数变化 → MainPage 的统计块数组重新求值；
- * 容器列表条数变化 → 列表模型重置；存储各项在可用 / 不可用之间切换 →
- * StorageBar 的分段数组重新求值。
+ * Every iteration changes the data for real: count changes → MainPage re-evaluates
+ * its stat-tile array; a change in the container list count → the list model resets;
+ * storage entries flip between available / unavailable → StorageBar re-evaluates
+ * its segment array.
  */
 void RefreshChurnTest::fillData(int iteration)
 {
     EngineInfo engine;
     engine.available = true;
-    engine.countsAvailable = (iteration % 5) != 4; // 偶尔回到「概要不可用」
+    engine.countsAvailable = (iteration % 5) != 4; // occasionally report the summary as unavailable
     engine.serverVersion = QStringLiteral("29.8.0");
     engine.apiVersion = QStringLiteral("1.56");
     engine.minApiVersion = QStringLiteral("1.24");
@@ -196,7 +197,7 @@ void RefreshChurnTest::fillData(int iteration)
 
     StorageUsage storage;
     storage.valid = true;
-    storage.buildCacheAvailable = (iteration % 3) != 2; // 构建缓存时有时无
+    storage.buildCacheAvailable = (iteration % 3) != 2; // the build cache comes and goes
     storage.imagesBytes = (iteration % 4 == 3) ? -1 : (iteration + 1) * 100ll * 1024 * 1024;
     storage.containersBytes = (iteration + 1) * 20ll * 1024 * 1024;
     storage.volumesBytes = (iteration % 5 == 4) ? -1 : (iteration + 1) * 300ll * 1024 * 1024;
@@ -233,7 +234,7 @@ void RefreshChurnTest::mainPageSurvivesDataChurn()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
 
-    // 变化窗口宽度会让统计块在 5/3/2 列之间切换，正是布局条目被增删的时刻
+    // Window width changes reflow the stat tiles between 5/3/2 columns, exactly when entries are added/removed
     const QList<int> widths = {900, 640, 420, 1100, 520};
     for (int iteration = 1; iteration <= 40; ++iteration) {
         fillData(iteration);
@@ -289,7 +290,7 @@ void RefreshChurnTest::containerDetailSurvivesDataChurn()
 
         m_backend->completeRefresh();
 
-        // 每轮都新建窗口：页面反复进入/离开，正是详情页的真实使用方式
+        // A fresh window every round: the page is entered and left repeatedly, as in real detail-page use
         window.reset(new QQuickWindow);
         window->resize(900, 700);
         page->setParentItem(window->contentItem());
@@ -299,7 +300,7 @@ void RefreshChurnTest::containerDetailSurvivesDataChurn()
 
         QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
         if (tabBar) {
-            // 在五个分区之间来回切换，并在概览里展开折叠区
+            // Cycle through the five sections and expand/collapse the collapsible area in the overview
             tabBar->setProperty("currentIndex", iteration % 5);
             QCoreApplication::processEvents();
             QQuickItem *environment = childByObjectName(page, QStringLiteral("environmentValues"));
@@ -328,7 +329,7 @@ void RefreshChurnTest::imageDetailSurvivesDataChurn()
         detail.created = QDateTime::currentDateTimeUtc();
         detail.architecture = QStringLiteral("amd64");
         detail.os = QStringLiteral("linux");
-        // 层数在 0 / 3 / 20 之间跳变：默认折叠为 5 层的逻辑会被反复触发
+        // Layer count jumps between 0 / 3 / 20: the default 5-layer collapse logic is retriggered every time
         const int layerCount = (iteration % 3 == 0) ? 0 : ((iteration % 3 == 1) ? 3 : 20);
         for (int layer = 0; layer < layerCount; ++layer) {
             detail.layers.append(QStringLiteral("sha256:layer%1").arg(layer));

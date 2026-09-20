@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -29,7 +29,7 @@ void writeFile(const QString &path, const QByteArray &content)
     file.close();
 }
 
-/*! 系统级 daemon（本机形态）：SecurityOptions 有内容但不含 rootless。 */
+/*! System-wide daemon (this machine): SecurityOptions non-empty but without rootless. */
 EngineInfo systemEngine()
 {
     EngineInfo info;
@@ -49,10 +49,10 @@ EngineInfo rootlessEngine()
 } // namespace
 
 /*!
- * `daemon.json` 读写（ARCH_V5_V8 §2.3/§2.4）。
+ * `daemon.json` read/write (ARCH_V5_V8 §2.3/§2.4).
  *
- * 最重要的一条：**未知键必须原样保留**。用户可能有 data-root、features、runtimes
- * 等我们不懂的配置，一个"配置编辑器"把它们弄丢是最不可接受的失败方式。
+ * The key rule: **unknown keys must be preserved verbatim**. Users may have data-root,
+ * features or runtimes we do not understand; a "config editor" losing them is the worst failure.
  */
 class DaemonConfigTest : public QObject
 {
@@ -74,7 +74,7 @@ private Q_SLOTS:
     void backupsAreListedNewestFirst();
     void readBackupRejectsBrokenContent();
 
-    /* 作用域与解锁状态机（ARCH_V5_V8 §2.2 修正 / 用户界面分离） */
+    /* Scope and unlock state machine (ARCH_V5_V8 §2.2 fix / UI separation) */
     void scopesPointAtDifferentFiles();
     void protectedScopeIsLockedUntilAuthorized();
     void authorizationExpiresAndLocksAgain();
@@ -106,7 +106,7 @@ void DaemonConfigTest::readsManagedKeys()
     QCOMPARE(document.maxConcurrentDownloads(), 5);
     QCOMPARE(document.logDriver(), QStringLiteral("json-file"));
     QCOMPARE(document.dataRoot(), QStringLiteral("/srv/docker"));
-    // data-root 不是我们管理的键：界面只显示"其他键"，不提供编辑
+    // data-root is not a managed key: the UI lists it as "other keys", no editing
     QCOMPARE(document.unmanagedKeys(), QStringList {QStringLiteral("data-root")});
 }
 
@@ -132,7 +132,7 @@ void DaemonConfigTest::invalidJsonIsReadOnlyAndNeverOverwritten()
     QVERIFY2(!document.isValid(), "broken JSON must be reported as invalid");
     QVERIFY(!document.errorText().isEmpty());
 
-    // 关键：看不懂的文件不允许产生新内容（否则一次保存就会毁掉用户的配置）
+    // Crucial: an unparsable file must never yield new content (one save would destroy the config)
     DaemonConfigEdits edits;
     edits.setRegistryMirrors = true;
     edits.registryMirrors = {QStringLiteral("https://mirror.example.com")};
@@ -162,9 +162,9 @@ void DaemonConfigTest::mergePreservesUnknownKeys()
     QVERIFY(!merged.isEmpty());
 
     const QJsonObject root = QJsonDocument::fromJson(merged).object();
-    // 我们改的键生效
+    // Our edited key takes effect
     QCOMPARE(root.value(QStringLiteral("registry-mirrors")).toArray().first().toString(), QStringLiteral("https://new.example.com"));
-    // 未知键逐键保留（包括嵌套对象）
+    // Unknown keys preserved one by one (nested objects included)
     QCOMPARE(root.value(QStringLiteral("data-root")).toString(), QStringLiteral("/home/thf/.local/share/docker/"));
     QCOMPARE(root.value(QStringLiteral("features")).toObject().value(QStringLiteral("buildkit")).toBool(), true);
     QCOMPARE(root.value(QStringLiteral("runtimes")).toObject().value(QStringLiteral("custom")).toObject().value(QStringLiteral("path")).toString(),
@@ -180,7 +180,7 @@ void DaemonConfigTest::mergeCanRemoveASetting()
 
     const DaemonConfigDocument document = DaemonConfigDocument::fromFile(path);
     DaemonConfigEdits edits;
-    edits.setRegistryMirrors = true; // 空列表 = 删除该键
+    edits.setRegistryMirrors = true; // empty list = remove the key
     const QJsonObject root = QJsonDocument::fromJson(document.merged(edits)).object();
     QVERIFY2(!root.contains(QStringLiteral("registry-mirrors")), "clearing the list must remove the key");
     QCOMPARE(root.value(QStringLiteral("data-root")).toString(), QStringLiteral("/srv"));
@@ -195,7 +195,7 @@ void DaemonConfigTest::mergeOnlyTouchesRequestedKeys()
 
     const DaemonConfigDocument document = DaemonConfigDocument::fromFile(path);
     DaemonConfigEdits edits;
-    edits.concurrentDownloadsEdit = ConfigEdit::Set; // 只改这一项
+    edits.concurrentDownloadsEdit = ConfigEdit::Set; // only this one changes
     edits.maxConcurrentDownloads = 3;
     const QJsonObject root = QJsonDocument::fromJson(document.merged(edits)).object();
     QCOMPARE(root.value(QStringLiteral("registry-mirrors")).toArray().first().toString(), QStringLiteral("https://keep.example.com"));
@@ -211,8 +211,8 @@ void DaemonConfigTest::mergeCanRemoveScalarKeys()
     writeFile(path,
               QByteArrayLiteral("{\"max-concurrent-downloads\":5,\"log-driver\":\"json-file\",\"data-root\":\"/srv\"}"));
 
-    // 「回到默认」= 删掉这个键：不是写 0，也不写空串
-    // （daemon 的默认值会随版本变化，而且那个键可能是用户自己写的）
+    // "Back to default" = remove the key, not write 0 or an empty string
+    // (daemon defaults change with the version, and the key may be the user's own)
     const DaemonConfigDocument document = DaemonConfigDocument::fromFile(path);
     DaemonConfigEdits edits;
     edits.concurrentDownloadsEdit = ConfigEdit::Remove;
@@ -221,17 +221,17 @@ void DaemonConfigTest::mergeCanRemoveScalarKeys()
 
     QVERIFY2(!root.contains(QStringLiteral("max-concurrent-downloads")), "the key must be gone");
     QVERIFY2(!root.contains(QStringLiteral("log-driver")), "the key must be gone");
-    // 我们不懂的键照旧保留
+    // Keys we do not understand stay untouched
     QCOMPARE(root.value(QStringLiteral("data-root")).toString(), QStringLiteral("/srv"));
 }
 
 void DaemonConfigTest::periodicRefreshKeepsPendingEdits()
 {
-    // 真实反馈的 bug：状态刷新（引擎信息每次更新都会调 setEngineInfo）把
-    // 正在编辑的内容恢复成磁盘上的旧值。自动刷新只允许更新"引擎的事实"。
+    // Reported bug: the status refresh (setEngineInfo runs on every engine update) reverted
+    // in-progress edits to disk values. Auto-refresh may only update "engine facts".
     DaemonConfigController controller;
     controller.setEngineInfo(systemEngine());
-    controller.setScope(QStringLiteral("user")); // 用户作用域：不依赖机器上的 /etc 内容
+    controller.setScope(QStringLiteral("user")); // user scope: independent of this machine's /etc
 
     controller.setRegistryMirrors({QStringLiteral("https://mirror.example.com")});
     controller.setMaxConcurrentDownloads(9);
@@ -239,7 +239,7 @@ void DaemonConfigTest::periodicRefreshKeepsPendingEdits()
     QVERIFY(controller.dirty());
 
     for (int tick = 0; tick < 3; ++tick) {
-        controller.setEngineInfo(systemEngine()); // 自动刷新走的就是这条路
+        controller.setEngineInfo(systemEngine()); // this is the auto-refresh path
         QVERIFY2(controller.dirty(), "periodic refresh must not clear the pending edits");
         QCOMPARE(controller.registryMirrors(), QStringList {QStringLiteral("https://mirror.example.com")});
         QCOMPARE(controller.maxConcurrentDownloads(), 9);
@@ -247,7 +247,7 @@ void DaemonConfigTest::periodicRefreshKeepsPendingEdits()
         QVERIFY(controller.pendingContentPreview().contains(QStringLiteral("mirror.example.com")));
     }
 
-    // 显式重新读盘才是"以磁盘为准、丢弃编辑"的入口
+    // Only an explicit reload re-reads from disk and drops the edits
     controller.reload();
     QVERIFY(!controller.dirty());
     QVERIFY2(!controller.pendingContentPreview().contains(QStringLiteral("mirror.example.com")),
@@ -257,7 +257,7 @@ void DaemonConfigTest::periodicRefreshKeepsPendingEdits()
 
 void DaemonConfigTest::removeIntentIsNotAnEmptyEdit()
 {
-    // 纯删除也是编辑：不能因为"没有值"就被当成"什么都没改"而拒绝保存
+    // Removal is an edit too: "no value" must not mean "nothing changed" and block saving
     DaemonConfigEdits edits;
     edits.logDriverEdit = ConfigEdit::Remove;
     QVERIFY(!edits.isEmpty());
@@ -296,7 +296,7 @@ void DaemonConfigTest::refusingEmptyContent()
     const QString path = dir.path() + QStringLiteral("/daemon.json");
     writeFile(path, QByteArrayLiteral("{\"data-root\":\"/srv\"}"));
 
-    // 空内容会写出一个空文件（daemon 直接起不来）→ 必须拒绝
+    // Empty content writes an empty file (daemon will not start) → must be refused
     QVERIFY(!DaemonConfigWriter::writeAtomically(path, QByteArray(), nullptr).isEmpty());
     QFile file(path);
     QVERIFY(file.open(QIODevice::ReadOnly));
@@ -311,7 +311,7 @@ void DaemonConfigTest::backupsAreListedNewestFirst()
     writeFile(path, QByteArrayLiteral("{\"data-root\":\"/srv\"}"));
 
     QCOMPARE(DaemonConfigWriter::writeAtomically(path, QByteArrayLiteral("{\"data-root\":\"/srv\",\"a\":1}"), nullptr), QString());
-    QTest::qWait(1100); // 备份名精确到秒
+    QTest::qWait(1100); // backup names are second-granular
     QCOMPARE(DaemonConfigWriter::writeAtomically(path, QByteArrayLiteral("{\"data-root\":\"/srv\",\"a\":2}"), nullptr), QString());
 
     const QStringList backups = DaemonConfigWriter::listBackups(path);
@@ -325,7 +325,7 @@ void DaemonConfigTest::readBackupRejectsBrokenContent()
     QVERIFY(dir.isValid());
     const QString broken = dir.path() + QStringLiteral("/daemon.json.kontainer-backup-20260101-000000");
     writeFile(broken, QByteArrayLiteral("{ broken"));
-    // 坏备份不能拿来"恢复"（否则一次点击就把可用配置换成起不来的配置）
+    // A broken backup must never be restored (one click would replace a working config)
     QVERIFY(DaemonConfigWriter::readBackup(broken).isEmpty());
 
     const QString good = dir.path() + QStringLiteral("/daemon.json.kontainer-backup-20260101-000001");
@@ -333,7 +333,7 @@ void DaemonConfigTest::readBackupRejectsBrokenContent()
     QVERIFY(!DaemonConfigWriter::readBackup(good).isEmpty());
 }
 
-/* --- 作用域与解锁状态机 --- */
+/* --- Scope and unlock state machine --- */
 
 
 void DaemonConfigTest::scopesPointAtDifferentFiles()
@@ -343,12 +343,12 @@ void DaemonConfigTest::scopesPointAtDifferentFiles()
 
     controller.setScope(QStringLiteral("system"));
     QCOMPARE(controller.configPath(), QStringLiteral("/etc/docker/daemon.json"));
-    // 系统级 daemon 正在运行 → 系统作用域是"生效的那个"
+    // System-wide daemon is running → system scope is the active one
     QVERIFY(controller.activeScope());
 
     controller.setScope(QStringLiteral("user"));
     QVERIFY2(controller.configPath().endsWith(QStringLiteral("/.config/docker/daemon.json")), qPrintable(controller.configPath()));
-    // rootless 才读用户配置：系统级 daemon 下这个作用域不生效（界面据此给横幅）
+    // Only rootless reads user config: inactive under a system daemon (UI shows a banner)
     QVERIFY(!controller.activeScope());
 }
 
@@ -358,12 +358,12 @@ void DaemonConfigTest::protectedScopeIsLockedUntilAuthorized()
     controller.setEngineInfo(systemEngine());
     controller.setScope(QStringLiteral("system"));
 
-    // 本机 /etc/docker/daemon.json 属于 root → 受保护、默认锁定
+    // This machine's /etc/docker/daemon.json is root-owned → protected, locked by default
     QVERIFY(controller.requiresPrivilege());
     QVERIFY2(!controller.unlocked(), "a protected scope starts locked");
     QCOMPARE(controller.unlockSecondsRemaining(), 0);
 
-    // 未解锁时保存被拒绝（兜底：界面也会禁用按钮）
+    // Saving while locked is refused (backstop: the UI also disables the button)
     controller.setRegistryMirrors({QStringLiteral("https://mirror.example.com")});
     QVERIFY(!controller.save());
     QCOMPARE(controller.lastError(), QStringLiteral("locked"));
@@ -378,8 +378,8 @@ void DaemonConfigTest::authorizationExpiresAndLocksAgain()
     FakePrivilegedClient client;
     controller.setPrivilegedClient(&client);
 
-    // 驱动解锁：界面点「解锁」→ 客户端发起请求 → 授权成功（测试不真的去走 polkit）。
-    // 必须先 requestUnlock()：共享客户端的 finished() 是广播，controller 只认自己发起的请求
+    // Drive unlock: UI clicks Unlock → client requests → authorized (no real polkit here).
+    // requestUnlock() first: shared finished() is a broadcast, controller takes only its own.
     controller.requestUnlock();
     QCOMPARE(client.authorizeRequests, 1);
     Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
@@ -387,12 +387,12 @@ void DaemonConfigTest::authorizationExpiresAndLocksAgain()
     QVERIFY2(controller.unlockSecondsRemaining() > 0, "unlocking must start the countdown");
     QCOMPARE(controller.lastError(), QString());
 
-    // 主动上锁：界面上的「重新上锁」
+    // Explicit lock: the UI's "Lock again" button
     controller.lock();
     QVERIFY(!controller.unlocked());
     QCOMPARE(controller.unlockSecondsRemaining(), 0);
 
-    // 取消授权是正常结果：保持锁定，但不应变成错误横幅
+    // Cancelling is a normal outcome: stay locked, but no error banner
     controller.requestUnlock();
     Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, false, QStringLiteral("cancelled"));
     QVERIFY(!controller.unlocked());
@@ -411,17 +411,17 @@ void DaemonConfigTest::switchingScopeLocksAgain()
     Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
     QVERIFY(controller.unlocked());
 
-    // 授权是给"那个文件"的：换作用域必须重新授权
+    // Authorization is per file: switching scope must require re-authorization
     controller.setScope(QStringLiteral("user"));
     QVERIFY2(!controller.unlocked(), "switching scope must drop the authorization");
 }
 
 
 /*!
- * B1：服务控制的边界与结果。
+ * B1: service control boundaries and results.
  *
- * 关键点：**非法请求不发起任何提权动作**（这是唯一新增的提权面，必须守住）；
- * 合法请求的结果经同一条结果通道回来，失败时给出稳定 key。
+ * Key point: **an invalid request triggers no privileged action** (the only new privilege surface
+ * here, so it must hold); valid requests come back on the same channel with a stable key on failure.
  */
 void DaemonConfigTest::serviceControlValidatesAndReports()
 {
@@ -431,17 +431,17 @@ void DaemonConfigTest::serviceControlValidatesAndReports()
     controller.setEngineInfo(systemEngine());
     QSignalSpy controlledSpy(&controller, &DaemonConfigController::serviceControlled);
 
-    // 白名单之外的 unit：拒绝，且**没有**发起任何请求
+    // Unit outside the whitelist: refused, and **no** request was sent
     QVERIFY(!controller.controlService(QStringLiteral("sshd.service"), QStringLiteral("start")));
     QCOMPARE(controller.serviceErrorKey(), QStringLiteral("unitNotManaged"));
     QCOMPARE(client.serviceRequests, 0);
 
-    // 不认识的动词：同样拒绝
+    // Unknown verb: refused the same way
     QVERIFY(!controller.controlService(QStringLiteral("docker.service"), QStringLiteral("mask")));
     QCOMPARE(controller.serviceErrorKey(), QStringLiteral("verbNotManaged"));
     QCOMPARE(client.serviceRequests, 0);
 
-    // 合法请求：交给客户端，进入"进行中"
+    // Valid request: handed to the client, goes in-flight
     QVERIFY(controller.controlService(QStringLiteral("docker.service"), QStringLiteral("restart")));
     QCOMPARE(client.serviceRequests, 1);
     QCOMPARE(client.lastServiceUnit, QStringLiteral("docker.service"));
@@ -449,7 +449,7 @@ void DaemonConfigTest::serviceControlValidatesAndReports()
     QVERIFY(controller.serviceInFlight());
     QVERIFY(controller.serviceErrorKey().isEmpty());
 
-    // 成功：结果带 unit/动词，错误 key 为空
+    // Success: result carries unit/verb, error key empty
     Q_EMIT client.finished(PrivilegedClient::Operation::ServiceControl, true, QString());
     QCOMPARE(controlledSpy.count(), 1);
     QCOMPARE(controlledSpy.at(0).at(0).toString(), QStringLiteral("docker.service"));
@@ -457,7 +457,7 @@ void DaemonConfigTest::serviceControlValidatesAndReports()
     QCOMPARE(controlledSpy.at(0).at(2).toBool(), true);
     QVERIFY(!controller.serviceInFlight());
 
-    // 失败（用户取消）：如实回报，可重试
+    // Failure (user cancelled): reported honestly, retryable
     QVERIFY(controller.controlService(QStringLiteral("containerd.service"), QStringLiteral("stop")));
     Q_EMIT client.finished(PrivilegedClient::Operation::ServiceControl, false, QStringLiteral("cancelled"));
     QCOMPARE(controlledSpy.count(), 2);
@@ -472,8 +472,8 @@ QTEST_MAIN(DaemonConfigTest)
 
 void DaemonConfigTest::unlockOnlyAffectsTheRequestingScope()
 {
-    // DockerKcm 只建一个 PrivilegedConfigClient，两个作用域共享它，而它的
-    // finished() 是广播。真实反馈：系统级页面解锁→锁定后进用户级页面，仍显示已解锁。
+    // DockerKcm creates one PrivilegedConfigClient shared by both scopes, its finished() is a
+    // broadcast. Reported bug: system page unlock → lock, then the user page still showed unlocked.
     FakePrivilegedClient client;
     DaemonConfigController user;
     DaemonConfigController system;
@@ -484,19 +484,19 @@ void DaemonConfigTest::unlockOnlyAffectsTheRequestingScope()
     user.setPrivilegedClient(&client);
     system.setPrivilegedClient(&client);
 
-    // 系统级页面发起解锁
+    // The system page starts an unlock
     system.requestUnlock();
     QCOMPARE(client.authorizeRequests, 1);
     Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
     QVERIFY2(system.unlocked(), "the requesting scope must be unlocked");
     QVERIFY2(!user.unlocked(), "an unlock started elsewhere must not unlock this scope");
 
-    // 系统级页面重新上锁；迟到的授权结果不能把它又改回已解锁
+    // The system page locks again; a late authorize result must not re-unlock it
     system.lock();
     Q_EMIT client.finished(PrivilegedClient::Operation::Authorize, true, QString());
     QVERIFY2(!system.unlocked(), "a late result must not re-unlock after an explicit lock");
 
-    // 写入结果同理：只有发起方收到 saved()，另一方不该冒出"配置已写入"
+    // Same for writes: only the initiator gets saved(), the bystander must not see "config written"
     DaemonConfigController writer;
     DaemonConfigController bystander;
     writer.setEngineInfo(systemEngine());
@@ -527,9 +527,9 @@ void DaemonConfigTest::privilegeDependsOnWritabilityOnly()
 {
     DaemonConfigController controller;
 
-    // "要不要提权"只由这个文件能不能写决定，与部署形态无关：
-    // 形态只决定"改了会不会生效"。两者混起来就会出现
-    // "文件写不了却不给解锁入口"（保存必然失败）这类错误。
+    // Whether privilege is needed depends only on file writability, not the deployment shape:
+    // the shape only decides whether a change takes effect. Mixing the two yields bugs
+    // like "file is unwritable but no unlock entry point" (saving always fails).
     for (const EngineInfo &engine : {systemEngine(), rootlessEngine()}) {
         controller.setEngineInfo(engine);
         for (const QString &scope : {QStringLiteral("system"), QStringLiteral("user")}) {
@@ -545,14 +545,14 @@ void DaemonConfigTest::manualCommandRestartsTheRightService()
 {
     DaemonConfigController controller;
 
-    // rootless daemon 是用户自己的服务：降级命令里不能出现 sudo systemctl
-    // （那动的是系统服务，与本作用域无关，而且会平白多要一次 root）
+    // A rootless daemon is the user's own service: no sudo systemctl in the fallback command
+    // (that would touch the system service, unrelated to this scope, and ask for root for nothing)
     controller.setEngineInfo(rootlessEngine());
     controller.setScope(QStringLiteral("user"));
     const QString rootless = controller.privilegedCommand();
     QVERIFY2(rootless.contains(QStringLiteral("systemctl --user restart docker")), qPrintable(rootless));
     QVERIFY2(!rootless.contains(QStringLiteral("sudo systemctl")), qPrintable(rootless));
-    // 写的是用户配置，不是 /etc
+    // Writes the user config, not /etc
     QVERIFY2(rootless.contains(QStringLiteral("/.config/docker/daemon.json")), qPrintable(rootless));
 
     controller.setEngineInfo(systemEngine());

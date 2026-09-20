@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,17 +16,18 @@
 using namespace Kontainer;
 
 /*!
- * 用一个进程内的假 Docker Engine（Unix socket + 最小 HTTP）驱动真实 DockerBackend。
+ * Drives the real DockerBackend against an in-process fake Docker Engine (Unix socket + minimal HTTP).
  *
- * 覆盖真实 daemon 上难以复现的行为：
- *  - 请求去重（§17：连续刷新只产生一个请求）
- *  - /info 刷新失败后旧计数必须作废（不能把过期计数当当前值）
- *  - API 版本协商失败 / daemon 返回 400 "too new"
- *  - Content-Length 与 chunked 两种响应
+ * Covers behavior hard to reproduce on a real daemon:
+ *  - request coalescing (§17: consecutive refreshes produce one request)
+ *  - stale counts must be dropped when a later /info refresh fails
+ *  - API version negotiation failure / daemon 400 "too new"
+ *  - both Content-Length and chunked responses
  *
- * 四期起假 Engine 也实现写端点（start / stop / restart / remove / image pull / image remove），
- * 并记录每个请求的方法、路径与 query：写操作的契约测试（动词、参数、状态码归一）
- * 因此不依赖真实 daemon，也不会动用户的容器（ARCH_V4 §5.3）。
+ * Since phase 4 the fake Engine also serves write endpoints (start / stop / restart / remove /
+ * image pull / image remove) and records each request's method, path and query: the mutation
+ * contract tests (verb, parameters, status mapping) need no real daemon and never touch the
+ * user's containers (ARCH_V4 §5.3).
  */
 class FakeEngine : public QObject
 {
@@ -37,9 +38,9 @@ public:
         QString method;
         QString path;
         QString query;
-        /*! 原始请求头块（`\r\n` 分隔，未含请求行）：认证用例要断言 `X-Registry-Auth` 的内容。 */
+        /*! Raw header block (`\r\n`-separated, no request line): auth tests assert `X-Registry-Auth`. */
         QByteArray headers;
-        /*! 请求体（创建网络的用例要断言提交给 daemon 的 JSON）。 */
+        /*! Request body (network-create tests assert the JSON sent to the daemon). */
         QByteArray body;
     };
 
@@ -61,13 +62,13 @@ public:
         return m_socketPath;
     }
 
-    /* --- 写操作的观察与注入控制 --- */
+    /* --- Mutation observation and injection control --- */
 
     QList<RequestRecord> requests() const
     {
         return m_requests;
     }
-    /*! 最后一次请求（断言动词与 query 用）。 */
+    /*! Last request (for asserting verb and query). */
     RequestRecord lastRequest() const
     {
         return m_requests.isEmpty() ? RequestRecord{} : m_requests.last();
@@ -82,32 +83,32 @@ public:
         }
         return count;
     }
-    /*! 让某个写端点返回指定状态码与响应体（例如 409 / 304）。 */
+    /*! Make one write endpoint return a given status and body (e.g. 409 / 304). */
     void setMutationResponse(const QString &barePath, int status, const QByteArray &body)
     {
         m_mutationResponses.insert(barePath, {status, body});
     }
-    /*! 让某个 start / stop 端点返回 304（引擎的「已处于目标状态」语义）。 */
+    /*! Make a start / stop endpoint return 304 (engine's "already in target state" semantics). */
     void setMutationNotModified(const QString &barePath)
     {
         m_notModifiedMutations.insert(barePath);
     }
-    /*! 拉取流的每一行（每行一个 chunk，用于覆盖「一行跨 chunk / 一个 chunk 多行」）。 */
+    /*! Pull-stream lines (one chunk each; covers lines split across chunks and many lines per chunk). */
     void setPullLines(const QList<QByteArray> &lines)
     {
         m_pullLines = lines;
     }
-    /*! 拉取流的写入间隔：> 0 时每个 chunk 之间留出事件循环时间（用于取消测试）。 */
+    /*! Pull-stream write delay: > 0 leaves event-loop time between chunks (used by cancel tests). */
     void setPullChunkDelayMs(int delayMs)
     {
         m_pullChunkDelayMs = delayMs;
     }
 
     /*!
-     * 保持连接不结束（模拟 `follow=1` 的静默流）。
+     * Keep the connection open (simulates a silent `follow=1` stream).
      *
-     * 真实跟随流在容器没输出时会一直挂着：客户端只能靠取消结束，
-     * 而我们**不能**给它设静默超时（否则长任务日志会被误判失败）。
+     * A real follow stream hangs while the container produces no output: only an explicit cancel
+     * ends it, and we must **not** add an idle timeout (long-running task logs would look failed).
      */
     void setHoldConnection(bool hold)
     {
@@ -122,13 +123,13 @@ public:
     {
         m_apiVersion = version;
     }
-    /*! 让某个裸路径返回指定状态码（用于伪造 400 version 错误）。 */
+    /*! Make one bare path return a given status (used to fake a 400 version error). */
     void setPathStatus(const QString &barePath, int status, const QByteArray &body)
     {
         m_overrides.insert(barePath, {status, body});
     }
 
-    /*! 用例之间清空注入的失败/覆盖与计数，避免状态泄漏。 */
+    /*! Clear injected failures/overrides and counters between tests to avoid state leaks. */
     void reset()
     {
         m_holdConnection = false;
@@ -143,7 +144,7 @@ public:
         m_pullChunkDelayMs = 0;
     }
 
-    /*! 默认的镜像拉取流：两层各一段进度 + 一条完成行。 */
+    /*! Default image pull stream: one progress step per layer + one completion line. */
     static QList<QByteArray> defaultPullLines()
     {
         return {
@@ -205,11 +206,11 @@ private:
 
         if (const auto override = m_overrides.constFind(bare); override != m_overrides.constEnd()) {
             if (m_holdConnection) {
-                // 只写响应头 + chunked 声明，永不发终止块：客户端会一直等（直到取消）
+                // Headers + chunked declaration only, no terminal chunk: the client waits until cancelled
                 QByteArray head = "HTTP/1.1 " + QByteArray::number(override->first) + " OK\r\n";
                 head += "Content-Type: application/vnd.docker.raw-stream\r\n";
                 head += "Transfer-Encoding: chunked\r\n\r\n";
-                head += override->second; // 允许先给一段历史数据
+                head += override->second; // allow some backlog data first
                 socket->write(head);
                 socket->flush();
                 return;
@@ -218,7 +219,7 @@ private:
             return;
         }
 
-        /* --- 写端点（ARCH_V4 §2.2.4）：先看有没有注入的响应 --- */
+        /* --- Write endpoints (ARCH_V4 §2.2.4): check injected responses first --- */
         if (const auto injected = m_mutationResponses.constFind(bare); injected != m_mutationResponses.constEnd()) {
             writeResponse(socket, injected->first, injected->second, false);
             return;
@@ -228,7 +229,7 @@ private:
             return;
         }
         if (method == QLatin1String("POST") && bare.startsWith(QLatin1String("/containers/"))) {
-            // start（已运行）/ stop（已停止）之外的写操作一律 204
+            // every write other than start (already running) / stop (already stopped) returns 204
             const bool isStart = bare.endsWith(QLatin1String("/start"));
             const bool isStop = bare.endsWith(QLatin1String("/stop"));
             if ((isStart || isStop) && m_notModifiedMutations.contains(bare)) {
@@ -329,7 +330,7 @@ private:
 
     static QByteArray statsPayload()
     {
-        // 第二个采样：与 precpu 有明显差值，便于验证 CPU 计算
+        // Second sample: clear delta vs. precpu so the CPU math is checkable
         return QByteArrayLiteral("{"
                                  "\"id\":\"1111111111111111111111111111111111111111111111111111111111111111\","
                                  "\"cpu_stats\":{\"cpu_usage\":{\"total_usage\":3000000000},\"system_cpu_usage\":600000000000,"
@@ -348,7 +349,7 @@ private:
                                  "\"Created\":1789400000,\"Containers\":2}]");
     }
 
-    /*! 按 Content-Length 或 chunked 写回响应（两种都要覆盖）。 */
+    /*! Write the response as Content-Length or chunked (both must be covered). */
     static void writeResponse(QLocalSocket *socket,
                               int status,
                               const QByteArray &body,
@@ -369,8 +370,8 @@ private:
     }
 
     /*!
-     * 逐块写出 chunked 的拉取流：真实 daemon 的分片与 JSON 行边界毫无关系，
-     * 因此每行单独一个 chunk，必要时还在 chunk 之间留出时间（取消测试）。
+     * Write the pull stream chunk by chunk: real daemon chunk boundaries ignore JSON line boundaries,
+     * so each line gets its own chunk, with optional delays between chunks (cancel tests).
      */
     static void writePullStream(QLocalSocket *socket, const QList<QByteArray> &lines, int delayMs)
     {
@@ -437,7 +438,7 @@ private Q_SLOTS:
     void coalescesDuplicateDetailRequests();
     void stopsStatsSamplingOnRequest();
 
-    /* --- 写操作契约（ARCH_V4 §5.1） --- */
+    /* --- Mutation contracts (ARCH_V4 §5.1) --- */
     void startContainerSendsPostWithoutParameters();
     void stopContainerSendsTimeoutParameter();
     void removeContainerUsesDeleteWithoutVolumeFlag();
@@ -469,7 +470,7 @@ private:
 };
 
 /* ============================================================================
- * 仓库凭据校验（ARCH_V5_V8 §2.6）
+ * Registry credential check (ARCH_V5_V8 §2.6)
  * ==========================================================================*/
 
 namespace
@@ -487,18 +488,18 @@ RegistryCredential sampleCredential()
 } // namespace
 
 /*!
- * 凭据放在**请求体**里（与 docker CLI 一致），不进 URL。
+ * Credentials go in the **request body** (like the docker CLI), never in the URL.
  *
- * 实测教训：只发 `X-Registry-Auth` 头、body 为空时，引擎回
- * `400 invalid X-Registry-Auth header: invalid JSON: EOF` —— 于是"每个仓库都校验失败"。
- * 假引擎把请求体原样记下来供断言。
+ * Measured lesson: an empty body with only the `X-Registry-Auth` header makes the engine answer
+ * `400 invalid X-Registry-Auth header: invalid JSON: EOF` - so every registry check failed.
+ * The fake engine records the body verbatim for assertions.
  */
 /*!
- * 私有仓库拉取：凭据只走 `X-Registry-Auth` 头，且 `serveraddress` 必须是**镜像所在仓库**
- * （调用方给的凭据结构里可能写着别的地址）。
+ * Private registry pull: credentials travel only in the `X-Registry-Auth` header, and `serveraddress`
+ * must be the **registry holding the image** (the caller's credential may name a different one).
  */
 /*!
- * 网络列表（ARCH_V5_V8 §3.2）：请求路径、解析与信号。
+ * Network list (ARCH_V5_V8 §3.2): request path, parsing and signals.
  */
 void DockerBackendFakeEngineTest::networksAreListedFromTheEngine()
 {
@@ -533,7 +534,7 @@ void DockerBackendFakeEngineTest::networksAreListedFromTheEngine()
     QCOMPARE(networks.at(1).memberCount(), 1);
     QCOMPARE(networks.at(1).subnetText(), QStringLiteral("172.18.0.0/16"));
 
-    // 请求形态：版本前缀 + 简单 GET
+    // Request shape: version prefix + plain GET
     const FakeEngine::RequestRecord request = m_engine->lastRequest();
     QCOMPARE(request.method, QStringLiteral("GET"));
     QCOMPARE(request.path, QStringLiteral("/v1.56/networks"));
@@ -542,7 +543,7 @@ void DockerBackendFakeEngineTest::networksAreListedFromTheEngine()
 
 
 /* ============================================================================
- * 容器日志（ARCH_V5_V8 §3.1）
+ * Container logs (ARCH_V5_V8 §3.1)
  * ==========================================================================*/
 
 namespace
@@ -560,15 +561,15 @@ QStringList logTexts(const QVariantList &lines)
 } // namespace
 
 /*!
- * 历史 + 跟随：请求形态（stdout/stderr/follow/tail）与帧解复用都要对。
- * 假引擎按容器日志的形态返回 stdcopy 帧流。
+ * History + follow: request shape (stdout/stderr/follow/tail) and frame demultiplexing must both be right.
+ * The fake engine answers with a stdcopy frame stream, like container logs.
  */
 void DockerBackendFakeEngineTest::logStreamDemultiplexesAndEnds()
 {
     DockerBackend backend;
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
 
-    // 服务端一次给两帧：stdout 一行、stderr 一行
+    // Server sends two frames at once: one stdout line, one stderr line
     QByteArray body;
     body += QByteArray("\x01\x00\x00\x00\x00\x00\x00\x06hello\n", 14);
     body += QByteArray("\x02\x00\x00\x00\x00\x00\x00\x07warning", 15);
@@ -595,7 +596,7 @@ void DockerBackendFakeEngineTest::logStreamDemultiplexesAndEnds()
     }
     QCOMPARE(texts, QStringList({QStringLiteral("hello"), QStringLiteral("warning")}));
 
-    // 流自然结束（容器停止 / 历史读完）：Ended 而不是错误
+    // Stream ends naturally (container stopped / history consumed): Ended, not an error
     QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Ended);
 }
 
@@ -618,20 +619,20 @@ void DockerBackendFakeEngineTest::logStreamCancelIsNotAnError()
 {
     DockerBackend backend;
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
-    // 跟随流：服务端保持连接（不结束），由我们取消
+    // Follow stream: the server holds the connection open, so we cancel it
     m_engine->setPathStatus(QStringLiteral("/containers/tailing/logs"), 200, QByteArrayLiteral(""));
     m_engine->setHoldConnection(true);
 
     QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
     backend.startContainerLogs(QStringLiteral("tailing"), false, true, 50);
-    QTest::qWait(200); // 等请求真的发出去
+    QTest::qWait(200); // wait until the request is really sent
     backend.stopContainerLogs(QStringLiteral("tailing"));
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
 
     QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Cancelled);
     m_engine->setHoldConnection(false);
 
-    // 幂等：再停一次不该再发信号
+    // Idempotent: stopping again must not emit another signal
     backend.stopContainerLogs(QStringLiteral("tailing"));
     QTest::qWait(50);
     QCOMPARE(finishedSpy.count(), 1);
@@ -647,7 +648,7 @@ void DockerBackendFakeEngineTest::logStreamReconnectDropsTheOldStream()
     QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
     backend.startContainerLogs(QStringLiteral("reconnect"), false, true, 50);
     QTest::qWait(200);
-    // 重连：先停旧的，再开新的。旧流的收尾不能把新流的状态擦掉
+    // Reconnect: stop the old stream, start a new one. The old stream's teardown must not clear the new state
     backend.startContainerLogs(QStringLiteral("reconnect"), true, false, 10);
     QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() >= 1, 10000);
     QCOMPARE(finishedSpy.at(0).at(1).value<LogEnd>(), LogEnd::Cancelled);
@@ -663,16 +664,16 @@ void DockerBackendFakeEngineTest::pullSendsCredentialsOnlyWhenPresent()
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
     m_engine->setPullLines({QByteArrayLiteral("{\"status\":\"Pull complete\"}\n")});
 
-    // 匿名拉取：一个头都不加
+    // Anonymous pull: no header at all
     QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
     backend.pullImage(QStringLiteral("alpine:3.19"));
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
     QVERIFY2(!m_engine->lastRequest().headers.contains("X-Registry-Auth"),
              "anonymous pulls must not send an auth header");
 
-    // 带凭据：头里能解回同一条凭据，且 serveraddress 被改写成镜像所在仓库
+    // With credentials: the header decodes back to them, serveraddress rewritten to the image's registry
     RegistryCredential credential;
-    credential.serverAddress = QStringLiteral("index.docker.io"); // 故意写成别的仓库
+    credential.serverAddress = QStringLiteral("index.docker.io"); // deliberately a different registry
     credential.username = QStringLiteral("alice");
     credential.password = QStringLiteral("s3cret");
     backend.pullImage(QStringLiteral("registry.example.com:5000/team/app:1.0"), credential);
@@ -705,14 +706,14 @@ void DockerBackendFakeEngineTest::authCheckSendsCredentialsInTheRequestBody()
     QVERIFY2(request.query.isEmpty(), "credentials must never appear in the URL");
     QVERIFY2(!request.headers.contains("s3cret"), "the raw password must never be sent in a header");
 
-    // 体里就是 docker CLI 用的那种 JSON（键名与引擎一致）
+    // Body is the JSON the docker CLI uses (keys match the engine)
     const QJsonObject payload = QJsonDocument::fromJson(request.body).object();
     QCOMPARE(payload.value(QStringLiteral("username")).toString(), QStringLiteral("alice"));
     QCOMPARE(payload.value(QStringLiteral("password")).toString(), QStringLiteral("s3cret"));
-    // serveraddress 用调用方给的仓库（不是凭据结构里那个 index.docker.io）
+    // serveraddress uses the caller's registry, not the index.docker.io in the credential
     QCOMPARE(payload.value(QStringLiteral("serveraddress")).toString(), QStringLiteral("registry.example.com"));
 
-    // 结果：成功，且回报的是规范化后的仓库地址
+    // Result: success, reporting the normalized registry address
     QCOMPARE(checkedSpy.at(0).at(0).toString(), QStringLiteral("registry.example.com"));
     QCOMPARE(checkedSpy.at(0).at(1).value<AuthResult>(), AuthResult::Succeeded);
 }
@@ -723,34 +724,34 @@ void DockerBackendFakeEngineTest::authCheckClassifiesFailures()
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
     QSignalSpy checkedSpy(&backend, &DockerBackend::registryAuthChecked);
 
-    // 401：用户名/密码不对（引擎原文里可能只有 unauthorized）
+    // 401: wrong username/password (the engine text may only say unauthorized)
     m_engine->setPathStatus(QStringLiteral("/auth"), 401,
                             QByteArrayLiteral("{\"message\":\"unauthorized: incorrect username or password\"}"));
     backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
     QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 1, 10000);
     QCOMPARE(checkedSpy.at(0).at(1).value<AuthResult>(), AuthResult::InvalidCredentials);
 
-    // 500 且原文是网络错误：归到"仓库不可达"（界面要提示查网络/代理，而不是"密码错了"）
+    // 500 whose message is a network error -> "registry unreachable" (UI: check network/proxy, not password)
     m_engine->setPathStatus(QStringLiteral("/auth"), 500,
                             QByteArrayLiteral("{\"message\":\"dial tcp: lookup registry.invalid: no such host\"}"));
     backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
     QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 2, 10000);
     QCOMPARE(checkedSpy.at(1).at(1).value<AuthResult>(), AuthResult::RegistryUnreachable);
 
-    // 500 且原文是超时措辞（实测：引擎连不上仓库时就这样回）：归到"仓库不可达"
+    // 500 with timeout wording (measured: engine cannot reach registry) -> "registry unreachable"
     m_engine->setPathStatus(QStringLiteral("/auth"), 500,
                             QByteArrayLiteral("{\"message\":\"Get \\\"https://registry-1.docker.io/v2/\\\": context deadline exceeded\"}"));
     backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
     QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 3, 10000);
     QCOMPARE(checkedSpy.at(2).at(1).value<AuthResult>(), AuthResult::RegistryUnreachable);
 
-    // 500 但看不出网络线索：普通失败（不乱猜）
+    // 500 with no network clue: plain failure (no guessing)
     m_engine->setPathStatus(QStringLiteral("/auth"), 500, QByteArrayLiteral("{\"message\":\"something else went wrong\"}"));
     backend.checkRegistryAuth(QStringLiteral("registry.example.com"), sampleCredential());
     QTRY_COMPARE_WITH_TIMEOUT(checkedSpy.count(), 4, 10000);
     QCOMPARE(checkedSpy.at(3).at(1).value<AuthResult>(), AuthResult::Failed);
 
-    // 参数不全：不发请求，直接给出"凭据不对"
+    // Incomplete parameters: no request sent, reported as "bad credentials"
     const int requestsBefore = m_engine->requests().size();
     RegistryCredential incomplete;
     incomplete.serverAddress = QStringLiteral("registry.example.com");
@@ -811,7 +812,7 @@ void DockerBackendFakeEngineTest::usesNegotiatedApiVersionPrefix()
     backend.refreshEngine();
     QTRY_COMPARE_WITH_TIMEOUT(engineSpy.count(), 1, 10000);
 
-    // 协商前用无版本路径，协商后用 v1.56
+    // Unversioned paths before negotiation, v1.56 after
     QVERIFY(m_engine->requestCount(QStringLiteral("/_ping")) >= 1);
     QVERIFY(m_engine->requestCount(QStringLiteral("/version")) >= 1);
     QVERIFY(m_engine->requestCount(QStringLiteral("/info")) >= 1);
@@ -829,7 +830,7 @@ void DockerBackendFakeEngineTest::coalescesConcurrentRefreshes()
     backend.refreshContainers();
     QTRY_COMPARE_WITH_TIMEOUT(containersSpy.count(), 1, 10000);
 
-    // 三次刷新只允许产生一个请求（§17 Coalesce）
+    // Three refreshes must produce exactly one request (§17 Coalesce)
     QCOMPARE(m_engine->requestCount(QStringLiteral("/containers/json")) - before, 1);
 }
 
@@ -844,7 +845,7 @@ void DockerBackendFakeEngineTest::clearsStaleCountsWhenInfoFailsOnLaterRefresh()
     QVERIFY(backend.engineInfo().countsAvailable);
     QCOMPARE(backend.engineInfo().containerTotal, 2);
 
-    // 第二次刷新：/info 失败，但 /version 仍然成功
+    // Second refresh: /info fails but /version still succeeds
     m_engine->setFailInfo(true);
     QSignalSpy secondEngineSpy(&backend, &DockerBackend::engineUpdated);
     QSignalSpy failureSpy(&backend, &DockerBackend::sectionFailed);
@@ -853,8 +854,8 @@ void DockerBackendFakeEngineTest::clearsStaleCountsWhenInfoFailsOnLaterRefresh()
     QTRY_VERIFY_WITH_TIMEOUT(secondEngineSpy.count() >= 1 && failureSpy.count() >= 1, 10000);
 
     const EngineInfo info = backend.engineInfo();
-    QVERIFY(info.available); // 仍然连得上
-    QVERIFY(!info.countsAvailable); // 但汇总计数必须作废
+    QVERIFY(info.available); // still reachable
+    QVERIFY(!info.countsAvailable); // but the summary counts must be dropped
     QCOMPARE(info.containerTotal, 0);
     QCOMPARE(info.containersRunning, 0);
     QCOMPARE(info.containersStopped, 0);
@@ -880,7 +881,7 @@ void DockerBackendFakeEngineTest::rejectsUnsupportedServerApiVersion()
 
 void DockerBackendFakeEngineTest::mapsDaemonVersionRejectionToMismatchError()
 {
-    // 伪造 daemon 对"客户端版本过新"的 400 响应
+    // Fake the daemon's 400 response for "client version too new"
     m_engine->setPathStatus(QStringLiteral("/info"),
                             400,
                             QByteArrayLiteral("{\"message\":\"client version 1.56 is too new. Maximum supported API version is 1.40\"}"));
@@ -897,7 +898,7 @@ void DockerBackendFakeEngineTest::mapsDaemonVersionRejectionToMismatchError()
 }
 
 /*!
- * §23/§24：disk usage 来自结构化 API（/system/df），而不是 CLI。
+ * §23/§24: disk usage comes from the structured API (/system/df), not from the CLI.
  */
 void DockerBackendFakeEngineTest::readsStorageUsage()
 {
@@ -921,7 +922,7 @@ void DockerBackendFakeEngineTest::readsStorageUsage()
 }
 
 /*!
- * §7/§26：容器详情来自 inspect，并经 DTO → domain 转换。
+ * §7/§26: container detail comes from inspect and goes through the DTO → domain mapping.
  */
 void DockerBackendFakeEngineTest::readsContainerDetail()
 {
@@ -936,7 +937,7 @@ void DockerBackendFakeEngineTest::readsContainerDetail()
 
     const ContainerDetail detail = backend.containerDetail();
     QCOMPARE(detail.name, QStringLiteral("fake-running"));
-    QCOMPARE(detail.image, QStringLiteral("alpine:latest")); // 来自 Config.Image，而不是镜像 ID
+    QCOMPARE(detail.image, QStringLiteral("alpine:latest")); // from Config.Image, not the image ID
     QVERIFY(detail.imageId.startsWith(QLatin1String("sha256:aaaa")));
     QCOMPARE(int(detail.state), int(ContainerState::Running));
     QCOMPARE(int(detail.health), int(HealthState::Healthy));
@@ -947,14 +948,14 @@ void DockerBackendFakeEngineTest::readsContainerDetail()
     QCOMPARE(detail.restartPolicy, QStringLiteral("unless-stopped"));
     QVERIFY(detail.created.isValid());
     QVERIFY(detail.started.isValid());
-    // Go 的零值时间（从未发生）必须被解析为无效时间
+    // Go's zero time (never happened) must parse as an invalid time
     QVERIFY(!detail.finished.isValid());
     QCOMPARE(detail.environment.size(), 2);
     QCOMPARE(detail.command, (QStringList {QStringLiteral("sleep"), QStringLiteral("infinity")}));
     QCOMPARE(detail.entrypoint, (QStringList {QStringLiteral("/entry.sh")}));
     QCOMPARE(detail.workingDirectory, QStringLiteral("/work"));
     QCOMPARE(detail.hostname, QStringLiteral("fakehost"));
-    // 日志流按 Config.Tty 分支：判错会把 8 字节帧头当成日志正文
+    // Log stream branches on Config.Tty: getting it wrong treats the 8-byte frame header as log text
     QVERIFY2(!detail.tty, "the fixture is a non-TTY container");
     QCOMPARE(detail.user, QStringLiteral("root"));
     QCOMPARE(detail.labels.size(), 1);
@@ -1005,7 +1006,7 @@ void DockerBackendFakeEngineTest::readsContainerStats()
 }
 
 /*!
- * §29：同一资源的 inspect 请求在途时必须合并，不能产生重复请求。
+ * §29: in-flight inspect requests for the same resource must coalesce, never duplicate.
  */
 void DockerBackendFakeEngineTest::coalescesDuplicateDetailRequests()
 {
@@ -1024,7 +1025,7 @@ void DockerBackendFakeEngineTest::coalescesDuplicateDetailRequests()
 }
 
 /*!
- * §27：离开详情页后必须停止 stats 采样（只结束本地请求生命周期）。
+ * §27: leaving the detail page must stop stats sampling (ends only the local request lifecycle).
  */
 void DockerBackendFakeEngineTest::stopsStatsSamplingOnRequest()
 {
@@ -1040,16 +1041,16 @@ void DockerBackendFakeEngineTest::stopsStatsSamplingOnRequest()
     backend.stopContainerStats(id);
     QVERIFY(!backend.isSamplingStats(id));
 
-    // 停止后即使再次请求采样，也需要显式 start 才会继续（这里只验证状态语义）
+    // After stopping, sampling needs an explicit start to resume (only state semantics checked here)
     backend.stopContainerStats(id);
     QVERIFY(!backend.isSamplingStats(id));
 }
 
 /* ============================================================================
- * 写操作契约（ARCH_V4 §2.2.4 / §5.1）
+ * Mutation contracts (ARCH_V4 §2.2.4 / §5.1)
  *
- * 这些用例断言的是「我们到底发了什么请求」与「引擎的状态码如何被归一」，
- * 全部跑在假 Engine 上：不碰真实 daemon，也不依赖任何容器存在。
+ * These tests assert which requests we actually send and how engine status codes are mapped,
+ * all against the fake Engine: no real daemon, no container required.
  * ==========================================================================*/
 
 namespace
@@ -1091,7 +1092,7 @@ void DockerBackendFakeEngineTest::stopContainerSendsTimeoutParameter()
     const FakeEngine::RequestRecord request = m_engine->lastRequest();
     QCOMPARE(request.method, QStringLiteral("POST"));
     QCOMPARE(request.path, QStringLiteral("/v1.56/containers/%1/stop").arg(kContainerId));
-    // 停止宽限期由 backend 统一决定（RefreshPolicy），不由 UI 传
+    // The stop grace period is decided by the backend (RefreshPolicy), not passed by the UI
     QCOMPARE(request.query, QStringLiteral("t=%1").arg(RefreshPolicy::kStopTimeoutSeconds));
     QCOMPARE(finishedSpy.at(0).at(2).value<Outcome>(), Outcome::Succeeded);
 }
@@ -1108,7 +1109,7 @@ void DockerBackendFakeEngineTest::removeContainerUsesDeleteWithoutVolumeFlag()
     const FakeEngine::RequestRecord request = m_engine->lastRequest();
     QCOMPARE(request.method, QStringLiteral("DELETE"));
     QCOMPARE(request.path, QStringLiteral("/v1.56/containers/%1").arg(kContainerId));
-    // 不删卷（不带 v）、不强制（不带 force）：这是有意的数据保护
+    // No volume removal (no v), no force: deliberate data protection
     QVERIFY(request.query.isEmpty());
     QCOMPARE(finishedSpy.at(0).at(2).value<Outcome>(), Outcome::Succeeded);
     QVERIFY(!finishedSpy.at(0).at(3).value<DockerError>().isError());
@@ -1125,7 +1126,7 @@ void DockerBackendFakeEngineTest::notModifiedStartIsReportedAsUnchanged()
     backend.startContainer(kContainerId);
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
 
-    // 304 是「已经在跑了」，不是错误
+    // 304 means "already running", not an error
     QCOMPARE(finishedSpy.at(0).at(2).value<Outcome>(), Outcome::Unchanged);
     QVERIFY(!finishedSpy.at(0).at(3).value<DockerError>().isError());
 }
@@ -1147,7 +1148,7 @@ void DockerBackendFakeEngineTest::containerMutationFailureKeepsEngineMessage()
     QCOMPARE(finishedSpy.at(0).at(2).value<Outcome>(), Outcome::Failed);
     QCOMPARE(error.kind(), DockerError::Kind::Conflict);
     QCOMPARE(error.httpStatus(), 409);
-    // 引擎原文要保留下来：文案映射靠它区分「运行中 / 被引用 / 名称冲突」
+    // Keep the engine message: the text mapping tells running / in use / name conflict apart
     QVERIFY(error.detail().contains(QStringLiteral("running container")));
 }
 
@@ -1157,7 +1158,7 @@ void DockerBackendFakeEngineTest::pullImageSendsFromImageAndTag()
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
 
     QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
-    // 不写 tag → 归一化为 latest，但仍然显式发 tag 参数
+    // No tag -> normalized to latest, but the tag parameter is still sent explicitly
     backend.pullImage(QStringLiteral("alpine"));
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
 
@@ -1184,7 +1185,7 @@ void DockerBackendFakeEngineTest::pullImageAggregatesLayerProgress()
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
 
     QVERIFY(progress.size() >= 4);
-    // 两层共 140 字节，最后一层完成时总量已知且已满
+    // Two layers, 140 bytes total; when the last layer completes the total is known and full
     const ImagePullProgress last = progress.last();
     QCOMPARE(last.reference, QStringLiteral("alpine:3.19"));
     QCOMPARE(last.totalLayers, 2);
@@ -1195,7 +1196,7 @@ void DockerBackendFakeEngineTest::pullImageAggregatesLayerProgress()
     QVERIFY(last.statusText.contains(QStringLiteral("Downloaded newer image")));
     QVERIFY(!last.failed());
 
-    // 中间至少有一次是「总量未知」的不确定态（进度条必须先能处理这种情况）
+    // At least one intermediate update is indeterminate (unknown total): the progress bar must handle it
     bool sawIndeterminate = false;
     for (const ImagePullProgress &p : progress) {
         if (p.isIndeterminate() && p.phase != ImagePullProgress::Phase::Complete) {
@@ -1204,7 +1205,7 @@ void DockerBackendFakeEngineTest::pullImageAggregatesLayerProgress()
     }
     QVERIFY(sawIndeterminate);
 
-    // 进度必须单调不减（UI 的进度条不能倒退）
+    // Progress must be monotonic (the UI progress bar must not go backwards)
     qint64 previous = 0;
     for (const ImagePullProgress &p : progress) {
         QVERIFY(p.currentBytes >= previous);
@@ -1214,7 +1215,7 @@ void DockerBackendFakeEngineTest::pullImageAggregatesLayerProgress()
 
 void DockerBackendFakeEngineTest::pullImageErrorLineFailsTheMutation()
 {
-    // HTTP 是 200，失败在流里：这是 Docker 的常见形态，不能被当成成功
+    // HTTP is 200, the failure is inside the stream: a common Docker shape, must not count as success
     m_engine->setPullLines({
         QByteArrayLiteral("{\"status\":\"Pulling from library/nope\"}\n"),
         QByteArrayLiteral("{\"errorDetail\":{\"message\":\"manifest unknown\"},\"error\":\"manifest unknown\"}\n"),
@@ -1238,7 +1239,7 @@ void DockerBackendFakeEngineTest::pullImageCanBeCancelled()
     DockerBackend backend;
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
 
-    // 在第一帧进度到达时取消：不依赖时序猜测，也不依赖握手耗时
+    // Cancel when the first progress frame arrives: no timing guesses, no dependence on handshake latency
     bool requestedCancel = false;
     connect(&backend, &DockerBackend::imagePullProgress, this, [&backend, &requestedCancel] {
         if (!requestedCancel) {
@@ -1251,7 +1252,7 @@ void DockerBackendFakeEngineTest::pullImageCanBeCancelled()
     backend.pullImage(QStringLiteral("alpine:3.19"));
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
 
-    // 取消不是错误，但必须恰好上报一次结果
+    // Cancelling is not an error, but the outcome must be reported exactly once
     QCOMPARE(finishedSpy.at(0).at(2).value<Outcome>(), Outcome::Cancelled);
     QVERIFY(!finishedSpy.at(0).at(3).value<DockerError>().isError());
     QTest::qWait(300);
@@ -1280,8 +1281,8 @@ void DockerBackendFakeEngineTest::removeImageSendsForceFlag()
 }
 
 /*!
- * 写操作可能在版本握手完成之前被触发（例如 KCM 刚打开就点了启动）：
- * 必须排队等握手，而不是发出一个没有 /v1.xx 前缀的请求。
+ * A mutation can be triggered before the version handshake finishes (e.g. Start clicked right after
+ * the KCM opens): it must queue for the handshake instead of sending a request without a /v1.xx prefix.
  */
 void DockerBackendFakeEngineTest::mutationWaitsForApiVersionHandshake()
 {
@@ -1289,7 +1290,7 @@ void DockerBackendFakeEngineTest::mutationWaitsForApiVersionHandshake()
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
 
     QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
-    // 不先 refreshAll：客户端此时还不知道 API 版本
+    // No refreshAll first: the client does not know the API version yet
     QVERIFY(!backend.isLoading());
     backend.startContainer(kContainerId);
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 10000);
@@ -1302,8 +1303,8 @@ void DockerBackendFakeEngineTest::mutationWaitsForApiVersionHandshake()
 
 
 /*!
- * 并发拉取（ARCH_V4 §2.4）：不同引用同时在途，互不干扰——
- * 取消其中一路不能影响另一路的状态与结果。
+ * Concurrent pulls (ARCH_V4 §2.4): different references in flight at once stay independent:
+ * cancelling one must not affect the other's state or outcome.
  */
 void DockerBackendFakeEngineTest::concurrentPullsAreIndependent()
 {
@@ -1333,31 +1334,33 @@ void DockerBackendFakeEngineTest::concurrentPullsAreIndependent()
     }
     QCOMPARE(outcomeByTarget.value(QStringLiteral("image:alpine:3.19")), int(Outcome::Cancelled));
     QCOMPARE(outcomeByTarget.value(QStringLiteral("image:busybox:latest")), int(Outcome::Succeeded));
-    // 两路都真的推进过（不是一路跑完另一路才开始）
+    // Both really made progress (not one finishing before the other starts)
     QVERIFY(progressing.contains(QStringLiteral("alpine:3.19")));
     QVERIFY(progressing.contains(QStringLiteral("busybox:latest")));
 
-    // 取消过的引用可以重新拉取（状态没有残留）
+    // A cancelled reference can be pulled again (no leftover state)
     backend.pullImage(QStringLiteral("alpine:3.19"));
     QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() == 3, 20000);
     QCOMPARE(finishedSpy.at(2).at(2).value<Outcome>(), Outcome::Succeeded);
 }
 
 /*!
- * 网络写操作（ARCH_V5_V8 §3.3）：创建走 JSON 体，删除走 DELETE。
+ * Network mutations (ARCH_V5_V8 §3.3): create uses a JSON body, remove uses DELETE.
  *
- * 创建是四期以来**第一个带请求体的写操作**（之前都靠 query 参数），因此这里同时钉住
- * "体真的发出去了"与"键名与 Docker API 一致"。
+ * Create is the **first mutation with a request body** since phase 4 (all earlier ones used query
+ * parameters), so this pins both "the body really went out" and "the keys match the Docker API".
  */
 /*!
- * 网络成员只能从**容器列表**汇总（用户实测：网络页所有网桥都显示 0 个容器）。
+ * Network members can only be aggregated from the **container list** (user report: every bridge on
+ * the network page showed 0 containers).
  *
- * 实测依据（对真实 daemon 只读核对）：
- *   - `GET /networks` 的 `Containers` **是空的**（列表端点不填）
- *   - `GET /networks/{id}` 才填（bridge 6 个）
- *   - `GET /containers/json` 里每个容器都有 `NetworkSettings.Networks`（含 IP/MAC）
- * 因此"哪些容器连了这个网络"必须由容器侧汇总；这里用假引擎把这条形状钉死：
- * 网络端点给空 Containers，容器端点给归属关系，最后网络成员必须是容器侧的结果。
+ * Read-only evidence from a real daemon:
+ *   - `Containers` in `GET /networks` **is empty** (the list endpoint does not fill it)
+ *   - `GET /networks/{id}` fills it (6 for bridge)
+ *   - every container in `GET /containers/json` carries `NetworkSettings.Networks` (with IP/MAC)
+ * So "which containers joined this network" must be aggregated container-side; the fake engine pins
+ * that shape: the network endpoint returns empty Containers, the container endpoint carries the
+ * membership, and the final members must come from the container side.
  */
 void DockerBackendFakeEngineTest::networkMembersComeFromTheContainerList()
 {
@@ -1385,7 +1388,7 @@ void DockerBackendFakeEngineTest::networkMembersComeFromTheContainerList()
     DockerBackend backend;
     backend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
 
-    // 先取容器（成员来源），再取网络
+    // Fetch containers first (the membership source), then networks
     QSignalSpy containersSpy(&backend, &DockerBackend::containersUpdated);
     backend.refreshContainers();
     QTRY_COMPARE_WITH_TIMEOUT(containersSpy.count(), 1, 10000);
@@ -1405,7 +1408,7 @@ void DockerBackendFakeEngineTest::networkMembersComeFromTheContainerList()
         names.sort();
         if (network.name == QLatin1String("app_default")) {
             QCOMPARE(names, QStringList({QStringLiteral("web"), QStringLiteral("worker")}));
-            // 地址与 MAC 也要带过来（详情页要显示）
+            // Address and MAC must come along too (the detail page shows them)
             QVERIFY(!members.first().ipv4Address.isEmpty());
             QVERIFY(!members.first().macAddress.isEmpty());
         } else {
@@ -1413,13 +1416,13 @@ void DockerBackendFakeEngineTest::networkMembersComeFromTheContainerList()
         }
     }
 
-    // 反方向：容器列表后来才到，网络成员也要补上（幂等重算）
+    // Reverse order: containers arrive later, members must still be filled in (idempotent recompute)
     DockerBackend lateBackend;
     lateBackend.setEndpoint(DockerEndpoint::unixSocket(m_engine->socketPath()));
     QSignalSpy lateNetworksSpy(&lateBackend, &DockerBackend::networksUpdated);
     lateBackend.refreshNetworks();
     QTRY_VERIFY_WITH_TIMEOUT(lateNetworksSpy.count() >= 1, 10000);
-    QCOMPARE(lateBackend.networks().at(1).members.size(), 0); // 此时还没有容器数据
+    QCOMPARE(lateBackend.networks().at(1).members.size(), 0); // no container data yet
     QSignalSpy lateContainersSpy(&lateBackend, &DockerBackend::containersUpdated);
     lateBackend.refreshContainers();
     QTRY_COMPARE_WITH_TIMEOUT(lateContainersSpy.count(), 1, 10000);
@@ -1467,7 +1470,7 @@ void DockerBackendFakeEngineTest::networkCreateSendsJsonBodyAndRemoveUsesDelete(
     QCOMPARE(configs.at(0).toObject().value(QStringLiteral("Subnet")).toString(), QStringLiteral("172.30.0.0/16"));
     QCOMPARE(configs.at(0).toObject().value(QStringLiteral("Gateway")).toString(), QStringLiteral("172.30.0.1"));
 
-    // 删除：DELETE /networks/{id}
+    // Remove: DELETE /networks/{id}
     backend.removeNetwork(QStringLiteral("abc123"));
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);
     QCOMPARE(finishedSpy.at(1).at(0).value<DockerBackendInterface::Mutation>(), DockerBackendInterface::Mutation::RemoveNetwork);
@@ -1477,7 +1480,7 @@ void DockerBackendFakeEngineTest::networkCreateSendsJsonBodyAndRemoveUsesDelete(
 }
 
 /*!
- * 容器与网络的连接/断开（ARCH_V5_V8 §3.4）：都是带 JSON 体的 POST。
+ * Container connect/disconnect to a network (ARCH_V5_V8 §3.4): both are POSTs with a JSON body.
  */
 void DockerBackendFakeEngineTest::networkConnectAndDisconnectSendTheContainer()
 {
@@ -1501,7 +1504,7 @@ void DockerBackendFakeEngineTest::networkConnectAndDisconnectSendTheContainer()
     const QJsonArray aliases = connectBody.value(QStringLiteral("EndpointConfig")).toObject().value(QStringLiteral("Aliases")).toArray();
     QCOMPARE(aliases.size(), 2);
     QCOMPARE(aliases.at(0).toString(), QStringLiteral("app"));
-    QCOMPARE(aliases.at(1).toString(), QStringLiteral("api")); // trim 过
+    QCOMPARE(aliases.at(1).toString(), QStringLiteral("api")); // trimmed
 
     backend.disconnectNetwork(QStringLiteral("net1"), QStringLiteral("cid-1"));
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);
@@ -1510,15 +1513,16 @@ void DockerBackendFakeEngineTest::networkConnectAndDisconnectSendTheContainer()
     QCOMPARE(disconnected.path, QStringLiteral("/v1.56/networks/net1/disconnect"));
     const QJsonObject disconnectBody = QJsonDocument::fromJson(disconnected.body).object();
     QCOMPARE(disconnectBody.value(QStringLiteral("Container")).toString(), QStringLiteral("cid-1"));
-    // force 默认关闭：不强断正在使用的网络
+    // force off by default: do not force-disconnect a network in use
     QVERIFY(!disconnectBody.value(QStringLiteral("Force")).toBool());
 }
 
 
 /*!
- * 数据卷列表（ARCH_V5_V8 §3.5）：请求形态与解析。
+ * Volume list (ARCH_V5_V8 §3.5): request shape and parsing.
  *
- * 与 `/networks` 不同的是载荷是**对象**（`{Volumes, Warnings}`），空列表时 `Volumes` 为 null。
+ * Unlike `/networks` the payload is an **object** (`{Volumes, Warnings}`), and `Volumes` is null
+ * when the list is empty.
  */
 void DockerBackendFakeEngineTest::volumesAreListedFromTheEngine()
 {
@@ -1555,7 +1559,7 @@ void DockerBackendFakeEngineTest::volumesAreListedFromTheEngine()
     QCOMPARE(request.path, QStringLiteral("/v1.56/volumes"));
     QVERIFY2(request.query.isEmpty(), "usage is included by default");
 
-    // 关闭占用统计：带上 no-usage（大环境下扫占用很慢）
+    // Disable usage stats: send no-usage (scanning usage is slow on large setups)
     backend.refreshVolumes(false);
     QTRY_COMPARE_WITH_TIMEOUT(updatedSpy.count(), 2, 10000);
     request = m_engine->lastRequest();
@@ -1564,7 +1568,8 @@ void DockerBackendFakeEngineTest::volumesAreListedFromTheEngine()
 
 
 /*!
- * 创建容器（ARCH_V5_V8 §4.6）：名字走 query、体是映射函数生成的 JSON、id 经信号回来。
+ * Container create (ARCH_V5_V8 §4.6): name in the query, body JSON from the mapping function,
+ * id back via signal.
  */
 void DockerBackendFakeEngineTest::createsAContainerWithNameInTheQuery()
 {
@@ -1591,12 +1596,12 @@ void DockerBackendFakeEngineTest::createsAContainerWithNameInTheQuery()
     const FakeEngine::RequestRecord record = m_engine->lastRequest();
     QCOMPARE(record.method, QStringLiteral("POST"));
     QCOMPARE(record.path, QStringLiteral("/v1.56/containers/create"));
-    QCOMPARE(record.query, QStringLiteral("name=web")); // 名字在 query 里
+    QCOMPARE(record.query, QStringLiteral("name=web")); // the name is in the query
     const QJsonObject body = QJsonDocument::fromJson(record.body).object();
     QCOMPARE(body.value(QStringLiteral("Image")).toString(), QStringLiteral("alpine:3.19"));
     QVERIFY2(!body.contains(QStringLiteral("Name")), "the name must not be in the body");
 
-    // 201 但没有 Id：必须当成失败，不能让界面以为创建成功了
+    // 201 without an Id: must count as failure, the UI must not think creation succeeded
     m_engine->setPathStatus(QStringLiteral("/containers/create"), 201, QByteArrayLiteral("{}"));
     backend.createContainer(request);
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 2, 10000);

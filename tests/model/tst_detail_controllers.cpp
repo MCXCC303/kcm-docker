@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,10 +17,10 @@
 using namespace Kontainer;
 
 /*!
- * 详情页 controller 测试（ARCH_V2 §27/§28/§31/§43/§46）。
+ * Detail page controller tests (ARCH_V2 §27/§28/§31/§43/§46).
  *
- * 重点验证生命周期：页面进入才请求数据、离开就停止采样并释放历史；
- * 以及 inspect 失败时列表页不受影响（错误只落在详情分区）。
+ * Focus is the lifecycle: entering the page requests data, leaving stops sampling and releases
+ * history; a failing inspect must not affect the list page (the error stays in the detail view).
  */
 class DetailControllersTest : public QObject
 {
@@ -108,8 +108,9 @@ void DetailControllersTest::containerDetailLoadsAndBuildsLists()
     QCOMPARE(controller.restartCount(), 2);
     QCOMPARE(controller.environmentCount(), 2);
 
-    // 结构化子列表（不是把 JSON 丢给 QML）
-    // 端口现在是结构化模型（拓扑图要按字段画，而不是解析文本，ARCH_V4 §2.1.2）
+    // Structured child lists, not raw JSON handed to QML
+    // Ports are a structured model now: the topology view draws fields instead of parsing text
+    // (ARCH_V4 §2.1.2)
     QCOMPARE(controller.publishedPorts()->count(), 1);
     QCOMPARE(controller.unpublishedPorts()->count(), 0);
     QCOMPARE(controller.publishedPorts()->index(0, 0).data(PortMappingModel::ContainerChipTextRole).toString(), QStringLiteral("8080/tcp"));
@@ -119,7 +120,7 @@ void DetailControllersTest::containerDetailLoadsAndBuildsLists()
     QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::DestinationRole).toString(), QStringLiteral("/data"));
     QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::SourceRole).toString(), QStringLiteral("/host/data"));
     QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::ModeRole).toString(), QStringLiteral("rw"));
-    // 没有注入宿主路径服务时，不谎报路径存在，也不提供打开动作
+    // Without an injected host path service, do not claim the path exists or offer to open it
     QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("notApplicable"));
     QVERIFY(!controller.mounts()->index(0, 0).data(MountListModel::OpenableRole).toBool());
     QCOMPARE(controller.labels()->count(), 1);
@@ -137,7 +138,7 @@ void DetailControllersTest::containerDetailStartsMetricsOnlyWhenRunning()
     controller.start();
     backend.completeRefresh();
 
-    // 已停止容器没有资源数据：不应该轮询 stats（§17/§27）
+    // A stopped container has no stats: no stats polling (§17/§27)
     QVERIFY(!controller.running());
     QVERIFY(!controller.metrics()->sampling());
     QVERIFY(backend.samplingIds().isEmpty());
@@ -155,7 +156,7 @@ void DetailControllersTest::containerDetailStopReleasesSampling()
     QVERIFY(controller.metrics()->sampling());
     QVERIFY(backend.samplingIds().contains(QStringLiteral("cid-1")));
 
-    // 离开页面（§27）
+    // Leaving the page (§27)
     controller.stop();
     QVERIFY(!controller.metrics()->sampling());
     QVERIFY(backend.samplingIds().isEmpty());
@@ -163,8 +164,8 @@ void DetailControllersTest::containerDetailStopReleasesSampling()
 }
 
 /*!
- * §27/§46：离开详情页再进入同一个对象，必须重新 inspect 并恢复 stats 采样
- * （否则页面会一直显示旧缓存，Resources 卡在 “Not sampling”）。
+ * §27/§46: leaving the detail page and re-entering the same object must inspect again and
+ * resume stats sampling (otherwise the page keeps stale data and Resources stays "Not sampling").
  */
 void DetailControllersTest::containerDetailReloadsAfterReentry()
 {
@@ -183,7 +184,7 @@ void DetailControllersTest::containerDetailReloadsAfterReentry()
     QVERIFY(!controller.metrics()->sampling());
     QVERIFY(backend.samplingIds().isEmpty());
 
-    // 再次进入同一个容器
+    // Enter the same container again
     const int inspectBefore = backend.refreshCount(DockerBackendInterface::Section::ContainerDetail);
     controller.start();
     backend.completeRefresh();
@@ -208,7 +209,7 @@ void DetailControllersTest::containerDetailReportsErrorAndRetries()
     QCOMPARE(controller.loadStateKey(), QStringLiteral("error"));
     QVERIFY(!controller.errorText().isEmpty());
 
-    // 重试成功后进入 ready（§31）
+    // A successful retry reaches ready (§31)
     backend.setContainerDetail(makeDetail(ContainerState::Running));
     controller.refresh();
     QCOMPARE(controller.loadStateKey(), QStringLiteral("loading"));
@@ -258,7 +259,7 @@ void DetailControllersTest::imageDetailLoadsTagsLayersAndUsage()
     QCOMPARE(controller.layers()->index(0, 0).data(DetailListModel::LabelRole).toString(), QStringLiteral("1"));
     QCOMPARE(controller.environmentCount(), 1);
 
-    // §52：与 Container 的只读关联
+    // §52: read-only relation to containers
     QCOMPARE(controller.usedByContainers()->count(), 1);
     QCOMPARE(controller.usedByContainers()->index(0, 0).data(DetailListModel::LabelRole).toString(), QStringLiteral("WinBoat"));
 }
@@ -279,14 +280,14 @@ void DetailControllersTest::imageDetailReportsError()
 }
 
 /*!
- * ARCH_V2 §32/§34 + ARCH_V3 附录 A.1d：
- * 静默刷新（数据没变）时详情列表**不得**重置模型。
+ * ARCH_V2 §32/§34 + ARCH_V3 Appendix A.1d:
+ * a silent refresh (unchanged data) must NOT reset the detail lists.
  *
- * 详情页的列表会被反复重建：容器列表每 5 秒变化一次就会触发
- * ImageDetailController::rebuildUsedBy()，inspect 复核每 30 秒触发
- * ContainerDetailController::rebuildLists()。如果每次都发 modelReset，
- * QML 里的 Repeater 就会反复销毁重建 delegate，而「布局正在算尺寸时条目被销毁」
- * 正是真实会话里段错误（QGridLayoutEngine / polish）的触发条件。
+ * These lists are rebuilt repeatedly: any 5-second container list change triggers
+ * ImageDetailController::rebuildUsedBy(), and the 30-second inspect re-check triggers
+ * ContainerDetailController::rebuildLists(). Emitting modelReset each time makes QML's Repeater
+ * destroy and recreate delegates, and destroying an item while the layout computes its size is
+ * exactly what caused the segfaults seen in real sessions (QGridLayoutEngine / polish).
  */
 void DetailControllersTest::unchangedDetailListsDoNotResetTheModel()
 {
@@ -302,8 +303,8 @@ void DetailControllersTest::unchangedDetailListsDoNotResetTheModel()
     controller.start();
     backend.completeRefresh();
 
-    // 一个 Docker 网络可能展开成多条展示条目（network / ipv6 / gateway），
-    // 因此这里只固定「初始条数」，不假设它与 Docker 侧条目数一一对应
+    // One Docker network can expand into several display entries (network / ipv6 / gateway),
+    // so only the initial count is pinned here, not a 1:1 relation with the Docker entries
     const int initialNetworkCount = controller.networks()->count();
     const int initialMountCount = controller.mounts()->count();
     QVERIFY(initialNetworkCount > 0);
@@ -313,7 +314,7 @@ void DetailControllersTest::unchangedDetailListsDoNotResetTheModel()
     QSignalSpy mountsReset(controller.mounts(), &QAbstractItemModel::modelReset);
     QSignalSpy countChanged(controller.networks(), &DetailListModel::countChanged);
 
-    // 连续三次「数据完全没变」的 inspect 复核
+    // Three consecutive inspect re-checks with completely unchanged data
     for (int round = 0; round < 3; ++round) {
         controller.refresh();
         backend.completeRefresh();
@@ -322,7 +323,7 @@ void DetailControllersTest::unchangedDetailListsDoNotResetTheModel()
     QCOMPARE(mountsReset.count(), 0);
     QCOMPARE(countChanged.count(), 0);
 
-    // 数据真的变了就必须重置，否则界面会显示过期内容
+    // A real data change must reset, otherwise the view shows stale content
     detail.networks.append({QStringLiteral("host"), QStringLiteral("id2"), QStringLiteral("172.17.0.3"), {}, {}, QStringLiteral("172.17.0.1")});
     backend.setContainerDetail(detail);
     controller.refresh();

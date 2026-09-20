@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,12 +15,12 @@
 using namespace Kontainer;
 
 /*!
- * 挂载分区（ARCH_V4 §2.1.1 / §5.1）。
+ * Mount section (ARCH_V4 §2.1.1 / §5.1).
  *
- * 覆盖三件事：
- *  - domain 挂载 → presentation 条目的字段映射（类型 / 模式 / 卷名 / 路径）
- *  - 宿主路径探测结果如何决定「能不能打开」
- *  - 打开失败必须给出可读原因，而不是静默
+ * Covers three things:
+ *  - domain mount -> presentation entry field mapping (type / mode / volume name / paths)
+ *  - how the host path probe decides whether a mount "can be opened"
+ *  - a failed open must give a readable reason instead of failing silently
  */
 class MountListModelTest : public QObject
 {
@@ -70,7 +70,7 @@ void MountListModelTest::mapsMountFieldsToRoles()
     bind.source = QStringLiteral("/srv/data");
     bind.destination = QStringLiteral("/data");
     bind.mode = QStringLiteral("rw");
-    bind.readOnly = true; // 引擎的 RW=false 必须体现在 presentation 里
+    bind.readOnly = true; // the engine's RW=false must show up in the presentation
     backend.setContainerDetail(detailWithMounts({bind}));
 
     controller.setContainerId(QStringLiteral("cid-1"));
@@ -82,7 +82,7 @@ void MountListModelTest::mapsMountFieldsToRoles()
     QCOMPARE(index.data(MountListModel::TypeKeyRole).toString(), QStringLiteral("bind"));
     QCOMPARE(index.data(MountListModel::SourceRole).toString(), QStringLiteral("/srv/data"));
     QCOMPARE(index.data(MountListModel::DestinationRole).toString(), QStringLiteral("/data"));
-    // 只读挂载显示 ro：这是用户判断「能不能写进去」的唯一线索
+    // A read-only mount shows ro: the only clue whether the user can write into it
     QCOMPARE(index.data(MountListModel::ModeRole).toString(), QStringLiteral("ro"));
     QCOMPARE(index.data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("directory"));
     QVERIFY(index.data(MountListModel::OpenableRole).toBool());
@@ -131,7 +131,7 @@ void MountListModelTest::tmpfsHasNoHostPath()
     controller.start();
     backend.completeRefresh();
 
-    // tmpfs 没有宿主机路径：不谎报「缺失」，而是「不适用」
+    // tmpfs has no host path: report "not applicable", not a bogus "missing"
     QCOMPARE(controller.mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("notApplicable"));
     QVERIFY(!controller.mounts()->index(0, 0).data(MountListModel::OpenableRole).toBool());
     QCOMPARE(controller.mounts()->blockedCount(), 0);
@@ -168,8 +168,8 @@ void MountListModelTest::unchangedMountsDoNotResetTheModel()
     backend.completeRefresh();
 
     QSignalSpy resetSpy(controller.mounts(), &QAbstractItemModel::modelReset);
-    // 数据没变：30 秒一次的 inspect 复核不允许重置模型
-    // （重置会销毁重建 QML 里的行，正是 ARCH_V3 附录 A.1g 的段错误诱因）
+    // Unchanged data: the 30-second inspect re-check must not reset the model
+    // (a reset destroys and recreates the QML rows, the segfault trigger of ARCH_V3 Appendix A.1g)
     controller.refresh();
     backend.completeRefresh();
     QCOMPARE(resetSpy.count(), 0);
@@ -196,7 +196,7 @@ void MountListModelTest::openMountHostPathAsksTheService()
     QCOMPARE(hostPaths.openedPaths().first(), QStringLiteral("/srv/data"));
     QVERIFY(controller.mountActionError().isEmpty());
 
-    // 越界索引不该崩，也不该触发打开
+    // An out-of-range index must neither crash nor trigger an open
     controller.openMountHostPath(7);
     controller.openMountHostPath(-1);
     QCOMPARE(hostPaths.openCount(), 1);
@@ -251,7 +251,7 @@ void MountListModelTest::blockedMountsAreCounted()
     controller.start();
     backend.completeRefresh();
 
-    // 只有「本该有路径却打不开」的才算被挡住；tmpfs 天生没有宿主路径
+    // Only "should have a path but cannot be opened" counts as blocked; tmpfs never has one
     QCOMPARE(controller.mounts()->count(), 2);
     QCOMPARE(controller.mounts()->blockedCount(), 1);
 }

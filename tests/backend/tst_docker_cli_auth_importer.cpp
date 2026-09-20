@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,11 +15,11 @@
 using namespace Kontainer;
 
 /*!
- * Docker CLI 配置的一次性只读导入（ARCH_V5_V8 §2.6/§2.7）。
+ * One-shot read-only import of the Docker CLI config (ARCH_V5_V8 §2.6/§2.7).
  *
- * 这个功能碰的是**别人的文件**，所以边界比功能更重要：
- * 只读、不覆盖钱包里已有的条目、不调用 credential helper、
- * 坏条目如实报出来而不是猜。
+ * It reads **someone else's file**, so boundaries matter more than features:
+ * read-only, never overwrite existing wallet entries, never invoke a credential
+ * helper, report bad entries instead of guessing.
  */
 class DockerCliAuthImporterTest : public QObject
 {
@@ -62,7 +62,7 @@ void DockerCliAuthImporterTest::scansAuthsAndNormalizesIndexKeys()
     QVERIFY(dir.isValid());
 
     QJsonObject auths;
-    // Docker Hub 的历史键：必须归一成 index.docker.io
+    // Historical Docker Hub key: must normalize to index.docker.io
     auths.insert(QStringLiteral("https://index.docker.io/v1/"), entryWithAuth(QByteArrayLiteral("alice:hub-secret")));
     auths.insert(QStringLiteral("registry.example.com:5000"), entryWithAuth(QByteArrayLiteral("bob:s3cret:with:colons")));
     QJsonObject token;
@@ -86,13 +86,13 @@ void DockerCliAuthImporterTest::scansAuthsAndNormalizesIndexKeys()
     QVERIFY(byAddress.contains(QStringLiteral("registry.example.com:5000")));
     QVERIFY(byAddress.contains(QStringLiteral("ghcr.io")));
 
-    // 来源键如实保留（界面要说明"这条来自 ~/.docker/config.json 的哪个键"）
+    // Keep the source key verbatim: the UI must say which ~/.docker/config.json key it came from
     QCOMPARE(byAddress.value(QStringLiteral("index.docker.io")).sourceKey, QStringLiteral("https://index.docker.io/v1/"));
     QCOMPARE(byAddress.value(QStringLiteral("index.docker.io")).credential.username, QStringLiteral("alice"));
     QCOMPARE(byAddress.value(QStringLiteral("index.docker.io")).credential.password, QStringLiteral("hub-secret"));
-    // 密码里的冒号不能被切断
+    // Colons inside the password must not be split
     QCOMPARE(byAddress.value(QStringLiteral("registry.example.com:5000")).credential.password, QStringLiteral("s3cret:with:colons"));
-    // 令牌形式
+    // Token form
     QVERIFY(byAddress.value(QStringLiteral("ghcr.io")).credential.usesIdentityToken());
     QCOMPARE(byAddress.value(QStringLiteral("ghcr.io")).credential.identityToken, QStringLiteral("ci-token"));
 }
@@ -103,7 +103,7 @@ void DockerCliAuthImporterTest::reportsHelperManagedEntries()
     QVERIFY(dir.isValid());
 
     QJsonObject auths;
-    // 由 credsStore 管的条目在 auths 里通常没有 auth 字段
+    // Entries managed by credsStore usually have no auth field in auths
     auths.insert(QStringLiteral("registry.helper.test"), QJsonObject());
     auths.insert(QStringLiteral("registry.broken.test"), entryWithAuth(QByteArrayLiteral("nocolon")));
 
@@ -119,10 +119,10 @@ void DockerCliAuthImporterTest::reportsHelperManagedEntries()
     const DockerCliAuthScan scan = DockerCliAuthImporter::scan(path);
     QVERIFY(scan.errorKey.isEmpty());
     QVERIFY2(scan.credentials.isEmpty(), "helper-managed entries cannot be imported");
-    // 助手的两种形态都要如实报告：否则用户会奇怪"我的仓库为什么没被导入"
+    // Both helper forms must be reported, else users wonder why their registry was not imported
     QVERIFY(scan.helperManagedKeys.contains(QStringLiteral("credsStore:desktop")));
     QVERIFY(scan.helperManagedKeys.contains(QStringLiteral("credHelpers:registry.helper.test")));
-    // 有 auth 但内容坏掉的条目单独列出
+    // Entries that have an auth field but broken content are listed separately
     QCOMPARE(scan.skippedKeys, QStringList {QStringLiteral("registry.broken.test")});
 }
 
@@ -142,7 +142,7 @@ void DockerCliAuthImporterTest::toleratesMissingAndBrokenFiles()
     file.close();
     QCOMPARE(DockerCliAuthImporter::scan(broken).errorKey, QStringLiteral("invalidJson"));
 
-    // 合法 JSON 但没有 auths：不是错误，只是没有可导入的东西
+    // Valid JSON without auths: not an error, just nothing to import
     QJsonObject root;
     root.insert(QStringLiteral("experimental"), QStringLiteral("enabled"));
     const QString path = writeConfig(dir, root);
@@ -167,7 +167,7 @@ void DockerCliAuthImporterTest::importNeverOverwritesExistingEntries()
     CredentialStore store(&backend);
     store.open();
 
-    // 用户已经在界面上设过 Hub 的密码：导入不得把它换回文件里的旧值
+    // Hub password already set in the UI: import must not revert it to the file's old value
     RegistryCredential existing;
     existing.serverAddress = QStringLiteral("index.docker.io");
     existing.username = QStringLiteral("alice");
@@ -181,16 +181,17 @@ void DockerCliAuthImporterTest::importNeverOverwritesExistingEntries()
     QCOMPARE(store.credential(QStringLiteral("index.docker.io")).password, QStringLiteral("just-set-in-the-ui"));
     QCOMPARE(store.credential(QStringLiteral("ghcr.io")).password, QStringLiteral("from-file"));
 
-    // 再导入一次：幂等，什么都不写
+    // Importing again is idempotent: nothing is written
     const DockerCliAuthImporter::ImportOutcome again = DockerCliAuthImporter::importInto(store, DockerCliAuthImporter::scan(path));
     QCOMPARE(again.imported, 0);
     QCOMPARE(again.alreadyPresent, 2);
 }
 
 /*!
- * 本机实测 `~/.docker/config.json` 里有 `https://index.docker.io/v1/access-token`
- * 与 `.../refresh-token` 两个键：它们是 Docker 的 OAuth 令牌**缓存**，不是仓库凭据。
- * 抹掉路径后就与真正的 Hub 条目撞在同一个索引键上，甚至会把缓存令牌当密码导入。
+ * This machine's `~/.docker/config.json` really holds `https://index.docker.io/v1/access-token`
+ * and `.../refresh-token`: Docker OAuth token **caches**, not registry credentials.
+ * Stripping their paths collides with the real Hub entry on one index key, and can
+ * import a cached token as the password.
  */
 void DockerCliAuthImporterTest::ignoresTokenCacheAndDuplicateKeys()
 {
@@ -201,7 +202,7 @@ void DockerCliAuthImporterTest::ignoresTokenCacheAndDuplicateKeys()
     auths.insert(QStringLiteral("https://index.docker.io/v1/"), entryWithAuth(QByteArrayLiteral("alice:real-password")));
     auths.insert(QStringLiteral("https://index.docker.io/v1/access-token"), entryWithAuth(QByteArrayLiteral("alice:access-token-cache")));
     auths.insert(QStringLiteral("https://index.docker.io/v1/refresh-token"), entryWithAuth(QByteArrayLiteral("alice:refresh-token-cache")));
-    // 同一仓库的另一种写法：只取第一条，剩余如实记为跳过
+    // Another spelling of the same registry: take the first, report the rest as skipped
     auths.insert(QStringLiteral("docker.io"), entryWithAuth(QByteArrayLiteral("alice:duplicate")));
 
     QJsonObject root;
@@ -217,7 +218,7 @@ void DockerCliAuthImporterTest::ignoresTokenCacheAndDuplicateKeys()
     QVERIFY(scan.tokenCacheKeys.contains(QStringLiteral("https://index.docker.io/v1/access-token")));
     QVERIFY2(scan.skippedKeys.contains(QStringLiteral("docker.io")), "a duplicate address must be reported, not dropped silently");
 
-    // 导入只写一条
+    // Import writes a single entry
     FakeCredentialBackend backend;
     CredentialStore store(&backend);
     store.open();
@@ -229,7 +230,7 @@ void DockerCliAuthImporterTest::ignoresTokenCacheAndDuplicateKeys()
 
 void DockerCliAuthImporterTest::defaultPathHonoursDockerConfig()
 {
-    // DOCKER_CONFIG 指的是目录（CLI 的约定），不是文件
+    // DOCKER_CONFIG names a directory (the CLI convention), not a file
     qputenv("DOCKER_CONFIG", "/tmp/kontainer-docker-config-test");
     QCOMPARE(DockerCliAuthImporter::defaultConfigPath(), QStringLiteral("/tmp/kontainer-docker-config-test/config.json"));
     qunsetenv("DOCKER_CONFIG");

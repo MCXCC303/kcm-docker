@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,19 +20,22 @@
 using namespace Kontainer;
 
 /*!
- * 从 **qrc** 加载界面（ARCH_V3 §5.1）。
+ * Load the UI from **qrc** (ARCH_V3 §5.1).
  *
- * 与 tst_qml_load 的分工：
- *  - tst_qml_load 读源码目录里的 .qml，检查语法、绑定与交互行为；
- *  - 本测试把同一份文件（同一份清单，见顶层 CMakeLists.txt 的
- *    KCM_DOCKER_QML_FILES）打进 qrc，再按插件运行时的路径
- *    `qrc:/kcm/kcm_docker/main.qml` 加载。
+ * Division of labour with tst_qml_load:
+ *  - tst_qml_load reads the .qml files from the source directory and checks syntax,
+ *    bindings and interactive behaviour;
+ *  - this test packs the same files (same manifest, KCM_DOCKER_QML_FILES in the
+ *    top-level CMakeLists.txt) into qrc and loads them at the plugin's runtime path
+ *    `qrc:/kcm/kcm_docker/main.qml`.
  *
- * 存在的理由：资源清单漏项、qmldir / 单例在 qrc 下解析失败、资源前缀写错
- * 这三类问题都不会被源码目录测试发现，却会让安装后的 KCM 直接打不开
- * （kcmshell6 只显示一个错误页，--smoke-test 只给一个非零退出码）。
- * 实测教训：ChartPalette.qml / StatusPalette.qml 曾经漏出资源清单，
- * 源码目录测试 15/15 全绿，而 `kcmshell6 --smoke-test` 退出码是 1。
+ * Why it exists: a missing entry in the resource manifest, a qmldir / singleton that
+ * fails to resolve under qrc, and a wrong resource prefix are all invisible to the
+ * source-directory test, yet each makes the installed KCM fail to open
+ * (kcmshell6 shows only an error page; --smoke-test only returns a non-zero exit code).
+ * Measured lesson: ChartPalette.qml / StatusPalette.qml were once missing from the
+ * resource manifest, the source-directory test was 15/15 green, and
+ * `kcmshell6 --smoke-test` exited with 1.
  */
 class QmlResourceTest : public QObject
 {
@@ -87,8 +90,8 @@ void QmlResourceTest::cleanup()
 }
 
 /*!
- * 插件的入口：KQuickConfigModule::mainUi() 就是从这个 URL 加载界面。
- * 这里失败 = 安装后的 KCM 打不开。
+ * The plugin entry point: KQuickConfigModule::mainUi() loads the UI from this URL.
+ * Failure here = the installed KCM does not open.
  */
 void QmlResourceTest::mainUiLoadsFromResource()
 {
@@ -100,11 +103,12 @@ void QmlResourceTest::mainUiLoadsFromResource()
 }
 
 /*!
- * 源码目录里的每个界面文件（含 qmldir）都必须能在资源里找到**完全相同**的内容。
+ * Every UI file in the source directory (including qmldir) must have a **byte-identical**
+ * counterpart in the resource.
  *
- * 期望值直接从源码目录扫描得到，不维护第二份清单：
- * 新增组件时忘了加进 KCM_DOCKER_QML_FILES 会立刻在这里失败，
- * 而不是等到安装之后。
+ * The expectations are scanned from the source directory; there is no second manifest:
+ * forgetting to add a new component to KCM_DOCKER_QML_FILES fails here immediately
+ * instead of after installation.
  */
 void QmlResourceTest::everySourceFileIsInTheResource_data()
 {
@@ -120,7 +124,7 @@ void QmlResourceTest::everySourceFileIsInTheResource_data()
         QTest::newRow(rowName.constData()) << relative;
         ++count;
     }
-    // 扫描到 0 个文件说明测试自身失效了（路径写错等），必须显式失败
+    // 0 files scanned means the test itself is broken (bad path etc.); fail explicitly
     QVERIFY2(count >= 15, qPrintable(QStringLiteral("only %1 interface files found under %2").arg(count).arg(root.absolutePath())));
 }
 
@@ -142,11 +146,11 @@ void QmlResourceTest::everySourceFileIsInTheResource()
 }
 
 /*!
- * 单例必须能从 qrc 解析：`import "components" as Components` 之后
- * Components.StatusPalette / Components.ChartPalette 可用且能取到主题色。
+ * Singletons must resolve from qrc: after `import "components" as Components`,
+ * Components.StatusPalette / Components.ChartPalette must be usable and return theme colors.
  *
- * 这段片段不依赖任何具体页面，因此页面加载失败时它能直接指出
- * 问题出在单例解析上（而不是让 main.qml 报一句 "Type MainPage unavailable"）。
+ * This snippet depends on no page, so when a page fails to load it points straight at
+ * singleton resolution (instead of leaving main.qml to report "Type MainPage unavailable").
  */
 void QmlResourceTest::singletonPalettesResolveFromResource()
 {
@@ -169,9 +173,9 @@ void QmlResourceTest::singletonPalettesResolveFromResource()
     QScopedPointer<QObject> object(component.create());
     QVERIFY2(!object.isNull(), qPrintable(component.errorString()));
 
-    // 颜色值本身随主题变化，重要的是解析成功且有合理取值
+    // The color itself follows the theme; what matters is that it resolves and has a sane value
     QVERIFY(object->property("statusPositive").value<QColor>().isValid());
-    QCOMPARE(object->property("badgeType").toInt(), 3); // Error 用于 negative
+    QCOMPARE(object->property("badgeType").toInt(), 3); // Error is used for negative
     QVERIFY(object->property("cpuSeries").value<QColor>().isValid());
     QCOMPARE(object->property("contrast").toReal(), 21.0);
 }

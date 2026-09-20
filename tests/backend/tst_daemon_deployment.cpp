@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,10 +13,10 @@
 using namespace Kontainer;
 
 /*!
- * daemon 部署形态探测（ARCH_V5_V8 §2.2）。
+ * Daemon deployment form detection (ARCH_V5_V8 §2.2).
  *
- * 探测决定"要不要提权"：判错会造成两种坏结果——该提权时不提权（功能不可用），
- * 或不该提权时弹授权框（打扰用户）。所以这里把矩阵钉死。
+ * Detection decides whether to escalate: a wrong verdict either blocks the feature
+ * (privilege needed but not requested) or nags with an auth dialog. Pin the matrix here.
  */
 class DaemonDeploymentTest : public QObject
 {
@@ -30,7 +30,7 @@ private Q_SLOTS:
     void dataRootInHomeIsFlagged();
     void configStatsAreReported();
 
-    /* 可写性判定：只看这个文件（或它所在目录）能不能写（ARCH_V5_V8 §2.2 修正） */
+    /* Writability: only whether this file (or its directory) is writable (ARCH_V5_V8 §2.2 revised) */
     void missingConfigInWritableDirIsWritable();
     void missingConfigUnderUnwritableDirIsNotWritable();
     void existingReadOnlyConfigIsNotWritable();
@@ -67,17 +67,17 @@ void DaemonDeploymentTest::systemDaemonNeedsPrivilegeWhenConfigIsNotWritable()
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    // 系统级 daemon：SecurityOptions 有内容但不含 rootless
+    // System daemon: SecurityOptions non-empty but without rootless
     const EngineInfo info = engineWith({QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")},
                                        dir.path() + QStringLiteral("/.local/share/docker"));
 
     const DaemonDeployment deployment = DaemonDeploymentDetector::detect(info, dir.path());
     QCOMPARE(deployment.formKey(), QStringLiteral("systemRoot"));
     QCOMPARE(deployment.configPath, QStringLiteral("/etc/docker/daemon.json"));
-    // 真实机器上这个文件不属于当前用户 → 需要提权（本机实测正是这种形态）
+    // On a real machine this file belongs to root, so privilege is needed (what this host does)
     QVERIFY2(deployment.requiresPrivilege() || deployment.configWritable,
              "requiresPrivilege must be false only when the config is actually writable");
-    // 数据目录在家目录里：需要提示（用户容易误以为是 rootless）
+    // Data root inside home: warn, users mistake this for rootless
     QVERIFY(deployment.dataRootInHomeDir);
 }
 
@@ -105,7 +105,7 @@ void DaemonDeploymentTest::userConfigWinsWhenFormIsUnknown()
     const QString userConfig = dir.path() + QStringLiteral("/.config/docker/daemon.json");
     writeFile(userConfig, QByteArrayLiteral("{}"));
 
-    // SecurityOptions 为空 → 形态未知，但用户配置存在 → 按用户配置处理
+    // No SecurityOptions: form unknown, but the user config exists, so use it
     const DaemonDeployment deployment = DaemonDeploymentDetector::detect(engineWith({}), dir.path());
     QCOMPARE(deployment.formKey(), QStringLiteral("unknown"));
     QCOMPARE(deployment.configPath, userConfig);
@@ -117,8 +117,8 @@ void DaemonDeploymentTest::missingSecurityOptionsMeansUnknownForm()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
-    // 引擎信息不完整（例如 /info 失败）：不得猜测形态，也不得猜系统路径、
-    // 更不得就此宣布"需要提权"（没有路径就没有写入目标）
+    // Incomplete engine info (e.g. /info failed): never guess the form or a system path,
+    // and never declare "privilege required" (no path means no write target)
     const EngineInfo info; // available=false
     const DaemonDeployment deployment = DaemonDeploymentDetector::detect(info, dir.path());
     QCOMPARE(deployment.formKey(), QStringLiteral("unknown"));
@@ -159,14 +159,14 @@ void DaemonDeploymentTest::missingConfigInWritableDirIsWritable()
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    // 新装的 rootless daemon 常常还没有 daemon.json：能创建就算可写，
-    // 否则会把"用户自己就能写"的文件判成需要 root（界面会平白要一次授权）
+    // A fresh rootless daemon often has no daemon.json yet: creatable counts as writable.
+    // Otherwise a user-writable file would be judged as needing root (a pointless auth prompt).
     QVERIFY(DaemonDeploymentDetector::configIsWritable(dir.path() + QStringLiteral("/.config/docker/daemon.json")));
 }
 
 void DaemonDeploymentTest::missingConfigUnderUnwritableDirIsNotWritable()
 {
-    // 系统级路径：/etc/docker 或 /etc 不属于当前用户 → 不存在也不能写
+    // System path: /etc/docker or /etc is not ours, so a missing file is still unwritable
     QVERIFY(!DaemonDeploymentDetector::configIsWritable(QStringLiteral("/etc/docker/daemon.json"))
             || QFileInfo(QStringLiteral("/etc")).isWritable());
 }
@@ -177,10 +177,10 @@ void DaemonDeploymentTest::existingReadOnlyConfigIsNotWritable()
     QVERIFY(dir.isValid());
     const QString path = dir.path() + QStringLiteral("/daemon.json");
     writeFile(path, QByteArrayLiteral("{}"));
-    // 父目录可写、文件本身可写
+    // Parent directory writable and file itself writable
     QVERIFY(DaemonDeploymentDetector::configIsWritable(path));
 
-    // 文件只读（父目录仍然可写）：不能只看父目录，必须看文件自己的权限位
+    // File read-only while the parent stays writable: check the file's own mode bits
     QVERIFY(QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::ReadGroup | QFileDevice::ReadOther));
     QVERIFY(!DaemonDeploymentDetector::configIsWritable(path));
 }
@@ -195,7 +195,7 @@ void DaemonDeploymentTest::missingUserConfigDoesNotRequirePrivilege()
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    // rootless daemon + 还没有用户配置：不需要提权（可创建），也不该给锁
+    // Rootless daemon without a user config yet: no privilege needed (creatable) and no lock
     const DaemonDeployment deployment =
         DaemonDeploymentDetector::detect(engineWith({QStringLiteral("name=rootless")}), dir.path());
     QCOMPARE(deployment.configPath, dir.path() + QStringLiteral("/.config/docker/daemon.json"));

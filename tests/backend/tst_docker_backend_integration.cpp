@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,16 +14,16 @@
 using namespace Kontainer;
 
 /*!
- * 针对真实 Docker Engine 的集成测试（ARCH_V1 §29 / ARCH_V4 §5.3）。
+ * Integration tests against a real Docker Engine (ARCH_V1 §29 / ARCH_V4 §5.3).
  *
- * 默认**只做 GET**；如果本机没有可用的 Docker socket，则整体跳过
- * （CI 不应依赖开发者的 Docker 数据目录）。
+ * **GET only** by default; the whole test skips when no usable Docker socket
+ * exists locally (CI must not depend on a developer's Docker data directory).
  *
- * 唯一的例外是显式 opt-in 的拉取测试（`pullsAnImageWhenExplicitlyRequested`）：
- * 自动化测试绝不擅自修改用户的 Docker 资源，因此它需要
- * `KCM_DOCKER_PULL_TEST=1`，并且默认拉取一个**已经存在**的小镜像
- * （重复拉取对镜像库是无副作用的），引用可以用
- * `KCM_DOCKER_PULL_REFERENCE` 覆盖。
+ * The one exception is the explicitly opt-in pull test (`pullsAnImageWhenExplicitlyRequested`):
+ * automated tests never touch the user's Docker resources, so it needs
+ * `KCM_DOCKER_PULL_TEST=1` and by default pulls an **already present** small
+ * image (a repeated pull adds nothing to the registry); override the reference
+ * with `KCM_DOCKER_PULL_REFERENCE`.
  */
 class DockerBackendIntegrationTest : public QObject
 {
@@ -98,7 +98,7 @@ void DockerBackendIntegrationTest::readsContainerList()
         QVERIFY(container.created.isValid());
     }
 
-    // chunked 响应必须被完整解码为合法 JSON 数组（能解析出条目即说明解码正确）
+    // A chunked response must decode to a complete JSON array (parsed entries prove decoding works)
     const EngineInfo info = backend.engineInfo();
     if (info.countsAvailable) {
         QCOMPARE(containers.size(), info.containerTotal);
@@ -139,7 +139,7 @@ void DockerBackendIntegrationTest::missingSocketProducesClearError()
     backend.refreshEngine();
     QTRY_VERIFY_WITH_TIMEOUT(engineSpy.count() + failureSpy.count() > 0, 10000);
 
-    // 任何后端失败都必须是可观察的（§23.1），且带可理解的用户文本
+    // Every backend failure must be observable (§23.1) and carry understandable user-facing text
     QCOMPARE(failureSpy.count(), 1);
     const auto arguments = failureSpy.first();
     const auto error = arguments.at(1).value<DockerError>();
@@ -150,16 +150,17 @@ void DockerBackendIntegrationTest::missingSocketProducesClearError()
 
 
 /*!
- * 真实 daemon 上的拉取（ARCH_V4 §2.4 / §5.3，opt-in）。
+ * Pull against a real daemon (ARCH_V4 §2.4 / §5.3, opt-in).
  *
- * 覆盖自动化测试里最难伪造的两件事：真实引擎的 chunked 进度流长什么样，
- * 以及「流内 error 行 / 正常结束」在真实实现下如何被判定。
+ * Covers the two things hardest to fake in automated tests: what a real engine's
+ * chunked progress stream looks like, and how an in-stream error line vs. a clean
+ * end is classified by the real implementation.
  *
- * 默认拉取 `quay.io/libpod/alpine:latest`（podman 常用的公共小镜像）：
- * 如果本地已经有它，重复拉取只会返回「已是最新」，不会向镜像库新增任何东西。
- * 想换镜像请设置 `KCM_DOCKER_PULL_REFERENCE`。
+ * By default it pulls `quay.io/libpod/alpine:latest` (a small public podman image):
+ * if it is already local, the pull just reports up to date and adds nothing to the
+ * registry. Set `KCM_DOCKER_PULL_REFERENCE` to use another reference.
  *
- * 运行方式：
+ * How to run:
  *     KCM_DOCKER_PULL_TEST=1 ./bin/tst_docker_backend_integration pullsAnImageWhenExplicitlyRequested
  */
 void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
@@ -185,7 +186,7 @@ void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
     QSignalSpy finishedSpy(&backend, &DockerBackend::mutationFinished);
 
     backend.pullImage(reference);
-    // 首次拉取可能要下载若干 MB；给足时间，但仍然有上限
+    // A first pull may download several MB: allow generous time, but stay bounded
     QTRY_COMPARE_WITH_TIMEOUT(finishedSpy.count(), 1, 180000);
 
     const auto outcome = finishedSpy.at(0).at(2).value<DockerBackendInterface::MutationOutcome>();
@@ -208,10 +209,11 @@ void DockerBackendIntegrationTest::pullsAnImageWhenExplicitlyRequested()
 }
 
 /*!
- * 真实 daemon 的历史日志（ARCH_V5_V8 §3.1.5）。
+ * Historical logs on a real daemon (ARCH_V5_V8 §3.1.5).
  *
- * **只读**：`GET /containers/{id}/logs?follow=0`，不创建、不启动、不停止任何容器。
- * 机器上没有容器时跳过——测试不得以"用户的 Docker 环境"为唯一 fixture（ARCH_V4 §5.3）。
+ * **Read-only**: `GET /containers/{id}/logs?follow=0`; create, start and stop nothing.
+ * Skipped when the machine has no containers - a test must not use the user's Docker
+ * environment as its only fixture (ARCH_V4 §5.3).
  */
 void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
 {
@@ -225,11 +227,12 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
         QSKIP("no container on this machine to read logs from");
     }
 
-    // 从有输出的容器里挑一个：纯"读了但一行都没有"无法验证解复用真的工作。
-    // 只读（follow=0），不改动任何容器；全部容器都没有输出时跳过。
+    // Pick a container that has output: "read but empty" cannot prove demultiplexing works.
+    // Read-only (follow=0), no container is touched; skip when none of them has output.
     //
-    // **只碰 alpine / ubuntu 这类测试镜像**：用户的 Docker 里可能有正在使用的
-    // 业务容器（例如某个 Windows 兼容层），即使只是读日志也不该去动它们。
+    // **Only touch test images like alpine / ubuntu**: the user's Docker may hold
+    // containers in active use (a Windows compatibility layer, say) which must be left
+    // alone even for log reading.
     const auto isTestContainer = [](const Container &container) {
         const QString haystack = (container.name + QLatin1Char(' ') + container.image).toLower();
         return haystack.contains(QLatin1String("alpine")) || haystack.contains(QLatin1String("ubuntu"));
@@ -241,7 +244,7 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
             continue;
         }
         if (++inspected > 8) {
-            break; // 别把整个列表都扫一遍
+            break; // don't scan the entire list
         }
         QSignalSpy detailSpy(&backend, &DockerBackend::containerDetailUpdated);
         backend.inspectContainer(container.id);
@@ -250,12 +253,12 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
 
         QSignalSpy linesSpy(&backend, &DockerBackend::containerLogLines);
         QSignalSpy finishedSpy(&backend, &DockerBackend::containerLogsFinished);
-        backend.startContainerLogs(container.id, tty, false, 20); // follow=0：读完历史就结束
+        backend.startContainerLogs(container.id, tty, false, 20); // follow=0: read the history and finish
         QTRY_VERIFY_WITH_TIMEOUT(finishedSpy.count() > 0, 20000);
 
         const auto end = finishedSpy.at(0).at(1).value<DockerBackendInterface::LogStreamEnd>();
         if (end == DockerBackendInterface::LogStreamEnd::Failed) {
-            // journald / syslog 之类的日志驱动本来就不可读：换下一个
+            // journald / syslog log drivers are simply unreadable: try the next one
             continue;
         }
         QCOMPARE(end, DockerBackendInterface::LogStreamEnd::Ended);
@@ -265,7 +268,7 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
             const QList<LogLine> lines = call.at(1).value<QList<LogLine>>();
             for (const LogLine &line : lines) {
                 ++lineCount;
-                // 解复用出来的行必须是可读文本：不能残留 8 字节帧头那种控制字符
+                // Demultiplexed lines must be readable: no 8-byte frame-header control bytes left
                 QVERIFY2(!line.text.contains(QChar(0x01)) && !line.text.contains(QChar(0x02)),
                          "frame header bytes must never end up in the log text");
                 QVERIFY2(!line.text.contains(QChar(0x1b)), "ANSI escapes must be stripped");
@@ -281,9 +284,10 @@ void DockerBackendIntegrationTest::readsHistoricalLogsOfAnExistingContainer()
 }
 
 /*!
- * 真实 daemon 的网络列表（ARCH_V5_V8 §3.2）。只读 `GET /networks`。
+ * Network list on a real daemon (ARCH_V5_V8 §3.2). Read-only `GET /networks`.
  *
- * 断言的是"真实载荷能被解析"以及三条预定义网络一定在（本机实测 4 个网络）。
+ * Asserts that the real payload parses and that the three predefined networks are present
+ * (4 networks measured on this machine).
  */
 void DockerBackendIntegrationTest::readsNetworkList()
 {
@@ -320,13 +324,15 @@ void DockerBackendIntegrationTest::readsNetworkList()
 }
 
 /*!
- * `/auth` 的请求形态（ARCH_V5_V8 §2.6 的实测修正）。
+ * `/auth` request shape (measured correction in ARCH_V5_V8 §2.6).
  *
- * **只读、且不涉及真实凭据**：用一个明显不存在的账号去问引擎，目的是区分
- *   - 请求**格式**不对 → 引擎回 400 `invalid X-Registry-Auth ...`（曾经就是这样，导致"每个仓库都校验失败"）
- *   - 格式对但凭据不对 → 401
- *   - 格式对但引擎连不上仓库 → 500（超时措辞），我们归类为"仓库不可达"
- * 因此这里断言的是"**不是**格式错误"，而不是"校验成功"。
+ * **Read-only, no real credentials**: a clearly nonexistent account is sent to the engine
+ * to tell apart
+ *   - wrong request **shape** → 400 `invalid X-Registry-Auth ...` (the actual bug:
+ *     every registry failed validation)
+ *   - right shape, wrong credentials → 401
+ *   - right shape, engine cannot reach registry → 500 (timeout wording) = "registry unreachable"
+ * So this asserts "**not** a shape error", not "validation succeeded".
  */
 void DockerBackendIntegrationTest::authCheckRequestIsWellFormed()
 {
@@ -350,9 +356,10 @@ void DockerBackendIntegrationTest::authCheckRequestIsWellFormed()
 }
 
 /*!
- * 真实 daemon 的数据卷列表（ARCH_V5_V8 §3.5）。只读 `GET /volumes`。
+ * Volume list on a real daemon (ARCH_V5_V8 §3.5). Read-only `GET /volumes`.
  *
- * 本机可能一个卷都没有（实测如此），因此断言的是"载荷形态被解析"而不是"一定有卷"。
+ * This machine may have no volume at all (it has none), so the assertion is that the
+ * payload shape parses, not that volumes exist.
  */
 void DockerBackendIntegrationTest::readsVolumeList()
 {

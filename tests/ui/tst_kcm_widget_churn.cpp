@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -24,26 +24,29 @@
 using namespace Kontainer;
 
 /*!
- * kcmshell6 宿主形态下的刷新抖动测试（复现真实会话里的段错误）。
+ * Refresh-churn test in the kcmshell6 host shape (reproduces the real-session segfault).
  *
- * 为什么需要单独一个测试文件：kcmshell6 把 KCM 的 QML 放进 **QQuickWidget**
- * （core dump 的调用栈里能看到 libQt6QuickWidgets → QQuickRenderControl::polishItems
- * → QQuickWindowPrivate::polishItems → QQuickLayout::updatePolish）。
- * QQuickWidget 走的是离屏渲染 + 手动 polish 的路径，与 QQuickWindow 不同；
- * 只用 QQuickWindow 的压力测试（tst_refresh_churn）无法覆盖这条路径。
+ * Why a separate file: kcmshell6 puts the KCM's QML into a **QQuickWidget**
+ * (the core dump stack shows libQt6QuickWidgets → QQuickRenderControl::polishItems
+ * → QQuickWindowPrivate::polishItems → QQuickLayout::updatePolish).
+ * QQuickWidget renders offscreen and polishes manually, unlike QQuickWindow, so the
+ * QQuickWindow-only stress test (tst_refresh_churn) does not cover this path.
  *
- * 崩溃点（用户实际 core dump）：
+ * Crash site (the user's actual core dump):
  *
  *     qmlAttachedPropertiesObject ← QQuickLayoutAttached::sizeHint
  *     ← QGridLayoutEngine::fillRowData ← QQuickLayout::effectiveSizeHints_helper
  *
- * 即在布局 polish 期间访问布局条目的附加属性时踩到悬空指针——
- * 典型触发条件是「布局正在算尺寸时，里面的条目被销毁重建」。
+ * i.e. a dangling pointer while reading attached properties of layout entries
+ * during layout polish -- typically triggered when "entries are destroyed and
+ * recreated while the layout computes its sizes".
  *
- * 本测试因此做两件事：
- *   1. 用 QQuickWidget 承载真实入口 main.qml（含 StackView 导航）；
- *   2. 在总览 ↔ 容器详情之间反复进出，同时让数据持续变化、窗口反复缩放。
- * 任何一步再踩到悬空指针，进程都会在这里直接崩掉，而不是等到用户会话里。
+ * The test therefore does two things:
+ *   1. hosts the real entry point main.qml (with StackView navigation) in a QQuickWidget;
+ *   2. repeatedly enters and leaves overview ↔ container detail while the data keeps
+ *      changing and the window is resized repeatedly.
+ * Stepping on a dangling pointer again crashes the process right here instead of
+ * waiting for a user session.
  */
 class KcmWidgetChurnTest : public QObject
 {
@@ -70,11 +73,11 @@ private:
 
     void fillData(int iteration);
     /*!
-     * 只改数值、不改结构（存储段数恒为 4、统计块恒为 5）：
-     * 用来断言「同一结构下的数值刷新不得重建条目」。
+     * Values only, structure unchanged (always 4 storage segments, always 5 stat tiles):
+     * asserts "a value refresh under the same structure must not recreate entries".
      */
     void fillDataStableStructure(int iteration);
-    /*! 固定 30 个容器，只让"运行时长"这种**值**变化（列表可滚动、结构不变）。 */
+    /*! Fixed 30 containers; only a **value** such as "uptime" changes (list scrollable, structure fixed). */
     void fillManyContainersWithChangingStatus(int iteration);
 
     std::unique_ptr<MockDockerBackend> m_backend;
@@ -110,7 +113,7 @@ QStringList KcmWidgetChurnTest::takeQmlErrors()
 
 QQuickItem *KcmWidgetChurnTest::childByObjectName(QQuickItem *root, const QString &objectName)
 {
-    // 走可视树：Repeater 创建的 delegate 不在 QObject 树里（详见该助手头文件说明）
+    // Walk the visual tree: Repeater delegates are not in the QObject tree (see that helper's header)
     return TestSupport::findItemByObjectName(root, objectName);
 }
 
@@ -214,7 +217,7 @@ void KcmWidgetChurnTest::fillDataStableStructure(int iteration)
 
     StorageUsage storage;
     storage.valid = true;
-    // 段数保持 4（构建缓存始终存在），且所有取值都有效 → 结构不变、只有数值在变
+    // 4 segments throughout (the build cache is always present), every value valid → only values move
     storage.buildCacheAvailable = true;
     storage.imagesBytes = (iteration + 1) * 111ll * 1024 * 1024;
     storage.containersBytes = (iteration + 1) * 22ll * 1024 * 1024;
@@ -228,11 +231,11 @@ void KcmWidgetChurnTest::fillDataStableStructure(int iteration)
 }
 
 /*!
- * 用 QQuickWidget 承载 main.qml，然后反复：
- *   - 刷新数据（统计块、列表、存储区都会变）
- *   - 缩放窗口（统计块在 5/3/2 列之间切换、详情页正文在限宽与非限宽之间切换）
- *   - 进入 / 离开容器详情（页面创建与销毁）
- *   - 在详情分区之间切换
+ * Host main.qml in a QQuickWidget, then repeatedly:
+ *   - refresh data (stat tiles, list and storage area all change)
+ *   - resize the window (stat tiles switch between 5/3/2 columns; the detail body toggles its width cap)
+ *   - enter / leave container detail (page created and destroyed)
+ *   - switch between detail sections
  */
 void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
 {
@@ -243,8 +246,8 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
 
     QQuickWidget widget;
     widget.setResizeMode(QQuickWidget::SizeRootObjectToView);
-    // QQuickWidget 自带一个 QQmlEngine：i18n 桩与 kcm 上下文都必须注入到它上面
-    // （真实运行时由 KCMUtils 的 KLocalizedQmlContext 提供 i18n）。
+    // QQuickWidget brings its own QQmlEngine: the i18n stub and the kcm context must go into that one
+    // (at runtime KCMUtils' KLocalizedQmlContext provides i18n).
     widget.engine()->evaluate(QStringLiteral("function i18n(text) { return text; }\n"
                                             "function i18nc(context, text) { return text; }\n"
                                             "function i18np(singular, plural, count) { return count === 1 ? singular : plural; }\n"
@@ -267,10 +270,10 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
         m_backend->completeRefresh();
         QCoreApplication::processEvents();
 
-        // 进入容器详情：由 MainPage 发出导航信号（main.qml 里接到 StackView.push）
+        // Enter container detail: MainPage emits the navigation signal (wired to StackView.push in main.qml)
         QQuickItem *stack = childByObjectName(root, QStringLiteral("pageStack"));
         QVERIFY2(stack, "pageStack not found");
-        // 同样必须走可视树：main.qml 的 MainPage 在 StackView 内部
+        // The visual tree again: main.qml's MainPage lives inside the StackView
         QQuickItem *mainPage = nullptr;
         const auto findMainPage = [root]() -> QQuickItem * {
             QQuickItem *found = nullptr;
@@ -294,13 +297,13 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
         QVERIFY(QMetaObject::invokeMethod(mainPage, "containerActivated", Q_ARG(QString, QStringLiteral("cid-0"))));
         QCoreApplication::processEvents();
 
-        // 详情页里切换分区（QQuickWidget 下每一帧都要手动 polish）
+        // Switch sections in the detail page (under QQuickWidget every frame must be polished manually)
         if (QQuickItem *detailTabs = childByObjectName(root, QStringLiteral("detailTabBar"))) {
             detailTabs->setProperty("currentIndex", iteration % 5);
             QCoreApplication::processEvents();
         }
 
-        // 每两轮返回列表页（页面销毁），再重新进入
+        // Go back to the list page every two rounds (page destroyed), then re-enter
         if (iteration % 2 == 0) {
             QMetaObject::invokeMethod(stack, "pop");
             QCoreApplication::processEvents();
@@ -318,22 +321,27 @@ void KcmWidgetChurnTest::widgetHostedKcmSurvivesNavigationChurn()
 }
 
 /*!
- * 用户 core dump 的根因是「布局正在算尺寸时，布局内的条目被销毁重建」。
- * 因此这里把不变量直接断言出来：**数据变化不得重建统计块与存储图例的条目**。
+ * The user's core dump came from "entries inside a layout are destroyed and recreated
+ * while the layout computes its sizes", so the invariant is asserted directly here:
+ * **a data change must not recreate the stat tiles or storage legend entries**.
  *
- * 只要有人再次把 JS 数组直接当作 Repeater 的 model（数组每次刷新都会重新求值），
- * 条目实例就会变，测试立刻失败——比「跑到用户那里崩溃」早得多。
+ * If anyone again passes a JS array straight to a Repeater as its model (an array is
+ * re-evaluated on every refresh), the entry instances change and the test fails at once
+ * -- far earlier than "it crashes on a user's machine".
  */
 /*!
- * 刷新时列表不能被拉回最上方（用户实测）。
+ * A refresh must not pull the list back to the top (measured in real use).
  *
- * 场景：容器很多（这里 30 个，可滚动），用户滚到中间；后台刷新只改了
- * "运行时长/状态文本"这类**值**。旧实现每次刷新都 `beginResetModel()`，
- * 而模型重置必然让 ListView 回到顶部——用户来不及翻到目标。
+ * Scenario: many containers (30 here, scrollable) with the user scrolled to the middle;
+ * a background refresh only changed **values** like "uptime/status text". The old
+ * implementation called `beginResetModel()` on every refresh, and a model reset always
+ * sends the ListView back to the top -- the user never reaches the target.
  *
- * 断言两件事：① 这次刷新**没有**发生 modelReset（根因）；② contentY 原地不动（用户可见结果）。
- * 只看 contentY 是不够的：页面上还有一段"重置后恢复 contentY"的兜底代码，
- * 它在新内容尚未布局完时会被夹到 0，正是线上表现。
+ * Asserts two things: ① this refresh did **not** emit modelReset (the root cause);
+ * ② contentY stays put (the user-visible result).
+ * contentY alone is not enough: the page also has a fallback that "restores contentY
+ * after a reset", and it gets clamped to 0 before the new content is laid out -- the
+ * exact production symptom.
  */
 void KcmWidgetChurnTest::listKeepsScrollPositionOnValueRefresh()
 {
@@ -362,11 +370,11 @@ void KcmWidgetChurnTest::listKeepsScrollPositionOnValueRefresh()
     QTRY_VERIFY_WITH_TIMEOUT((view = TestSupport::findItemByObjectName(page, QStringLiteral("containerView"))) != nullptr, 5000);
     QTRY_COMPARE_WITH_TIMEOUT(view->property("count").toInt(), 30, 5000);
 
-    // 模型重置是"被拉回顶部"的根因：这一路刷新里一次都不该出现
+    // A model reset is the root cause of "pulled back to the top": it must never occur in these refreshes
     QSignalSpy resetSpy(view->property("model").value<QObject *>(), SIGNAL(modelReset()));
     QVERIFY(resetSpy.isValid());
 
-    // 滚到中间（内容够高才滚得动）
+    // Scroll to the middle (only scrollable when the content is tall enough)
     QTRY_VERIFY_WITH_TIMEOUT(view->property("contentHeight").toReal() > view->height(), 5000);
     view->setProperty("contentY", 400.0);
     QTRY_VERIFY_WITH_TIMEOUT(qAbs(view->property("contentY").toReal() - 400.0) < 1.0, 3000);
@@ -404,7 +412,7 @@ void KcmWidgetChurnTest::fillManyContainersWithChangingStatus(int iteration)
         container.name = QStringLiteral("container-%1").arg(i, 2, 10, QLatin1Char('0'));
         container.image = QStringLiteral("alpine:latest");
         container.imageId = QStringLiteral("sha256:aaaa");
-        // 只有这里在变：运行时长/状态文本
+        // Only this changes: uptime/status text
         container.status = QStringLiteral("Up %1 minutes").arg(i + iteration);
         container.state = ContainerState::Running;
         container.health = HealthState::Healthy;
@@ -446,11 +454,11 @@ void KcmWidgetChurnTest::delegatesSurviveDataChanges()
 
     QQuickItem *page = widget.rootObject();
     QVERIFY(page);
-    // 必须等根条目真正拿到尺寸：ScrollView 的 contentItem 在尺寸为 0 时不会建立内容树
+    // The root item must get a real size first: a ScrollView contentItem of size 0 builds no content tree
     QTRY_VERIFY_WITH_TIMEOUT(page->width() > 0 && page->height() > 0, 5000);
     QTest::qWait(100);
 
-    // 必须走可视树：Repeater 创建的 delegate 不在 QObject 树里
+    // The visual tree again: delegates created by a Repeater are not in the QObject tree
     const auto firstEntry = [page, &objectName]() -> QQuickItem * {
         return TestSupport::findItemByObjectName(page, objectName);
     };
@@ -458,8 +466,8 @@ void KcmWidgetChurnTest::delegatesSurviveDataChanges()
     QQuickItem *before = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((before = firstEntry()) != nullptr, 5000);
 
-    // 只让**数值**连续变化：结构（条目数量）不变，因此条目实例必须复用。
-    // 条目数量变化时重建是正常的（那是另一回事，由导航抖动用例覆盖）。
+    // Change **values** only: the structure (entry count) stays fixed, so the entry instances must be reused.
+    // Rebuilding when the entry count changes is normal (covered by the navigation churn case).
     for (int iteration = 1; iteration <= 6; ++iteration) {
         fillDataStableStructure(iteration);
         controller->refresh();
@@ -477,14 +485,16 @@ void KcmWidgetChurnTest::delegatesSurviveDataChanges()
 }
 
 /*!
- * 崩溃路径的精确回归：**数据没变的刷新不得重建详情页里的条目**。
+ * Exact regression of the crash path: **a refresh that changes no data must not rebuild
+ * the entries on the detail page**.
  *
- * 详情页的列表会被周期性重建：
- *   - 容器列表每 5 秒刷新一次 → ImageDetailController::rebuildUsedBy()
- *   - inspect 复核每 30 秒一次 → ContainerDetailController::rebuildLists()
- * 修复前 DetailListModel::setEntries 无条件发 modelReset，QML 的 Repeater
- * 因此反复销毁重建 delegate（网络条目还是一个 FormLayout），
- * 而「布局正在算尺寸时条目被销毁」正是段错误的触发条件。
+ * The detail page lists are rebuilt periodically:
+ *   - container list refreshed every 5 seconds → ImageDetailController::rebuildUsedBy()
+ *   - inspect re-check every 30 seconds → ContainerDetailController::rebuildLists()
+ * Before the fix DetailListModel::setEntries emitted modelReset unconditionally, so the
+ * QML Repeater destroyed and recreated its delegates over and over (network entries are
+ * even a FormLayout) -- and "an entry is destroyed while the layout computes its sizes"
+ * is exactly the segfault trigger.
  */
 void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries_data()
 {
@@ -510,7 +520,7 @@ void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
     QFETCH(QString, signalArgument);
     QFETCH(QString, objectName);
 
-    // 固定一份数据：下面的刷新都是「数据没变」的静默刷新
+    // One fixed dataset: every refresh below is a "no data changed" silent refresh
     fillData(0);
     StatusController *controller = m_stubKcm->controller();
     controller->refresh();
@@ -532,7 +542,7 @@ void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
     QVERIFY(root);
     QTRY_VERIFY_WITH_TIMEOUT(root->width() > 0, 5000);
 
-    // StackView 的 initialItem 需要一次布局之后才建立，因此这里轮询等待
+    // StackView's initialItem only appears after one layout pass, so poll for it here
     const QByteArray signalSignature = (signalName + QStringLiteral("(QString)")).toUtf8();
     const auto findMainPage = [root, &signalSignature]() -> QQuickItem * {
         QQuickItem *found = nullptr;
@@ -556,16 +566,16 @@ void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
     QQuickItem *mainPage = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((mainPage = findMainPage()) != nullptr, 5000);
     QVERIFY(QMetaObject::invokeMethod(mainPage, signalName.toUtf8().constData(), Q_ARG(QString, signalArgument)));
-    // 详情页进入后会发起 inspect，必须交付这一轮结果，页面才有真正的数据
+    // Entering the detail page issues an inspect; this round must be delivered for the page to hold real data
     m_backend->completeRefresh();
 
     QQuickItem *before = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((before = TestSupport::findItemByObjectName(root, objectName)) != nullptr, 5000);
     Q_UNUSED(page);
 
-    // 静默刷新若干轮：数据完全没变，但两条重建路径都要走到
-    //   - 容器列表刷新 → ImageDetailController::rebuildUsedBy()
-    //   - inspect 复核   → ContainerDetailController::rebuildLists()
+    // Several silent refresh rounds: the data is unchanged, but both rebuild paths must be exercised
+    //   - container list refresh → ImageDetailController::rebuildUsedBy()
+    //   - inspect re-check      → ContainerDetailController::rebuildLists()
     for (int round = 0; round < 5; ++round) {
         controller->refresh();
         controller->containerDetail()->refresh();
@@ -586,18 +596,20 @@ void KcmWidgetChurnTest::silentRefreshesDoNotRecreateDetailEntries()
 }
 
 /*!
- * 崩溃路径的精确回归（ARCH_V3 附录 A.1g）：
- * **资源采样的趋势柱不得被重建**。
+ * Exact regression of the crash path (ARCH_V3 appendix A.1g):
+ * **the trend bars of the stats samples must not be rebuilt**.
  *
- * 容器详情页开着时，MetricsModel 每 5 秒产生一次新的 *History（QVariantList）。
- * 如果趋势柱的 Repeater 直接以该数组为 model，每 5 秒就会销毁重建最多 60 个柱子；
- * 这些柱子位于 Kirigami.FormLayout（GridLayout）的条目里，
- * 正是真实会话中「布局算尺寸时条目被销毁 → qmlAttachedPropertiesObject 段错误」的形状。
- * 这也是「点进详情页看一会儿才崩」的原因。
+ * While the container detail page is open, MetricsModel produces a new *History
+ * (QVariantList) every 5 seconds. If the trend-bar Repeater took that array as its model
+ * directly, up to 60 bars would be destroyed and recreated every 5 seconds; those bars sit
+ * inside Kirigami.FormLayout (GridLayout) entries -- precisely the shape of "an entry is
+ * destroyed while the layout computes its sizes → qmlAttachedPropertiesObject segfault"
+ * from the real session. It is also why the crash came "a while after opening the detail
+ * page".
  */
 void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
 {
-    fillData(0); // 容器状态为 Running，才会启动资源采样
+    fillData(0); // the container must be Running for stats sampling to start
     StatusController *controller = m_stubKcm->controller();
     controller->refresh();
     m_backend->completeRefresh();
@@ -618,7 +630,7 @@ void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
     QVERIFY(root);
     QTRY_VERIFY_WITH_TIMEOUT(root->width() > 0, 5000);
 
-    // 进入容器详情
+    // Enter container detail
     const QByteArray signalSignature("containerActivated(QString)");
     const auto findMainPage = [root, &signalSignature]() -> QQuickItem * {
         QQuickItem *found = nullptr;
@@ -641,23 +653,23 @@ void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
     QQuickItem *mainPage = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((mainPage = findMainPage()) != nullptr, 5000);
     QVERIFY(QMetaObject::invokeMethod(mainPage, "containerActivated", Q_ARG(QString, QStringLiteral("cid-0"))));
-    m_backend->completeRefresh(); // 交付 inspect
+    m_backend->completeRefresh(); // deliver the inspect
 
-    // 切到「资源」分区（下标 1）
+    // Switch to the "stats" section (index 1)
     QQuickItem *detailTabs = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((detailTabs = TestSupport::findItemByObjectName(root, QStringLiteral("detailTabBar"))) != nullptr, 5000);
     detailTabs->setProperty("currentIndex", 1);
     QTest::qWait(50);
 
-    // 先喂几次采样，让趋势线出现（MiniTrend 在样本数 > 1 时才可见）
+    // Feed a few samples first so the trend lines appear (MiniTrend is visible only with more than 1 sample)
     for (int sample = 0; sample < 3; ++sample) {
         m_backend->requestContainerStats(QStringLiteral("cid-0"));
         m_backend->completeRefresh();
         QTest::qWait(30);
     }
 
-    // 收集全部趋势柱（3 条趋势线各有自己的柱子），断言**已有实例不被销毁**：
-    // 断言"第一个实例不变"会被"新增柱子"误判，因此按集合判断。
+    // Collect every trend bar (each of the 3 trend lines has its own) and assert no existing instance dies:
+    // asserting "the first instance is unchanged" would misjudge newly added bars, so compare as a set.
     const auto collectBars = [root]() -> QList<QQuickItem *> {
         QList<QQuickItem *> bars;
         std::function<void(QQuickItem *)> walk = [&](QQuickItem *item) {
@@ -677,7 +689,7 @@ void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
     QTRY_VERIFY_WITH_TIMEOUT(!(before = collectBars()).isEmpty(), 5000);
     const int sampleCountBefore = controller->containerDetail()->metrics()->sampleCount();
 
-    // 继续采样：每轮都是一次新的 *History 数组
+    // Keep sampling: every round is a new *History array
     for (int sample = 0; sample < 6; ++sample) {
         m_backend->requestContainerStats(QStringLiteral("cid-0"));
         m_backend->completeRefresh();
@@ -708,11 +720,13 @@ void KcmWidgetChurnTest::statsSamplesDoNotRecreateTrendBars()
 }
 
 /*!
- * 更宽的不变量（ARCH_V3 附录 A.1g）：**只发生资源采样时，界面上不得有任何条目被销毁**。
+ * The broader invariant (ARCH_V3 appendix A.1g): **when only stats samples happen, no item
+ * on screen may be destroyed**.
  *
- * 容器详情页开着时，采样每 5 秒一次；只要有一次采样导致某个条目被销毁，
- * 就可能撞上「布局算尺寸时条目被析构」的崩溃路径。这里把「保留所有已有条目」
- * 直接断言出来，比逐个组件写断言更能覆盖到未来新加的界面元素。
+ * While the container detail page is open, samples arrive every 5 seconds; a single sample
+ * destroying an item can hit the "entry destructed while the layout computes its sizes"
+ * crash path. Asserting "keep every existing item" directly covers future UI elements
+ * better than per-component assertions.
  */
 void KcmWidgetChurnTest::statsSamplesDoNotDestroyAnyItem()
 {
@@ -763,7 +777,7 @@ void KcmWidgetChurnTest::statsSamplesDoNotDestroyAnyItem()
 
     QQuickItem *detailTabs = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((detailTabs = TestSupport::findItemByObjectName(root, QStringLiteral("detailTabBar"))) != nullptr, 5000);
-    detailTabs->setProperty("currentIndex", 1); // 资源分区
+    detailTabs->setProperty("currentIndex", 1); // stats section
     QTest::qWait(50);
 
     const auto collectItems = [root]() -> QSet<QQuickItem *> {
@@ -779,7 +793,7 @@ void KcmWidgetChurnTest::statsSamplesDoNotDestroyAnyItem()
         return items;
     };
 
-    // 先喂两次采样，让趋势线进入"有数据"的状态
+    // Feed two samples first so the trend lines enter the "has data" state
     for (int sample = 0; sample < 2; ++sample) {
         m_backend->requestContainerStats(QStringLiteral("cid-0"));
         m_backend->completeRefresh();

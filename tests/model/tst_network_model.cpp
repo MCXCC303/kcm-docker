@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,11 +15,11 @@
 using namespace Kontainer;
 
 /*!
- * 网络列表模型与过滤代理（ARCH_V5_V8 §3.2）。
+ * Network list model and filter proxy (ARCH_V5_V8 §3.2).
  *
- * 与容器/镜像列表同一套约定，因此这里钉的是"同一套约定真的成立"：
- * 数据未变不重置模型（后台刷新不重建 delegate）、搜索覆盖名称/ID/驱动/子网、
- * 内置网络可单独过滤出来（用户通常只关心自己建的网络）、排序稳定。
+ * Same contract as the container/image lists, so this pins that it really holds:
+ * unchanged data does not reset the model (refresh must not rebuild delegates), search covers
+ * name/id/driver/subnet, predefined networks filter separately (users care about their own), order is stable.
  */
 class NetworkModelTest : public QObject
 {
@@ -105,10 +105,10 @@ void NetworkModelTest::exposesListRoles()
     QCOMPARE(compose.data(NetworkModel::MemberCountRole).toInt(), 2);
     QCOMPARE(compose.data(NetworkModel::MembersRole).value<QList<NetworkMember>>().size(), 2);
 
-    // host / none 没有子网：显示空而不是 "0.0.0.0/0"
+    // host / none have no subnet: show empty, not "0.0.0.0/0"
     QVERIFY(model.index(1, 0).data(NetworkModel::SubnetRole).toString().isEmpty());
 
-    // 按 Id（含短 Id）找行：详情页导航要用
+    // Row lookup by id (short id too): the detail page navigates with it
     QCOMPARE(model.rowForId(QString(64, QLatin1Char('4'))), 3);
     QCOMPARE(model.rowForId(QString(12, QLatin1Char('4'))), 3);
     QCOMPARE(model.rowForId(QStringLiteral("does-not-exist")), -1);
@@ -121,10 +121,10 @@ void NetworkModelTest::unchangedNetworksDoNotResetTheModel()
 
     QSignalSpy resetSpy(&model, &QAbstractItemModel::modelReset);
     model.setNetworks(sampleNetworks());
-    QCOMPARE(resetSpy.count(), 0); // 内容未变：delegate 不该被销毁重建
+    QCOMPARE(resetSpy.count(), 0); // unchanged content: no delegate destruction/re-creation
 
-    // 值变化（成员列表清了）：只发 dataChanged，**不重置模型**——
-    // 重置会让 ListView 跳回顶部（用户实测的体验问题）
+    // Value change (members cleared): dataChanged only, **no model reset** —
+    // a reset makes the ListView jump back to the top (seen in real use)
     QList<Network> changed = sampleNetworks();
     changed[3].members.clear();
     QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
@@ -134,7 +134,7 @@ void NetworkModelTest::unchangedNetworksDoNotResetTheModel()
 
     model.clear();
     QVERIFY(model.empty());
-    QCOMPARE(resetSpy.count(), 0); // 清空是"逐行删除"，不是整表重置
+    QCOMPARE(resetSpy.count(), 0); // clear removes rows one by one, it is not a model reset
 }
 
 void NetworkModelTest::searchesAcrossNameIdDriverAndSubnet()
@@ -146,11 +146,11 @@ void NetworkModelTest::searchesAcrossNameIdDriverAndSubnet()
 
     QCOMPARE(filter.count(), 4);
 
-    // 默认按名称升序（app_default / bridge / host / none）
+    // Default sort is name ascending (app_default / bridge / host / none)
     QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
     QCOMPARE(filter.index(3, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("none"));
 
-    filter.setSearchText(QStringLiteral("APP_DEFAULT")); // 大小写不敏感
+    filter.setSearchText(QStringLiteral("APP_DEFAULT")); // case-insensitive
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 
@@ -162,7 +162,7 @@ void NetworkModelTest::searchesAcrossNameIdDriverAndSubnet()
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("host"));
 
-    // 驱动搜索：null 只有 none 网络
+    // Driver search: "null" matches only the none network
     filter.setSearchText(QStringLiteral("null"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("none"));
@@ -185,14 +185,14 @@ void NetworkModelTest::filtersPredefinedNetworks()
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 
-    // 过滤与搜索可组合
+    // Filter and search combine
     filter.setSearchText(QStringLiteral("app"));
     QCOMPARE(filter.count(), 1);
 
     filter.setOriginFilter(QStringLiteral("all"));
     QCOMPARE(filter.count(), 1);
 
-    // 后台刷新不会重置用户条件（§32）
+    // A background refresh does not reset user criteria (§32)
     model.setNetworks(sampleNetworks());
     QCOMPARE(filter.searchText(), QStringLiteral("app"));
     QCOMPARE(filter.count(), 1);
@@ -206,7 +206,7 @@ void NetworkModelTest::sortsByNameAndMembers()
     filter.setSourceModel(&model);
 
     filter.setSortKey(QStringLiteral("members"));
-    // 成员数降序：app_default(2) 在最前
+    // Member count descending: app_default(2) first
     QCOMPARE(filter.index(0, 0).data(NetworkModel::NameRole).toString(), QStringLiteral("app_default"));
 
     filter.setSortKey(QStringLiteral("driver"));
@@ -244,14 +244,14 @@ void NetworkModelTest::controllerKeepsListWhenRefreshFails()
     backend.completeRefresh();
     QCOMPARE(controller.networkModel()->count(), 4);
 
-    // 读失败：低频数据保留上一次的列表，只把状态标成失败（界面提示，不突然空掉）
+    // Read failure: keep the last list, only mark the state failed (banner, not a sudden empty view)
     backend.setNextFailure(DockerBackendInterface::Section::Networks,
                            DockerError(DockerError::Kind::DockerUnavailable, QStringLiteral("socket gone")));
     backend.refreshNetworks();
     backend.completeRefresh();
 
     QCOMPARE(controller.networkModel()->count(), 4);
-    // 状态是 error，但**列表内容保留**——这正是"低频数据读失败不突然空掉"的约定
+    // State is error but the rows survive: that is the "no sudden empty on failed read" rule
     QCOMPARE(controller.networksStateKey(), QStringLiteral("error"));
     QVERIFY(!controller.networksError().isEmpty());
 }

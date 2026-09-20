@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,11 +11,11 @@
 using namespace Kontainer;
 
 /*!
- * 服务管理的提权边界（ARCH_V5_V8 §B1）。
+ * Privilege boundary of service management (ARCH_V5_V8 §B1).
  *
- * 这是**唯一新增的提权面**，因此用例的重点全在"拒绝"上：
- * 只有三个白名单 unit × 五个固定动词能通过，其它一律给稳定错误 key，
- * 而且会话侧与 helper 侧用的是同一个校验函数（纵深防御）。
+ * This is the **only new privilege surface**, so the tests focus on rejection:
+ * only 3 whitelisted units × 5 fixed verbs pass, everything else gets a stable
+ * error key, and session and helper share one validation function (defense in depth).
  */
 class ServiceControlTest : public QObject
 {
@@ -37,7 +37,7 @@ void ServiceControlTest::whitelistCoversExactlyThreeUnits()
     for (const QString &unit : units) {
         QVERIFY(isManagedServiceUnit(unit));
     }
-    // 白名单之外一律不是（包括看起来很像的）
+    // Nothing else is managed, including look-alike names
     QVERIFY(!isManagedServiceUnit(QStringLiteral("sshd.service")));
     QVERIFY(!isManagedServiceUnit(QStringLiteral("docker")));
     QVERIFY(!isManagedServiceUnit(QStringLiteral("docker.service ")));
@@ -52,17 +52,17 @@ void ServiceControlTest::acceptsOnlyTheManagedCombinations()
                      qPrintable(QStringLiteral("%1 + %2 must be accepted").arg(unit, verb)));
         }
     }
-    // 3 × 5 = 15 组，一个不多一个不少
+    // Exactly 3 × 5 = 15 combinations
     QCOMPARE(managedServiceUnits().size() * managedServiceVerbs().size(), 15);
 }
 
 void ServiceControlTest::rejectsEverythingElse()
 {
-    // 空值
+    // Empty values
     QCOMPARE(serviceControlArgumentError(QString(), QStringLiteral("start")), QStringLiteral("unitRequired"));
     QCOMPARE(serviceControlArgumentError(QStringLiteral("docker.service"), QString()), QStringLiteral("verbRequired"));
 
-    // 白名单之外的 unit：即使动词合法也拒绝（这是提权边界上最要紧的一条）
+    // Unit outside the whitelist: rejected even with a valid verb (the critical privilege-boundary rule)
     QCOMPARE(serviceControlArgumentError(QStringLiteral("sshd.service"), QStringLiteral("start")),
              QStringLiteral("unitNotManaged"));
     QCOMPARE(serviceControlArgumentError(QStringLiteral("docker.service; reboot"), QStringLiteral("stop")),
@@ -70,7 +70,7 @@ void ServiceControlTest::rejectsEverythingElse()
     QCOMPARE(serviceControlArgumentError(QStringLiteral("../etc/passwd"), QStringLiteral("start")),
              QStringLiteral("unitNotManaged"));
 
-    // 不认识的动词：包括 systemctl 的其它子命令与大小写变体
+    // Unknown verbs: other systemctl subcommands and case variants
     for (const QString &verb : {QStringLiteral("mask"), QStringLiteral("kill"), QStringLiteral("Start"),
                                 QStringLiteral("daemon-reload"), QStringLiteral("start ")}) {
         QCOMPARE(serviceControlArgumentError(QStringLiteral("docker.service"), verb), QStringLiteral("verbNotManaged"));
@@ -79,13 +79,13 @@ void ServiceControlTest::rejectsEverythingElse()
 
 void ServiceControlTest::mapsVerbsToActionsAndSlots()
 {
-    // 动作名与槽名必须一一对应（.actions 的注释里写了规则，改名字要同步）
+    // Action and slot names must match one-to-one (rules live in .actions comments; rename both together)
     QCOMPARE(serviceActionName(ServiceVerb::Start), QStringLiteral("org.kde.kcm.docker.service.start"));
     QCOMPARE(serviceActionName(ServiceVerb::Disable), QStringLiteral("org.kde.kcm.docker.service.disable"));
     QCOMPARE(serviceHelperSlot(ServiceVerb::Start), QStringLiteral("service_start"));
     QCOMPARE(serviceHelperSlot(ServiceVerb::Disable), QStringLiteral("service_disable"));
 
-    // key ↔ 枚举是双向一致的
+    // key ↔ enum must round-trip
     for (const QString &key : managedServiceVerbs()) {
         ServiceVerb verb = ServiceVerb::Start;
         QVERIFY(serviceVerbFromKey(key, &verb));

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -22,11 +22,12 @@
 using namespace Kontainer;
 
 /*!
- * 创建容器的表单 → Docker API 的映射（ARCH_V5_V8 §4.4）。
+ * Create-container form -> Docker API mapping (ARCH_V5_V8 §4.4).
  *
- * 这是七期最容易"看起来对、实际发错请求"的地方，因此用**快照断言**钉住 JSON：
- * 字段名、嵌套结构、单位（NanoCpus 是十亿分之一核）、以及几个反直觉的点
- * （`name` 是 query 参数、随机端口用空字符串表达、tmpfs 不能进 Binds）。
+ * This is where "looks right, sends the wrong request" happens most easily, so the JSON is pinned
+ * with snapshot assertions: field names, nesting, units (NanoCpus is billionths of a core) and the
+ * counter-intuitive bits (`name` is a query parameter, a random port is an empty string, tmpfs
+ * never goes into Binds).
  */
 class ContainerCreateTest : public QObject
 {
@@ -92,14 +93,14 @@ void ContainerCreateTest::mapsFormFieldsToTheCreatePayload()
     QCOMPARE(payload.value(QStringLiteral("User")).toString(), QStringLiteral("1000:1000"));
     QCOMPARE(payload.value(QStringLiteral("Hostname")).toString(), QStringLiteral("web-1"));
 
-    // 端口映射里的容器端口也要出现在 ExposedPorts（Docker 的语义）
+    // Container ports in port mappings must also appear in ExposedPorts (Docker semantics)
     QVERIFY(payload.value(QStringLiteral("ExposedPorts")).toObject().contains(QStringLiteral("80/tcp")));
 
     const QJsonObject hostConfig = payload.value(QStringLiteral("HostConfig")).toObject();
     const QJsonArray binds = hostConfig.value(QStringLiteral("Binds")).toArray();
     QCOMPARE(binds.size(), 2);
-    QCOMPARE(binds.at(0).toString(), QStringLiteral("/srv/data:/data:ro")); // 只读带 :ro
-    QCOMPARE(binds.at(1).toString(), QStringLiteral("app_cache:/cache")); // 命名卷同样是 Binds
+    QCOMPARE(binds.at(0).toString(), QStringLiteral("/srv/data:/data:ro")); // read-only adds :ro
+    QCOMPARE(binds.at(1).toString(), QStringLiteral("app_cache:/cache")); // a named volume is a Binds too
 
     const QJsonObject portBindings = hostConfig.value(QStringLiteral("PortBindings")).toObject();
     const QJsonArray binding = portBindings.value(QStringLiteral("80/tcp")).toArray();
@@ -112,7 +113,7 @@ void ContainerCreateTest::mapsFormFieldsToTheCreatePayload()
     QCOMPARE(policy.value(QStringLiteral("MaximumRetryCount")).toInt(), 3);
 
     QCOMPARE(hostConfig.value(QStringLiteral("Memory")).toDouble(), double(512LL * 1024 * 1024));
-    // CPU 以"十亿分之一核"表达：1.5 核 = 1_500_000_000
+    // CPU is expressed in billionths of a core: 1.5 cores = 1_500_000_000
     QCOMPARE(hostConfig.value(QStringLiteral("NanoCpus")).toDouble(), 1500000000.0);
     QVERIFY(hostConfig.value(QStringLiteral("Privileged")).toBool());
 
@@ -126,10 +127,11 @@ void ContainerCreateTest::mapsFormFieldsToTheCreatePayload()
 }
 
 /*!
- * 交互能力（用户实测 F1）：向导默认开 `-i -t`，并且真的写进请求体。
+ * Interactive capability (user-reported F1): the wizard defaults `-i -t` on and really sends them.
  *
- * 用户反馈的"容器启动后立刻退出"根因就是缺这两项：alpine 的默认命令 `/bin/sh`
- * 在既没有 stdin 也没有 TTY 时读到 EOF 就正常退出（已用只读 inspect 核对过）。
+ * The "container exits right after start" reported by users was caused by missing these two:
+ * alpine's default command `/bin/sh` reads EOF and exits normally with neither stdin nor a TTY
+ * (verified with a read-only inspect).
  */
 void ContainerCreateTest::interactiveFlagsDefaultOnAndReachThePayload()
 {
@@ -140,12 +142,12 @@ void ContainerCreateTest::interactiveFlagsDefaultOnAndReachThePayload()
     OperationController operations(&backend);
     CreateContainerController wizard(&operations, &presets, &backend);
 
-    // 默认值：-i 与 -t 都开，stdin-once 关
+    // Defaults: -i and -t on, stdin-once off
     QVERIFY2(wizard.openStdin(), "standard input must be enabled by default");
     QVERIFY2(wizard.tty(), "a TTY must be allocated by default");
     QVERIFY(!wizard.stdinOnce());
 
-    // 默认值进请求体（JSON 快照）
+    // Defaults reach the request body (JSON snapshot)
     ContainerCreateRequest request;
     request.name = QStringLiteral("interactive");
     request.image = QStringLiteral("alpine:latest");
@@ -157,14 +159,14 @@ void ContainerCreateTest::interactiveFlagsDefaultOnAndReachThePayload()
     QCOMPARE(payload.value(QStringLiteral("Tty")).toBool(), true);
     QVERIFY2(!payload.contains(QStringLiteral("StdinOnce")), "stdin-once is off by default and must not be sent");
 
-    // 关掉时不写进 JSON（让引擎用它自己的默认值）
+    // When off they are not written to JSON, so the engine uses its own defaults
     request.openStdin = false;
     request.tty = false;
     payload = QJsonDocument::fromJson(request.toJson()).object();
     QVERIFY(!payload.contains(QStringLiteral("OpenStdin")));
     QVERIFY(!payload.contains(QStringLiteral("Tty")));
 
-    // 打开 stdin-once 时会写进去
+    // Turning stdin-once on writes it in
     request.openStdin = true;
     request.stdinOnce = true;
     payload = QJsonDocument::fromJson(request.toJson()).object();
@@ -178,14 +180,14 @@ void ContainerCreateTest::omitsEmptyFieldsAndKeepsDockerDefaults()
     request.image = QStringLiteral("alpine:3.19");
 
     const QJsonObject payload = QJsonDocument::fromJson(request.toJson()).object();
-    // 没填的字段**不写进 JSON**，让引擎用它自己的默认值（写 null/空数组会改变语义）
+    // Unset fields are NOT written to JSON: null or an empty array would change engine defaults
     QVERIFY(!payload.contains(QStringLiteral("Cmd")));
     QVERIFY(!payload.contains(QStringLiteral("Env")));
     QVERIFY(!payload.contains(QStringLiteral("HostConfig")));
     QVERIFY(!payload.contains(QStringLiteral("NetworkingConfig")));
     QVERIFY(!payload.contains(QStringLiteral("ExposedPorts")));
 
-    // 随机宿主端口：Docker 用**空字符串**表示"随机分配"，不是 0
+    // Random host port: Docker uses an EMPTY STRING for "assign one", not 0
     ContainerCreateRequest randomPort;
     randomPort.name = QStringLiteral("random-port");
     randomPort.image = QStringLiteral("alpine:3.19");
@@ -206,7 +208,7 @@ void ContainerCreateTest::nameGoesIntoTheQueryNotTheBody()
     request.name = QStringLiteral("web-1");
     request.image = QStringLiteral("alpine:3.19");
 
-    // 反直觉但必须记住：容器名是 `?name=` 而不是请求体里的字段
+    // Counter-intuitive but essential: the container name is `?name=`, not a body field
     QCOMPARE(request.queryString(), QStringLiteral("name=web-1"));
     QVERIFY2(!QJsonDocument::fromJson(request.toJson()).object().contains(QStringLiteral("Name")),
              "the container name must not be sent in the body");
@@ -218,7 +220,7 @@ void ContainerCreateTest::tmpfsGoesToTmpfsNotBinds()
     request.name = QStringLiteral("tmpfs-demo");
     request.image = QStringLiteral("alpine:3.19");
     request.mounts = {{QStringLiteral("tmpfs"), QString(), QStringLiteral("/tmp"), false},
-                      {QStringLiteral("bind"), QString(), QStringLiteral("/ignored"), false}}; // 没有来源 → 不发
+                      {QStringLiteral("bind"), QString(), QStringLiteral("/ignored"), false}}; // no source
 
     const QJsonObject hostConfig = QJsonDocument::fromJson(request.toJson()).object().value(QStringLiteral("HostConfig")).toObject();
     QVERIFY2(!hostConfig.contains(QStringLiteral("Binds")), "tmpfs and source-less mounts must not become binds");
@@ -227,24 +229,24 @@ void ContainerCreateTest::tmpfsGoesToTmpfsNotBinds()
 
 void ContainerCreateTest::validatesNamesPathsKeysAndLimits()
 {
-    // 名称
+    // Name
     QCOMPARE(validateContainerName(QString()), QStringLiteral("nameRequired"));
     QCOMPARE(validateContainerName(QStringLiteral("has space")), QStringLiteral("nameInvalid"));
     QCOMPARE(validateContainerName(QStringLiteral("-leading-dash")), QStringLiteral("nameInvalid"));
     QVERIFY(validateContainerName(QStringLiteral("web_1.2-3")).isEmpty());
 
-    // 容器内路径必须绝对
+    // Container paths must be absolute
     QCOMPARE(validateContainerPath(QString()), QStringLiteral("pathRequired"));
     QCOMPARE(validateContainerPath(QStringLiteral("data")), QStringLiteral("pathNotAbsolute"));
     QVERIFY(validateContainerPath(QStringLiteral("/data")).isEmpty());
 
-    // 环境变量/标签键
+    // Environment variable / label keys
     QCOMPARE(validateEnvironmentKey(QString()), QStringLiteral("keyRequired"));
     QCOMPARE(validateEnvironmentKey(QStringLiteral("1BAD")), QStringLiteral("keyInvalid"));
     QCOMPARE(validateEnvironmentKey(QStringLiteral("has-dash")), QStringLiteral("keyInvalid"));
     QVERIFY(validateEnvironmentKey(QStringLiteral("GOOD_KEY_1")).isEmpty());
 
-    // 资源限制：0 = 不限制；有值时不能低于 Docker 的 6 MiB
+    // Resource limits: 0 = unlimited; a real value must not be below Docker's 6 MiB
     QVERIFY(validateMemoryLimit(0).isEmpty());
     QCOMPARE(validateMemoryLimit(1024), QStringLiteral("memoryTooSmall"));
     QVERIFY(validateMemoryLimit(6 * 1024 * 1024).isEmpty());
@@ -272,16 +274,16 @@ void ContainerCreateTest::presetStorePersistsAndOrders()
         QVERIFY2(!store.add(QStringLiteral("/srv/data"), QStringLiteral("/data"), QStringLiteral("bind"), true).isEmpty(),
                  "adding the same mount twice must not create a second entry");
         QCOMPARE(store.count(), 2);
-        // 非法输入被拒绝（宿主路径必须绝对、容器路径必须绝对）
+        // Invalid input is rejected (host and container paths must be absolute)
         QVERIFY(store.add(QStringLiteral("relative/path"), QStringLiteral("/x")).isEmpty());
         QVERIFY(store.add(QStringLiteral("/srv/x"), QStringLiteral("relative")).isEmpty());
 
         QVERIFY(store.setFavorite(secondId, true));
-        // 收藏置顶
+        // Favourites sort first
         QCOMPARE(store.presets().first().id, secondId);
     }
 
-    // 重新打开：内容与顺序都要还在（持久化真的写进了 kcm_dockerrc）
+    // Reopened: content and order must survive (persistence really wrote to kcm_dockerrc)
     MountPresetStore reopened(path);
     QCOMPARE(reopened.count(), 2);
     QCOMPARE(reopened.presets().first().id, secondId);
@@ -292,7 +294,7 @@ void ContainerCreateTest::presetStorePersistsAndOrders()
     QVERIFY(bindPreset.readOnly);
     QCOMPARE(bindPreset.note, QStringLiteral("数据目录"));
 
-    // 排序：收藏在前，其余按加入顺序；下移能让非收藏项交换
+    // Ordering: favourites first, then insertion order; moveDown swaps non-favourites
     QVERIFY(reopened.moveDown(secondId) == false || reopened.presets().size() == 2);
     QVERIFY(reopened.remove(firstId));
     QCOMPARE(reopened.count(), 1);
@@ -304,20 +306,20 @@ void ContainerCreateTest::presetStoreDeduplicatesAndTrimsRecents()
     QVERIFY(dir.isValid());
     MountPresetStore store(dir.filePath(QStringLiteral("kcm_dockerrc")));
 
-    // 创建成功后把本次挂载并入"最近使用"
+    // After a successful create this request's mounts join "recently used"
     QList<ContainerMountRequest> mounts;
     mounts.append({QStringLiteral("bind"), QStringLiteral("/srv/app"), QStringLiteral("/app"), false});
-    mounts.append({QStringLiteral("tmpfs"), QString(), QStringLiteral("/tmp"), false}); // tmpfs 不进预设
+    mounts.append({QStringLiteral("tmpfs"), QString(), QStringLiteral("/tmp"), false}); // tmpfs: no preset
     store.noteUsed(mounts);
     QCOMPARE(store.count(), 1);
     QCOMPARE(store.presets().first().source, QStringLiteral("/srv/app"));
     QVERIFY(store.presets().first().lastUsedAt.isValid());
 
-    // 再次使用同一个挂载：不新增，只刷新时间
+    // Using the same mount again adds nothing, it only refreshes the timestamp
     store.noteUsed(mounts);
     QCOMPARE(store.count(), 1);
 
-    // 超过上限时淘汰最旧的"最近使用"，但**收藏与从未用过的预设不动**
+    // Past the cap the oldest recent entries go, but favourites and never-used presets stay
     const QString favoriteId = store.presets().first().id;
     QVERIFY(store.setFavorite(favoriteId, true));
     for (int i = 0; i < MountPresetStore::kMaxRecent + 5; ++i) {
@@ -333,7 +335,7 @@ void ContainerCreateTest::presetStoreDeduplicatesAndTrimsRecents()
 }
 
 /*!
- * 向导的分步校验（ARCH_V5_V8 §4.3）：每一步都不许带着问题往下走。
+ * Wizard step validation (ARCH_V5_V8 §4.3): no step may be left while it still has problems.
  */
 void ContainerCreateTest::wizardGatesSteps()
 {
@@ -349,7 +351,7 @@ void ContainerCreateTest::wizardGatesSteps()
     existing.id = QStringLiteral("existing");
     existing.name = QStringLiteral("web");
     existing.image = QStringLiteral("alpine:3.19");
-    // 只有**运行中**的容器才真的占着宿主端口（见 OperationController::holdsHostPorts）
+    // Only RUNNING containers really hold a host port (see OperationController::holdsHostPorts)
     existing.state = ContainerState::Running;
     existing.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
     backend.setContainers({existing});
@@ -358,7 +360,7 @@ void ContainerCreateTest::wizardGatesSteps()
     operations.refreshWriteAccess();
 
     CreateContainerController wizard(&operations, &presets, &backend);
-    // 步骤顺序（用户实测）：镜像 → 基础 → 环境与标签 → 交互 → 端口 → 挂载 → 资源 → 总览
+    // Step order: image -> basics -> environment -> interactive -> ports -> mounts -> resources -> summary
     QCOMPARE(CreateContainerController::stepKeys(),
              QStringList({QStringLiteral("image"),
                           QStringLiteral("basics"),
@@ -371,7 +373,7 @@ void ContainerCreateTest::wizardGatesSteps()
     QCOMPARE(wizard.stepKey(), QStringLiteral("image"));
     QCOMPARE(wizard.stepCount(), 8);
 
-    // ① 镜像：先要求填，再要求本地存在（除非勾了"先拉取"）
+    // (1) Image: first required, then must exist locally unless "pull if missing" is on
     QVERIFY(!wizard.nextStep());
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("imageRequired"));
     wizard.setImage(QStringLiteral("busybox:latest"));
@@ -381,7 +383,7 @@ void ContainerCreateTest::wizardGatesSteps()
     QVERIFY(wizard.nextStep());
     QCOMPARE(wizard.stepKey(), QStringLiteral("basics"));
 
-    // ② 基础：名称规则 + 重名
+    // (2) Basics: name rules + duplicates
     wizard.setName(QStringLiteral("bad name"));
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("nameInvalid"));
     wizard.setName(QStringLiteral("WEB"));
@@ -389,7 +391,7 @@ void ContainerCreateTest::wizardGatesSteps()
     wizard.setName(QStringLiteral("worker"));
     QVERIFY(wizard.nextStep());
 
-    // ③ 环境与标签：键名规则
+    // (3) Environment and labels: key naming rules
     wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("1BAD")},
                                             {QStringLiteral("value"), QStringLiteral("x")}}});
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("keyInvalid"));
@@ -397,11 +399,11 @@ void ContainerCreateTest::wizardGatesSteps()
                                             {QStringLiteral("value"), QStringLiteral("x")}}});
     QVERIFY(wizard.nextStep());
 
-    // ④ 交互：没有阻断性校验，直接下一步
+    // (4) Interactive: nothing blocking, straight on
     QCOMPARE(wizard.stepKey(), QStringLiteral("interactive"));
     QVERIFY(wizard.nextStep());
 
-    // ⑤ 端口：容器端口必填、宿主端口不能冲突（0 = 随机，不冲突）
+    // (5) Ports: container port required, host ports must not clash (0 = random, never clashes)
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 0},
                                      {QStringLiteral("hostPort"), 0}}});
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portRequired"));
@@ -412,7 +414,7 @@ void ContainerCreateTest::wizardGatesSteps()
                                      {QStringLiteral("hostPort"), 0}}});
     QVERIFY(wizard.nextStep());
 
-    // ⑥ 挂载：目标必须绝对、不能重复；来源格式要被校验（bind 必须绝对）
+    // (6) Mounts: destination absolute and unique; the source format is checked (a bind must be absolute)
     wizard.setMountRows({QVariantMap {{QStringLiteral("type"), QStringLiteral("bind")},
                                       {QStringLiteral("source"), QStringLiteral("relative")},
                                       {QStringLiteral("destination"), QStringLiteral("/data")}}});
@@ -433,7 +435,7 @@ void ContainerCreateTest::wizardGatesSteps()
                                       {QStringLiteral("destination"), QStringLiteral("/data")}}});
     QVERIFY(wizard.nextStep());
 
-    // ⑦ 资源：内存下限与 CPU 非负
+    // (7) Resources: memory floor and non-negative CPU
     wizard.setMemoryLimitBytes(1024);
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("memoryTooSmall"));
     wizard.setMemoryLimitBytes(0);
@@ -442,21 +444,22 @@ void ContainerCreateTest::wizardGatesSteps()
     wizard.setCpus(0.0);
     QVERIFY(wizard.nextStep());
 
-    // ⑧ 总览：不能越级跳过来，也不能在总览上再"下一步"
+    // (8) Summary: it cannot be jumped to from above, and there is no "next" on it
     QCOMPARE(wizard.stepKey(), QStringLiteral("summary"));
     QVERIFY(wizard.onSummary());
     QVERIFY(!wizard.nextStep());
-    // 往回跳随时可以（用户要能改前面的选择）
+    // Jumping back is always allowed (the user must be able to change earlier choices)
     QVERIFY(wizard.goToStep(QStringLiteral("ports")));
     QCOMPARE(wizard.stepKey(), QStringLiteral("ports"));
-    // 往前跳则要逐步通过校验：总览不能从"还没填完"的地方直接到达
+    // Jumping forward validates step by step: the summary is unreachable from an unfilled step
     wizard.setImage(QString());
     wizard.goToStep(QStringLiteral("image"));
     QVERIFY2(!wizard.goToStep(QStringLiteral("summary")), "the wizard must not skip unfilled steps");
 }
 
 /*!
- * 总览内容与提交（§4.4/§4.6）：环境变量只列键名，提交时把表单交给控制器。
+ * Summary content and submit (§4.4/§4.6): environment variables list keys only; submit hands the
+ * form to the controller.
  */
 void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
 {
@@ -485,11 +488,11 @@ void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
     wizard.setEnvironmentRows({QVariantMap {{QStringLiteral("key"), QStringLiteral("SECRET_TOKEN")},
                                             {QStringLiteral("value"), QStringLiteral("super-secret")}}});
     wizard.setStartAfterCreate(true);
-    QVERIFY(wizard.nextStep()); // ports（无端口）
+    QVERIFY(wizard.nextStep()); // ports (no ports)
     QVERIFY(wizard.nextStep()); // environment
     QVERIFY(wizard.nextStep()); // mounts
 
-    // 从预设快速添加（已存在的不会重复加）
+    // Quick add from a preset (an existing one is not added twice)
     QVERIFY(wizard.addMountFromPreset(presetId));
     QVERIFY(!wizard.addMountFromPreset(presetId));
     QCOMPARE(wizard.mountRows().size(), 1);
@@ -498,7 +501,7 @@ void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
     QVERIFY(wizard.nextStep()); // resources
     QVERIFY(wizard.nextStep()); // summary
 
-    // 总览：环境变量**只列键名**（值可能是密码）
+    // Summary: environment variables list KEYS ONLY (a value may be a password)
     const QVariantList rows = wizard.summary();
     QStringList labels;
     QStringList values;
@@ -513,14 +516,15 @@ void ContainerCreateTest::wizardBuildsTheRequestAndSubmits()
              "secret environment values must never appear in the summary");
     QVERIFY(values.join(QStringLiteral("|")).contains(QStringLiteral("SECRET_TOKEN")));
 
-    // 提交：写权限门在控制器里（这里是只读 endpoint），因此先换一个可写的
+    // Submit: the write gate lives in the controller and this endpoint is read-only, so it fails
     QVERIFY(!wizard.submit());
     QVERIFY(!operations.resultText().isEmpty());
 }
 
 /*!
- * 克隆（ARCH_V5_V8 §4.5）：复制**配置**而不是运行时状态；命令/入口点/环境/标签/重启策略
- * 只有 inspect 里才有，因此从容器详情进入时要一并带过来。
+ * Clone (ARCH_V5_V8 §4.5): copies the CONFIGURATION, not runtime state; command, entrypoint,
+ * environment, labels and restart policy exist only in inspect, so they must be carried over when
+ * entering from a container detail page.
  */
 void ContainerCreateTest::cloneCopiesTheFullConfiguration()
 {
@@ -537,7 +541,7 @@ void ContainerCreateTest::cloneCopiesTheFullConfiguration()
     listed.ports = {{QStringLiteral("0.0.0.0"), 8080, 18080, QStringLiteral("tcp")}};
     backend.setContainers({listed});
 
-    // 详情（inspect）里才有的字段
+    // Fields that exist only in the inspect response
     ContainerDetail detail;
     detail.id = QStringLiteral("cid-1");
     detail.name = QStringLiteral("web");
@@ -555,7 +559,7 @@ void ContainerCreateTest::cloneCopiesTheFullConfiguration()
     ContainerDetailController detailController(&backend);
     detailController.setContainerId(QStringLiteral("cid-1"));
     detailController.start();
-    backend.completeRefresh(); // inspect 是异步的：必须先真的把详情读进来
+    backend.completeRefresh(); // inspect is asynchronous: the detail must really be loaded first
 
     CreateContainerController wizard(&operations, &presets, &backend, &detailController);
     QVERIFY(wizard.prefillFromContainer(QStringLiteral("cid-1")));
@@ -574,14 +578,15 @@ void ContainerCreateTest::cloneCopiesTheFullConfiguration()
     QCOMPARE(wizard.portRows().size(), 1);
     QCOMPARE(wizard.portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), 18080);
 
-    // 受控容器不存在时：返回 false，不改动现有表单
+    // Unknown container: returns false and leaves the current form untouched
     const QString previousName = wizard.name();
     QVERIFY(!wizard.prefillFromContainer(QStringLiteral("does-not-exist")));
     QCOMPARE(wizard.name(), previousName);
 }
 
 /*!
- * 「用建议名称」（用户实测 ③）：名称为空时按镜像生成候选，并且**避开已占用的名字**。
+ * "Use suggested name" (user-reported item 3): with an empty name, derive a candidate from the image
+ * and avoid names that are already taken.
  */
 void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
 {
@@ -599,13 +604,13 @@ void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
 
     CreateContainerController wizard(&operations, &presets, &backend);
 
-    // 还没有镜像：也会给一个可用的候选（`container-xxxx`）——按钮因此始终可用，
-    // 但真正要创建时镜像仍是必填项
+    // No image yet: a usable candidate (`container-xxxx`) is still offered, so the button is always
+    // enabled, but the image stays required for an actual create
     const QString fallback = wizard.suggestedName();
     QVERIFY2(!fallback.isEmpty(), "a suggestion must always be available");
     QVERIFY(validateContainerName(fallback).isEmpty());
 
-    // 有镜像但没有名字：给 docker 风格的候选（去掉仓库前缀与 tag，非法字符换成 -）
+    // Image but no name: docker-style candidate (drop the repository prefix and tag, illegal chars -> -)
     wizard.setImage(QStringLiteral("registry.example.com/team/My App:1.0"));
     const QString first = wizard.suggestedName();
     QVERIFY2(!first.isEmpty(), "a suggestion must be available as soon as an image is chosen");
@@ -614,22 +619,22 @@ void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
     QVERIFY2(!first.contains(QLatin1Char('/')), qPrintable(first));
     QVERIFY(validateContainerName(first).isEmpty());
 
-    // 已经有名字（克隆场景）：给 `<名字>-copy`
+    // A name already exists (clone case): `<name>-copy`
     wizard.setName(QStringLiteral("web"));
     QCOMPARE(wizard.suggestedName(), QStringLiteral("web-copy"));
-    // 被占用时继续加序号
+    // Keep appending a counter while the name is taken
     Container occupied;
     occupied.id = QStringLiteral("occupied");
     occupied.name = QStringLiteral("web-copy");
     backend.setContainers({taken, occupied});
     QCOMPARE(wizard.suggestedName(), QStringLiteral("web-copy2"));
 
-    // ⑧ 命令与入口点要能写进请求（原来只有控制器字段、界面没有入口）
+    // (8) Command and entrypoint must reach the request (they were controller-only fields before)
     wizard.setCommandText(QStringLiteral("sh\n-c\nsleep infinity"));
     wizard.setEntrypointText(QStringLiteral("/usr/bin/env sh"));
     wizard.setWorkingDirectory(QStringLiteral("/app"));
     wizard.setUser(QStringLiteral("1000:1000"));
-    // 总览里能看到命令/入口点/工作目录/用户（用户要能核对自己填了什么）
+    // The summary shows command/entrypoint/working dir/user so the user can check what they entered
     const QVariantList summary = wizard.summary();
     QStringList summaryText;
     for (const QVariant &entry : summary) {
@@ -644,7 +649,8 @@ void ContainerCreateTest::suggestsNamesFromTheImageAndOccupancy()
 }
 
 /*!
- * 命令历史（F3）：本地记录（去重 / 上限 / 持久化）+ 已有容器命令的合并。
+ * Command history (F3): local records (dedup / cap / persistence) plus merging commands from
+ * existing containers.
  */
 void ContainerCreateTest::commandHistoryRecordsAndMerges()
 {
@@ -656,33 +662,34 @@ void ContainerCreateTest::commandHistoryRecordsAndMerges()
         CommandHistoryStore history(path);
         QVERIFY(history.empty());
 
-        // 多行命令要整条存下来（用 QStringList 存会被换行拆散，所以底层是 JSON 数组）
+        // Multi-line commands are stored whole; a QStringList would split them on newlines,
+        // so the backing store is a JSON array
         history.record(QStringLiteral("sh\n-c\nsleep infinity"));
         history.record(QStringLiteral("nginx -g 'daemon off;'"));
         QCOMPARE(history.commands().size(), 2);
-        QCOMPARE(history.commands().first(), QStringLiteral("nginx -g 'daemon off;'")); // 最近的在最前
+        QCOMPARE(history.commands().first(), QStringLiteral("nginx -g 'daemon off;'")); // most recent first
 
-        // 重复的提到最前，不新增
+        // A duplicate moves to the front instead of being added again
         history.record(QStringLiteral("sh\n-c\nsleep infinity"));
         QCOMPARE(history.commands().size(), 2);
         QCOMPARE(history.commands().first(), QStringLiteral("sh\n-c\nsleep infinity"));
 
-        // 空命令不记
+        // Blank commands are not recorded
         history.record(QStringLiteral("   "));
         QCOMPARE(history.commands().size(), 2);
 
-        // 上限：超出后丢弃最旧的
+        // Cap: entries past the limit drop the oldest
         for (int i = 0; i < CommandHistoryStore::kMaxEntries + 5; ++i) {
             history.record(QStringLiteral("cmd-%1").arg(i));
         }
         QCOMPARE(history.commands().size(), CommandHistoryStore::kMaxEntries);
         QVERIFY(history.commands().first() == QStringLiteral("cmd-%1").arg(CommandHistoryStore::kMaxEntries + 4));
 
-        // 已有容器的命令：合并进来（不写盘），并且去重
+        // Commands from existing containers are merged in (not written to disk) and deduplicated
         history.mergeExternal({QStringLiteral("nginx -g 'daemon off;'"), QStringLiteral("from-container")});
         QVERIFY(history.commands().contains(QStringLiteral("from-container")));
         QCOMPARE(history.commands().count(QStringLiteral("nginx -g 'daemon off;'")), 1);
-        // 外部来源标记为 container
+        // External entries are marked with source "container"
         bool foundExternal = false;
         for (const QVariant &entry : history.entries()) {
             const QVariantMap row = entry.toMap();
@@ -693,13 +700,13 @@ void ContainerCreateTest::commandHistoryRecordsAndMerges()
         QVERIFY2(foundExternal, "commands from existing containers must be marked as such");
     }
 
-    // 重新打开：只有**本地记录**被持久化（外部来源是临时的）
+    // Reopened: only LOCAL records are persisted (external entries are transient)
     CommandHistoryStore reopened(path);
     QCOMPARE(reopened.commands().size(), CommandHistoryStore::kMaxEntries);
     QVERIFY(!reopened.commands().contains(QStringLiteral("from-container")));
     QVERIFY(reopened.commands().first() == QStringLiteral("cmd-%1").arg(CommandHistoryStore::kMaxEntries + 4));
 
-    // 清空本地记录
+    // Clear the local records
     reopened.clearLocal();
     QVERIFY(reopened.empty());
     CommandHistoryStore afterClear(path);
@@ -708,9 +715,9 @@ void ContainerCreateTest::commandHistoryRecordsAndMerges()
 
 
 /*!
- * 同一个请求里重复使用同一个宿主端口必须被拦下（实测反馈）：
- * 用户填 8100→80 / 8100→81 / 8100→82，请求本身合法，但启动时 Docker 会报
- * `Bind for 0.0.0.0:8100 failed: port is already allocated`。
+ * Reusing the same host port within one request must be rejected (user-reported):
+ * a user filled in 8100->80 / 8100->81 / 8100->82; the request itself is legal, but at start Docker
+ * reports `Bind for 0.0.0.0:8100 failed: port is already allocated`.
  */
 void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
 {
@@ -728,20 +735,20 @@ void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
     wizard.setImage(QStringLiteral("alpine:3.19"));
     wizard.setPullIfMissing(true);
     wizard.setName(QStringLiteral("dup-ports"));
-    // 走到"端口"这一步（stepErrorKey() 说的是**当前**步骤）
+    // Move to the "ports" step (stepErrorKey() reports the CURRENT step)
     QVERIFY(wizard.nextStep()); // basics
     QVERIFY(wizard.nextStep()); // environment
     QVERIFY(wizard.nextStep()); // interactive
     QVERIFY(wizard.nextStep()); // ports
     QCOMPARE(wizard.stepKey(), QStringLiteral("ports"));
 
-    // 三行都指向同一个宿主端口 → 拦截
+    // All three rows target the same host port -> rejected
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
                         QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 8100}},
                         QVariantMap {{QStringLiteral("containerPort"), 82}, {QStringLiteral("hostPort"), 8100}}});
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portDuplicateInRequest"));
 
-    // 同一宿主端口、但绑在**不同具体地址**上是合法的
+    // The same host port on DIFFERENT concrete addresses is legal
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80},
                                      {QStringLiteral("hostPort"), 8100},
                                      {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")}},
@@ -750,14 +757,14 @@ void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
                                      {QStringLiteral("hostIp"), QStringLiteral("192.168.1.5")}}});
     QVERIFY2(wizard.stepErrorKey().isEmpty(), qPrintable(wizard.stepErrorKey()));
 
-    // 通配 + 具体地址（同一端口）仍然冲突
+    // Wildcard plus a concrete address on the same port still conflicts
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
                         QVariantMap {{QStringLiteral("containerPort"), 81},
                                      {QStringLiteral("hostPort"), 8100},
                                      {QStringLiteral("hostIp"), QStringLiteral("127.0.0.1")}}});
     QCOMPARE(wizard.stepErrorKey(), QStringLiteral("portDuplicateInRequest"));
 
-    // 随机端口（0）重复多少次都合法
+    // Random ports (0) may be repeated any number of times
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 0}},
                         QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 0}}});
     QVERIFY2(wizard.stepErrorKey().isEmpty(), qPrintable(wizard.stepErrorKey()));
@@ -765,11 +772,12 @@ void ContainerCreateTest::duplicateHostPortsInOneRequestAreRejected()
 
 
 /*!
- * 逐行端口状态（ARCH_next_ports.md §4.D，里程碑 M2）。
+ * Per-row port status (ARCH_next_ports.md §4.D, milestone M2).
  *
- * 界面要能在用户**输入的那一刻**说清"这个端口不能用，被谁占着，建议用哪个"，
- * 因此状态是**属性**（容器列表一变就更新），并且：空闲不产生任何提示、
- * 已停止的容器不算占用、建议端口要避开同一张表单里已经填过的端口。
+ * The UI must say, at the moment the user types, "this port is unusable, X holds it, try Y", so the
+ * status is a property (refreshed whenever the container list changes), and: a free port produces no
+ * hint, a stopped container does not count as a holder, and the suggestion avoids ports already
+ * filled into the same form.
  */
 void ContainerCreateTest::portRowStatusesReportHoldersAndSuggestFreePorts()
 {
@@ -796,7 +804,7 @@ void ContainerCreateTest::portRowStatusesReportHoldersAndSuggestFreePorts()
     backend.setContainers({running, stopped});
     CreateContainerController wizard(&operations, &presets, &backend);
 
-    // 一行被运行中的容器占用、一行空闲、一行被已停止的容器声明过
+    // One row held by a running container, one free, one declared by a stopped container
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 8100}},
                         QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 9000}},
                         QVariantMap {{QStringLiteral("containerPort"), 82}, {QStringLiteral("hostPort"), 8200}}});
@@ -810,16 +818,16 @@ void ContainerCreateTest::portRowStatusesReportHoldersAndSuggestFreePorts()
     QVERIFY2(occupied.value(QStringLiteral("suggestion")).toInt() > 8100,
              "the suggestion must skip the port that is already used");
 
-    // 空闲 → 不产生任何提示（界面据此什么都不显示）
+    // Free -> no hint at all (the UI then shows nothing)
     QVERIFY2(statuses.at(1).toMap().value(QStringLiteral("errorKey")).toString().isEmpty(),
              "a free port must not produce any hint");
     QCOMPARE(statuses.at(1).toMap().value(QStringLiteral("suggestion")).toInt(), 0);
 
-    // 已停止容器声明过的端口：不算占用（没运行自然不占端口，用户已确认）
+    // A port declared by a stopped container is not a conflict (nothing runs, user confirmed)
     QVERIFY2(statuses.at(2).toMap().value(QStringLiteral("errorKey")).toString().isEmpty(),
              "a stopped container must not block its declared port");
 
-    // 同一张表单里重复使用同一个宿主端口：报出来，且建议端口避开本表单已用的端口
+    // The same host port twice in one form: reported, and the suggestion avoids ports this form uses
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 9100}},
                         QVariantMap {{QStringLiteral("containerPort"), 81}, {QStringLiteral("hostPort"), 9100}}});
     const QVariantList duplicates = wizard.portRowStatuses();
@@ -828,7 +836,7 @@ void ContainerCreateTest::portRowStatusesReportHoldersAndSuggestFreePorts()
     const int suggestion = duplicates.at(1).toMap().value(QStringLiteral("suggestion")).toInt();
     QVERIFY2(suggestion != 9100, "the suggestion must not be one of the ports this form already uses");
 
-    // 随机端口（0）：既不冲突也不给建议
+    // Random port (0): neither a conflict nor a suggestion
     wizard.setPortRows({QVariantMap {{QStringLiteral("containerPort"), 80}, {QStringLiteral("hostPort"), 0}}});
     QVERIFY(wizard.portRowStatuses().at(0).toMap().value(QStringLiteral("errorKey")).toString().isEmpty());
     QCOMPARE(wizard.portRowStatuses().at(0).toMap().value(QStringLiteral("suggestion")).toInt(), 0);

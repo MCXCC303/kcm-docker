@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,16 +13,17 @@
 using namespace Kontainer;
 
 /*!
- * 搜索 / 过滤 / 排序测试（ARCH_V2 §9/§10/§32/§44 Filter）。
+ * Search / filter / sort tests (ARCH_V2 §9/§10/§32/§44 Filter).
  *
- * 条件组合、大小写不敏感、默认排序、以及“刷新不重置条件”都在这里验证。
+ * Combined conditions, case-insensitivity, default sort order, and "a refresh does not reset
+ * the conditions" are all verified here.
  */
 class FilterModelsTest : public QObject
 {
     Q_OBJECT
 
 private Q_SLOTS:
-    // --- 容器 ---
+    // --- containers ---
     void searchesByNameIdAndImage();
     void searchIsCaseInsensitive();
     void filtersByState();
@@ -31,7 +32,7 @@ private Q_SLOTS:
     void sortsByStateAndCreated();
     void conditionsSurviveModelReset();
 
-    // --- 镜像 ---
+    // --- images ---
     void searchesImageByRepositoryTagAndId();
     void filtersImagesByUsage();
     void sortsImagesByRepositoryByDefault();
@@ -76,12 +77,12 @@ void FilterModelsTest::searchesByNameIdAndImage()
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(ContainerModel::NameRole).toString(), QStringLiteral("alpha"));
 
-    // ID 前缀
+    // ID prefix
     filter.setSearchText(QStringLiteral("cccccccc"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(ContainerModel::NameRole).toString(), QStringLiteral("medai-worker"));
 
-    // 镜像名
+    // image name
     filter.setSearchText(QStringLiteral("postgres"));
     QCOMPARE(filter.count(), 1);
     QCOMPARE(filter.index(0, 0).data(ContainerModel::NameRole).toString(), QStringLiteral("alpha"));
@@ -131,12 +132,12 @@ void FilterModelsTest::combinesStateAndSearch()
     filter.setSourceModel(&source);
     source.setContainers(sampleContainers());
 
-    // State == Running AND search matches（§9.4：条件不能互相覆盖）
+    // State == Running AND search matches (§9.4: conditions must not clobber each other)
     filter.setStateFilter(QStringLiteral("running"));
     filter.setSearchText(QStringLiteral("zeta"));
     QCOMPARE(filter.count(), 1);
 
-    filter.setSearchText(QStringLiteral("alpha")); // alpha 是 exited
+    filter.setSearchText(QStringLiteral("alpha")); // alpha is exited
     QCOMPARE(filter.count(), 0);
 
     filter.setStateFilter(QStringLiteral("stopped"));
@@ -150,7 +151,7 @@ void FilterModelsTest::sortsByNameByDefault()
     filter.setSourceModel(&source);
     source.setContainers(sampleContainers());
 
-    QCOMPARE(filter.sortKey(), QStringLiteral("name")); // §10：默认排序固定为 Name 升序
+    QCOMPARE(filter.sortKey(), QStringLiteral("name")); // §10: default sort is fixed to Name ascending
     QCOMPARE(filter.index(0, 0).data(ContainerModel::NameRole).toString(), QStringLiteral("alpha"));
     QCOMPARE(filter.index(1, 0).data(ContainerModel::NameRole).toString(), QStringLiteral("dead-one"));
 }
@@ -166,7 +167,7 @@ void FilterModelsTest::sortsByStateAndCreated()
     QCOMPARE(filter.index(0, 0).data(ContainerModel::StateKeyRole).toString(), QStringLiteral("dead"));
 
     filter.setSortKey(QStringLiteral("created"));
-    // created 降序：最新在前
+    // created descending: newest first
     const QDateTime first = filter.index(0, 0).data(ContainerModel::CreatedRole).toDateTime();
     const QDateTime last = filter.index(filter.count() - 1, 0).data(ContainerModel::CreatedRole).toDateTime();
     QVERIFY(first > last);
@@ -184,7 +185,7 @@ void FilterModelsTest::conditionsSurviveModelReset()
     filter.setSortKey(QStringLiteral("created"));
     QCOMPARE(filter.count(), 1);
 
-    // 后台刷新：source model 被整体重置（§32）
+    // Background refresh: the source model is reset wholesale (§32)
     source.setContainers(sampleContainers());
 
     QCOMPARE(filter.searchText(), QStringLiteral("zeta"));
@@ -268,11 +269,11 @@ void FilterModelsTest::sortsImagesByRepositoryByDefault()
 
     source.setImages({beta, alpha});
 
-    QCOMPARE(filter.sortKey(), QStringLiteral("repository")); // §10：默认 Repository 升序
+    QCOMPARE(filter.sortKey(), QStringLiteral("repository")); // §10: default is Repository ascending
     QCOMPARE(filter.index(0, 0).data(ImageModel::PrimaryTagRole).toString(), QStringLiteral("alpha/app:1"));
 
     filter.setSortKey(QStringLiteral("size"));
-    QCOMPARE(filter.index(0, 0).data(ImageModel::PrimaryTagRole).toString(), QStringLiteral("alpha/app:1")); // 200 > 100，降序
+    QCOMPARE(filter.index(0, 0).data(ImageModel::PrimaryTagRole).toString(), QStringLiteral("alpha/app:1")); // size desc
 }
 
 QTEST_GUILESS_MAIN(FilterModelsTest)

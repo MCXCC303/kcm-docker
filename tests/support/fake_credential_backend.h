@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,24 +13,24 @@ namespace Kontainer
 {
 
 /*!
- * 内存版凭据后端（测试替身）。
+ * In-memory credential backend (test double).
  *
- * KWallet 在 CI 与无桌面环境里不可用，而 `CredentialStore` 的逻辑
- * （索引键规范化、条目格式、覆盖/删除、可用性状态机）与钱包无关，
- * 必须能在任何环境下确定性验证。
+ * KWallet is unavailable in CI and headless environments, yet `CredentialStore`'s logic
+ * (index-key normalization, entry format, overwrite/remove, availability state machine) is
+ * wallet-independent and must be verified deterministically anywhere.
  *
- * 通过开关模拟三种现实情形：可用、钱包被禁用、用户拒绝解锁。
+ * Switches simulate the three real cases: available, wallet disabled, user refusing to unlock.
  */
 class FakeCredentialBackend : public CredentialBackend
 {
 public:
-    /*! 打开时是否成功（false = 用户拒绝解锁 / 打不开）。 */
+    /*! Whether open succeeds (false = user refused to unlock / cannot be opened). */
     bool openSucceeds = true;
-    /*! 包子系统是否启用（false = 用户关掉了钱包）。 */
+    /*! Whether the wallet subsystem is enabled (false = user turned the wallet off). */
     bool enabled = true;
-    /*! 写入是否失败（模拟钱包只读/磁盘错误）。 */
+    /*! Whether writes fail (simulates a read-only wallet or a disk error). */
     bool writeFails = false;
-    /*! 打开时是否立即回调（false = 模拟 KWallet 的异步打开）。 */
+    /*! Whether open calls back immediately (false = simulates KWallet's async open). */
     bool synchronousOpen = true;
 
     bool isAvailable() const override
@@ -57,10 +57,10 @@ public:
             finish(openSucceeds);
             return;
         }
-        m_pendingOpen = finish; // 由测试调用 completeOpen()
+        m_pendingOpen = finish; // the test calls completeOpen()
     }
 
-    /*! 完成一次异步打开（`synchronousOpen == false` 时使用）。 */
+    /*! Finish an async open (used when `synchronousOpen == false`). */
     void completeOpen()
     {
         auto pending = m_pendingOpen;
@@ -101,7 +101,7 @@ public:
     }
 
     int openRequests = 0;
-    /*! 直接塞一条原始条目（模拟旧版本或手工编辑留下的内容）。 */
+    /*! Inject a raw entry directly (simulates content left by an older version or manual editing). */
     QHash<QString, QByteArray> entries;
 
 private:

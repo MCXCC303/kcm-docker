@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,11 +11,12 @@ namespace Kontainer
 {
 
 /*!
- * 提权客户端的测试替身（见 `backend/privileged_client.h` 的说明）。
+ * Test double for the privileged client (see `backend/privileged_client.h`).
  *
- * 只记录"谁调用了什么"，结果由测试自己 `Q_EMIT finished(...)` 决定：
- * 于是"解锁只作用于发起的作用域""别人的保存结果不该刷新我这一页"
- * 这类时序逻辑可以在没有 root、没有 polkit、没有 helper 的情况下确定性地验证。
+ * It only records what was called; the test decides outcomes by emitting `finished(...)` itself.
+ * That makes ordering rules — "an unlock affects only the scope that requested it", "someone
+ * else's save result must not refresh my page" — verifiable deterministically without root,
+ * polkit or the helper.
  */
 class FakePrivilegedClient : public PrivilegedClient
 {
@@ -56,12 +57,12 @@ public:
         lastServiceVerb = verbKey;
     }
 
-    /*! `writeAvailable()` 的返回值（默认可用）。 */
+    /*! Return value of `writeAvailable()` (available by default). */
     bool available = true;
     int authorizeRequests = 0;
     int writeRequests = 0;
     int restartRequests = 0;
-    /*! 服务控制请求（B1）：次数 + 最近一次的 unit/动词。 */
+    /*! Service control requests (B1): count plus the most recent unit/verb. */
     int serviceRequests = 0;
     QString lastServiceUnit;
     QString lastServiceVerb;

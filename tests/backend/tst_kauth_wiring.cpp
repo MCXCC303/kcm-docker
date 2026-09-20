@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,19 +15,19 @@
 using namespace Kontainer;
 
 /*!
- * 提权链路的"接线"测试（ARCH_V5_V8 附录 C）。
+ * Wiring test for the privilege path (ARCH_V5_V8 appendix C).
  *
- * 为什么需要它：polkit/KAuth 的同一个标识符必须同时出现在四个地方——
+ * Why it exists: the same polkit/KAuth identifier must appear in four places:
  *
- *   1. `KAUTH_HELPER_MAIN()` 的 helper id（helper own 哪个总线名）
- *   2. `KAuth::Action::setHelperId()`（不设它，polkit 后端直接拒绝执行）
- *   3. `.actions` 里动作名的前缀（策略里注册了哪些动作）
- *   4. D-Bus 系统策略的 `allow own`（系统总线默认 `<deny own="*"/>`）
+ *   1. the helper id in `KAUTH_HELPER_MAIN()` (which bus name the helper owns)
+ *   2. `KAuth::Action::setHelperId()` (without it the polkit backend refuses to run)
+ *   3. the action name prefix in `.actions` (which actions the policy registers)
+ *   4. `allow own` in the D-Bus system policy (the system bus defaults to `<deny own="*"/>`)
  *
- * 这四处任何一处不一致，**编译、单测、界面都不会报错**，只在真机上表现为
- * "授权失败 / 没有这个动作 / 找不到 helper"，而且症状会把人引向错误的方向
- * （实测踩过：打包路径装出的是空策略、安装脚本漏了 D-Bus 策略文件、
- *  会话侧根本没调 setHelperId）。所以这里把接线钉死。
+ * Hence this test pins the wiring: diverging in any of the four keeps **compilation, unit tests and
+ * the UI silent**; on a real machine it shows as "authorization failed / no such action / helper
+ * not found", and the symptoms point the wrong way (observed: the packaging path shipped an empty
+ * policy, the install script missed the D-Bus policy file, the session side never called setHelperId).
  */
 class KauthWiringTest : public QObject
 {
@@ -59,7 +59,7 @@ QString readFile(const QString &path)
     return QString::fromUtf8(file.readAll());
 }
 
-/*! 按 KAuth 的规则把动作名换算成 helper 槽名。 */
+/*! Map an action name to a helper slot name per KAuth's rules. */
 QString slotNameFor(const QString &actionName)
 {
     QString slot = actionName;
@@ -71,7 +71,7 @@ QString slotNameFor(const QString &actionName)
     return slot;
 }
 
-/*! 解析 .actions（INI）：section → (key → value)，键名大小写不敏感。 */
+/*! Parse .actions (INI) into section → (key → value); keys are case-insensitive. */
 QHash<QString, QHash<QString, QString>> parseActions(const QString &content)
 {
     QHash<QString, QHash<QString, QString>> sections;
@@ -114,20 +114,20 @@ QString installScriptPath()
 
 void KauthWiringTest::helperIdAndActionsAreSingleSourced()
 {
-    // helper id 与两个动作 id 都在 privileged_config_request.h 里，且动作必须挂在
-    // 这个 helper 的命名空间下（KAuth 按"去掉前缀 + 点换下划线"查槽）
+    // helper id and both action ids live in privileged_config_request.h, and actions must
+    // sit under this helper's namespace (KAuth resolves slots by stripping the prefix, dots to underscores)
     const QString helperId = QString::fromLatin1(kHelperId);
     QCOMPARE(helperId, QStringLiteral("org.kde.kcm.docker"));
 
     for (const char *action : {kSaveActionName, kRestartActionName}) {
         const QString name = QString::fromLatin1(action);
         QVERIFY2(name.startsWith(helperId + QLatin1Char('.')), qPrintable(name));
-        // 官方规则：小写字母与数字（分层用 `.`）——kauth-policy-gen 会拒绝大写与下划线
+        // Official rule: lowercase, digits and `.` only; kauth-policy-gen rejects uppercase and underscores
         const QRegularExpression valid(QStringLiteral("^[a-z0-9.]+$"));
         QVERIFY2(valid.match(name).hasMatch(), qPrintable(name));
     }
 
-    // 会话侧只能用常量，不能自己写字符串字面量（写错了不会编译失败）
+    // The session side must use the constants, never string literals (a typo still compiles)
     const QString client = readFile(sourceDir() + QStringLiteral("/src/backend/privileged_config_client.cpp"));
     QVERIFY(!client.isEmpty());
     QVERIFY2(!client.contains(QLatin1String("\"org.kde.kcm.docker")),
@@ -135,7 +135,7 @@ void KauthWiringTest::helperIdAndActionsAreSingleSourced()
     QVERIFY2(client.contains(QLatin1String("setHelperId")), "the client must set the helper id");
     QVERIFY2(client.contains(QLatin1String("kHelperId")), "the client must use the shared helper id constant");
 
-    // helper 侧同理：helper id 由常量给出（宏的第三个参数就是总线名）
+    // Helper side likewise: the helper id comes from the constant (the macro's third arg is the bus name)
     const QString helper = readFile(sourceDir() + QStringLiteral("/src/kauth/kcm_docker_helper.cpp"));
     QVERIFY(!helper.isEmpty());
     QVERIFY2(helper.contains(QLatin1String("KAUTH_HELPER_MAIN(Kontainer::kHelperId")),
@@ -146,12 +146,12 @@ void KauthWiringTest::helperIdAndActionsAreSingleSourced()
 
 void KauthWiringTest::installScriptInstallsEveryRequiredFile()
 {
-    // 四个文件缺一不可：helper、polkit 策略、D-Bus 服务文件（激活）、D-Bus 系统策略（own）
+    // Required: helper, polkit policy, D-Bus service file (activation), D-Bus system policy (own)
     const QString script = readFile(installScriptPath());
     if (script.isEmpty()) {
         QSKIP("install-privileged-helper.sh has not been generated yet");
     }
-    // 路径由变量拼出，因此分别检查目录与文件名
+    // Paths are built from variables, so check directories and file names separately
     for (const char *directory : {"/usr/lib/kf6/kauth",
                                   "/usr/share/polkit-1/actions",
                                   "/usr/share/dbus-1/system-services",
@@ -165,17 +165,17 @@ void KauthWiringTest::installScriptInstallsEveryRequiredFile()
         QVERIFY2(script.contains(QString::fromLatin1(fileName)), fileName);
     }
 
-    // 安装的必须是**生成出来的**策略（源头是 .actions）；不能去装手写 XML
+    // It must install the **generated** policy (sourced from .actions), never a hand-written XML
     QVERIFY2(script.contains(QStringLiteral("${KCM_DOCKER_POLICY_FILE}"))
                  || script.contains(QStringLiteral("build/src/org.kde.kcm.docker.policy")),
              qPrintable(script));
     QVERIFY2(!script.contains(QStringLiteral("src/kauth/org.kde.kcm.docker.policy")),
              "the script must install the generated policy, not a hand-written one");
 
-    // 卸载分支必须存在，且删的是同一组变量（README 里不再抄一份路径清单）
+    // The uninstall branch must exist and delete the same variables (no second path list in the README)
     const int uninstall = script.indexOf(QLatin1String("uninstall)"));
     QVERIFY2(uninstall > 0, "the script must support uninstalling what it installed");
-    // 只看 rm 那一行：四个文件必须都在同一条 rm 里
+    // Look only at the rm line: all four files must be in that one rm
     QString removeLine;
     for (const QString &line : script.mid(uninstall).split(QLatin1Char('\n'))) {
         if (line.contains(QLatin1String("rm -f"))) {
@@ -189,7 +189,7 @@ void KauthWiringTest::installScriptInstallsEveryRequiredFile()
                  qPrintable(QStringLiteral("%1 is not removed: %2").arg(QString::fromLatin1(variable), removeLine)));
     }
 
-    // D-Bus 系统策略的内容必须是"打洞"而不是空文件
+    // The D-Bus system policy must punch the hole, not be an empty file
     QVERIFY2(script.contains(QStringLiteral("<allow own=\"org.kde.kcm.docker\"/>")), qPrintable(script));
     QVERIFY2(script.contains(QStringLiteral("<allow send_destination=\"org.kde.kcm.docker\"/>")), qPrintable(script));
     QVERIFY2(script.contains(QStringLiteral("Name=org.kde.kcm.docker")), qPrintable(script));
@@ -201,7 +201,7 @@ void KauthWiringTest::actionsFileDefinesExactlyOurActions()
     QVERIFY2(!content.isEmpty(), qPrintable(actionsFilePath()));
     const auto sections = parseActions(content);
 
-    // [Domain] 给策略文件提供 vendor / icon（官方格式）
+    // [Domain] supplies vendor / icon to the policy file (official format)
     QVERIFY(sections.contains(QStringLiteral("Domain")));
     const auto domain = sections.value(QStringLiteral("Domain"));
     QVERIFY(!domain.value(QStringLiteral("name")).isEmpty());
@@ -215,8 +215,8 @@ void KauthWiringTest::actionsFileDefinesExactlyOurActions()
         }
     }
     actionSections.sort();
-    // 期望值来自**单一来源**：`.actions` 里应该有的动作 = 配置读写两个 + 服务管理的五个
-    // （服务管理的 unit/动词白名单在 service_control 里，这里只核对"动作名齐全"）
+    // Expected comes from a **single source**: `.actions` actions = 2 config read/write + 5 service
+    // management (unit/verb whitelist lives in service_control; here we only check all names are present)
     QStringList expected {QString::fromLatin1(kRestartActionName), QString::fromLatin1(kSaveActionName)};
     for (const QString &verb : managedServiceVerbs()) {
         ServiceVerb parsed = ServiceVerb::Start;
@@ -230,8 +230,8 @@ void KauthWiringTest::actionsFileDefinesExactlyOurActions()
 
     for (const QString &name : expected) {
         const auto action = sections.value(name);
-        // 每次都问管理员 = 我们的设计（授权窗口由 polkit 的 keep 决定，
-        // 生成器会把 Persistence 翻成 allow_active=auth_admin_keep）
+        // Asking the admin every time is our design (the authorization window comes from
+        // polkit keep; the generator maps Persistence to allow_active=auth_admin_keep)
         QCOMPARE(action.value(QStringLiteral("policy")), QStringLiteral("auth_admin"));
         QCOMPARE(action.value(QStringLiteral("persistence")), QStringLiteral("session"));
         QVERIFY(!action.value(QStringLiteral("name")).isEmpty());
@@ -241,9 +241,9 @@ void KauthWiringTest::actionsFileDefinesExactlyOurActions()
 
 void KauthWiringTest::actionsFileCarriesChineseDialogText()
 {
-    // polkit 的授权对话框用的是 .actions 里的文案。它是**唯一**不走 po 体系的
-    // 用户可见文本（xgettext 不提取这个格式），因此这里直接守住中文译文存在：
-    // 少了它，中文会话里会弹出一句英文。
+    // The polkit auth dialog uses the text in .actions. That is the **only** user-visible
+    // text outside the po system (xgettext does not extract this format), so this test guards
+    // the Chinese translation directly: without it a Chinese session shows an English line.
     const auto sections = parseActions(readFile(actionsFilePath()));
     for (const char *action : {kSaveActionName, kRestartActionName}) {
         const auto section = sections.value(QString::fromLatin1(action));
@@ -254,8 +254,8 @@ void KauthWiringTest::actionsFileCarriesChineseDialogText()
 
 void KauthWiringTest::helperSlotsMatchActionNames()
 {
-    // KAuth 用"动作名去掉 helper id 前缀、`.` 换成 `_`"来查槽（DBusHelperProxy）：
-    // 名字对不上不会编译失败，只会在真机上表现为"没有这个动作"
+    // KAuth looks up slots by action name minus the helper id prefix, `.` replaced by `_`
+    // (DBusHelperProxy): a mismatch still compiles and only shows as "no such action" on a real machine
     const QString helper = readFile(sourceDir() + QStringLiteral("/src/kauth/kcm_docker_helper.cpp"));
     QVERIFY(!helper.isEmpty());
 
@@ -274,17 +274,17 @@ void KauthWiringTest::generatedPolicyIsNotSilentlyEmpty()
         QSKIP("the generated policy is missing; build the kcm_docker_policy target first");
     }
 
-    // 这就是那个真实踩过的坑：把 XML 交给 kauth-policy-gen 会"成功"生成
-    // 一个没有动作的空策略，安装后所有授权都失败但没有任何报错
+    // The real-world trap: feeding XML to kauth-policy-gen "succeeds" and produces an empty
+    // policy with no actions; after install every authorization fails with no error reported
     const int actionCount = policy.count(QLatin1String("<action id="));
-    // 配置读写 2 个 + 服务管理 5 个
+    // 2 config read/write + 5 service management
     QCOMPARE(actionCount, 7);
 
     for (const char *action : {kSaveActionName, kRestartActionName}) {
         QVERIFY2(policy.contains(QString::fromLatin1(action)), action);
     }
-    // 授权窗口（polkit 下 = 保持几分钟）与最小暴露面
-    // 七个动作都应该是 auth_admin + keep（服务管理的五个同样是 session 级授权）
+    // Authorization window (under polkit = kept for a few minutes) and minimal exposure:
+    // all seven actions must be auth_admin + keep (the five service ones are session-level too)
     QCOMPARE(policy.count(QLatin1String("<allow_active>auth_admin_keep</allow_active>")), 7);
     QCOMPARE(policy.count(QLatin1String("<allow_inactive>no</allow_inactive>")), 7);
     QVERIFY2(!policy.contains(QLatin1String("<allow_any>")),

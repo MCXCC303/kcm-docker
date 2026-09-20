@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -10,11 +10,12 @@
 using namespace Kontainer;
 
 /*!
- * Docker 日志字节流的解复用（ARCH_V5_V8 §3.1.1）。
+ * Demultiplexing the Docker log byte stream (ARCH_V5_V8 §3.1.1).
  *
- * 这些用例对应的是"真实日志里一定会遇到、但只靠肉眼很难发现"的情形：
- * 半帧跨包、一个包里多个帧、TTY 的原始流、ANSI 颜色、`\r` 进度条、
- * 以及畸形帧头（一个坏长度不能让进程去分配几个 GB）。
+ * These cases are what real logs always contain but the eye rarely catches:
+ * half frames across packets, several frames per packet, raw TTY streams, ANSI
+ * color, `\r` progress bars, and malformed headers (a bad length must not make
+ * the process allocate gigabytes).
  */
 class LogFrameReaderTest : public QObject
 {
@@ -34,7 +35,7 @@ private Q_SLOTS:
 
 namespace
 {
-/*! 构造一帧（stream: 1=stdout, 2=stderr）。 */
+/*! Build one frame (stream: 1=stdout, 2=stderr). */
 QByteArray frame(char stream, const QByteArray &payload)
 {
     QByteArray out;
@@ -73,12 +74,12 @@ void LogFrameReaderTest::stdcopyFramesAreDemultiplexed()
 
 void LogFrameReaderTest::partialFramesAcrossPacketsAreBuffered()
 {
-    // 半帧必须留在缓冲里：真实 socket 的切分点完全随机
+    // Half frames must stay buffered: real socket split points are fully random
     const QByteArray whole = frame(1, "line one\nline two\n");
     LogFrameReader reader;
     QList<LogLine> lines;
     for (int i = 0; i < whole.size(); ++i) {
-        lines += reader.feed(whole.mid(i, 1)); // 逐字节喂
+        lines += reader.feed(whole.mid(i, 1)); // feed one byte at a time
     }
     QCOMPARE(texts(lines), QStringList({QStringLiteral("line one"), QStringLiteral("line two")}));
     QCOMPARE(reader.discardedBytes(), 0);
@@ -94,7 +95,7 @@ void LogFrameReaderTest::multipleFramesInOnePacket()
 
 void LogFrameReaderTest::ttyStreamsAreRaw()
 {
-    // TTY 容器没有帧头：一律当原始字节，否则会把正文当成帧头解析掉
+    // TTY containers have no frame headers: treat everything as raw bytes, else payload is parsed as a header
     LogFrameReader reader(true);
     QVERIFY(reader.isTty());
     QList<LogLine> lines = reader.feed("first\nthe ");
@@ -108,11 +109,11 @@ void LogFrameReaderTest::ttyStreamsAreRaw()
 void LogFrameReaderTest::ansiSequencesAreStrippedAcrossPackets()
 {
     LogFrameReader reader;
-    // 颜色：\x1b[31m ... \x1b[0m
+    // Color: \x1b[31m ... \x1b[0m
     QList<LogLine> lines = reader.feed(frame(1, "\x1b[31mred\x1b[0m text\n"));
     QCOMPARE(texts(lines), QStringList {QStringLiteral("red text")});
 
-    // 序列被切在两个包之间：不能把 ESC[31 当成正文漏出去
+    // Sequence split across two packets: ESC[31 must not leak out as text
     const QByteArray colored = frame(1, "still \x1b[1;32mgreen\x1b[0m\n");
     const int splitAt = colored.indexOf("\x1b") + 2;
     LogFrameReader split;
@@ -120,7 +121,7 @@ void LogFrameReaderTest::ansiSequencesAreStrippedAcrossPackets()
     lines += split.feed(colored.mid(splitAt));
     QCOMPARE(texts(lines), QStringList {QStringLiteral("still green")});
 
-    // OSC（终端标题等）也要整段丢掉
+    // OSC (terminal titles etc.) must be dropped whole as well
     LogFrameReader osc;
     lines = osc.feed(frame(1, "\x1b]0;title" "\x07" "after\n"));
     QCOMPARE(texts(lines), QStringList {QStringLiteral("after")});
@@ -128,8 +129,8 @@ void LogFrameReaderTest::ansiSequencesAreStrippedAcrossPackets()
 
 void LogFrameReaderTest::carriageReturnOverwritesTheCurrentLine()
 {
-    // 进度条：每次覆盖发一条**临时行**（complete == false），控制台据此替换最后一行，
-    // 因此既能实时看到进度，又不会把控制台刷爆
+    // Progress bar: each overwrite emits a **provisional line** (complete == false) that the
+    // console replaces the last line with, so progress stays live without flooding it
     LogFrameReader reader;
     const QList<LogLine> lines = reader.feed(frame(1, "10%\r50%\r100% done\nnext\n"));
     QCOMPARE(texts(lines), QStringList({QStringLiteral("10%"), QStringLiteral("50%"), QStringLiteral("100% done"), QStringLiteral("next")}));
@@ -141,7 +142,7 @@ void LogFrameReaderTest::carriageReturnOverwritesTheCurrentLine()
 
 void LogFrameReaderTest::carriageReturnFollowedByNewlineIsJustALineEnd()
 {
-    // CRLF 是行尾，不是"覆盖"：内容必须保留
+    // CRLF is a line end, not an overwrite: the content must be kept
     LogFrameReader reader;
     const QList<LogLine> lines = reader.feed(frame(1, "windows line\r\nsecond\r\n"));
     QCOMPARE(texts(lines), QStringList({QStringLiteral("windows line"), QStringLiteral("second")}));
@@ -149,16 +150,16 @@ void LogFrameReaderTest::carriageReturnFollowedByNewlineIsJustALineEnd()
 
 void LogFrameReaderTest::malformedFramesAreDiscardedSafely()
 {
-    // 流号非法：丢掉这一帧头与缓冲，不做任何分配
+    // Invalid stream number: drop this frame header and the buffer, allocate nothing
     LogFrameReader badStream;
     QList<LogLine> lines = badStream.feed(QByteArray("\x07\x00\x00\x00\x00\x00\x00\x04junk", 12));
     QVERIFY(lines.isEmpty());
     QVERIFY(badStream.discardedBytes() > 0);
-    // 之后仍然能正常工作（清空缓冲后重新同步）
+    // Still works afterwards (resyncs after clearing the buffer)
     lines = badStream.feed(frame(1, "recovered\n"));
     QCOMPARE(texts(lines), QStringList {QStringLiteral("recovered")});
 
-    // 声称 4 GiB 的帧：绝不能照单分配
+    // A frame claiming 4 GiB: must never be allocated as claimed
     LogFrameReader huge;
     QByteArray hugeHeader;
     hugeHeader.append(char(1));
@@ -183,10 +184,10 @@ void LogFrameReaderTest::flushEmitsTheTrailingPartialLine()
     QCOMPARE(tail.at(0).text, QStringLiteral("half"));
     QVERIFY2(!tail.at(0).complete, "the trailing line was never terminated by a newline");
 
-    // 结束后状态清空：再 flush 不该重复输出
+    // State is cleared at the end: a second flush must not repeat output
     QVERIFY(reader.flush().isEmpty());
 
-    // 流在 \r 之后结束：那一行已被覆盖成空（进度条常见形态）
+    // Stream ends right after \r: that line was already overwritten to empty (typical progress bar)
     LogFrameReader overwritten;
     overwritten.feed(frame(1, "progress 10%\r"));
     const QList<LogLine> empty = overwritten.flush();

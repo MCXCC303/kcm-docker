@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -42,7 +42,7 @@ void HttpResponseParserTest::parsesContentLengthResponse()
 
 void HttpResponseParserTest::parsesChunkedResponse()
 {
-    // /info 与 /containers/json 使用 chunked 传输（ARCH_V1 §7 实测行为）
+    // /info and /containers/json use chunked transfer (measured behavior, ARCH_V1 §7)
     HttpResponseParser parser;
     parser.feed("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n"
                 "5\r\n{\"a\":\r\n"
@@ -57,7 +57,7 @@ void HttpResponseParserTest::parsesChunkedResponseSplitAcrossFeeds()
     HttpResponseParser parser;
     const QByteArray payload = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n4\r\nWiki\r\n5\r\npedia\r\n0\r\n\r\n";
 
-    // 逐字节喂入：解析器必须在任意切分点都能正确推进
+    // Feed one byte at a time: the parser must advance at any split point
     for (int i = 0; i < payload.size(); ++i) {
         parser.feed(payload.mid(i, 1));
     }
@@ -143,34 +143,34 @@ void HttpResponseParserTest::finishInputFailsOnTruncatedResponse()
 }
 
 /*!
- * 流式响应（镜像拉取）靠 takeBody() 增量取值：
- * 只返回「上次取走之后新增」的部分，且不能丢字节。
+ * Streaming responses (image pull) take increments via takeBody():
+ * it returns only the part added since the previous call, and must not drop bytes.
  */
 void HttpResponseParserTest::takeBodyReturnsOnlyNewBytes()
 {
     HttpResponseParser parser;
 
-    // 头部 + 第一个 chunk（"{\"a\":1}\n" 共 8 字节）
+    // Headers + first chunk ("{\"a\":1}\n", 8 bytes)
     parser.feed("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n8\r\n{\"a\":1}\n\r\n");
     QCOMPARE(parser.takeBody(), QByteArray("{\"a\":1}\n"));
     QVERIFY(parser.takeBody().isEmpty());
 
-    // 第二个 chunk（"{\"b\":2}\n"），同样是增量
+    // Second chunk ("{\"b\":2}\n"), also incremental
     parser.feed("8\r\n{\"b\":2}\n\r\n");
     QCOMPARE(parser.takeBody(), QByteArray("{\"b\":2}\n"));
 
-    // 结束 chunk
+    // Terminating chunk
     parser.feed("0\r\n\r\n");
     QVERIFY(parser.isComplete());
     QVERIFY(parser.takeBody().isEmpty());
 
-    // 增量之和 == 全量
+    // Sum of increments == full body
     QCOMPARE(parser.body(), QByteArray("{\"a\":1}\n{\"b\":2}\n"));
 }
 
 /*!
- * `body()` 的全量语义不受 takeBody() 影响——非流式调用方（所有只读请求）
- * 拿到的仍然是完整响应体。
+ * `body()` keeps its full-body semantics regardless of takeBody() - non-streaming callers
+ * (all read-only requests) still get the complete response body.
  */
 void HttpResponseParserTest::takeBodyKeepsFullBodySemantics()
 {

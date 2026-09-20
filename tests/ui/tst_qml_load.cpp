@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -46,16 +46,16 @@ namespace
 {
 
 /*!
- * 挑两个"颜色不同"的宿主端口（用于端口拓扑的断言）。
+ * Pick two host ports whose colours differ, for the topology assertions.
  *
- * 颜色是纯函数（容器 id + 容器端口 + 该绑定的芯片文本）-> 色板下标，
- * 因此直接在 C++ 里比较下标即可，不必去问 QML 的色板。
- * 找不到就返回一对固定值（那时断言会退化为"只比较相等"，不至于误报失败）。
+ * Colour is a pure function (container id + container port + binding chip text) -> palette index,
+ * so comparing indices in C++ is enough; there is no need to ask QML for colours.
+ * No such pair found: return a fixed pair, so the assertion degrades to equality rather than failing.
  */
 QPair<quint16, quint16> distinctBranchPorts()
 {
     const Presentation presentation;
-    // 与界面上的取色种子一致：容器 id + "|" + 容器端口芯片文本 + "|" + 该绑定的芯片文本
+    // Same colour seed as the UI: container id + "|" + container-port chip text + "|" + binding chip text
     const auto indexFor = [&presentation](const QString &hostChip) {
         return presentation.connectionColorIndex(QStringLiteral("cid-1|80/tcp|") + hostChip, 6);
     };
@@ -68,7 +68,7 @@ QPair<quint16, quint16> distinctBranchPorts()
     return {8080, 8081};
 }
 
-/*! 造一个当前进程可写的 socket 文件：权限门据此判定允许写。 */
+/*! Create a socket file this process may write: the permission gate then allows writes. */
 QString writableSocketPath()
 {
     static QTemporaryDir dir;
@@ -82,8 +82,8 @@ QString writableSocketPath()
     return path;
 }
 
-/*! 在已经实例化的页面里按 objectName 找控件（页面没有窗口，直接遍历子对象即可）。 */
-/*! 列表编辑器当前的行数（读它内部 Repeater 的 count）。 */
+/*! Find a control by objectName in an instantiated page (no window, so plain child lookup works). */
+/*! Current row count of a list editor (reads the count of its inner Repeater). */
 int repeaterCount(QQuickItem *editor)
 {
     const QList<QObject *> objects = editor->findChildren<QObject *>();
@@ -95,7 +95,7 @@ int repeaterCount(QQuickItem *editor)
     return -1;
 }
 
-/*! 待保存的配置内容里是否包含某段文本（用于断言"空草稿没有进配置"）。 */
+/*! Whether the pending config text contains a needle (asserts an empty draft never lands there). */
 bool controller_pendingContains(Kontainer::DaemonConfigController *controller, const QString &needle)
 {
     return controller->pendingContentPreview().contains(needle);
@@ -113,10 +113,10 @@ QQuickItem *findItemByName(QObject *root, const QString &objectName)
 }
 
 /*!
- * 沿 `childItems()` 递归查找（**delegate 条目只能用这个**）。
+ * Recurse through `childItems()` — **the only way to reach delegate items**.
  *
- * `findChildren<QQuickItem *>()` 走的是 QObject 树：Repeater 建出来的 delegate 不在这棵树里，
- * 因此按对象名找不到它们（八期在这里吃过一次亏）。视觉树里是找得到的。
+ * `findChildren<QQuickItem *>()` walks the QObject tree, where Repeater delegates do not live,
+ * so objectName lookups miss them (bitten in phase 8); the visual tree does find them.
  */
 QQuickItem *findItemDeep(QQuickItem *root, const QString &objectName)
 {
@@ -136,13 +136,13 @@ QQuickItem *findItemDeep(QQuickItem *root, const QString &objectName)
 } // namespace
 
 /*!
- * QML 加载测试（ARCH_V2 §46）。
+ * QML loading tests (ARCH_V2 §46).
  *
- * 逐个加载界面文件，确保没有语法错误、未知属性、类型解析失败等问题。
- * 这类错误在 kcmshell6 里只会显示一个错误页，很难定位；在这里可以直接断言。
+ * Load each UI file to catch syntax errors, unknown properties, type-resolution failures and the like:
+ * kcmshell6 only shows an error page for those, hard to locate; here they can be asserted directly.
  *
- * 注意：测试加载的是源码目录里的 QML 文件（含 components/ 相对导入），
- * 与打包进插件 qrc 的是同一份内容。
+ * Note: tests load the QML files from the source directory (with components/ relative imports),
+ * the same content that is packaged into the plugin qrc.
  */
 class QmlLoadTest : public QObject
 {
@@ -225,7 +225,7 @@ private:
     static void captureMessages(QtMsgType type, const QMessageLogContext &context, const QString &message);
     void failOnQmlRuntimeErrors();
 
-    /*! 按 objectName 在已实例化的页面里查找子项。 */
+    /*! Find a child item by objectName in an instantiated page. */
     static QQuickItem *childByObjectName(QQuickItem *root, const QString &objectName);
 
     std::unique_ptr<MockDockerBackend> m_backend;
@@ -268,16 +268,16 @@ void QmlLoadTest::initTestCase()
 
 void QmlLoadTest::init()
 {
-    // 每个用例都重新安装：cleanup() 会把它还原，只在 initTestCase 装一次的话，
-    // 第一个用例之后所有 QML 运行时错误都会被静默（真实踩过的坑）
+    // Reinstalled per test case; cleanup() restores it. Installing only once in initTestCase would
+    // silence every QML runtime error after the first case (a real trap).
     g_messages.clear();
     g_previousHandler = qInstallMessageHandler(&QmlLoadTest::captureMessages);
 
     m_backend = std::make_unique<MockDockerBackend>();
     m_stubKcm = std::make_unique<QmlStubKcm>(m_backend.get());
     m_engine = std::make_unique<QQmlEngine>();
-    // 真实运行时由 KCMUtils 的 KLocalizedQmlContext 提供这些全局函数；
-    // 测试里用等价的 identity 实现，保证界面文件的绑定能被正常求值。
+    // At runtime KCMUtils' KLocalizedQmlContext provides these globals; the test uses
+    // equivalent identity implementations so the UI bindings still evaluate.
     m_engine->evaluate(QStringLiteral(
         "function _ktFormat(text, args) {\n"
         "    return String(text).replace(/%(\\d+)/g, function (match, index) {\n"
@@ -305,10 +305,10 @@ void QmlLoadTest::cleanup()
 }
 
 /*!
- * §6/§46：卡片必须真的能触发导航信号。
+ * §6/§46: cards must really emit their navigation signals.
  *
- * 这类问题（delegate 里引用了未声明的 model role）不会在加载期暴露，
- * 只有真正触发信号时才会抛 ReferenceError。
+ * An undeclared model role in a delegate does not show up at load time;
+ * only a real signal emission throws the ReferenceError.
  */
 void QmlLoadTest::delegateActivationIsWired()
 {
@@ -340,7 +340,7 @@ void QmlLoadTest::delegateActivationIsWired()
     auto *page = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(page);
 
-    // 需要真实布局才会创建 delegate
+    // Delegates are created only with a real layout
     QQuickWindow window;
     window.resize(900, 700);
     page->setParentItem(window.contentItem());
@@ -359,7 +359,7 @@ void QmlLoadTest::delegateActivationIsWired()
         return nullptr;
     };
 
-    // delegate 用视图自己的 API 取（遍历子对象拿不到由视图托管生命周期的 delegate）
+    // Fetch delegates through the view's own API; child traversal misses view-managed delegates
     const auto delegateAt = [&findItem](const QString &viewName, int row) -> QQuickItem * {
         QQuickItem *view = findItem(viewName);
         if (!view) {
@@ -379,7 +379,7 @@ void QmlLoadTest::delegateActivationIsWired()
     QCOMPARE(containerSpy.count(), 1);
     QCOMPARE(containerSpy.first().first().toString(), QStringLiteral("cid-1"));
 
-    // 切到镜像标签页，等它的 delegate 创建
+    // Switch to the images tab and wait for its delegates
     QQuickItem *tabBar = findItem(QStringLiteral("tabBar"));
     QVERIFY2(tabBar, "tab bar not found");
     QVERIFY(tabBar->setProperty("currentIndex", 1));
@@ -392,11 +392,11 @@ void QmlLoadTest::delegateActivationIsWired()
 }
 
 /*!
- * 配置页的两个可编辑控件（ARCH_V5_V8 §2.2）。
+ * The two editable controls on the config page (ARCH_V5_V8 §2.2).
  *
- * 为什么单独测：助手里早就支持 `max-concurrent-downloads` / `log-driver` 了，
- * 但页面上它们一度只是**只读的一行文字**——用户根本改不了（真实反馈）。
- * 这里钉住"控件存在、用户改动会写回控制器、选「默认」产生的是删除而不是写 0/空串"。
+ * Tested separately: the helper long supported `max-concurrent-downloads` / `log-driver`,
+ * yet the page showed them as **read-only text** users could not change (real feedback).
+ * Pinned here: controls exist, edits reach the controller, "Default" deletes instead of writing 0/empty.
  */
 void QmlLoadTest::configPageEditorsWriteThroughToTheController()
 {
@@ -407,7 +407,7 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
                             QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
     QVariantMap initial;
-    initial.insert(QStringLiteral("scope"), QStringLiteral("user")); // 用户级：不需要解锁就能编辑
+    initial.insert(QStringLiteral("scope"), QStringLiteral("user")); // user scope: editable without unlocking
     QScopedPointer<QObject> page(component.createWithInitialProperties(initial, m_engine->rootContext()));
     if (page.isNull()) {
         QFAIL(qPrintable(component.errorString()));
@@ -431,39 +431,39 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
 
     QVERIFY2(spin->property("editable").toBool() && spin->property("enabled").toBool(), qPrintable(state));
     QVERIFY2(combo->property("enabled").toBool(), qPrintable(state));
-    // 「默认」+ helper 白名单里的驱动
+    // "Default" plus the drivers on the helper's allow-list
     QCOMPARE(combo->property("count").toInt(), controller->selectableLogDrivers().size());
     QCOMPARE(combo->property("count").toInt(), 6);
 
-    // 程序化赋值不得被当成用户改动（读盘刷新后不能变成"未保存的修改"）
+    // Programmatic writes must not count as user edits (a reload must not leave the page dirty)
     QVERIFY(spin->setProperty("value", 9));
     QVERIFY2(!controller->dirty(), "programmatic value changes must not mark the page dirty");
 
-    // 用户真的改了：valueModified 只在交互时发出
+    // A real user edit: valueModified is emitted on interaction only
     QVERIFY(spin->setProperty("value", 9));
     QVERIFY(QMetaObject::invokeMethod(spin, "valueModified"));
     QVERIFY(controller->dirty());
     QCOMPARE(controller->maxConcurrentDownloads(), 9);
-    // 写进文件的是值本身
+    // The value itself is what gets written to the file
     QJsonObject merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
     QCOMPARE(merged.value(QStringLiteral("max-concurrent-downloads")).toInt(), 9);
 
-    // 自动刷新（状态控制器拿到引擎信息就会调 setEngineInfo）不得把正在编辑的内容刷回去：
-    // refresh() 只标记待刷新，completeRefresh() 才真的把 engineUpdated 发出来
+    // Auto-refresh (setEngineInfo once engine info arrives) must not clobber an edit in progress:
+    // refresh() only marks pending, completeRefresh() really emits engineUpdated
     m_stubKcm->controller()->refresh();
     m_backend->completeRefresh();
     QTRY_VERIFY(controller->dirty());
     QCOMPARE(controller->maxConcurrentDownloads(), 9);
     QCOMPARE(spin->property("value").toInt(), 9);
 
-    // 选一个具体驱动 → Set
+    // Pick a concrete driver -> Set
     QVERIFY(combo->setProperty("currentIndex", 1));
     QVERIFY(QMetaObject::invokeMethod(combo, "activated", Q_ARG(int, 1)));
     QCOMPARE(controller->logDriver(), QStringLiteral("json-file"));
     merged = QJsonDocument::fromJson(controller->pendingContentPreview().toUtf8()).object();
     QCOMPARE(merged.value(QStringLiteral("log-driver")).toString(), QStringLiteral("json-file"));
 
-    // 选回「默认」→ **删除这个键**（不是写空串），并发下载数同理
+    // Back to "Default" -> **remove the key** (not write ""), same for concurrent downloads
     QVERIFY(combo->setProperty("currentIndex", 0));
     QVERIFY(QMetaObject::invokeMethod(combo, "activated", Q_ARG(int, 0)));
     QVERIFY2(controller->logDriver().isEmpty(), "selecting the default must clear the value");
@@ -474,7 +474,7 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
     QVERIFY2(!merged.contains(QStringLiteral("log-driver")), "the key must be removed, not emptied");
     QVERIFY2(!merged.contains(QStringLiteral("max-concurrent-downloads")), "the key must be removed, not zeroed");
 
-    // 「默认」也是待保存的编辑：自动刷新后仍然是待保存状态
+    // "Default" is a pending edit too: it must stay pending after an auto-refresh
     m_stubKcm->controller()->refresh();
     m_backend->completeRefresh();
     QTRY_VERIFY(controller->dirty());
@@ -483,19 +483,19 @@ void QmlLoadTest::configPageEditorsWriteThroughToTheController()
 }
 
 /*!
- * 配置页的两个作用域在"能不能编辑"与"提示措辞"上的差别（用户实测反馈）。
+ * The two config scopes differ in editability and in hint wording (user-reported feedback).
  *
- *  1) 系统级未解锁时**每个**编辑控件都必须禁用——只设 `editable` 是不够的：
- *     SpinBox 的文本框会只读，但上下箭头仍然能改值。
- *  2) 用户级的提示必须说"让改动生效需要管理员权限"，而不是"改这份配置需要管理员权限"：
- *     文件本来就是用户自己的，只有"生效"（重启系统级守护进程 / 改用 rootless）需要权限。
+ *  1) While the system scope is locked **every** editor must be disabled — `editable` is not enough:
+ *     a SpinBox text field turns read-only, but its arrows still change the value.
+ *  2) The user-scope hint must say taking effect needs administrator rights, not that editing the file does:
+ *     the file is the user's own; only taking effect (restarting the system daemon / rootless) needs them.
  */
 void QmlLoadTest::configPageWordingAndLocksPerScope()
 {
     auto *user = m_stubKcm->controller()->daemonConfigUser();
     auto *system = m_stubKcm->controller()->daemonConfigSystem();
 
-    // 造出用户的真实形态：系统级守护进程 + 数据目录在家目录里（"看起来像 rootless"）
+    // Reproduce the real shape: system daemon plus a data root under $HOME ("looks rootless")
     Kontainer::EngineInfo info;
     info.available = true;
     info.securityOptions = {QStringLiteral("name=seccomp,profile=builtin"), QStringLiteral("name=cgroupns")};
@@ -507,7 +507,7 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
                             QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/DaemonConfigPage.qml")));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
 
-    // ---- 系统级：受保护、未解锁 → 一切编辑控件禁用 ----
+    // ---- system scope: protected, locked -> every editor disabled ----
     QVariantMap systemInitial;
     systemInitial.insert(QStringLiteral("scope"), QStringLiteral("system"));
     QScopedPointer<QObject> systemPage(component.createWithInitialProperties(systemInitial, m_engine->rootContext()));
@@ -523,7 +523,7 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
     QVERIFY2(!systemCombo->property("enabled").toBool(), "the combo box must be disabled while locked");
     QVERIFY2(!systemMirrors->property("editable").toBool(), "the mirror editor must be read-only while locked");
 
-    // ---- 用户级：文件属于用户 → 可编辑，且**没有**解锁相关的界面 ----
+    // ---- user scope: the file belongs to the user -> editable, and **no** unlock UI ----
     QVariantMap userInitial;
     userInitial.insert(QStringLiteral("scope"), QStringLiteral("user"));
     QScopedPointer<QObject> userPage(component.createWithInitialProperties(userInitial, m_engine->rootContext()));
@@ -540,25 +540,25 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
                  qPrintable(QStringLiteral("%1 must not appear on the user scope page").arg(QString::fromLatin1(name))));
     }
 
-    // 点「添加加速器」必须真的出现一个空行，并且它不会被"同步 initialEntries"清掉
-    // （真实反馈：点了添加只是变成未保存，条目没出现）。空行还会立刻走校验分支，
-    // 那条分支里只能用 QML 的字符串字面量——写成 C++ 的 QStringLiteral 会抛
-    // ReferenceError，而这条路径编译与页面加载都看不出来。
+    // "Add mirror" must really add an empty row, and syncing initialEntries must not drop it
+    // (real feedback: adding only marked the page dirty, no row appeared). The empty row takes the
+    // validation branch, which may only use QML string literals: a C++ QStringLiteral throws a
+    // ReferenceError there, invisible to both compilation and page loading.
     QQuickItem *mirrorsEditor = findItemByName(userPage.data(), QStringLiteral("mirrorsEditor"));
     QVERIFY(mirrorsEditor);
     QQuickItem *addButton = findItemByName(mirrorsEditor, QStringLiteral("stringListAddButton"));
     QVERIFY(addButton);
     QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
 
-    // 条目真的进了模型：Repeater 的 count 就是行数
-    // （无窗口的页面不会实例化 delegate，所以只能看模型，不能找 delegate 里的控件）
+    // The row really reached the model: the Repeater count is the row count
+    // (a windowless page creates no delegates, so assert on the model, not on delegate controls)
     QCOMPARE(repeaterCount(mirrorsEditor), 1);
-    // 空行是待填写草稿，不是"外部变化"：再同步一次也不能把它清掉
-    // （真实反馈：点添加只是变成未保存、条目没出现——旧逻辑在这里把空行当外部变化清掉了）
+    // An empty row is a draft, not an "external change": another sync must not clear it
+    // (real feedback: add only marked dirty, no row — the old code cleared it as an external change)
     QVERIFY(QMetaObject::invokeMethod(mirrorsEditor, "syncFromInitialEntries"));
     QCOMPARE(repeaterCount(mirrorsEditor), 1);
 
-    // 校验分支必须真的产出文案（空行会立刻走这条分支）
+    // The validation branch must really produce a message (the empty row goes straight into it)
     QQmlExpression emptyHostCall(qmlContext(userPage.data()), userPage.data(), QStringLiteral("mirrorError('')"));
     QVERIFY2(emptyHostCall.evaluate().toString().contains(QStringLiteral("example")),
              qPrintable(emptyHostCall.evaluate().toString()));
@@ -568,11 +568,11 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
         QVERIFY2(!captured.contains(QStringLiteral("ReferenceError")), qPrintable(captured));
     }
 
-    // 空行只是草稿：它不该进到待保存的内容里（写了地址才算一条）
+    // An empty draft must not reach the pending config (a row counts only once it has an address)
     QVERIFY2(!controller_pendingContains(user, QStringLiteral("mirror.example.com")),
              "an empty draft row must not end up in the pending config");
 
-    // 数据目录提示：用户级说的是"生效需要权限"
+    // Data-root hint: the user scope speaks of privileges needed to take effect
     QQuickItem *hint = findItemByName(userPage.data(), QStringLiteral("dataRootHint"));
     QVERIFY(hint);
     QVERIFY(hint->property("visible").toBool());
@@ -580,24 +580,24 @@ void QmlLoadTest::configPageWordingAndLocksPerScope()
     QVERIFY2(hintText.contains(QStringLiteral("take effect")), qPrintable(hintText));
     QVERIFY2(!hintText.contains(QStringLiteral("changing this configuration needs")), qPrintable(hintText));
 
-    // 系统级那条说的仍然是"改这份配置需要权限"（文件属于系统）
+    // The system-scope hint still says changing this configuration needs privileges (system-owned file)
     QQuickItem *systemHint = findItemByName(systemPage.data(), QStringLiteral("dataRootHint"));
     QVERIFY(systemHint);
     QVERIFY(systemHint->property("visible").toBool());
-    // 用户反馈后统一压成一句：不再区分"文件归谁"，只说"生效需要管理员权限"
+    // Unified after user feedback: no ownership distinction, just "taking effect needs administrator rights"
     QVERIFY2(systemHint->property("text").toString().contains(QStringLiteral("administrator rights")),
              qPrintable(systemHint->property("text").toString()));
 }
 
 /*!
- * 拓扑连线颜色必须"跟容器走"：同一个容器（同一份端口映射）永远得到同一组颜色，
- * 不同容器则应换一组。颜色是装饰，但它一旦随机，用户会以为"这个容器变了"。
+ * Topology link colours must follow the container: one container (one port mapping) always gets the same
+ * colours, another a different set. If they were random, users would read it as "this container changed".
  */
 void QmlLoadTest::topologyConnectionColorsAreStablePerContainer()
 {
     const QString componentsPath = QStringLiteral("file://") + QStringLiteral(KCM_DOCKER_SOURCE_DIR) + QStringLiteral("/src/ui/components");
 
-    // 直接问色板：同一个种子两次求值必须一致，不同种子（不同映射）应当能取到不同色位
+    // Ask the palette directly: one seed twice must match, different seeds should reach different slots
     QQmlComponent component(m_engine.get());
     component.setData(QStringLiteral("import QtQuick\n"
                                      "import \"%1\" as C\n"
@@ -617,18 +617,18 @@ void QmlLoadTest::topologyConnectionColorsAreStablePerContainer()
     QCOMPARE(probe->property("sameSeedAgain").value<QColor>(), probe->property("first").value<QColor>());
     QVERIFY2(probe->property("first").value<QColor>() != probe->property("other").value<QColor>(),
              "different mappings of the same container should be able to differ");
-    // 还没拿到种子时退回中性色，而不是抛错或变成透明
+    // With no seed yet, fall back to a neutral colour rather than throwing or going transparent
     QVERIFY(probe->property("emptySeed").value<QColor>().isValid());
 }
 
 /*!
- * 仓库认证页（ARCH_V5_V8 §2.7）：空状态、钱包横幅、已保存列表、CLI 导入候选。
+ * Registry auth page (ARCH_V5_V8 §2.7): empty state, wallet banner, stored list, CLI import candidates.
  *
- * 用注入的内存凭据后端（`QmlStubKcm::credentialBackend()`）——绝不碰真实 KWallet。
+ * Uses the injected in-memory credential backend (`QmlStubKcm::credentialBackend()`) — never real KWallet.
  */
 void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
 {
-    // CLI 配置指向临时目录：不读（也不写）开发者机器上真实的 ~/.docker
+    // Point the CLI config at a temp dir: never read (or write) the developer's real ~/.docker
     QTemporaryDir cliDir;
     QVERIFY(cliDir.isValid());
     QJsonObject auths;
@@ -657,14 +657,14 @@ void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
     QVERIFY2(!walletBanner->property("visible").toBool(), "an available wallet must not show a banner");
 
     /*
-     * 新版行为（实测需求）：不再有"导入/同步"按钮，CLI 配置里的条目在页面打开时
-     * 就被**静默**识别——所以 hub 那条已经在列表里，空状态不出现。
+     * New behaviour (requested): no import/sync button anymore; CLI config entries are
+     * recognized **silently** on page load — the hub entry is already listed, no empty state.
      */
     QTRY_VERIFY(!emptyPlaceholder->property("visible").toBool());
     QVERIFY2(m_stubKcm->controller()->registryAuth()->credentials()->rowCount() == 1,
              "the docker cli entry must be recognized silently on load");
 
-    // 列表里出现该仓库
+    // The registry shows up in the list
     int rows = 0;
     std::function<void(QQuickItem *)> countRows = [&](QQuickItem *item) {
         for (QQuickItem *child : item->childItems()) {
@@ -677,12 +677,12 @@ void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
     countRows(page);
     QCOMPARE(rows, 1);
 
-    // 「添加凭据」入口存在且可用（新增需求：能主动添加）
+    // The "add credential" entry exists and is enabled (new requirement: add proactively)
     QQuickItem *addButton = childByObjectName(page, QStringLiteral("addCredentialButton"));
     QVERIFY2(addButton, "the page must offer an 'add credential' entry");
     QVERIFY(addButton->property("enabled").toBool());
 
-    // 旧的同步界面必须**彻底消失**：候选勾选框与"导入选中"按钮都不该再存在
+    // The old sync UI must be **gone**: neither candidate checkboxes nor "import selected" may remain
     QVERIFY2(!childByObjectName(page, QStringLiteral("importSelectedButton")),
              "the explicit import/sync button must be gone");
     QVERIFY2(!childByObjectName(page, QStringLiteral("importCandidateCheck")),
@@ -692,11 +692,11 @@ void QmlLoadTest::registryAuthPageReflectsWalletAndStoredCredentials()
 }
 
 /*!
- * 引导：拉取失败（401/403）与"该仓库还没登录"都要能一键到登录框。
+ * Guidance: failed pulls (401/403) and "not logged in to this registry" must reach the login form.
  */
 void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
 {
-    // 失败行：只有 permissionDenied 才给「去登录…」
+    // Failed row: only permissionDenied offers "Go to login..."
     ImagePullEntry failed;
     failed.reference = QStringLiteral("registry.example.com/team/app:1.0");
     failed.statusKey = QStringLiteral("failed");
@@ -717,13 +717,13 @@ void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
     QVERIFY2(loginButton, "a credential failure must offer a login action");
     QTRY_VERIFY(loginButton->property("visible").toBool());
 
-    // 其他失败原因（例如仓库不可达）不出现这个按钮
+    // Other failure reasons (e.g. an unreachable registry) must not show that button
     ImagePullEntry unreachable = failed;
     unreachable.errorKindKey = QStringLiteral("timeout");
     m_stubKcm->controller()->operations()->pulls()->setEntries({unreachable});
     QTRY_VERIFY(!loginButton->property("visible").toBool());
 
-    // 拉取对话框：该仓库没有凭据时给提示与「去登录…」
+    // Pull dialog: no credentials for the registry -> hint plus "Go to login..."
     QQmlComponent dialogComponent(m_engine.get(), QUrl::fromLocalFile(QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/PullImageDialog.qml")));
     QVERIFY2(!dialogComponent.isError(), qPrintable(dialogComponent.errorString()));
     QVariantMap dialogInitial;
@@ -731,7 +731,7 @@ void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
     dialogInitial.insert(QStringLiteral("credentialKnown"), false);
     QScopedPointer<QObject> dialog(dialogComponent.createWithInitialProperties(dialogInitial, m_engine->rootContext()));
     QVERIFY2(!dialog.isNull(), qPrintable(dialogComponent.errorString()));
-    // Kirigami.Dialog 不是 QQuickItem（它是 QObject 基类），因此这里按对象树找子项
+    // Kirigami.Dialog is not a QQuickItem (QObject-based), so look it up in the QObject tree
     QQuickItem *hint = findItemByName(dialog.data(), QStringLiteral("pullNeedsLoginHint"));
     QVERIFY2(hint, "the pull dialog must be able to guide to the login page");
     QVERIFY2(!hint->property("text").toString().isEmpty(), "the hint must say what will happen");
@@ -739,7 +739,7 @@ void QmlLoadTest::registryAuthGuidesFromFailedPullsAndMissingCredentials()
 }
 
 /*!
- * 网络标签页（ARCH_V5_V8 §3.2）：列表、过滤、以及"切到该页才刷新"。
+ * Networks tab (ARCH_V5_V8 §3.2): list, filtering, and refresh-on-tab-switch only.
  */
 void QmlLoadTest::networksTabListsAndOpensDetails()
 {
@@ -777,7 +777,7 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
     QVERIFY(page);
     m_backend->completeRefresh();
 
-    // ListView 只为可见区域创建 delegate：需要真实窗口与布局
+    // ListView creates delegates for the visible area only: a real window and layout are needed
     QQuickWindow window;
     window.resize(1000, 700);
     page->setParentItem(window.contentItem());
@@ -788,12 +788,12 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
     QVERIFY(tabBar);
-    // 0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 引擎
-    // 标签页数量会随功能增加（现在是 6：容器/镜像/网络/数据卷/引擎/挂载预设），
-    // 因此断言"够用"而不是写死数字，避免每加一页就改一次用例
+    // 0 containers / 1 images / 2 networks / 3 volumes / 4 engine
+    // The tab count grows with features (now 6: containers/images/networks/volumes/engine/mount presets),
+    // so assert "enough tabs" instead of a hard number and avoid touching the test per new page
     QVERIFY2(tabBar->property("count").toInt() >= 5, qPrintable(QString::number(tabBar->property("count").toInt())));
 
-    // 没进网络页就不该去读网络列表（低频数据，按需刷新）
+    // No network-tab visit, no network list read (low-frequency data, refreshed on demand)
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Networks), 0);
 
     QVERIFY(tabBar->setProperty("currentIndex", 2));
@@ -803,7 +803,7 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
     QQuickItem *networkView = childByObjectName(page, QStringLiteral("networkView"));
     QVERIFY2(networkView, "the networks tab must have its own list");
     QTRY_COMPARE(networkView->property("count").toInt(), 2);
-    QTest::qWait(50); // 等 delegate 创建
+    QTest::qWait(50); // wait for the delegates to be created
     QTRY_COMPARE(networkView->property("count").toInt(), 2);
 
     int cards = 0;
@@ -820,16 +820,16 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
     };
     walk(networkView);
     QCOMPARE(cards, 2);
-    QCOMPARE(builtinChips, 2); // 两行都有这枚芯片，但只有内置网络那行可见
+    QCOMPARE(builtinChips, 2); // both rows carry this chip, but only the built-in network row shows it
 
-    // 过滤：只看用户自建的网络
+    // Filtering: user-defined networks only
     auto *filter = m_stubKcm->controller()->networkList();
     filter->setOriginFilter(QStringLiteral("custom"));
     QTRY_COMPARE(networkView->property("count").toInt(), 1);
     filter->setOriginFilter(QStringLiteral("all"));
     QTRY_COMPARE(networkView->property("count").toInt(), 2);
 
-    // 共享的容器/镜像搜索行不在这里出现（网络页有自己的工具栏）
+    // The shared container/image search row is absent here (the networks tab has its own toolbar)
     QQuickItem *searchRow = childByObjectName(page, QStringLiteral("containerSearchField"));
     if (searchRow) {
         QVERIFY2(!searchRow->isVisible(), "the shared container/image toolbar must be hidden on the networks tab");
@@ -837,7 +837,7 @@ void QmlLoadTest::networksTabListsAndOpensDetails()
 }
 
 /*!
- * 网络详情：成员容器列表 + 跳到容器详情的信号（导航由 main.qml 负责）。
+ * Network detail: member container list plus a signal to jump to the container detail (main.qml navigates).
  */
 void QmlLoadTest::networkDetailShowsMembersAndJumpsToContainers()
 {
@@ -882,7 +882,7 @@ void QmlLoadTest::networkDetailShowsMembersAndJumpsToContainers()
     QTRY_COMPARE(containerSpy.count(), 1);
     QCOMPARE(containerSpy.at(0).at(0).toString(), member.containerId);
 
-    // 标签与选项折叠区存在（默认折叠，避免长列表淹没页面）
+    // Labels and options sections exist (collapsed by default so long lists do not swamp the page)
     QQuickItem *labelsSection = childByObjectName(page, QStringLiteral("networkLabelsSection"));
     QVERIFY(labelsSection);
     QVERIFY2(!labelsSection->property("expanded").toBool(), "collapsible sections start collapsed");
@@ -891,11 +891,11 @@ void QmlLoadTest::networkDetailShowsMembersAndJumpsToContainers()
 }
 
 /*!
- * 创建网络对话框（ARCH_V5_V8 §3.3）：校验在提交前发生，非法输入一个请求都不发。
+ * Create-network dialog (ARCH_V5_V8 §3.3): validation precedes submission; invalid input sends no request.
  */
 void QmlLoadTest::createNetworkDialogValidatesBeforeSubmitting()
 {
-    // 提交要走写权限门：先把 endpoint 指到一个当前进程可写的 socket
+    // Submission goes through the write gate: point the endpoint at a socket this process may write
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     m_stubKcm->controller()->operations()->refreshWriteAccess();
     QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
@@ -921,27 +921,27 @@ void QmlLoadTest::createNetworkDialogValidatesBeforeSubmitting()
     QVERIFY(nameField && subnetField && gatewayField);
     QVERIFY2(!dialog->property("canSubmit").toBool(), "an empty name must not be submittable");
 
-    // 非法名称：就地说明原因，且不能提交
+    // Invalid name: explain the reason in place and refuse to submit
     nameField->setProperty("text", QStringLiteral("my net"));
     QCOMPARE(dialog->property("currentError").toString(), QStringLiteral("nameInvalid"));
     QVERIFY(!dialog->property("canSubmit").toBool());
-    // 对话内容在 Kirigami.Dialog 里可能有两份实例（弹层与管理器各一），
-    // 因此不去断言某一份实例的可见性，而是直接断言"这个 key 有对应文案"
+    // Kirigami.Dialog content may exist as two instances (popup and manager), so rather than
+    // asserting one instance's visibility, assert that this key has user-facing text
     QString message;
     QVERIFY(QMetaObject::invokeMethod(dialog.data(), "messageFor", Q_RETURN_ARG(QString, message),
                                       Q_ARG(QString, QStringLiteral("nameInvalid"))));
     QVERIFY2(!message.isEmpty(), "every validation key must have user-facing text");
 
-    // 与现有网络重名
+    // Clashes with an existing network name
     nameField->setProperty("text", QStringLiteral("Bridge"));
     QCOMPARE(dialog->property("currentError").toString(), QStringLiteral("nameInUse"));
 
-    // 网关没有子网
+    // Gateway without a subnet
     nameField->setProperty("text", QStringLiteral("app_net"));
     gatewayField->setProperty("text", QStringLiteral("172.30.0.1"));
     QCOMPARE(dialog->property("currentError").toString(), QStringLiteral("gatewayNeedsSubnet"));
 
-    // 合法输入：可以提交，并且真的发出请求
+    // Valid input: submittable, and the request is really sent
     subnetField->setProperty("text", QStringLiteral("172.30.0.0/16"));
     QCOMPARE(dialog->property("currentError").toString(), QString());
     QVERIFY(dialog->property("canSubmit").toBool());
@@ -955,8 +955,8 @@ void QmlLoadTest::createNetworkDialogValidatesBeforeSubmitting()
 }
 
 /*!
- * 删除入口的可见性（ARCH_V5_V8 §3.2/§3.3）：
- * 内置网络**没有**删除入口（daemon 会回 403），只读模式同样不出现。
+ * Removal entry visibility (ARCH_V5_V8 §3.2/§3.3):
+ * built-in networks get **no** removal entry (the daemon answers 403), nor does read-only mode.
  */
 void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
 {
@@ -998,7 +998,7 @@ void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
         return std::unique_ptr<QObject>(component->createWithInitialProperties(initial, m_engine->rootContext()));
     };
 
-    // 内置网络：没有删除动作
+    // Built-in network: no removal action
     std::unique_ptr<QObject> builtinObject = loadPage(builtin.id);
     QVERIFY(builtinObject);
     auto *builtinPage = qobject_cast<QQuickItem *>(builtinObject.get());
@@ -1006,25 +1006,25 @@ void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
     QQuickItem *notice = childByObjectName(builtinPage, QStringLiteral("networkPredefinedNotice"));
     QVERIFY(notice);
     QVERIFY2(notice->property("visible").toBool(), "the reason why it cannot be removed must be shown");
-    // Kirigami.Action 不是 QQuickItem：按对象名在对象树里找（否则这条断言会假通过）
+    // Kirigami.Action is not a QQuickItem: look it up in the QObject tree (else this assert passes vacuously)
     QObject *removeAction = builtinPage->findChild<QObject *>(QStringLiteral("removeNetworkAction"));
     QVERIFY2(removeAction, "the action must exist so that its visibility can be asserted");
     QVERIFY2(!removeAction->property("visible").toBool(), "a built-in network must not offer a remove action");
 
-    // 自定义网络：有删除动作，且确认文案里写明"已连接的容器会失去该网络"
+    // Custom network: has a removal action, and the confirmation spells out that attached containers lose it
     std::unique_ptr<QObject> customObject = loadPage(custom.id);
     QVERIFY(customObject);
     auto *customPage = qobject_cast<QQuickItem *>(customObject.get());
     QVERIFY(customPage);
-    // Kirigami.Dialog 不是 QQuickItem：按对象名在对象树里找
+    // Kirigami.Dialog is not a QQuickItem: look it up in the QObject tree
     QObject *removeDialog = customPage->findChild<QObject *>(QStringLiteral("removeNetworkDialog"));
     QVERIFY2(removeDialog, "a user-defined network must offer a removal dialog");
     const QString consequence = removeDialog->property("consequenceText").toString();
     QVERIFY2(!consequence.isEmpty(), "the removal dialog must always carry a consequence");
-    // 两个成员 → 复数文案，且带上数量（用户必须知道会影响几个容器）
+    // Two members -> plural wording with the count (users must know how many containers are affected)
     QVERIFY2(consequence.contains(QStringLiteral("2")), qPrintable(consequence));
 
-    // 只读模式：创建入口整体不出现（不是禁用后静默）
+    // Read-only mode: the create entry is absent entirely, not disabled and silent
     m_backend->setEndpoint(DockerEndpoint::unixSocket(QStringLiteral("/tmp/does-not-exist.sock")));
     m_stubKcm->controller()->operations()->refreshWriteAccess();
     QVERIFY(!m_stubKcm->controller()->operations()->writeAllowed());
@@ -1042,8 +1042,8 @@ void QmlLoadTest::networkRemovalIsHiddenForBuiltInNetworks()
 }
 
 /*!
- * 容器详情的网络分区（ARCH_V5_V8 §3.4）：连接对话框只列未连接的网络，
- * 断开走确认对话框（后果说明必填），只读模式下两个入口都不出现。
+ * Container detail network section (ARCH_V5_V8 §3.4): the connect dialog lists unattached networks only;
+ * disconnect goes through a confirmation (consequence text required); read-only hides both entries.
  */
 void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
 {
@@ -1051,7 +1051,7 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     m_stubKcm->controller()->operations()->refreshWriteAccess();
     QVERIFY(m_stubKcm->controller()->operations()->writeAllowed());
 
-    // 两个网络：容器已连 bridge，未连 app_default
+    // Two networks: the container is attached to bridge, not to app_default
     QList<Network> networks;
     Network bridge;
     bridge.id = QString(64, QLatin1Char('b'));
@@ -1085,20 +1085,20 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
     QVERIFY(tabBar);
-    QVERIFY(tabBar->setProperty("currentIndex", 2)); // 网络分区
+    QVERIFY(tabBar->setProperty("currentIndex", 2)); // networks section
 
-    // 已连接的网络在控制器里如实报告（对话框据此禁用该选项）
+    // Connected networks are reported truthfully by the controller (the dialog disables those options)
     const QStringList connected = m_stubKcm->controller()->containerDetail()->connectedNetworkNames();
     QCOMPARE(connected, QStringList {QStringLiteral("bridge")});
 
-    // 每行有「断开」，确认对话框带上后果说明；确认后发出断开请求
-    // Kirigami.Dialog / Kirigami.Action 都不是 QQuickItem：按对象名在对象树里找
+    // Each row offers "Disconnect"; the confirmation carries a consequence; confirming sends the request
+    // Kirigami.Dialog / Kirigami.Action are no QQuickItems: look them up in the QObject tree
     QObject *disconnectDialog = page->findChild<QObject *>(QStringLiteral("disconnectNetworkDialog"));
     QVERIFY2(disconnectDialog, "the disconnect confirmation must exist");
     QVERIFY2(!disconnectDialog->property("consequenceText").toString().isEmpty(),
              "the disconnect dialog must always carry a consequence");
 
-    // 连接入口是**内联面板**（不是弹窗）：点按钮把它展开
+    // The connect entry is an **inline panel** (not a popup): clicking the button expands it
     QQuickItem *connectEntry = findItemByName(page, QStringLiteral("connectNetworkEntryButton"));
     QVERIFY2(connectEntry, "the connect entry must exist");
     QVERIFY2(!page->property("connectPanelOpen").toBool(), "the panel starts collapsed");
@@ -1107,7 +1107,7 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QQuickItem *panel = findItemByName(page, QStringLiteral("connectNetworkPanel"));
     QVERIFY2(panel, "the inline connect panel must exist");
 
-    // 已连接的网络不能再选、未连接的可以（delegate 的 enabled 用的就是这个函数）
+    // Connected networks are not selectable, unattached ones are (the delegate enabled uses this function)
     bool connectable = true;
     QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectable),
                                       Q_ARG(QString, QStringLiteral("bridge"))));
@@ -1115,14 +1115,14 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectable),
                                       Q_ARG(QString, QStringLiteral("app_default"))));
     QVERIFY(connectable);
-    // 必须是**属性**：函数（或只读函数式绑定）不会随数据变化重新求值，
-    // 正是"断开后仍显示已连接、无法选择"的根因
+    // Must be a **property**: a function (or read-only function binding) never re-evaluates on data
+    // changes — the root cause of "still shown as connected, unselectable after disconnecting"
     QCOMPARE(page->property("connectableNetworkCount").isValid(), true);
-    QCOMPARE(page->property("connectableNetworkCount").toInt(), 1); // 只剩 app_default 可连
+    QCOMPARE(page->property("connectableNetworkCount").toInt(), 1); // only app_default stays connectable
     QVERIFY2(!page->property("connectedNetworkNameList").toStringList().isEmpty(),
              "the connected list must be exposed as a property so bindings track it");
 
-    // 选中未连接的网络并提交：请求带上网络 Id、容器 Id 与别名
+    // Select the unattached network and submit: the request carries network id, container id and aliases
     page->setProperty("connectNetworkId", app.id);
     QQuickItem *aliases = findItemByName(page, QStringLiteral("connectNetworkAliasesField"));
     QVERIFY2(aliases, "the aliases field must be in the panel");
@@ -1134,30 +1134,30 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
     QVERIFY2(!page->property("connectPanelOpen").toBool(), "the panel closes after a successful connect");
 
     /*
-     * 用户实测的回归场景：在容器网络分区断开某个网络后，再打开"连接网络"，
-     * 那个网络仍显示为"已连接"、无法选择。
+     * User-reported regression: after disconnecting a network in the container network section and
+     * reopening "connect network", that network still showed as connected and unselectable.
      *
-     * 现在断开后容器详情会重新 inspect，且连接面板的可用性来自**属性**绑定，
-     * 因此不需要重开面板：那个网络必须立刻重新可选。
+     * The detail is now re-inspected after a disconnect and panel availability comes from **property**
+     * bindings, so the network must become selectable again at once, without reopening the panel.
      */
-    // 详情里去掉 bridge（模拟断开之后引擎的真实状态）
+    // Drop bridge from the detail (the engine's real state after the disconnect)
     ContainerDetail afterDisconnect = detail;
     afterDisconnect.networks.clear();
     m_backend->setContainerDetail(afterDisconnect);
 
-    // 断开动作本身：对话框按**网络名**发起（名字 → Id 的转换只有一处实现）
+    // The disconnect itself: the dialog works by **network name** (name -> id conversion lives in one place)
     page->setProperty("pendingNetworkName", QStringLiteral("bridge"));
     QVERIFY(QMetaObject::invokeMethod(disconnectDialog, "confirmed"));
     QCOMPARE(m_backend->lastNetworkDisconnect().first, bridge.id);
     QCOMPARE(m_backend->lastNetworkDisconnect().second, QStringLiteral("cid-1"));
 
-    // 让这次变更"完成"：控制器随后会走"写后即读"重新 inspect（真正的刷新由它触发）
+    // Complete the mutation: the controller then re-inspects (write-then-read) and drives the real refresh
     m_backend->completeMutations();
     m_backend->completeRefresh();
     QTRY_VERIFY2(m_stubKcm->controller()->containerDetail()->connectedNetworkNames().isEmpty(),
                  "the detail must be re-read after a disconnect");
 
-    // 关键断言：不需要重开面板，两个网络都可选，且计数跟着变
+    // Key assertion: no panel reopen, both networks selectable and the count follows
     QTRY_COMPARE(page->property("connectableNetworkCount").toInt(), 2);
     bool connectableAfter = false;
     QVERIFY(QMetaObject::invokeMethod(page, "isConnectable", Q_RETURN_ARG(bool, connectableAfter),
@@ -1166,7 +1166,7 @@ void QmlLoadTest::containerNetworkSectionConnectsAndDisconnects()
 }
 
 /*!
- * 数据卷页（ARCH_V5_V8 §3.5）：列表、未使用过滤、创建面板与清理预览。
+ * Volumes tab (ARCH_V5_V8 §3.5): list, unused filter, create panel and prune preview.
  */
 void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
 {
@@ -1190,8 +1190,8 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
     unused.sizeBytes = 2048;
     unused.refCount = 0;
     volumes.append(unused);
-    // 使用情况未知、但**大小已知**：这样"可回收空间"就能区分两种实现
-    // （把未知当成未使用会把 512 字节也算进去 → 2.5 KiB 而不是 2.0 KiB）
+    // Usage unknown but **size known**: the reclaimable figure then separates the two implementations
+    // (treating unknown as unused adds the 512 bytes -> 2.5 KiB instead of 2.0 KiB)
     Volume unknown;
     unknown.name = QStringLiteral("legacy");
     unknown.driver = QStringLiteral("local");
@@ -1213,7 +1213,7 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
     QVERIFY(tabBar);
     QVERIFY2(tabBar->property("count").toInt() >= 5, qPrintable(QString::number(tabBar->property("count").toInt())));
-    // 没进数据卷页就不去读列表
+    // No volumes-tab visit, no list read
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Volumes), 0);
     QVERIFY(tabBar->setProperty("currentIndex", 3));
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::Volumes), 1);
@@ -1223,25 +1223,25 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
     QVERIFY2(volumeView, "the volumes tab must have its own list");
     QTRY_COMPARE(volumeView->property("count").toInt(), 3);
 
-    // 未使用过滤：只有 cache（legacy 的使用情况未知，不能算进"可清理"）
+    // Unused filter: cache only (legacy has unknown usage, so it does not count as prunable)
     auto *filter = m_stubKcm->controller()->volumeList();
     filter->setUsageFilter(QStringLiteral("unused"));
     QTRY_COMPARE(volumeView->property("count").toInt(), 1);
     filter->setUsageFilter(QStringLiteral("all"));
     QTRY_COMPARE(volumeView->property("count").toInt(), 3);
 
-    // 清理预览：列出将被删除的卷与可回收空间（未知大小要如实说明）
+    // Prune preview: lists the volumes to delete and the reclaimable space (unknown sizes stated honestly)
     QQuickItem *pruneEntry = findItemByName(page, QStringLiteral("pruneVolumesEntryButton"));
     QVERIFY(pruneEntry);
     QVERIFY(QMetaObject::invokeMethod(pruneEntry, "clicked"));
     QVERIFY(page->property("volumePrunePanelOpen").toBool());
     QString reclaimable;
     QVERIFY(QMetaObject::invokeMethod(page, "pruneReclaimableText", Q_RETURN_ARG(QString, reclaimable)));
-    // 只有 cache（2048 字节 = 2.0 KiB）算可回收：未知使用情况的 legacy（512 字节）不算
+    // Only cache (2048 bytes = 2.0 KiB) is reclaimable; legacy with unknown usage (512 bytes) is not
     QVERIFY2(reclaimable.contains(QStringLiteral("2.0 KiB")), qPrintable(reclaimable));
     QVERIFY2(!reclaimable.contains(QStringLiteral("2.5 KiB")), qPrintable(reclaimable));
 
-    // 创建面板：名称校验（空名不可提交），合法名会真的发出请求
+    // Create panel: name validation (an empty name cannot submit); a valid name really sends the request
     QQuickItem *createEntry = findItemByName(page, QStringLiteral("createVolumeEntryButton"));
     QVERIFY(createEntry);
     QVERIFY(QMetaObject::invokeMethod(createEntry, "clicked"));
@@ -1259,7 +1259,7 @@ void QmlLoadTest::volumesTabListsCreatesAndPreviewsCleanup()
 }
 
 /*!
- * 创建容器向导（ARCH_V5_V8 §4.4）：分步校验、特权的二次确认、总览不泄露环境变量值。
+ * Create-container wizard (ARCH_V5_V8 §4.4): per-step validation, privileged confirmation, hidden env values.
  */
 void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
 {
@@ -1288,8 +1288,8 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     auto *page = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(page);
 
-    // 必须放进窗口：ScrollView 里的内容与 Repeater 的条目在无窗口时不会真正建立
-    // （六期的网络页用例也踩过同一个坑）
+    // Must live in a window: ScrollView content and Repeater items are not really created without one
+    // (the phase-6 networks test hit the same trap)
     QQuickWindow window;
     window.resize(1100, 800);
     page->setParentItem(window.contentItem());
@@ -1305,7 +1305,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     auto *wizard = m_stubKcm->controller()->createContainer();
     QCOMPARE(wizard->stepKey(), QStringLiteral("image"));
 
-    // 第一步：没选镜像不能继续（"下一步"按钮也是禁用的，两条路径都要成立）
+    // Step one: no image, no progress (Next is disabled too; both paths must hold)
     QQuickItem *nextButton = childByObjectName(page, QStringLiteral("wizardNextButton"));
     QVERIFY(nextButton);
     QVERIFY2(!nextButton->property("enabled").toBool(), "an empty image must not allow continuing");
@@ -1314,13 +1314,13 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QTRY_VERIFY(stepError->property("visible").toBool());
     QVERIFY2(!stepError->property("text").toString().isEmpty(), "the reason must be translated");
 
-    // 填镜像后可以继续；镜像不在本地时要给"先拉取"的提示
+    // With an image filled in, continue; an image missing locally must hint "pull it first"
     QQuickItem *imageField = childByObjectName(page, QStringLiteral("wizardImageField"));
     QVERIFY(imageField);
     imageField->setProperty("text", QStringLiteral("busybox:latest"));
     QTRY_VERIFY(stepError->property("visible").toBool());
     QCOMPARE(stepError->property("text").toString().contains(QStringLiteral("Pull")), true);
-    // 复现用户路径：先点**步骤按钮**试图跳过去（被拒绝，"交互被拒绝的原因"被记下来）……
+    // Reproduce the user path: click a **step button** to jump there (rejected, reason recorded)...
     {
         QList<QQuickItem *> stepButtons;
         std::function<void(QQuickItem *)> collectSteps = [&](QQuickItem *node) {
@@ -1336,37 +1336,37 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
         };
         collectSteps(window.contentItem());
         QTRY_VERIFY_WITH_TIMEOUT(stepButtons.size() >= 8, 5000);
-        QVERIFY(QMetaObject::invokeMethod(stepButtons.at(7), "click")); // 总览：会被拒绝
+        QVERIFY(QMetaObject::invokeMethod(stepButtons.at(7), "click")); // summary: rejected
         QTest::qWait(20);
         QTRY_VERIFY(stepError->property("visible").toBool());
     }
 
     imageField->setProperty("text", QStringLiteral("alpine:3.19"));
     QTRY_VERIFY(nextButton->property("enabled").toBool());
-    // 提示必须跟着消失：跳转被拒绝的原因原来只在"点击步骤按钮成功"时才清，
-    // 于是选好镜像后"请选择一个镜像"仍然挂着（用户实测：只有点标签页才会消失）
+    // The hint must clear too: the rejection reason was only cleared on a successful step-button click,
+    // so "please choose an image" lingered after picking one (user: only switching tabs cleared it)
     QTRY_VERIFY2(!stepError->property("visible").toBool(),
              "the step error must disappear as soon as the image is chosen");
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked"));
     QCOMPARE(wizard->stepKey(), QStringLiteral("basics"));
 
-    // 名称：非法 → 阻断；合法 → 继续
+    // Name: invalid blocks, valid continues
     QQuickItem *nameField = childByObjectName(page, QStringLiteral("wizardNameField"));
     QVERIFY(nameField);
     nameField->setProperty("text", QStringLiteral("bad name"));
     QTRY_VERIFY(!nextButton->property("enabled").toBool());
     nameField->setProperty("text", QStringLiteral("worker"));
     QTRY_VERIFY(nextButton->property("enabled").toBool());
-    // 步骤顺序（用户实测）：基础 → 环境与标签 → 交互 → 端口 → 挂载 → 资源 → 总览
-    // （交互步骤曾经被嵌进"基础"里，导致它整页空白——见下面的 visible 断言）
+    // Step order (user-verified): basics, env/labels, interactive, ports, mounts, resources, summary
+    // (the interactive step was once nested in "basics" and rendered blank — see the visible assert below)
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // environment
     QCOMPARE(wizard->stepKey(), QStringLiteral("environment"));
 
-    // 环境变量与标签：值默认按密码显示，改动会回写控制器
+    // Environment and labels: values masked by default, edits written back to the controller
     auto *environmentEditor = qobject_cast<QQuickItem *>(findItemByName(page, QStringLiteral("wizardEnvironmentEditor")));
     QVERIFY(environmentEditor);
     QVERIFY2(environmentEditor->property("secretValues").toBool(), "environment values are masked by default");
-    // 用编辑器自己的 API 加一行（它与页面的回写路径才是被测对象）
+    // Add a row via the editor's own API (it and the page write-back path are what is under test)
     QVariantList entries;
     entries.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("API_TOKEN")},
                                 {QStringLiteral("value"), QStringLiteral("s3cret-value")}});
@@ -1376,7 +1376,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
 
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // interactive
     QCOMPARE(wizard->stepKey(), QStringLiteral("interactive"));
-    // 交互步骤的内容必须真的可见（曾经因为嵌套层级错了一层而整页空白）
+    // The interactive step content must really be visible (a nesting mistake once left it blank)
     {
         QQuickItem *commandField = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandField"));
         QVERIFY2(commandField, "the interactive step must expose the command field");
@@ -1392,19 +1392,19 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // resources
     QCOMPARE(wizard->stepKey(), QStringLiteral("resources"));
 
-    // 特权：勾选必须先二次确认，确认前不生效
+    // Privileged: ticking needs prior confirmation; nothing takes effect before it
     QQuickItem *privilegedCheck = childByObjectName(page, QStringLiteral("wizardPrivilegedCheck"));
     QVERIFY(privilegedCheck);
-    // 模拟用户真的勾上：设 checked 会触发 toggled 处理器（直接 invoke 信号不会翻转状态）
+    // Simulate a real tick: setting checked fires toggled (invoking the signal alone does not flip it)
     privilegedCheck->setProperty("checked", true);
     QTest::qWait(20);
     QVERIFY2(!wizard->privileged(), "privileged must not be enabled without confirmation");
-    // 勾选状态本身不在这里断言（Qt 的 CheckBox 会在处理器里自行翻转），
-    // 要紧的是"没有确认就绝不生效"，这条由上一行守着
+    // The checked state itself is not asserted (Qt's CheckBox flips it inside the handler);
+    // what matters, guarded by the line above, is that nothing takes effect without confirmation
     QQuickItem *privilegedNotice = childByObjectName(page, QStringLiteral("wizardPrivilegedNotice"));
     QVERIFY(privilegedNotice);
     QVERIFY2(!privilegedNotice->property("visible").toBool(), "the warning only shows once it is enabled");
-    // Kirigami.PromptDialog 不是 QQuickItem：按对象名在对象树里找
+    // Kirigami.PromptDialog is not a QQuickItem: look it up in the QObject tree
     QObject *privilegedDialog = page->findChild<QObject *>(QStringLiteral("wizardPrivilegedDialog"));
     QVERIFY2(privilegedDialog, "the privileged confirmation must exist");
     QVERIFY2(!privilegedDialog->property("consequenceText").toString().isEmpty(),
@@ -1413,10 +1413,10 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QVERIFY(QMetaObject::invokeMethod(nextButton, "clicked")); // summary
     QCOMPARE(wizard->stepKey(), QStringLiteral("summary"));
 
-    // 总览：环境变量只列键名，值绝不出现
-    // 总览：环境变量只列键名，值绝不出现。
-    // 断言在**控制器**这一层：summary 是它的属性，密码不进总览这条规则就实现在那里；
-    // 界面把它画出来由上文的渲染截图复核（离屏用例里 Repeater 条目的父链不可靠）。
+    // Summary: environment variables list key names only, never values.
+    // The assertion sits at the **controller** layer: summary is its property and the rule
+    // lives there; rendering it is covered by the screenshot review (in offscreen tests the
+    // parent chain of Repeater items is unreliable).
     QString summaryText;
     const QVariantList summaryRows = wizard->summary();
     QVERIFY2(!summaryRows.isEmpty(), "the review step must have something to show");
@@ -1428,7 +1428,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
     QVERIFY2(!summaryText.contains(QStringLiteral("s3cret-value")), qPrintable(summaryText));
     QVERIFY2(summaryText.contains(QStringLiteral("API_TOKEN")), qPrintable(summaryText));
 
-    // 提交：请求真的发给后端，并带上表单里的字段
+    // Submit: the request really reaches the backend with the fields from the form
     QQuickItem *createButton = childByObjectName(page, QStringLiteral("wizardCreateButton"));
     QVERIFY(createButton);
     QVERIFY(QMetaObject::invokeMethod(createButton, "clicked"));
@@ -1439,7 +1439,7 @@ void QmlLoadTest::createContainerWizardGatesStepsAndHidesSecrets()
 }
 
 /*!
- * 挂载预设的管理（ARCH_V5_V8 §4.2，用户实测反馈 ⑥：管理搬到独立标签页）。
+ * Mount preset management (ARCH_V5_V8 §4.2; user feedback ⑥: management moved to its own tab).
  */
 void QmlLoadTest::presetPanelManagesPresets()
 {
@@ -1468,7 +1468,7 @@ void QmlLoadTest::presetPanelManagesPresets()
     window.show();
     QTRY_VERIFY(manager->width() > 0);
 
-    // 已有的一条会渲染成一行，并且能收藏 / 排序 / 删除
+    // The existing entry renders as a row that can be favourited / reordered / removed
     QQuickItem *removeButton = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         removeButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerRemove"));
@@ -1480,7 +1480,7 @@ void QmlLoadTest::presetPanelManagesPresets()
     QTRY_VERIFY(store->presets().first().favorite);
     QCOMPARE(store->presets().first().id, firstId);
 
-    // 新增：填两个路径后按钮才可用，点下去真的多一条
+    // Add: the button enables only with both paths filled, and clicking really adds a row
     auto *newSource = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerNewSource")));
     auto *newDestination = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerNewDestination")));
     auto *addButton = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerAdd")));
@@ -1489,7 +1489,7 @@ void QmlLoadTest::presetPanelManagesPresets()
     newSource->setProperty("text", QStringLiteral("relative/path"));
     newDestination->setProperty("text", QStringLiteral("/cache"));
     QTRY_VERIFY(addButton->property("enabled").toBool());
-    // 非法来源：给出原因（校验与存储共用一份实现）
+    // Invalid source: state the reason (validation and storage share one implementation)
     auto *errorMessage = qobject_cast<QQuickItem *>(findItemDeep(manager, QStringLiteral("presetManagerError")));
     QVERIFY(errorMessage);
     QTRY_VERIFY(errorMessage->property("visible").toBool());
@@ -1499,7 +1499,7 @@ void QmlLoadTest::presetPanelManagesPresets()
     QVERIFY(QMetaObject::invokeMethod(addButton, "clicked"));
     QTRY_COMPARE(store->count(), 2);
 
-    // 「浏览…」在**新建行**里（用户实测：新建入口置顶、浏览按钮放在宿主路径前面）
+    // "Browse..." lives in the **create row** (user: create entry on top, browse before the host path)
     QQuickItem *browseButton = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         browseButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerNewBrowse"));
@@ -1510,18 +1510,18 @@ void QmlLoadTest::presetPanelManagesPresets()
     QVERIFY2(manager->findChild<QObject *>(QStringLiteral("presetManagerNewRow")) != nullptr
                  || browseButton != nullptr,
              "the create row must exist");
-    // 取消（返回空串）：保持输入框里的内容不变
+    // Cancelling (empty result) must leave the field's text untouched
     newSourceField->setProperty("text", QStringLiteral("/srv/hand-typed"));
     m_stubKcm->directoryPicker()->nextResult = QString();
     QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
     QTest::qWait(20);
     QCOMPARE(newSourceField->property("text").toString(), QStringLiteral("/srv/hand-typed"));
-    // 选中一个目录：填进新建行的宿主路径
+    // Picking a directory fills the create row's host path
     m_stubKcm->directoryPicker()->nextResult = QStringLiteral("/srv/picked");
     QVERIFY(QMetaObject::invokeMethod(browseButton, "clicked"));
     QTRY_COMPARE(newSourceField->property("text").toString(), QStringLiteral("/srv/picked"));
 
-    // 删除：**重新找一次**按钮——新增预设会让 Repeater 重铺，之前那个指针已经失效了
+    // Remove: find the button **again** — adding a preset makes the Repeater rebuild, invalidating it
     QQuickItem *freshRemoveButton = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         freshRemoveButton = findItemDeep(window.contentItem(), QStringLiteral("presetManagerRemove"));
@@ -1533,7 +1533,7 @@ void QmlLoadTest::presetPanelManagesPresets()
 }
 
 /*!
- * 构建面板（ARCH_V5_V8 §5.4）：表单校验、提交的字段、以及列表里的**失败步骤**。
+ * Build panel (ARCH_V5_V8 §5.4): form validation, submitted fields, and the **failed step** in the list.
  */
 void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
 {
@@ -1551,7 +1551,7 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/BuildImagePanel.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
-    // required property 必须在创建时给：创建后再 setProperty 会先报"未初始化"
+    // required properties must be given at creation: setProperty later reports "not initialized"
     QVariantMap initialProperties;
     initialProperties.insert(QStringLiteral("operations"), QVariant::fromValue(m_stubKcm->controller()->operations()));
     initialProperties.insert(QStringLiteral("formOpen"), true);
@@ -1575,7 +1575,7 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     auto *noCacheCheck = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildNoCacheCheck")));
     QVERIFY(startButton && contextField && tagsField && targetField && noCacheCheck);
 
-    // 上下文与标签都没填：不能提交（按钮也是禁用的）
+    // Context and tags empty: no submission (the button is disabled too)
     QVERIFY2(!startButton->property("enabled").toBool(), "an empty form must not be submittable");
     auto *formError = qobject_cast<QQuickItem *>(findItemByName(panel, QStringLiteral("buildFormError")));
     QVERIFY(formError);
@@ -1584,11 +1584,11 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     QVERIFY2(formError->property("text").toString().contains(QStringLiteral("absolute")),
              "a relative context path must be rejected with a clear reason");
 
-    // 填好之后提交：字段如实传给控制器
+    // Once filled in, submit: the fields reach the controller as entered
     contextField->setProperty("text", contextDir.path());
     tagsField->setProperty("text", QStringLiteral("app:1.0\napp:latest"));
     targetField->setProperty("text", QStringLiteral("runtime"));
-    // 用 click() 而不是直接写 checked：前者才是用户动作（可勾选按钮会自行翻转并发出 toggled）
+    // Use click(), not a direct checked write: only the former is a user action (checkable buttons flip)
     QVERIFY(QMetaObject::invokeMethod(noCacheCheck, "click"));
     QTRY_VERIFY(panel->property("noCache").toBool());
     QVERIFY(QMetaObject::invokeMethod(startButton, "clicked"));
@@ -1600,7 +1600,7 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     QVERIFY2(!request.contextArchive.isEmpty(), "the context must have been packed");
     QCOMPARE(m_stubKcm->controller()->operations()->builds()->count(), 1);
 
-    // 列表：进行中显示步骤，失败后把失败步骤留在列表里
+    // List: shows steps while running, and keeps the failed step after a failure
     const QString buildId = m_stubKcm->controller()->operations()->builds()->entries().first().id;
     ImageBuildUpdate update;
     update.statusText = QStringLiteral("Step 2/3 : RUN exit 1");
@@ -1613,8 +1613,8 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
     update.errorText = QStringLiteral("Step 2/3 (RUN exit 1) failed: exit code 1");
     m_backend->emitBuildProgress(buildId, update);
 
-    // 失败的步骤留在**数据**里（用例断言控制器；卡片把它画出来由渲染截图复核——
-    // 离屏用例里 Repeater 条目的父链不可靠，这条教训在七期已经踩过）
+    // The failed step stays in the **data** (assert the controller; the card rendering it is covered by
+    // screenshot review — offscreen Repeater item parent chains are unreliable, learned in phase 7)
     m_backend->emitBuildFinished(buildId,
                                  DockerBackendInterface::MutationOutcome::Failed,
                                  DockerError(DockerError::Kind::EngineError, QStringLiteral("exit code 1")));
@@ -1625,17 +1625,17 @@ void QmlLoadTest::buildPanelSubmitsAndShowsFailureStep()
 }
 
 /*!
- * 行删除（回归：用户实测"端口映射删不掉、标签能删"）。
+ * Row removal (regression: users reported "port mappings will not delete, labels do").
  *
- * delegate 在 `pragma ComponentBehavior: Unbound` 下拿不到根对象 id，原来的处理器写
- * `page.pushPorts()` / `root.changed()` 会抛 ReferenceError，改动没写回控制器——
- * 于是端口行"删了又回来"。现在 delegate 只调用中转对象，行编辑收在 C++ 控制器里。
+ * Under `pragma ComponentBehavior: Unbound` a delegate cannot see the root object id, so the old
+ * `page.pushPorts()` / `root.changed()` handlers threw a ReferenceError and the edit never reached
+ * the controller, making port rows "come back after deletion". Delegates now call a relay object only.
  */
 void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
 {
-    // ① 创建向导的端口行
+    // (1) port rows in the create wizard
     {
-        // 镜像步骤要求镜像在本地，先给一个（不是本用例的重点，但向导规则如此）
+        // The image step requires a local image, so provide one (not this test's focus, but the rules)
         Image localImage;
         localImage.id = QStringLiteral("sha256:feedface");
         localImage.repoTags = {QStringLiteral("alpine:3.19")};
@@ -1658,10 +1658,10 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
         QTRY_VERIFY(page->width() > 0);
 
         auto *wizard = m_stubKcm->controller()->createContainer();
-        // 页面创建时会 reset 控制器，因此行要在创建之后再放
+        // Creating the page resets the controller, so add rows only after construction
         wizard->addPortRow(80, 0, QString(), QStringLiteral("tcp"));
         wizard->addPortRow(443, 8443, QString(), QStringLiteral("tcp"));
-        // 步骤 0/1 要先合法，否则 goToStep 会拒绝往前跳（向导的规则，不该为了测试放宽）
+        // Steps 0/1 must be valid first or goToStep refuses to advance (a wizard rule, not relaxed for tests)
         wizard->setImage(QStringLiteral("alpine:3.19"));
         wizard->setName(QStringLiteral("port-rows"));
         QVERIFY2(wizard->goToStep(QStringLiteral("ports")), qPrintable(wizard->stepKey()));
@@ -1674,17 +1674,17 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
         QCOMPARE(wizard->portRows().size(), 2);
         QVERIFY(QMetaObject::invokeMethod(removeButton, "clicked"));
         QTRY_COMPARE(wizard->portRows().size(), 1);
-        // 删掉的是第一行（80/0），留下的那行要还是它自己
+        // The first row (80/0) is removed; the surviving row must still be the other one
         QCOMPARE(wizard->portRows().first().toMap().value(QStringLiteral("containerPort")).toInt(), 443);
 
         /*
-         * 端口输入不能被"每敲一位就打断一次"（用户实测：输入 8000 要反复重新选中）。
+         * Typing a port must not be interrupted on every keystroke (user: typing 8000 needed reselecting).
          *
-         * 端口现在是"带校验的文本框 + 失焦才回写"：逐位输入期间模型不动，因此不会出现
-         * "模型 → 文本"的回环把光标/选区抢走。这里逐位模拟并断言：
-         *   ① 输入过程中文本框内容就是用户敲进去的内容（没有被改写）；
-         *   ② 控制器在这一期间**保持旧值**（回写是延迟的）；
-         *   ③ 输入结束（editingFinished）后才写回。
+         * Ports are now a validated text field that writes back on focus loss, so the model stays put while
+         * typing and no "model -> text" loop steals the cursor or selection. Simulated digit by digit:
+         *   (1) during typing the field holds exactly what the user typed (never rewritten);
+         *   (2) the controller **keeps the old value** meanwhile (write-back is deferred);
+         *   (3) the write-back happens only on editingFinished.
          */
         QQuickItem *hostPortField = findItemDeep(window.contentItem(), QStringLiteral("wizardHostPort"));
         QVERIFY(hostPortField);
@@ -1701,7 +1701,7 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
         QTRY_COMPARE(wizard->portRows().first().toMap().value(QStringLiteral("hostPort")).toInt(), 8000);
     }
 
-    // ② 键值对编辑器的"删除"按钮
+    // (2) the key/value editor's "remove" button
     {
         const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/components/KeyValueListEditor.qml");
         QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
@@ -1730,7 +1730,7 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
             removeButton = findItemDeep(window.contentItem(), QStringLiteral("keyValueRemoveButton"));
             return removeButton != nullptr;
         }(), 5000);
-        // 值的显隐切换、以及删除后条目真的少了一条（回调不再抛 ReferenceError）
+        // Reveal toggle for values, and removal really drops a row (the callback no longer throws)
         QQuickItem *reveal = findItemDeep(window.contentItem(), QStringLiteral("keyValueRevealButton"));
         QVERIFY2(reveal, "secret values must offer a reveal toggle");
         QVERIFY(reveal->property("visible").toBool());
@@ -1745,9 +1745,9 @@ void QmlLoadTest::portAndKeyValueRowsCanBeRemoved()
 }
 
 /*!
- * 挂载步骤：选中预设后，「添加挂载」必须仍然有效（用户实测反馈 ⑦）。
+ * Mounts step: after picking a preset, "Add mount" must still work (user feedback ⑦).
  *
- * 根因同 ⑤：delegate 里的处理器调用了根对象 id，抛 ReferenceError 后改动没写回控制器。
+ * Same root cause as ⑤: the delegate handler used the root object id, threw ReferenceError, edit lost.
  */
 void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
 {
@@ -1782,9 +1782,9 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
     wizard->setName(QStringLiteral("mount-demo"));
     QVERIFY(wizard->goToStep(QStringLiteral("mounts")));
 
-    // 从预设添加：现在是**可搜索下拉**（用户实测 F3/本轮：预设多时按钮流太慢）
-    // 注意：页面里有多个可搜索下拉（镜像 / 预设 / 命令历史），
-    // 因此必须在**预设下拉内部**找它的列表，不能从整页里取第一个 filteredComboBoxList
+    // Add from preset: now a **searchable dropdown** (user F3: a button flow is too slow with many presets)
+    // Note: the page has several searchable dropdowns (image / preset / command history), so search for
+    // the list **inside the preset dropdown**; taking the page's first filteredComboBoxList would be wrong
     QQuickItem *presetCombo = nullptr;
     QQuickItem *presetList = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
@@ -1803,11 +1803,11 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
     QTRY_COMPARE(wizard->mountRows().size(), 1);
     QCOMPARE(wizard->mountRows().first().toMap().value(QStringLiteral("source")).toString(), QStringLiteral("/srv/data"));
 
-    // 再加一条空行：这一步以前会因为 delegate 抛错而"没反应"
+    // Add one more empty row: this used to do nothing because the delegate threw
     wizard->addMountRow(QStringLiteral("bind"), QString(), QString(), false);
     QTRY_COMPARE(wizard->mountRows().size(), 2);
 
-    // 用真实的「添加挂载」按钮再点一次
+    // Click the real "Add mount" button once more
     QQuickItem *addMountButton = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         addMountButton = findItemDeep(window.contentItem(), QStringLiteral("wizardAddMount"));
@@ -1816,7 +1816,7 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
     QVERIFY(QMetaObject::invokeMethod(addMountButton, "clicked"));
     QTRY_COMPARE(wizard->mountRows().size(), 3);
 
-    // 删除第二条（delegate 的删除按钮）
+    // Remove the second row (the delegate's remove button)
     QQuickItem *removeMount = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         removeMount = findItemDeep(window.contentItem(), QStringLiteral("wizardRemoveMount"));
@@ -1828,7 +1828,7 @@ void QmlLoadTest::wizardAddsPresetsAndExtraMounts()
 
 
 /*!
- * 暂停 / 继续按钮（用户实测反馈 ①）：运行中给「暂停」，已暂停给「继续」。
+ * Pause / resume buttons (user feedback ①): running offers Pause, paused offers Resume.
  */
 void QmlLoadTest::pauseAndResumeButtonsFollowTheState()
 {
@@ -1869,9 +1869,9 @@ void QmlLoadTest::pauseAndResumeButtonsFollowTheState()
     page->setHeight(700);
     window.show();
     QTRY_VERIFY(page->width() > 0);
-    m_backend->completeRefresh(); // inspect 是异步的：喂完数据再让详情落地
+    m_backend->completeRefresh(); // inspect is async: feed the data, then let the detail land
 
-    // 运行中：暂停可见，继续不可见
+    // Running: Pause visible, Resume not
     QQuickItem *pauseButton = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         pauseButton = findItemDeep(window.contentItem(), QStringLiteral("detailPauseButton"));
@@ -1881,14 +1881,14 @@ void QmlLoadTest::pauseAndResumeButtonsFollowTheState()
     QVERIFY(resumeButton);
     QVERIFY2(!resumeButton->property("visible").toBool(), "a running container must not offer Resume");
 
-    // 点「暂停」真的发出请求
+    // Clicking Pause really sends the request
     QVERIFY(QMetaObject::invokeMethod(pauseButton, "clicked"));
     QTRY_VERIFY(!m_backend->mutationCalls().isEmpty());
     QCOMPARE(m_backend->mutationCalls().first().mutation, DockerBackendInterface::Mutation::PauseContainer);
     m_backend->completeMutation(OperationTarget::container(QStringLiteral("running-one")),
                                DockerBackendInterface::MutationOutcome::Succeeded);
 
-    // 状态变成 paused：按钮反过来（继续可见，暂停不可见）
+    // State becomes paused: the buttons flip (Resume visible, Pause not)
     Container paused = running;
     paused.state = ContainerState::Paused;
     m_backend->setContainers({paused});
@@ -1906,19 +1906,19 @@ void QmlLoadTest::pauseAndResumeButtonsFollowTheState()
 }
 
 /*!
- * 创建容器入口会主动刷新网络（用户实测反馈 ②）：不用先点一次「网络」标签页。
+ * The create-container entry refreshes networks itself (user feedback ②): no Networks tab visit needed.
  */
 void QmlLoadTest::openingTheWizardRefreshesNetworks()
 {
     auto *controller = m_stubKcm->controller();
     const int before = m_backend->networkRefreshCount();
 
-    // 模拟"点创建容器入口"：主页面里那一步就是先刷新再发信号
+    // Simulate "click create container": the main page refreshes first, then emits the signal
     controller->refreshNetworks();
     QTRY_VERIFY(m_backend->networkRefreshCount() > before);
     m_backend->completeRefresh();
 
-    // 向导自己也会保一次险（打开时若列表仍为空就再刷）
+    // The wizard insures itself too: it refreshes again on open if the list is still empty
     const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/CreateContainer.qml");
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(component.errorString()));
@@ -1929,7 +1929,7 @@ void QmlLoadTest::openingTheWizardRefreshesNetworks()
 }
 
 /*!
- * 命令字段与"默认命令会立刻退出"的提示（用户实测反馈 ⑧⑨）。
+ * Command field and the "the default command would exit immediately" hint (user feedback ⑧⑨).
  */
 void QmlLoadTest::commandFieldAndExitHint()
 {
@@ -1959,13 +1959,13 @@ void QmlLoadTest::commandFieldAndExitHint()
     wizard->setName(QStringLiteral("hint-demo"));
     QVERIFY(wizard->goToStep(QStringLiteral("basics")));
 
-    // 命令写回控制器（⑨ 的提示已按用户要求移除：P2 会默认开 -i/-t，容器因此不会立刻退出）
+    // Command reaches the controller (hint ⑨ was dropped on request: P2 opens -i/-t by default)
     QQuickItem *commandField = findItemDeep(window.contentItem(), QStringLiteral("wizardCommandField"));
     QVERIFY(commandField);
     commandField->setProperty("text", QStringLiteral("sleep infinity"));
     QTRY_COMPARE(wizard->commandText(), QStringLiteral("sleep infinity"));
 
-    // 入口点/工作目录/用户也能写回
+    // Entrypoint / working directory / user reach the controller too
     auto *entrypointField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardEntrypointField")));
     auto *workingDirField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardWorkingDirField")));
     auto *userField = qobject_cast<QQuickItem *>(findItemDeep(window.contentItem(), QStringLiteral("wizardUserField")));
@@ -1980,10 +1980,10 @@ void QmlLoadTest::commandFieldAndExitHint()
 
 
 /*!
- * 步骤按钮不会出现"多选"假象（用户实测 A3）。
+ * Step buttons must never look multi-selected (user A3).
  *
- * 根因：按钮是 checkable，点击时 Qt 先自行翻转 checked；校验不通过导致跳转被拒绝后，
- * 那个翻转不会被纠正——看起来就像同时选中了好几步，页面却还停在第一步。
+ * Root cause: the buttons are checkable, so Qt flips checked first; when validation refuses the jump
+ * that flip is never corrected, so several steps look selected while the page stays on the first one.
  */
 void QmlLoadTest::stepButtonsNeverLookMultiSelected()
 {
@@ -2003,7 +2003,7 @@ void QmlLoadTest::stepButtonsNeverLookMultiSelected()
     window.show();
     QTRY_VERIFY(page->width() > 0);
 
-    // 收集所有步骤按钮（第一个是容器标题栏里的按钮，按对象名筛）
+    // Collect all step buttons (the first is the container header button; filter by objectName)
     QList<QQuickItem *> buttons;
     std::function<void(QQuickItem *)> collect = [&](QQuickItem *node) {
         if (!node) {
@@ -2028,16 +2028,16 @@ void QmlLoadTest::stepButtonsNeverLookMultiSelected()
         }
         return count;
     };
-    QCOMPARE(checkedCount(), 1); // 初始：只有第一步
+    QCOMPARE(checkedCount(), 1); // initially only step one
 
-    // 点第二个步骤按钮：校验不通过（镜像还没选），必须**仍然只有第一步高亮**。
-    // 用 click() 而不是 emit clicked()：只有前者会走"可勾选按钮自行翻转 checked"那条真实路径
+    // Click the second step button: validation fails (no image yet) and **only step one may stay checked**.
+    // Use click(), not emit clicked(): only the former exercises the checkable button flipping checked itself
     QQuickItem *second = buttons.at(1);
     QVERIFY(QMetaObject::invokeMethod(second, "click"));
     QTest::qWait(20);
     QVERIFY2(second->property("checked").toBool() == false, "a refused jump must not leave the button checked");
     QCOMPARE(checkedCount(), 1);
-    // 而且要说清为什么跳不过去
+    // And it must say why the jump was refused
     QQuickItem *stepError = findItemDeep(window.contentItem(), QStringLiteral("wizardStepError"));
     QVERIFY(stepError);
     QTRY_VERIFY(stepError->property("visible").toBool());
@@ -2045,7 +2045,7 @@ void QmlLoadTest::stepButtonsNeverLookMultiSelected()
 }
 
 /*!
- * `--privileged` 需要"输入容器名"强确认，且确认后勾选框要真的勾上（用户实测 F4）。
+ * `--privileged` needs typed confirmation of the container name, then the box must really be checked (F4).
  */
 void QmlLoadTest::privilegedNeedsTypedConfirmation()
 {
@@ -2081,13 +2081,13 @@ void QmlLoadTest::privilegedNeedsTypedConfirmation()
         return privilegedCheck != nullptr;
     }(), 5000);
 
-    // 勾选：被拦下来（还没确认）
+    // Ticking is intercepted (no confirmation yet)
     QVERIFY(QMetaObject::invokeMethod(privilegedCheck, "click"));
     QTest::qWait(20);
     QVERIFY2(!wizard->privileged(), "privileged must not be enabled before confirmation");
     QVERIFY2(!privilegedCheck->property("checked").toBool(), "the checkbox must fall back until confirmed");
 
-    // 确认框要求输入容器名：没输入对之前确认按钮不可用
+    // The dialog requires typing the container name: confirm stays disabled until it matches
     QObject *privilegedDialog = page->findChild<QObject *>(QStringLiteral("wizardPrivilegedDialog"));
     QVERIFY2(privilegedDialog, "the privileged confirmation must exist");
     QCOMPARE(privilegedDialog->property("requireText").toString(), QStringLiteral("root-demo"));
@@ -2098,16 +2098,16 @@ void QmlLoadTest::privilegedNeedsTypedConfirmation()
     confirmField->setProperty("text", QStringLiteral("root-demo"));
     QTRY_VERIFY(privilegedDialog->property("requireTextSatisfied").toBool());
 
-    // 确认：控制器生效，并且**勾选框真的勾上**（F4 的回归点）
+    // Confirm: the controller applies it and the **box really gets ticked** (the F4 regression)
     QVERIFY(QMetaObject::invokeMethod(privilegedDialog, "confirmed"));
     QTRY_VERIFY(wizard->privileged());
     QTRY_VERIFY_WITH_TIMEOUT(privilegedCheck->property("checked").toBool(), 5000);
-    // 真实流程里确认按钮会关闭对话框；这里直接发信号，所以要自己关掉——
-    // 模态对话框还在时，后面的点击会落在它身上（用例里吃过这个亏）
+    // The real confirm button closes the dialog; here the signal is emitted directly, so close it by
+    // hand — a modal dialog still up would swallow the following clicks (a trap hit in this test)
     QVERIFY(QMetaObject::invokeMethod(privilegedDialog, "close"));
     QTRY_VERIFY(!privilegedDialog->property("visible").toBool());
 
-    // 再点一次取消：两边都回到未启用
+    // Click again to untick: both sides return to disabled
     QVERIFY(QMetaObject::invokeMethod(privilegedCheck, "click"));
     QTest::qWait(20);
     QTRY_VERIFY(!wizard->privileged());
@@ -2116,7 +2116,7 @@ void QmlLoadTest::privilegedNeedsTypedConfirmation()
 
 
 /*!
- * 容器详情可复制命令与入口点（用户实测反馈 A2）。
+ * Container detail can copy the command and the entrypoint (user feedback A2).
  */
 void QmlLoadTest::detailOffersCopyForCommandAndEntrypoint()
 {
@@ -2166,11 +2166,11 @@ void QmlLoadTest::detailOffersCopyForCommandAndEntrypoint()
 
 
 /*!
- * 拓扑对齐（用户实测反馈 A5）：容器芯片与**第一条**宿主绑定同高，第一条连线因此是水平的。
+ * Topology alignment (user A5): the container chip is level with the first host binding, so its link is flat.
  */
 void QmlLoadTest::topologyAlignsTheContainerChipWithTheFirstBinding()
 {
-    // 一个容器端口映射到两个宿主地址（第二条应当向下分支）
+    // One container port mapped to two host addresses (the second must branch downwards)
     ContainerDetail detail;
     detail.id = QStringLiteral("cid-align");
     detail.name = QStringLiteral("align-demo");
@@ -2194,7 +2194,7 @@ void QmlLoadTest::topologyAlignsTheContainerChipWithTheFirstBinding()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
     QVERIFY(tabBar);
-    QVERIFY(tabBar->setProperty("currentIndex", 2)); // 网络分区（端口拓扑在这里）
+    QVERIFY(tabBar->setProperty("currentIndex", 2)); // networks section (the port topology lives here)
 
     QQuickItem *topology = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
@@ -2234,8 +2234,8 @@ void QmlLoadTest::topologyAlignsTheContainerChipWithTheFirstBinding()
                             .arg(centerY(hostChips.at(0)))));
     QVERIFY2(centerY(hostChips.at(1)) > centerY(containerChip) + 4.0, "the second binding must branch downwards");
 
-    // 连线的起点也必须落在第一条绑定的中心（第一条线因此是水平的）：
-    // 这与"芯片位置"由不同的代码决定，所以单独断言（负例：把起点改回整组中心就会失败）
+    // The link origin must also sit at the first binding's centre (hence the horizontal first line):
+    // separate code from the chip position, so assert it (moving the origin to the group centre fails)
     QQuickItem *link = nullptr;
     std::function<void(QQuickItem *)> findLink = [&](QQuickItem *node) {
         if (!node) {
@@ -2257,7 +2257,7 @@ void QmlLoadTest::topologyAlignsTheContainerChipWithTheFirstBinding()
 }
 
 /*!
- * 端口编辑器的连线（用户实测反馈 A4）：每行一种颜色、且不写特征标注。
+ * Port editor links (user feedback A4): one colour per row, and no feature annotation text.
  */
 void QmlLoadTest::portEditorColoursEachRowDifferently()
 {
@@ -2307,14 +2307,14 @@ void QmlLoadTest::portEditorColoursEachRowDifferently()
         return links.size() == 3 && containerChips.size() == 3;
     }(), 5000);
 
-    // 三行的连线颜色互不相同（"每行一种颜色"）
+    // The three rows use three different link colours ("one colour per row")
     QSet<QString> colors;
     for (QQuickItem *link : links) {
         colors.insert(link->property("linkColor").value<QColor>().name());
     }
     QCOMPARE(colors.size(), 3);
-    // 两侧标注存在（"宿主机" / "容器"）：断言用的是文案来源，而不是硬编码字符串
-    // 两侧标注：按 objectName 断言（不依赖语言，用例可能在英文环境跑）
+    // Both side labels exist ("host" / "container"), asserted by objectName rather than by string,
+    // so the test does not depend on the language (it may run in an English environment)
     QQuickItem *hostLabel = findItemDeep(window.contentItem(), QStringLiteral("portEditorHostLabel"));
     QQuickItem *containerLabel = findItemDeep(window.contentItem(), QStringLiteral("portEditorContainerLabel"));
     QVERIFY2(hostLabel && containerLabel, "the editor must label both sides (host / container)");
@@ -2323,7 +2323,7 @@ void QmlLoadTest::portEditorColoursEachRowDifferently()
 
 
 /*!
- * 服务卡片（B1）：三行状态、危险动作必须二次确认，确认后才真的发请求。
+ * Service card (B1): three status rows; risky actions confirm first and only then send the request.
  */
 void QmlLoadTest::serviceCardConfirmsRiskyActions()
 {
@@ -2349,7 +2349,7 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
     window.show();
     QTRY_VERIFY(card->width() > 0);
 
-    // 三行状态（socket / service / containerd），并且默认都是"运行中"
+    // Three status rows (socket / service / containerd), all "running" by default
     QList<QQuickItem *> rows;
     QList<QQuickItem *> stateLabels;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
@@ -2373,7 +2373,7 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
     }(), 5000);
     QVERIFY2(!stateLabels.first()->property("text").toString().isEmpty(), "the state must be readable in text form");
 
-    // 「停止」是危险动作：点了先弹确认，**确认之前一个请求都不发**
+    // Stop is risky: it opens a confirmation first, and **no request is sent before confirming**
     QQuickItem *stopButton = findItemDeep(window.contentItem(), QStringLiteral("serviceStopButton"));
     QVERIFY2(stopButton && stopButton->property("visible").toBool(), "a running service offers Stop");
     QObject *dialog = nullptr;
@@ -2385,14 +2385,14 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
              "a risky action must explain what happens");
     QTRY_VERIFY(dialog->property("visible").toBool());
 
-    // 确认后才发出请求（unit + 动词与按钮一致）
+    // Only after confirming is the request sent (unit and verb match the button)
     QVERIFY(QMetaObject::invokeMethod(dialog, "confirmed"));
     QTRY_COMPARE(m_stubKcm->privilegedClient()->serviceRequests, 1);
     QCOMPARE(m_stubKcm->privilegedClient()->lastServiceUnit, QStringLiteral("docker.socket"));
     QCOMPARE(m_stubKcm->privilegedClient()->lastServiceVerb, QStringLiteral("stop"));
     QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
 
-    // 「重启」不是危险动作：直接发（不弹确认）
+    // Restart is not risky: sent directly, no confirmation
     QQuickItem *restartButton = findItemDeep(window.contentItem(), QStringLiteral("serviceRestartButton"));
     QVERIFY(restartButton);
     QVERIFY(QMetaObject::invokeMethod(restartButton, "clicked"));
@@ -2402,7 +2402,7 @@ void QmlLoadTest::serviceCardConfirmsRiskyActions()
 
 
 /*!
- * 可搜索下拉（F3）：输入过滤、没有匹配时给提示、选中把整条数据交回去。
+ * Searchable dropdown (F3): typing filters, no match shows a hint, selecting returns the whole entry.
  */
 void QmlLoadTest::filteredComboBoxNarrowsAndSelects()
 {
@@ -2436,28 +2436,28 @@ void QmlLoadTest::filteredComboBoxNarrowsAndSelects()
     QQuickItem *emptyHint = findItemDeep(window.contentItem(), QStringLiteral("filteredComboBoxEmpty"));
     QVERIFY(list && search && emptyHint);
 
-    // 初始：全部四条，没有"没有匹配"的提示
+    // Initially all four entries and no "no match" hint
     QCOMPARE(list->property("count").toInt(), 4);
     QVERIFY(!emptyHint->property("visible").toBool());
 
-    // 输入过滤（不区分大小写）：注意 `postgres:17-alpine` 也含 "alpine"，所以是 3 条
+    // Typing filters (case-insensitive): `postgres:17-alpine` contains "alpine" too, hence 3 rows
     search->setProperty("text", QStringLiteral("ALPINE"));
     QTRY_COMPARE(list->property("count").toInt(), 3);
-    // 更精确的匹配
+    // A more precise match
     search->setProperty("text", QStringLiteral("alpine:3"));
     QTRY_COMPARE(list->property("count").toInt(), 1);
 
-    // 没有匹配：列表为空并给提示
+    // No match: the list empties and a hint appears
     search->setProperty("text", QStringLiteral("does-not-exist"));
     QTRY_COMPARE(list->property("count").toInt(), 0);
     QTRY_VERIFY(emptyHint->property("visible").toBool());
     QVERIFY2(!list->property("enabled").toBool(), "an empty list must not be selectable");
 
-    // 清空搜索：恢复全部
+    // Clearing the search restores all rows
     search->setProperty("text", QString());
     QTRY_COMPARE(list->property("count").toInt(), 4);
 
-    // 选中：selected(entry) 交回整条数据
+    // Selecting hands the whole entry back via selected(entry)
     QSignalSpy selectedSpy(combo, SIGNAL(selected(QVariant)));
     QVERIFY(QMetaObject::invokeMethod(list, "activated", Q_ARG(int, 2)));
     QCOMPARE(selectedSpy.count(), 1);
@@ -2467,9 +2467,9 @@ void QmlLoadTest::filteredComboBoxNarrowsAndSelects()
 
 
 /*!
- * 镜像详情的「关联容器」列表（实测反馈）：要有**状态图标**，并且**点击能跳到容器详情**。
+ * Image detail "used by" list (reported): rows need a **state icon** and clicking must open the container.
  *
- * 与网络详情的成员行统一：同样的状态图标 + 同样的跳转信号（target = 容器 id）。
+ * Consistent with network member rows: same state icon, same navigation signal (target = container id).
  */
 void QmlLoadTest::imageUsedByRowsShowStateAndNavigate()
 {
@@ -2523,7 +2523,7 @@ void QmlLoadTest::imageUsedByRowsShowStateAndNavigate()
     window.show();
     QTRY_VERIFY(page->width() > 0);
 
-    // 两行都要有状态图标（不是通用图标）
+    // Both rows need a state icon, not a generic one
     QList<QQuickItem *> rows;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         rows.clear();
@@ -2547,7 +2547,7 @@ void QmlLoadTest::imageUsedByRowsShowStateAndNavigate()
         QVERIFY2(!icon->property("source").toString().isEmpty(), "the state icon must resolve to an icon name");
     }
 
-    // 点击第一行：发出 containerRequested，且带上**容器 id**（不是状态 key）
+    // Click the first row: emits containerRequested with the **container id** (not the state key)
     QSignalSpy requestedSpy(page, SIGNAL(containerRequested(QString)));
     QVERIFY(requestedSpy.isValid());
     QVERIFY(QMetaObject::invokeMethod(rows.first(), "clicked"));
@@ -2559,17 +2559,17 @@ void QmlLoadTest::imageUsedByRowsShowStateAndNavigate()
 
 
 /*!
- * 「驱动选项」这类键值列表（实测反馈）：长选项名不能被挤没，值要贴右。
+ * Key/value lists like "driver options" (reported): long keys must stay readable, values hug the right.
  *
- * 原来键列固定 10 个 gridUnit，`com.docker.network.bridge.name` 这种长键只剩省略号，
- * 值却占满整行。现在键占剩余宽度、值贴右对齐（且长度有上限）。
+ * The key column was fixed at 10 gridUnits, so `com.docker.network.bridge.name` collapsed into an ellipsis
+ * while the value filled the row. Keys now take the leftover width, values are right-aligned and capped.
  */
 void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
 {
     /*
-     * 用一小段包装 QML 把组件放进真实布局里（`ColumnLayout` 撑满窗口）：
-     * 被测的问题只在**宽度受限**时才出现——直接给组件 setWidth，列宽不会被拉伸，
-     * 长键自然放得下，那样子测不到东西。
+     * A small wrapper QML puts the component into a real layout (`ColumnLayout` filling the window):
+     * the bug only appears under **constrained width** — setting the component width directly would
+     * leave the columns un-stretched, the long key would fit and the test would prove nothing.
      */
     QTemporaryFile wrapper;
     QVERIFY(wrapper.open());
@@ -2597,9 +2597,9 @@ void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
     QVERIFY(list);
 
     /*
-     * 行宽取 **320px**：这就是用户看到问题时的场景（面板不宽、选项名很长）。
-     * 旧策略下键列被固定在 ≈180px，`com.docker.network.bridge.name`（≈198px）
-     * 必然被省略号吃掉；新策略把剩余宽度给键列，于是完整显示。
+     * Row width is **320px**, the situation where users hit the bug (narrow panel, long option names).
+     * The old key column was pinned at ≈180px while `com.docker.network.bridge.name` needs ≈198px,
+     * so it was always elided; the new layout gives the key the leftover width and it fits.
      */
     QQuickWindow window;
     window.resize(320, 300);
@@ -2632,16 +2632,16 @@ void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
     }(), 5000);
 
     /*
-     * 关键断言：**完整的选项名必须放得下**（没有被省略号吃掉）。
+     * Key assertion: the **full option name must fit** (not eaten by an ellipsis).
      *
-     * 旧实现给键列固定 10 个 gridUnit（≈180px）而键需要约 198px，同时值列
-     * `Layout.fillWidth` 把剩余宽度全拿走——于是选项名被截断、值却占满整行
-     * （实测反馈："选项名全被挡住了"）。Text 的 contentWidth 是完整文本所需宽度，
-     * contentWidth <= width 就代表没被截断。
+     * The old key column was fixed at 10 gridUnits (≈180px) while keys need ≈198px, and the value's
+     * `Layout.fillWidth` took all the leftover room, truncating the name while the value filled the row
+     * (reported as "the option names are all covered"). Text.contentWidth is the full text width, so
+     * contentWidth <= width means not truncated.
      */
     for (QQuickItem *key : keys) {
-        // 用字体度量算"完整显示这个选项名需要多宽"，再和实际列宽比——不依赖
-        // QQC2.Label 在 elide 时对 contentWidth 的处理（实测它会给 0，断言会失效）
+        // Measure how wide the full option name is and compare with the column width, avoiding
+        // QQC2.Label's contentWidth handling under elide (measured: it returns 0 and breaks the assert)
         const QFontMetricsF metrics(key->property("font").value<QFont>());
         const qreal needed = metrics.horizontalAdvance(key->property("text").toString());
         QVERIFY2(needed <= key->width() + 1.0,
@@ -2650,11 +2650,11 @@ void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
                                 .arg(needed)
                                 .arg(key->width())));
     }
-    // 键列拿到剩余宽度、值贴右：值通常很短，长的是键
+    // Keys take the leftover width, values hug right: values are short, keys are long
     QVERIFY2(keys.first()->width() > values.first()->width(),
              "the key column must take the room; the value hugs the right edge");
 
-    // 值贴右：右边缘与行右边缘基本重合
+    // Value right-aligned: its right edge nearly coincides with the row's right edge
     QQuickItem *row = values.first()->parentItem();
     QVERIFY(row);
     const qreal rowRight = row->mapToItem(list, QPointF(row->width(), 0)).x();
@@ -2664,18 +2664,18 @@ void QmlLoadTest::keyValueRowsKeepLongKeysVisible()
 }
 
 /*!
- * 过长的命令（实测提问：命令很长会怎样）。
+ * Over-long commands (asked: what happens with a very long command).
  *
- * 以前是无限换行：一条几百字符的命令会把整页撑高、把后面的分区顶下去。
- * 现在默认最多 4 行，超出时给「显示全部（共 N 行）」；复制按钮始终给完整值。
+ * It used to wrap without limit: a few-hundred-character command stretched the page and pushed sections away.
+ * Now capped at 4 lines with a "show all (N lines)" affordance; the copy button always gives the full value.
  */
 void QmlLoadTest::longCommandIsCollapsedUntilExpanded()
 {
     /*
-     * 很长的命令（实测提问："如果命令过长会怎么样"）。
+     * A very long command (asked: "what if the command is too long?").
      *
-     * 期望行为：在**自己那一行里换行**——整页不会被撑宽（不溢出面板），
-     * 也不会把后面的分区顶得看不见；复制按钮给的始终是完整值。
+     * Expected: it wraps **inside its own row** — the page never widens (no panel overflow) and later
+     * sections are not pushed out of sight; the copy button still yields the full value.
      */
     const QString longCommand = QString(400, QLatin1Char('x'));
 
@@ -2708,26 +2708,26 @@ void QmlLoadTest::longCommandIsCollapsedUntilExpanded()
     QQuickItem *label = findItemDeep(row, QStringLiteral("copyableTextValue"));
     QVERIFY2(label, "the command value label must exist");
 
-    // ① 宽度不溢出：字段与标签都在页面宽度之内
+    // (1) No width overflow: field and label stay within the page width
     QTRY_VERIFY_WITH_TIMEOUT(label->width() > 0, 5000);
     const qreal rowRight = row->mapToItem(page, QPointF(row->width(), 0)).x();
     QVERIFY2(rowRight <= page->width() + 1.0,
              qPrintable(QStringLiteral("the command row overflows the page (%1 > %2)").arg(rowRight).arg(page->width())));
 
-    // ② 长值在自己的行里换行（不止一行），因此信息没有被丢掉
+    // (2) The long value wraps in its own row (more than one line), so nothing is lost
     QTRY_VERIFY2(label->property("lineCount").toInt() > 1,
                  "a long command must wrap inside its own field instead of overflowing");
 
-    // ③ 复制按钮给的始终是完整值
+    // (3) The copy button always yields the full value
     QQuickItem *copy = findItemDeep(row, QStringLiteral("copyButtonObject"));
     QVERIFY(copy);
     QCOMPARE(copy->property("value").toString(), detail.command.join(QLatin1Char(' ')));
 }
 /*!
- * 容器详情的「镜像」一行可以点进镜像详情（实测需求）。
+ * The container detail's "Image" row opens the image detail (requested).
  *
- * 与网络成员/关联容器同一种交互：整行可点 + 右箭头；发出的必须是**镜像 ID**
- * （`sha256:…`，镜像详情按它打开），而不是显示用的引用名。
+ * Same interaction as network members / used-by rows: whole row clickable plus a chevron; it must emit
+ * the **image ID** (`sha256:...`, used to open the image detail), not the displayed reference name.
  */
 void QmlLoadTest::containerDetailOpensTheImage()
 {
@@ -2756,7 +2756,7 @@ void QmlLoadTest::containerDetailOpensTheImage()
     QTRY_VERIFY(page->width() > 0);
     m_backend->completeRefresh();
 
-    // 这个 ItemDelegate 没有 objectName，用信号 + 内容树里的镜像标签定位
+    // This ItemDelegate has no objectName, so locate it by signal plus the image label in the content tree
     QQuickItem *label = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT((label = findItemDeep(window.contentItem(), QStringLiteral("detailImageLabel"))) != nullptr, 5000);
     QCOMPARE(label->property("text").toString(), QStringLiteral("demo:1.0"));
@@ -2771,7 +2771,7 @@ void QmlLoadTest::containerDetailOpensTheImage()
     QCOMPARE(requestedSpy.count(), 1);
     QCOMPARE(requestedSpy.at(0).at(0).toString(), QStringLiteral("sha256:feedface"));
 
-    // 引擎没给镜像 ID 时不可点（点了也没法打开详情）
+    // Without an image ID from the engine the row is not clickable (the detail cannot be opened)
     ContainerDetail withoutId = detail;
     withoutId.imageId.clear();
     m_backend->setContainerDetail(withoutId);
@@ -2782,7 +2782,7 @@ void QmlLoadTest::containerDetailOpensTheImage()
 
 
 /*!
- * 引擎页下半部分展示组件版本（实测需求：除了 dockerd 还要能看到 containerd 等）。
+ * The engine page's lower half lists component versions (requested: containerd etc. besides dockerd).
  */
 void QmlLoadTest::engineViewListsComponentVersions()
 {
@@ -2825,7 +2825,7 @@ void QmlLoadTest::engineViewListsComponentVersions()
     window.show();
     QTRY_VERIFY(view->width() > 0);
 
-    // 三个组件各一行，值就是版本号
+    // One row per component, its value being the version
     QStringList versions;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         versions.clear();
@@ -2847,7 +2847,7 @@ void QmlLoadTest::engineViewListsComponentVersions()
     QVERIFY2(versions.contains(QStringLiteral("1.7.24")), "the containerd version must be shown");
     QVERIFY(versions.contains(QStringLiteral("1.2.3")));
 
-    // cgroup 驱动与 CPU 数也在
+    // The cgroup driver and the CPU count are there too
     QQuickItem *cpus = findItemDeep(window.contentItem(), QStringLiteral("engineCpuCount"));
     QVERIFY(cpus);
     QCOMPARE(cpus->property("text").toString(), QStringLiteral("16"));
@@ -2855,10 +2855,10 @@ void QmlLoadTest::engineViewListsComponentVersions()
 
 
 /*!
- * 双栈（IPv4 + IPv6 通配）映射在拓扑里只画**一条**分支（实测需求）。
+ * A dual-stack mapping (IPv4 + IPv6 wildcard) draws **one** branch in the topology (requested).
  *
- * 宿主端点的圆环由 Canvas 绘制（用例看不到图形），因此断言的是"分支数"与
- * "芯片文本"：合并后应当只有一条分支、文本是纯端口号（地址由双环表达）。
+ * The host-endpoint rings are Canvas-drawn (invisible to the test), so assert the branch count and the
+ * chip text: after merging there is one branch and the text is the bare port (rings express addresses).
  */
 void QmlLoadTest::topologyMergesDualStackBindings()
 {
@@ -2866,7 +2866,7 @@ void QmlLoadTest::topologyMergesDualStackBindings()
     detail.id = QStringLiteral("cid-dual");
     detail.name = QStringLiteral("dual-stack");
     detail.state = ContainerState::Running;
-    // 没指定宿主地址 → Docker 会同时建 IPv4 与 IPv6 通配两条
+    // No host address given -> Docker creates both the IPv4 and the IPv6 wildcard binding
     detail.ports = {{QStringLiteral("0.0.0.0"), 8888, 20004, QStringLiteral("tcp")},
                     {QStringLiteral("::"), 8888, 20004, QStringLiteral("tcp")}};
     m_backend->setContainerDetail(detail);
@@ -2919,19 +2919,19 @@ void QmlLoadTest::topologyMergesDualStackBindings()
         return links.size() == 1 && hostChips.size() == 1;
     }(), 5000);
 
-    // 一条分支（合并成功），文本是纯端口号
+    // One branch (the merge worked) with the bare port as its text
     QCOMPARE(links.first()->property("branchCount").toInt(), 1);
     QCOMPARE(hostChips.first()->property("text").toString(), QStringLiteral("20004"));
-    // 并且标记为双栈（Canvas 据此画双环）
+    // And marked dual-stack (the Canvas draws two rings from that)
     QVERIFY2(hostChips.first()->parentItem() != nullptr, "the chip must sit in a binding row");
 }
 
 
 /*!
- * 端口行内冲突提示（ARCH_next_ports.md §4.D，里程碑 M2）。
+ * Inline port-row conflict hint (ARCH_next_ports.md §4.D, milestone M2).
  *
- * 被运行中的容器占用 → 行内出现提示与「使用建议端口 N」；点一下采用后提示消失；
- * 空闲的行**不显示任何东西**（用户要求：减少冗余小字）。
+ * Occupied by a running container -> an inline hint plus "Use suggested port N"; adopting it clears the
+ * hint; idle rows show **nothing at all** (user request: fewer redundant small labels).
  */
 void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
 {
@@ -2988,18 +2988,18 @@ void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
         return statuses.size() == 2;
     }(), 5000);
 
-    // 只有冲突那一行可见（空闲行不显示任何提示）
+    // Only the conflicting row is visible (idle rows show no hint)
     QTRY_VERIFY_WITH_TIMEOUT(statuses.at(0)->property("visible").toBool()
                                  && !statuses.at(1)->property("visible").toBool(), 5000);
     QVERIFY2(statuses.at(0)->property("text").toString().contains(QStringLiteral("web")),
              qPrintable(statuses.at(0)->property("text").toString()));
 
-    // 建议端口按钮：点一下写回该行，提示随之消失
+    // Suggest button: one click writes the port back into that row and the hint disappears
     QQuickItem *suggestionButton = suggestions.isEmpty() ? nullptr : suggestions.first();
     QVERIFY2(suggestionButton, "the conflicting row must offer a suggested port");
     const int suggestion = wizard->portRowStatuses().at(0).toMap().value(QStringLiteral("suggestion")).toInt();
     QVERIFY(suggestion > 0);
-    // QQC2.Button 的信号是 clicked（`triggered` 属于 QML Action，不在这里）
+    // QQC2.Button's signal is clicked (`triggered` belongs to QML Action, not here)
     QVERIFY(QMetaObject::invokeMethod(suggestionButton, "clicked"));
     QTRY_COMPARE(wizard->portRows().at(0).toMap().value(QStringLiteral("hostPort")).toInt(), suggestion);
     QTRY_VERIFY_WITH_TIMEOUT(!statuses.at(0)->property("visible").toBool(), 5000);
@@ -3007,10 +3007,10 @@ void QmlLoadTest::portRowShowsConflictAndAdoptsTheSuggestion()
 
 
 /*!
- * 「端口」标签页（ARCH_next_ports.md §4.A，里程碑 M3）。
+ * Ports tab (ARCH_next_ports.md §4.A, milestone M3).
  *
- * 端口是第一视觉焦点，容器只是其中一列；行内「停止」与其它危险动作一样要**二次确认**
- * （确认前不能真的发操作）。
+ * Ports are the primary focus and the container is just a column; an inline "Stop" needs confirmation
+ * like any risky action (nothing may be sent before it).
  */
 void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
 {
@@ -3025,7 +3025,7 @@ void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
     running.state = ContainerState::Running;
     running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
     m_backend->setContainers({running});
-    // 让状态控制器收到容器列表（走一遍真实的刷新路径）
+    // Let the state controller receive the container list (through the real refresh path)
     m_stubKcm->controller()->refresh();
     m_backend->completeRefresh();
 
@@ -3056,7 +3056,7 @@ void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
         return list != nullptr && list->property("count").toInt() == 1;
     }(), 5000);
 
-    // 行里能看到端口、状态与容器名（"端口是第一视觉焦点"）
+    // The row shows port, state and container name ("ports are the primary focus")
     QList<QQuickItem *> rows;
     QList<QQuickItem *> stopButtons;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
@@ -3105,8 +3105,8 @@ void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
     QVERIFY2(sawContainer, "the container name must be visible in the row");
 
     /*
-     * 交互（用户实测反馈）：按钮都去掉了——**整行可点**即跳转，
-     * "停止"改到容器详情页去做。因此这里断言：行内没有停止按钮，点行会发跳转信号。
+     * Interaction (user feedback): buttons are gone — the **row itself** navigates, and "stop" moved
+     * to the container detail. So assert: no stop button in the row, but clicking it emits the signal.
      */
     QVERIFY2(stopButtons.isEmpty(), "the row must not carry a stop button any more");
     QVERIFY2(!page->findChild<QObject *>(QStringLiteral("portStopContainerDialog")),
@@ -3118,16 +3118,16 @@ void QmlLoadTest::portsTabListsRowsAndOpensTheContainer()
     QVERIFY(QMetaObject::invokeMethod(rows.first(), "clicked"));
     QCOMPARE(openSpy.count(), 1);
     QCOMPARE(openSpy.first().at(0).toString(), QStringLiteral("running-id"));
-    // 只是导航，不发任何写操作
+    // Navigation only: no write operation is sent
     QCOMPARE(m_backend->mutationCalls().size(), callsBefore);
 }
 
 
 /*!
- * 区间地图（ARCH_next_ports.md §4.B，里程碑 M4）。
+ * Range map (ARCH_next_ports.md §4.B, milestone M4).
  *
- * 切到地图后：每个区间一段、每个方块一个端口、被占的方块有状态；
- * **超长区间必须限流**并显示"还有 N 个"——否则 1000-1100 会创建上百个方块。
+ * In the map: one section per range, one tile per port, occupied tiles carry state;
+ * **huge ranges must be capped** and say "N more" — otherwise 1000-1100 creates hundreds of tiles.
  */
 void QmlLoadTest::portsTabSwitchesToTheRangeMap()
 {
@@ -3138,7 +3138,7 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
     running.state = ContainerState::Running;
     running.ports = {{QStringLiteral("0.0.0.0"), 80, 8080, QStringLiteral("tcp")}};
     m_backend->setContainers({running});
-    // "声明"里塞一段超长区间（1000-1100，共 101 个端口）
+    // Put a huge declared range in (1000-1100, 101 ports)
     ContainerDetail detail;
     detail.id = running.id;
     detail.declaredPorts = {{80, QStringLiteral("tcp"), QString(), 1000, 1100}};
@@ -3168,7 +3168,7 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
     QVERIFY(tabBar->setProperty("currentIndex", 4));
     m_backend->completeRefresh();
 
-    // 切到地图视图
+    // Switch to the map view
     QQuickItem *viewCombo = childByObjectName(page, QStringLiteral("portViewCombo"));
     QVERIFY(viewCombo);
     QVERIFY(viewCombo->setProperty("currentIndex", 1)); // Range map
@@ -3196,7 +3196,7 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
         return tiles.size() > 0 && hiddenLabels.size() > 0;
     }(), 5000);
 
-    // 上限生效：方块数远小于 101，并且给出了"还有 N 个"
+    // The cap works: far fewer than 101 tiles, and the "N more" label is shown
     QVERIFY2(tiles.size() < 101, qPrintable(QString::number(tiles.size())));
     QVERIFY2(tiles.size() <= 64 + 8, "the map must cap how many tiles it renders");
     bool sawHidden = false;
@@ -3207,7 +3207,7 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
     }
     QVERIFY2(sawHidden, "a capped range must say how many ports are not shown");
 
-    // 切回列表视图
+    // Switch back to the list view
     QVERIFY(viewCombo->setProperty("currentIndex", 0));
     QMetaObject::invokeMethod(viewCombo, "activated", Q_ARG(int, 0));
     QTRY_VERIFY_WITH_TIMEOUT(childByObjectName(page, QStringLiteral("hostPortList")) != nullptr, 5000);
@@ -3215,9 +3215,9 @@ void QmlLoadTest::portsTabSwitchesToTheRangeMap()
 
 
 /*!
- * 区间地图的方块点击跳转（用户要求：运行中的端口对应唯一容器，点一下就能过去）。
+ * Range-map tile clicks (requested: a running port maps to one container, one click gets you there).
  *
- * 只有"运行中"的方块带容器信息，其它方块的点击是禁用的（不谎报可点）。
+ * Only "running" tiles carry container info; other tiles disable clicking (no false affordance).
  */
 void QmlLoadTest::rangeMapTilesOpenTheRunningContainer()
 {
@@ -3269,7 +3269,7 @@ void QmlLoadTest::rangeMapTilesOpenTheRunningContainer()
     QVERIFY(viewCombo->setProperty("currentIndex", 1));
     QMetaObject::invokeMethod(viewCombo, "activated", Q_ARG(int, 1));
 
-    // 找到 20003 那块方块：它在"全部端口"下应当是"运行中"（优先级高于被占用/未占用）
+    // Find the 20003 tile: under "all ports" it must count as running (beating in-use/free)
     QQuickItem *runningTile = nullptr;
     QTRY_VERIFY_WITH_TIMEOUT([&] {
         runningTile = nullptr;
@@ -3299,17 +3299,17 @@ void QmlLoadTest::rangeMapTilesOpenTheRunningContainer()
     QCOMPARE(tileData.value(QStringLiteral("containerId")).toString(), QStringLiteral("ml-id"));
 
     /*
-     * 点击方块 → 跳转信号。
+     * Clicking a tile -> navigation signal.
      *
-     * `MouseArea.clicked` 带一个 `QQuickMouseEvent*` 参数，测试里没法构造（头文件不在公开
-     * 包含路径上），因此分两步守：① 方块的点击区存在且 enabled（只有运行中的才可点）；
-     * ② 直接发地图组件的 `containerRequested`，验证"地图 → 页面 → 弹出容器详情"这条接线。
+     * `MouseArea.clicked` takes a `QQuickMouseEvent*` the test cannot construct (header not on the
+     * public include path), so guard in two steps: (1) the tile's click area exists and is enabled
+     * (only running tiles are clickable); (2) emit the map's `containerRequested` and verify the wiring.
      */
     QQuickItem *clickArea = childByObjectName(runningTile, QStringLiteral("portMapTileClick"));
     QVERIFY2(clickArea, "a running tile must be clickable");
     QVERIFY(clickArea->property("enabled").toBool());
-    // 方块上**不再**挂悬停提示（附着属性测试里读不到，改由 tst_source_conventions 守住）
-    // 容器名走无障碍名（附着属性，测试里读不到），这里改断言方块数据里带着它
+    // Tiles carry **no** hover tooltip any more (attached properties are unreadable here;
+    // tst_source_conventions guards that). The container name lives in the tile data instead.
     QCOMPARE(tileData.value(QStringLiteral("containerName")).toString(), QStringLiteral("ml-medai"));
 
     QSignalSpy openSpy(page, SIGNAL(portContainerActivated(QString)));
@@ -3355,7 +3355,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/EmptyPlaceholder.qml"),
         QStringLiteral("components/CollapsibleSection.qml"),
         QStringLiteral("components/KeyValueList.qml"),
-        // 四期新增（ARCH_V4 §2.2.5 / §2.4）
+        // Added in phase 4 (ARCH_V4 §2.2.5 / §2.4)
         QStringLiteral("components/ConfirmDialog.qml"),
         QStringLiteral("components/OperationMessage.qml"),
         QStringLiteral("components/PullImageDialog.qml"),
@@ -3375,7 +3375,7 @@ void QmlLoadTest::loadsAllQmlFiles_data()
         QStringLiteral("components/CreateNetworkDialog.qml"),
     };
     for (const QString &file : files) {
-        // 注意：行名必须是稳定的字节序列，qPrintable() 会产生悬垂指针
+        // Note: the row name must be a stable byte sequence; qPrintable() would dangle
         const QByteArray rowName = file.toUtf8();
         QTest::newRow(rowName.constData()) << uiDirectory + file;
     }
@@ -3404,8 +3404,8 @@ void QmlLoadTest::instantiatesPages_data()
 {
     QTest::addColumn<QString>("fileName");
 
-    // 只有「页面」类文件可以独立创建；卡片/视图组件依赖 required property（由调用方提供），
-    // 它们的编译检查已由 loadsAllQmlFiles 覆盖。
+    // Only "page" files can be created standalone; cards/views need required properties from a caller,
+    // and their compilation is already covered by loadsAllQmlFiles.
     const QString uiDirectory = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/");
     const QStringList files = {
         QStringLiteral("main.qml"),
@@ -3426,7 +3426,7 @@ void QmlLoadTest::instantiatesPages()
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(fileName));
     QVERIFY2(!component.isError(), qPrintable(fileName));
 
-    // 真正实例化：捕获绑定求值期错误（例如访问不存在的属性、类型转换失败）
+    // Really instantiate: catches binding-evaluation errors (missing property, failed type conversion)
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
     if (object.isNull()) {
         QStringList messages;
@@ -3439,8 +3439,8 @@ void QmlLoadTest::instantiatesPages()
 }
 
 /*!
- * §40：Environment / Labels 属于潜在敏感信息，默认必须只显示数量。
- * 这里实例化详情页并断言折叠内容的可见性。
+ * §40: Environment / Labels may hold sensitive data, so by default only counts may be shown.
+ * This instantiates the detail page and asserts the collapsed content's visibility.
  */
 void QmlLoadTest::sensitiveSectionsAreCollapsedByDefault()
 {
@@ -3470,15 +3470,15 @@ void QmlLoadTest::sensitiveSectionsAreCollapsedByDefault()
 
 QQuickItem *QmlLoadTest::childByObjectName(QQuickItem *root, const QString &objectName)
 {
-    // 走可视树：Repeater 创建的 delegate 不在 QObject 树里（详见该助手头文件说明）
+    // Walk the visual tree: Repeater delegates are not in the QObject tree (see the helper's header)
     return TestSupport::findItemByObjectName(root, objectName);
 }
 
 /*!
- * ARCH_V3 §2.1：状态徽标是状态呈现的唯一实现。
- * 语义 key → Kirigami.Badge.Type 的映射只允许发生在 StatusPalette 里。
+ * ARCH_V3 §2.1: StatusChip is the single implementation of status presentation.
+ * The semantic key -> Kirigami.Badge.Type mapping may only live in StatusPalette.
  *
- * Kirigami.Badge.Type 的取值：Information=0, Positive=1, Warning=2, Error=3。
+ * Kirigami.Badge.Type values: Information=0, Positive=1, Warning=2, Error=3.
  */
 void QmlLoadTest::statusChipMapsSemanticKeys_data()
 {
@@ -3511,7 +3511,7 @@ void QmlLoadTest::statusChipMapsSemanticKeys()
     QVERIFY2(!chip.isNull(), "StatusChip failed to instantiate");
 
     QCOMPARE(chip->property("type").toInt(), expectedType);
-    // 三重编码（§1.6/§1.8）：文字与图标必须同时存在，颜色不是唯一区分手段
+    // Triple encoding (§1.6/§1.8): text and icon must both be present; colour is not the only cue
     QCOMPARE(chip->property("text").toString(), QStringLiteral("Running"));
     QObject *icon = chip->property("icon").value<QObject *>();
     QVERIFY2(icon, "StatusChip must expose a grouped icon property");
@@ -3519,8 +3519,8 @@ void QmlLoadTest::statusChipMapsSemanticKeys()
 }
 
 /*!
- * ARCH_V3 §2.1：复制动作只有 CopyButton 一个实现。
- * 值为空时必须禁用按钮，而不是复制空串。
+ * ARCH_V3 §2.1: CopyButton is the only implementation of the copy action.
+ * With an empty value the button must be disabled instead of copying an empty string.
  */
 void QmlLoadTest::copyButtonFollowsValueAvailability()
 {
@@ -3555,8 +3555,8 @@ void QmlLoadTest::copyButtonFollowsValueAvailability()
 }
 
 /*!
- * ARCH_V2 §33 / ARCH_V3 §2.1：空状态必须区分
- * 「没有数据」与「被搜索 / 过滤排除」，后者还要给出可操作的出路。
+ * ARCH_V2 §33 / ARCH_V3 §2.1: empty states must distinguish "no data" from
+ * "excluded by search / filter", the latter also offering an actionable way out.
  */
 void QmlLoadTest::emptyPlaceholderDistinguishesStates()
 {
@@ -3583,18 +3583,18 @@ void QmlLoadTest::emptyPlaceholderDistinguishesStates()
     QQuickItem *placeholder = childByObjectName(page, QStringLiteral("containersEmptyPlaceholder"));
     QVERIFY2(placeholder, "containers empty placeholder not found");
 
-    // 有数据、没有搜索条件：不显示占位
+    // Data present, no search text: no placeholder
     QCOMPARE(placeholder->property("message").toString(), QString());
     QVERIFY(!placeholder->property("visible").toBool());
 
-    // 搜索无结果
+    // Search with no results
     controller->containerList()->setSearchText(QStringLiteral("zzz-no-such-container"));
     const QString searchMessage = placeholder->property("message").toString();
     QVERIFY2(!searchMessage.isEmpty(), "a search miss must show the placeholder");
     QVERIFY2(searchMessage.contains(QStringLiteral("zzz-no-such-container")), qPrintable(searchMessage));
     QCOMPARE(placeholder->property("actionText").toString(), QStringLiteral("Clear search"));
 
-    // 过滤无结果：文案与动作都必须与「搜索无结果」不同（四种空状态不能混为一谈）
+    // Filter with no results: message and action must differ from the search miss (four states, not one)
     controller->containerList()->setSearchText(QString());
     controller->containerList()->setStateFilter(QStringLiteral("paused"));
     const QString filterMessage = placeholder->property("message").toString();
@@ -3604,8 +3604,8 @@ void QmlLoadTest::emptyPlaceholderDistinguishesStates()
 }
 
 /*!
- * ARCH_V3 §2.2：容器详情分区。
- * 切换分区不得改变折叠状态，也不得重新发起 inspect（生命周期只跟页面绑定）。
+ * ARCH_V3 §2.2: container detail sections.
+ * Switching sections must not change collapse state nor re-run inspect (lifecycle is page-bound).
  */
 void QmlLoadTest::containerDetailHasSections()
 {
@@ -3643,10 +3643,10 @@ void QmlLoadTest::containerDetailHasSections()
     QVERIFY2(environment, "environment values container not found");
     QVERIFY2(!environment->isVisible(), "environment must stay collapsed (§40)");
 
-    // 日志是长连接：没进分区就不该开始读（§3.1.4）
+    // Logs are a long-lived stream: no section visit, no reading (§3.1.4)
     QVERIFY2(m_backend->lastLogContainerId().isEmpty(), "logs must not be read before the tab is opened");
 
-    // 切到「日志」分区：开始读日志（用容器详情里的 TTY 标记），且不重新 inspect、不改变折叠状态
+    // Switch to the Logs section: reading starts (TTY flag from the detail), no re-inspect, no expand
     QVERIFY(tabBar->setProperty("currentIndex", 4));
     QCOMPARE(stack->property("currentIndex").toInt(), 4);
     QQuickItem *logConsoleItem = childByObjectName(page, QStringLiteral("logConsole"));
@@ -3658,7 +3658,7 @@ void QmlLoadTest::containerDetailHasSections()
     QCOMPARE(m_backend->refreshCount(DockerBackendInterface::Section::ContainerDetail), 1);
     QVERIFY2(!environment->isVisible(), "switching sections must not expand environment (§40)");
 
-    // 引擎推来的日志出现在控制台里，暂停后继续接收但不追加
+    // Engine-pushed logs appear in the console; while paused they buffer but are not appended
     auto *logs = m_stubKcm->controller()->containerDetail()->logs();
     QVERIFY(logs);
     LogLine first;
@@ -3683,14 +3683,14 @@ void QmlLoadTest::containerDetailHasSections()
     logs->resume();
     QTRY_VERIFY(logText->property("text").toString().contains(QStringLiteral("while paused")));
 
-    // 离开分区：必须断开（长连接不该挂着）
+    // Leaving the section must disconnect (a long-lived stream should not linger)
     QVERIFY(tabBar->setProperty("currentIndex", 0));
     QCOMPARE(m_backend->stopLogsCount(QStringLiteral("cid-1")), 1);
     QCOMPARE(logs->stateKey(), QStringLiteral("idle"));
 }
 
 /*!
- * ARCH_V3 §2.3：镜像层默认只显示前 5 层，可展开全部（切片属于 model 层职责）。
+ * ARCH_V3 §2.3: image layers show 5 first and can expand to all (slicing is the model layer's job).
  */
 void QmlLoadTest::imageLayersCollapseByDefault()
 {
@@ -3731,10 +3731,10 @@ void QmlLoadTest::imageLayersCollapseByDefault()
 }
 
 /*!
- * ARCH_V3_pre §1.8：键盘导航与无障碍不能因为三期重构而退化。
+ * ARCH_V3_pre §1.8: keyboard navigation and accessibility must not regress in the phase-3 refactor.
  *
- * 这里断言的是「可聚焦 / 有可访问名」这些机器可查的部分；
- * 焦点框的实际可见性仍需要人工走查（见 ARCH_V3 §5.3）。
+ * This asserts the machine-checkable parts (focusable, has an accessible name);
+ * the actual visibility of focus rings still needs a manual walkthrough (ARCH_V3 §5.3).
  */
 void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
 {
@@ -3780,9 +3780,9 @@ void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
         QVERIFY2(view->property("keyNavigationEnabled").toBool(), qPrintable(viewName + QStringLiteral(" must support arrow-key navigation")));
     }
 
-    // 统计卡：颜色之外必须有可访问名（§1.8 三重编码）。
-    // 注意 Accessible.* 是附加属性，不能用 property("Accessible.name") 读，
-    // 必须通过 QAccessible 接口查询。
+    // Stat tiles need an accessible name besides colour (§1.8 triple encoding).
+    // Note: Accessible.* are attached properties, unreadable via property("Accessible.name");
+    // query them through the QAccessible interface.
     QQuickItem *tile = childByObjectName(page, QStringLiteral("statTile"));
     QVERIFY2(tile, "stat tile not found (visual tree search)");
     QAccessibleInterface *tileInterface = QAccessible::queryAccessibleInterface(tile);
@@ -3791,10 +3791,10 @@ void QmlLoadTest::keyboardNavigationAndAccessibilityAreWired()
 }
 
 /*!
- * ARCH_V3 §2.7：界面上的「自动刷新」开关必须真的控制刷新调度器。
+ * ARCH_V3 §2.7: the UI's Auto-refresh switch must really drive the refresh scheduler.
  *
- * 它既是用户选项，也是排查「定时刷新触发的界面重建」类问题的诊断开关——
- * 开关本身失效会让排查方向完全跑偏，所以这里做行为断言而不是只看它存在。
+ * It is both a user option and the diagnostic switch for "periodic refresh triggers UI rebuilds" bugs;
+ * a dead switch sends debugging the wrong way, so assert behaviour rather than mere existence.
  */
 void QmlLoadTest::autoRefreshActionControlsTheScheduler()
 {
@@ -3807,7 +3807,7 @@ void QmlLoadTest::autoRefreshActionControlsTheScheduler()
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
     QVERIFY(!object.isNull());
 
-    // 动作不是可视条目，因此从 QObject 子对象里找
+    // The action is not a visual item, so find it among the QObject children
     QObject *autoRefresh = nullptr;
     const QList<QObject *> children = object->findChildren<QObject *>();
     for (QObject *child : children) {
@@ -3818,7 +3818,7 @@ void QmlLoadTest::autoRefreshActionControlsTheScheduler()
     }
     QVERIFY2(autoRefresh, "auto-refresh action not found");
 
-    // 勾选状态跟随控制器（单一数据源）
+    // Checked state follows the controller (single source of truth)
     QCOMPARE(autoRefresh->property("checked").toBool(), controller->autoRefreshEnabled());
 
     QVERIFY(QMetaObject::invokeMethod(autoRefresh, "trigger"));
@@ -3830,12 +3830,12 @@ void QmlLoadTest::autoRefreshActionControlsTheScheduler()
 }
 
 /* ============================================================================
- * 写操作界面（ARCH_V4 §5.1）
+ * Write UI (ARCH_V4 §5.1)
  *
- * 这些用例锁住四期最容易悄悄退化的三件事：
- *  1. 权限门失效（只读环境下仍然出现写按钮）
- *  2. 前置条件失效（运行中的容器出现删除按钮）
- *  3. 确认对话框丢掉「后果说明」
+ * These tests pin the three things most likely to regress silently in phase 4:
+ *  1. permission gate broken (write buttons appear in read-only mode)
+ *  2. preconditions broken (a running container gets a delete button)
+ *  3. confirmation dialogs losing their consequence text
  * ==========================================================================*/
 
 namespace
@@ -3847,7 +3847,7 @@ void QmlLoadTest::writeActionsFollowThePermissionGate()
 {
     StatusController *controller = m_stubKcm->controller();
 
-    // 默认 mock endpoint 无效 → 不可写：写入口整体不出现，并说明原因
+    // The default mock endpoint is invalid -> read-only: no write entry at all, and the reason is stated
     QVERIFY(!controller->operations()->writeAllowed());
 
     const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/MainPage.qml");
@@ -3867,12 +3867,12 @@ void QmlLoadTest::writeActionsFollowThePermissionGate()
     QVERIFY2(banner->property("visible").toBool(), "read-only mode must explain itself");
     QVERIFY2(!banner->property("text").toString().isEmpty(), "banner text must not be empty");
 
-    // socket 变可写之后（例如用户刚被加入 docker 组）写入口回来
+    // Once the socket is writable (e.g. the user just joined the docker group) the entry returns
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
     QVERIFY(controller->operations()->writeAllowed());
     QVERIFY2(!banner->property("visible").toBool(), "banner must disappear once writing is allowed");
-    // 拉取入口在镜像标签页才出现，这里只断言权限门放行后它不再是「被权限挡掉」的状态
+    // The pull entry appears only on the images tab; here just assert the gate no longer blocks it
     QVERIFY(pullButton->property("visible").toBool() || pullButton->property("enabled").toBool());
 }
 
@@ -3885,7 +3885,7 @@ void QmlLoadTest::containerActionsFollowStateAndBusy()
 
     const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
 
-    // 运行中的容器：可以停止 / 重启，但不给删除（先停止再删除，别让用户撞引擎的 409）
+    // Running container: stop / restart but no delete (stop first; do not let users hit the engine's 409)
     ContainerDetail running;
     running.id = QStringLiteral("cid-1");
     running.name = QStringLiteral("demo");
@@ -3921,7 +3921,7 @@ void QmlLoadTest::containerActionsFollowStateAndBusy()
     QVERIFY2(!removeButton->property("visible").toBool(), "running container must not offer delete");
     QVERIFY2(blockedHint->property("visible").toBool(), "the missing delete button needs a reason");
 
-    // 已停止的容器：反过来（写操作后的「写后即读」正是走 reload 这条路）
+    // Exited container: the reverse (the post-write read-back goes through reload)
     ContainerDetail exited;
     exited.id = QStringLiteral("cid-1");
     exited.name = QStringLiteral("demo");
@@ -3935,7 +3935,7 @@ void QmlLoadTest::containerActionsFollowStateAndBusy()
     QVERIFY2(removeButton->property("visible").toBool(), "exited container may be deleted");
     QVERIFY2(!blockedHint->property("visible").toBool(), "no reason needed once delete is available");
 
-    // 操作在途：按钮禁用 + 忙碌指示，避免重复点击
+    // Mutation in flight: buttons disabled plus a busy indicator to prevent double clicks
     controller->operations()->startContainer(QStringLiteral("cid-1"));
     QVERIFY(controller->operations()->isContainerBusy(QStringLiteral("cid-1")));
     QQuickItem *busy = childByObjectName(page, QStringLiteral("detailBusyIndicator"));
@@ -3965,14 +3965,14 @@ void QmlLoadTest::operationMessageReflectsResultState()
     QVERIFY2(message, "operation message not found");
     QVERIFY2(!message->property("visible").toBool(), "no result yet means no banner");
 
-    // 成功：正向提示
+    // Success: positive message
     controller->operations()->startContainer(QStringLiteral("cid-1"));
     m_backend->completeMutations();
     QVERIFY2(message->property("visible").toBool(), "success must be visible");
     const int successType = message->property("type").toInt();
     QVERIFY(!message->property("text").toString().isEmpty());
 
-    // 失败：文案必须带上引擎原文（用户报问题时唯一的「为什么」）
+    // Failure: the message must carry the engine text (the only "why" when users report a bug)
     controller->operations()->removeContainer(QStringLiteral("cid-2"));
     m_backend->completeMutations(MutationOutcome::Failed,
                                  DockerError(DockerError::Kind::Conflict, QStringLiteral("You cannot remove a running container cid-2"), 409));
@@ -3981,7 +3981,7 @@ void QmlLoadTest::operationMessageReflectsResultState()
     QVERIFY2(message->property("text").toString().contains(QStringLiteral("running container")),
              "the engine message must reach the user");
 
-    // 用户已读：关掉之后不再显示
+    // Acknowledged by the user: once dismissed it must not reappear
     controller->operations()->dismissResult();
     QVERIFY2(!message->property("visible").toBool(), "dismissed result must disappear");
 }
@@ -4002,7 +4002,7 @@ void QmlLoadTest::pullDialogValidatesReferenceBeforeSubmitting()
         m_engine->rootContext()));
     QVERIFY2(!object.isNull(), "PullImageDialog failed to instantiate");
 
-    // Kirigami.Dialog 是 Popup：根对象不是 Item，内容项也要等它打开后才创建
+    // Kirigami.Dialog is a Popup: the root is not an Item and content items appear only once opened
     QObject *dialog = object.data();
     QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
 
@@ -4021,30 +4021,28 @@ void QmlLoadTest::pullDialogValidatesReferenceBeforeSubmitting()
     }
     QVERIFY2(field && pullButton, "pull dialog content not found");
 
-    // 空输入：不能提交
+    // Empty input: no submission
     QVERIFY2(!pullButton->property("enabled").toBool(), "empty reference must not be submittable");
 
-    // 非法输入（内部空格）：仍然不能提交
+    // Invalid input (embedded space): still no submission
     field->setProperty("text", QStringLiteral("alpine 3.19"));
     QVERIFY2(!dialog->property("referenceValid").toBool(), "invalid reference must be detected");
     QVERIFY2(!pullButton->property("enabled").toBool(), "invalid reference must not be submittable");
 
-    // 合法但没写标签：可提交，且归一化补上 latest
+    // Valid but untagged: submittable, and normalization appends latest
     field->setProperty("text", QStringLiteral("alpine"));
     QVERIFY2(dialog->property("referenceValid").toBool(), "bare repository is a valid reference");
     QVERIFY2(pullButton->property("enabled").toBool(), "valid reference must be submittable");
     QCOMPARE(dialog->property("normalizedReference").toString(), QStringLiteral("alpine:latest"));
-    // 「会补 latest」的提示由 ImageRefInput 统一提供（校验只有一份实现）；
-    // 可见性由组件的 plainReference 决定，这里同时断言两者，避免只看标签状态
-    // 提示标签与「补 latest」的可见性由 ImageRefInput 自己的用例覆盖
-    // （Kirigami.Dialog 的内容在弹层与管理器里各有一份实例，这里不去断言具体那份实例的内部，
-    //  对话框用例只负责对话框自身的状态与提交行为）
+    // The "latest will be appended" hint comes from ImageRefInput (one validation implementation) and
+    // its visibility is covered by that component's own test: Kirigami.Dialog content exists twice
+    // (popup and manager), so this dialog test only asserts dialog state and submission behaviour.
     QVERIFY2(latestHint || true, "hint label lookup is best-effort here; see imageRefInputOwnsTheValidationRules");
     QVERIFY2(!dialog->property("visible").toBool(), "the dialog must close once the pull has started");
 }
 
 /*!
- * 拉取列表（ARCH_V4 §2.4）：进度不在模态窗口里，关掉窗口也能看见。
+ * Pull list (ARCH_V4 §2.4): progress lives outside the modal window, visible after closing it.
  */
 void QmlLoadTest::pullProgressListShowsBackgroundPulls()
 {
@@ -4060,7 +4058,7 @@ void QmlLoadTest::pullProgressListShowsBackgroundPulls()
     auto *page = qobject_cast<QQuickItem *>(object.data());
     QVERIFY(page);
 
-    // 拉取列表在镜像标签页里：非当前标签页整体不可见，先切过去
+    // The pull list lives on the images tab: switch there first, it is invisible elsewhere
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("tabBar"));
     QVERIFY(tabBar);
     QVERIFY(tabBar->setProperty("currentIndex", 1));
@@ -4069,7 +4067,7 @@ void QmlLoadTest::pullProgressListShowsBackgroundPulls()
     QVERIFY2(list, "pull progress list not found");
     QVERIFY2(!list->property("visible").toBool(), "no pulls means no list");
 
-    // 两路并发：列表里应该出现两行，各自带进度条与取消按钮
+    // Two concurrent pulls: two rows, each with a progress bar and a cancel button
     controller->operations()->pullImage(QStringLiteral("alpine"));
     controller->operations()->pullImage(QStringLiteral("busybox"));
     QTRY_COMPARE(controller->operations()->activePullCount(), 2);
@@ -4096,7 +4094,7 @@ void QmlLoadTest::pullProgressListShowsBackgroundPulls()
     QCOMPARE(cancelButtons, 2);
     QCOMPARE(progressBars, 2);
 
-    // 进度来自后台推送，不依赖任何对话框
+    // Progress arrives from background pushes, independent of any dialog
     ImagePullProgress progress;
     progress.reference = QStringLiteral("alpine:latest");
     progress.phase = ImagePullProgress::Phase::Downloading;
@@ -4105,14 +4103,14 @@ void QmlLoadTest::pullProgressListShowsBackgroundPulls()
     progress.totalBytes = 100;
     m_backend->emitPullProgress(progress);
 
-    // 列表里「最近开始的在最上面」，因此按引用查行号而不是假定位置
+    // Newest pull on top, so look the row up by reference instead of assuming a position
     const int row = controller->operations()->pulls()->rowForReference(QStringLiteral("alpine:latest"));
     QVERIFY(row >= 0);
     QCOMPARE(controller->operations()->pulls()->index(row, 0).data(ImagePullModel::ProgressRole).toDouble(), 0.5);
 }
 
 /*!
- * 拉取失败必须留在列表里（带引擎原文）：这是「失败被静默」的直接对策。
+ * A failed pull must stay in the list with the engine text: the direct answer to silent failures.
  */
 void QmlLoadTest::pullFailureStaysVisibleInTheList()
 {
@@ -4132,7 +4130,7 @@ void QmlLoadTest::pullFailureStaysVisibleInTheList()
     m_backend->completeMutations(MutationOutcome::Failed,
                                  DockerError(DockerError::Kind::Timeout, QStringLiteral("no response headers within 10000 ms")));
 
-    // 列表里那一条变成失败并保留原因
+    // That entry turns failed and keeps its reason
     QCOMPARE(controller->operations()->pulls()->count(), 1);
     QCOMPARE(controller->operations()->pulls()->index(0, 0).data(ImagePullModel::StatusKeyRole).toString(), QStringLiteral("failed"));
 
@@ -4141,10 +4139,10 @@ void QmlLoadTest::pullFailureStaysVisibleInTheList()
     QVERIFY2(statusLabel->property("text").toString().contains(QStringLiteral("no response headers")),
              "the engine message must be visible in the list");
 
-    // 失败提示同时走全局结果通道，并带上「仓库可能不可达」的可操作说明
+    // The failure also goes to the global result channel with the actionable "registry may be unreachable"
     QVERIFY(controller->operations()->resultText().contains(QStringLiteral("registry may be unreachable")));
 
-    // 用户可以移除这条记录
+    // The user can dismiss this entry
     QQuickItem *dismissButton = childByObjectName(page, QStringLiteral("dismissPullButton"));
     QVERIFY(dismissButton);
     QVERIFY(QMetaObject::invokeMethod(dismissButton, "clicked"));
@@ -4152,8 +4150,8 @@ void QmlLoadTest::pullFailureStaysVisibleInTheList()
 }
 
 /*!
- * 刷新按钮不再随自动刷新闪烁：手动刷新在自动刷新期间依然可用
- * （重复触发是无害的，backend 会合并同类在途请求）。
+ * The refresh button no longer flickers with auto-refresh: manual refresh stays available during
+ * auto-refresh (duplicate triggers are harmless; the backend coalesces identical in-flight requests).
  */
 void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
 {
@@ -4168,8 +4166,8 @@ void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
     QObject *refreshAction = nullptr;
     const QList<QObject *> children = object->findChildren<QObject *>();
     for (QObject *child : children) {
-        // 用 text + 非 checkable 区分「刷新」与「自动刷新」两个动作
-        // （icon.name 是分组属性，property("icon.name") 取不到值）
+        // Distinguish Refresh from Auto-refresh by text plus non-checkable
+        // (icon.name is a grouped property; property("icon.name") yields nothing)
         if (child->property("text").toString() == QLatin1String("Refresh")
             && !child->property("checkable").toBool()) {
             refreshAction = child;
@@ -4179,7 +4177,7 @@ void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
     QVERIFY2(refreshAction, "refresh action not found");
     QVERIFY(refreshAction->property("enabled").toBool());
 
-    // 让控制器进入 busy（数据在途）：按钮必须保持可用，避免每 5 秒闪一次
+    // Put the controller in busy (data in flight): the button must stay enabled, not blink every 5s
     controller->refresh();
     QVERIFY(controller->busy());
     QVERIFY2(refreshAction->property("enabled").toBool(), "refresh must not flicker with auto-refresh");
@@ -4188,12 +4186,12 @@ void QmlLoadTest::refreshActionStaysEnabledDuringAutoRefresh()
 
 
 /*!
- * ImageRefInput（ARCH_V5_V8 §1.6）：校验规则来自 C++，组件只负责呈现。
+ * ImageRefInput (ARCH_V5_V8 §1.6): validation rules come from C++, the component only presents them.
  */
 void QmlLoadTest::imageRefInputOwnsTheValidationRules()
 {
     StatusController *controller = m_stubKcm->controller();
-    // 拉取要经过写权限门：先让 endpoint 可写，否则请求会被拒绝、列表为空
+    // Pulling goes through the write gate: make the endpoint writable or requests are refused
     m_backend->setEndpoint(DockerEndpoint::unixSocket(writableSocketPath()));
     controller->operations()->refreshWriteAccess();
 
@@ -4211,7 +4209,7 @@ void QmlLoadTest::imageRefInputOwnsTheValidationRules()
 
     QSignalSpy acceptedSpy(object.data(), SIGNAL(accepted()));
 
-    // 空输入：不合法、不可提交，也不显示"补 latest"提示
+    // Empty input: invalid, not submittable, and no "appends latest" hint
     QVERIFY(!input->property("referenceValid").toBool());
     QVERIFY(!input->property("acceptable").toBool());
 
@@ -4231,18 +4229,18 @@ void QmlLoadTest::imageRefInputOwnsTheValidationRules()
     QVERIFY2(latestHint->property("visible").toBool(), "the hint must be visible");
     QVERIFY(input->property("acceptable").toBool());
 
-    // 回车经组件转成 accepted 信号（调用方决定提交动作）
+    // Enter becomes the component's accepted signal; the caller decides what to submit
     QVERIFY(QMetaObject::invokeMethod(field, "accepted"));
     QCOMPARE(acceptedSpy.count(), 1);
 
-    // 已经在拉的引用：组件负责提示，调用方据此禁用提交
+    // A reference already pulling: the component reports it, the caller disables submission
     controller->operations()->pullImage(QStringLiteral("alpine"));
     QVERIFY2(input->property("alreadyPulling").toBool(), "a duplicate pull must be announced");
     QVERIFY2(!input->property("acceptable").toBool(), "a duplicate pull must not be submittable");
 }
 
 /*!
- * StringListEditor（ARCH_V5_V8 §1.6）：增删改序 + 注入式校验。
+ * StringListEditor (ARCH_V5_V8 §1.6): add/remove/reorder plus injected validation.
  */
 void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
 {
@@ -4250,7 +4248,7 @@ void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
     QQmlComponent component(m_engine.get(), QUrl::fromLocalFile(path));
     QVERIFY2(!component.isError(), qPrintable(path));
 
-    // 校验回调注入：只有 http(s) 开头才算合法
+    // Validation callback injected: only http(s) prefixes are legal
     m_engine->rootContext()->setContextProperty(QStringLiteral("_validatorOwner"), QVariant());
     QScopedPointer<QObject> object(component.create(m_engine->rootContext()));
     QVERIFY(!object.isNull());
@@ -4258,7 +4256,7 @@ void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
     QVERIFY(editor);
 
     editor->setProperty("initialEntries", QVariant(QStringList {QStringLiteral("https://mirror.example.com"), QStringLiteral("http://one.local")}));
-    // initialEntries 只在创建时读取一次 → 用 setValues 走真实路径
+    // initialEntries is read once at creation -> use setValues to take the real path
         QVariant initialValues = QVariant(QStringList {QStringLiteral("https://mirror.example.com"), QStringLiteral("http://one.local")});
     QMetaObject::invokeMethod(editor, "setValues", Q_ARG(QVariant, initialValues));
 
@@ -4267,16 +4265,16 @@ void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
     QCOMPARE(returnedValues.toList().size(), 2);
     QCOMPARE(returnedValues.toList().at(0).toString(), QStringLiteral("https://mirror.example.com"));
 
-    // 上移第一条（顺序对镜像源有意义）
-    // 注意：Repeater 的 delegate 不是 QObject 子对象，必须按可视树查找
+    // Move the first entry up (order matters for mirrors)
+    // Note: Repeater delegates are not QObject children, so search the visual tree
     QQuickItem *downButton = childByObjectName(editor, QStringLiteral("stringEntryDownButton"));
     QVERIFY2(downButton, "string entry down button not found");
     QVERIFY(QMetaObject::invokeMethod(downButton, "clicked"));
     QMetaObject::invokeMethod(editor, "values", Q_RETURN_ARG(QVariant, returnedValues));
     QCOMPARE(returnedValues.toList().at(0).toString(), QStringLiteral("http://one.local"));
 
-    // 删掉一条 → 只剩一条
-    // 注意：Repeater 对 move/remove 会重建 delegate，旧指针会失效 —— 必须重新按 objectName 取
+    // Remove one -> only one remains
+    // Note: Repeater rebuilds delegates on move/remove, so old pointers dangle — look it up again
     QQuickItem *removeButton = childByObjectName(editor, QStringLiteral("stringEntryRemoveButton"));
     QVERIFY2(removeButton, "string entry remove button not found after reorder");
     QVERIFY(QMetaObject::invokeMethod(removeButton, "clicked"));
@@ -4285,8 +4283,8 @@ void QmlLoadTest::stringListEditorEditsValidatesAndReorders()
 }
 
 /*!
- * KeyValueListEditor（ARCH_V5_V8 §1.6）：密钥默认不回显、键名重复会被指出、
- * `.env` 解析走 C++ 单一实现。
+ * KeyValueListEditor (ARCH_V5_V8 §1.6): secret values are masked by default, duplicate keys are
+ * reported, and `.env` parsing has a single C++ implementation.
  */
 void QmlLoadTest::keyValueListEditorMasksValuesAndDetectsDuplicates()
 {
@@ -4304,14 +4302,14 @@ void QmlLoadTest::keyValueListEditorMasksValuesAndDetectsDuplicates()
     QVariant initialArg = QVariant(initial);
     QMetaObject::invokeMethod(editor, "setEntries", Q_ARG(QVariant, initialArg));
 
-    // delegate 内的条目走可视树（findChildren 看不到 Repeater delegate）
+    // Items inside delegates need the visual tree (findChildren cannot see Repeater delegates)
     QQuickItem *keyField = childByObjectName(editor, QStringLiteral("keyValueKeyField"));
     QQuickItem *valueField = childByObjectName(editor, QStringLiteral("keyValueValueField"));
     QVERIFY(keyField && valueField);
-    // 密钥默认以密码样式显示（值可能是 token）：QtQuick TextInput.Password == 2
+    // Secret values use password echo by default (values may be tokens): TextInput.Password == 2
     QCOMPARE(valueField->property("echoMode").toInt(), 2);
 
-    // 重复键名会被指出（键名规则与查重都只有一份实现）
+    // Duplicate keys are reported (key rules and the duplicate check have one implementation)
     QVariantList duplicate;
     duplicate.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("a")}});
     duplicate.append(QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("b")}});
@@ -4323,11 +4321,11 @@ void QmlLoadTest::keyValueListEditorMasksValuesAndDetectsDuplicates()
     QMetaObject::invokeMethod(editor, "hasErrors", Q_RETURN_ARG(bool, hasErrors));
     QVERIFY2(hasErrors, "duplicate keys must be reported");
 
-    // 先回到"只有 TZ 一条"的干净状态，再验证"同名键覆盖、新键追加"
+    // Return to the clean "only TZ" state first, then check overwrite-by-key and append-new-key
     QVariant singleArg = QVariant(QVariantList {QVariantMap {{QStringLiteral("key"), QStringLiteral("TZ")}, {QStringLiteral("value"), QStringLiteral("UTC")}}});
     QMetaObject::invokeMethod(editor, "setEntries", Q_ARG(QVariant, singleArg));
 
-    // `.env` 文本解析（C++ 实现）→ 合并进编辑器
+    // `.env` text parsing (C++) -> merged into the editor
     const QVariantList parsed = Kontainer::Presentation().parseEnvText(QStringLiteral("# comment\nexport API_KEY=\"s3cret\"\nTZ=UTC\ngarbage line\n"));
     QVariant parsedArg = QVariant(parsed);
     QMetaObject::invokeMethod(editor, "appendEntries", Q_ARG(QVariant, parsedArg));
@@ -4369,14 +4367,14 @@ void QmlLoadTest::confirmDialogAlwaysCarriesConsequenceText()
     QCOMPARE(title, QStringLiteral("Delete container"));
     QVERIFY2(subtitle.contains(QStringLiteral("Delete the container")), "the question must be shown");
     QVERIFY2(subtitle.contains(QStringLiteral("volumes are kept")), "the consequence must never be dropped (§2.2.5)");
-    // 破坏性操作用警告样式，而不是普通询问
+    // Destructive actions use the warning style, not a plain question
     QVERIFY(object->property("dialogType").toInt() != 0);
 }
 
 /*!
- * 拉取对话框的 Enter 路径（用户报过的 bug）：
- * 之前写的是 `pullButton.trigger()`——`QQC2.Button` 没有这个方法，
- * 按下回车会抛 TypeError 并什么都不做（拉取请求根本没发出去）。
+ * The pull dialog's Enter path (a user-reported bug):
+ * it used to call `pullButton.trigger()` — `QQC2.Button` has no such method, so Enter threw a
+ * TypeError and did nothing (the pull request was never sent).
  */
 void QmlLoadTest::pullDialogStartsPullOnEnter()
 {
@@ -4407,15 +4405,15 @@ void QmlLoadTest::pullDialogStartsPullOnEnter()
 
     QSignalSpy requestedSpy(dialog, SIGNAL(pullRequested(QString)));
     field->setProperty("text", QStringLiteral("alpine"));
-    // 显式读一次「已经在拉取」这个派生属性：它内部要调用模型上的 Q_INVOKABLE，
-    // 如果方法没标 Q_INVOKABLE，QML 只会在**真正求值的那一刻**抛 TypeError。
-    // 显式读能保证这条路径每次都被走到，而不是依赖运行顺序或其它绑定是否被触发。
+    // Read the derived "already pulling" property explicitly: it calls a Q_INVOKABLE on the model, and
+    // without the Q_INVOKABLE marker QML throws a TypeError only **at evaluation time**; reading it
+    // here guarantees the path is always taken instead of depending on order or other bindings.
     QVERIFY(!dialog->property("alreadyPulling").toBool());
-    // 按下回车：必须发出请求（并且不能有 QML 运行时错误——由 cleanup 断言）
+    // Pressing Enter must send the request (and produce no QML runtime error — cleanup asserts that)
     QVERIFY(QMetaObject::invokeMethod(field, "accepted"));
     QCOMPARE(requestedSpy.count(), 1);
     QCOMPARE(requestedSpy.at(0).at(0).toString(), QStringLiteral("alpine:latest"));
-    // 对话框在发起后关闭，拉取在后台继续
+    // The dialog closes after starting; the pull continues in the background
     QVERIFY2(!dialog->property("visible").toBool(), "the dialog must close once the pull has started");
 }
 
@@ -4449,7 +4447,7 @@ void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
     QVERIFY2(remove->property("visible").toBool(), "a tag may always be deleted");
     QVERIFY2(removeAll->property("visible").toBool(), "multiple tags must offer the force path");
 
-    // 单标签：强制删除入口消失（没有歧义就不给危险选项）
+    // Single tag: the force-delete entry disappears (no ambiguity, no dangerous option)
     detail.repoTags = {QStringLiteral("alpine:3.19")};
     m_backend->setImageDetail(detail);
     controller->imageDetail()->refresh();
@@ -4458,7 +4456,7 @@ void QmlLoadTest::imageDetailOffersForceDeleteOnlyForMultipleTags()
 }
 
 /*!
- * 挂载分区（ARCH_V4 §2.1.1）：宿主路径的状态决定界面给不给「打开宿主目录」。
+ * Mounts section (ARCH_V4 §2.1.1): the host path's state decides whether "Open host folder" appears.
  */
 void QmlLoadTest::mountRowReflectsHostPathState()
 {
@@ -4474,7 +4472,7 @@ void QmlLoadTest::mountRowReflectsHostPathState()
     detail.mounts = {bind};
     m_backend->setContainerDetail(detail);
 
-    // 路径存在：提供打开动作
+    // Path exists: offer the open action
     StatusController *controller = m_stubKcm->controller();
     m_stubKcm->hostPaths()->setState(HostPathState::Directory);
     const QString path = QStringLiteral(KCM_DOCKER_SOURCE_DIR "/src/ui/ContainerDetail.qml");
@@ -4490,7 +4488,7 @@ void QmlLoadTest::mountRowReflectsHostPathState()
     QVERIFY(page);
     m_backend->completeRefresh();
 
-    // 模型必须已经把探测结果算出来（角色值用 QCOMPARE 暴露，便于失败时定位）
+    // The model must have the probe result ready (roles exposed via QCOMPARE to ease failure triage)
     QCOMPARE(controller->containerDetail()->mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("directory"));
     QVERIFY(controller->containerDetail()->mounts()->index(0, 0).data(MountListModel::OpenableRole).toBool());
     QQuickItem *openButton = childByObjectName(page, QStringLiteral("mountOpenButton"));
@@ -4502,8 +4500,8 @@ void QmlLoadTest::mountRowReflectsHostPathState()
     QCOMPARE(entry->property("openable").toBool(), true);
     QCOMPARE(entry->property("sourceStateKey").toString(), QStringLiteral("directory"));
 
-    // 详情页的五个分区在 StackLayout 里：非当前分区整体不可见，
-    // 因此要先切到被测分区（这也正是用户看到该分区时的状态）
+    // The detail page's five sections live in a StackLayout: non-current sections are invisible,
+    // so switch to the one under test (exactly the state users see it in)
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
     QVERIFY(tabBar);
     QVERIFY(tabBar->setProperty("currentIndex", 3));
@@ -4513,18 +4511,18 @@ void QmlLoadTest::mountRowReflectsHostPathState()
     QCOMPARE(typeChip->property("text").toString(), QStringLiteral("bind"));
     QCOMPARE(modeChip->property("text").toString(), QStringLiteral("rw"));
 
-    // 点一下：请求送达宿主路径服务（假实现），路径正确
+    // One click: the request reaches the host-path service (stub) with the right path
     QVERIFY(QMetaObject::invokeMethod(openButton, "clicked"));
     QCOMPARE(m_stubKcm->hostPaths()->openCount(), 1);
     QCOMPARE(m_stubKcm->hostPaths()->openedPaths().first(), QStringLiteral("/srv/data"));
 
-    // 路径不存在：给出警告，并且不提供打开动作（而不是打开后失败）
+    // Missing path: warn and offer no open action (instead of failing after opening)
     m_stubKcm->hostPaths()->setState(HostPathState::Missing);
     controller->containerDetail()->reload();
     m_backend->completeRefresh();
     QCOMPARE(controller->containerDetail()->mounts()->index(0, 0).data(MountListModel::SourceStateKeyRole).toString(), QStringLiteral("missing"));
 
-    // 模型内容变了会重建 delegate：必须重新按 objectName 取，不能复用旧指针
+    // Changed model content rebuilds delegates: look them up again by objectName, never reuse pointers
     QQuickItem *recreatedWarning = childByObjectName(page, QStringLiteral("mountSourceWarning"));
     QQuickItem *recreatedOpenButton = childByObjectName(page, QStringLiteral("mountOpenButton"));
     QVERIFY(recreatedWarning && recreatedOpenButton);
@@ -4534,7 +4532,7 @@ void QmlLoadTest::mountRowReflectsHostPathState()
 }
 
 /*!
- * 端口拓扑（ARCH_V4 §2.1.2）：一行一条映射、一行一条线，连线是装饰。
+ * Port topology (ARCH_V4 §2.1.2): one row and one line per mapping; the lines are decoration.
  */
 void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
 {
@@ -4542,8 +4540,8 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     detail.id = QStringLiteral("cid-1");
     detail.name = QStringLiteral("demo");
     detail.state = ContainerState::Running;
-    // 同一个容器端口的两条绑定：颜色要挑**不同**的一对，否则"起点取最下方分支颜色"
-    // 这条断言在色板碰撞时会失去判别力（色板是纯函数，查询结果确定）
+    // Two bindings of one container port: pick a pair with **different** colours, else the "origin uses
+    // the bottom branch colour" assertion loses its power on a palette collision (pure function, fixed)
     const QPair<quint16, quint16> ports = distinctBranchPorts();
     detail.ports = {
         Port {QStringLiteral("0.0.0.0"), 80, ports.first, QStringLiteral("tcp")},
@@ -4565,7 +4563,7 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     QVERIFY(page);
     m_backend->completeRefresh();
 
-    // 网络分区（index 2）才是端口所在的分区
+    // The ports live in the networks section (index 2)
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
     QVERIFY(tabBar);
     QVERIFY(tabBar->setProperty("currentIndex", 2));
@@ -4573,7 +4571,7 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     QQuickItem *topology = childByObjectName(page, QStringLiteral("portTopology"));
     QVERIFY2(topology, "port topology not found");
     QVERIFY2(topology->property("visible").toBool(), "published ports must render the topology");
-    // 分组：80/tcp 有两条绑定、443/tcp 一条 → 总高度 = 标题行 + 3 条绑定的行高
+    // Grouping: 80/tcp has two bindings, 443/tcp one -> height = header row + 3 binding row heights
     const qreal bindingRowHeight = topology->property("bindingRowHeight").toReal();
     QVERIFY2(bindingRowHeight > topology->property("rowHeight").toReal(),
              "binding rows must be taller than the container row (user feedback: the host-side chips were cramped)");
@@ -4598,16 +4596,16 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
     };
     count(topology);
 
-    // 合并：同一个容器端口的多条绑定只占**一行**（左侧一枚芯片），右侧仍然一条一枚
+    // Merging: one container port's bindings share **one row** (one chip on the left), the right stays 1:1
     QCOMPARE(rows, 2);
     QCOMPARE(containerChips, 2);
     QCOMPARE(hostChips, 3);
 
     {
         /*!
-         * 拓扑的前提：连线按 index 推导行位置，芯片按锚点居中——两者必须落在同一个中心。
-         * 一旦这条不变量破了（例如给行加了 margin、改了 rowHeight 的用法），
-         * 屏幕上就会出现「线从芯片旁边穿过去」这种只有肉眼能发现的错位。
+         * Topology premise: links derive row positions from the index while chips centre on anchors, so
+         * both must land on the same centre. Break that invariant (a row margin, a changed rowHeight use)
+         * and the screen shows lines passing beside the chips, a misalignment only eyes can catch.
          */
         QQuickItem *row0 = nullptr;
         std::function<void(QQuickItem *)> findRow = [&](QQuickItem *item) {
@@ -4622,17 +4620,17 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         QQuickItem *chip = row0 ? row0->childItems().value(0) : nullptr;
         QVERIFY(row0 && chip);
         const qreal headerHeight = topology->property("headerHeight").toReal();
-        // 行的 y 是相对列定位器的，比较时换算到拓扑的坐标系
+        // Row y is relative to the column positioner, so map it into the topology's coordinates
         QCOMPARE(row0->mapToItem(topology, QPointF(0, 0)).y(), headerHeight);
-        // 两条绑定的分组占两行高；左侧芯片垂直居中于整组（连线起点也在组中心）
+        // The two-binding group spans two rows; its left chip is centred on the group (the link origin too)
         QCOMPARE(row0->height(), 2 * bindingRowHeight);
         QVERIFY2(qAbs(chip->y() + chip->height() / 2 - row0->height() / 2) <= 1.0,
                  "the container chip must sit at the centre of its group");
     }
 
-    // 连线层只是装饰（QML 里标了 Accessible.ignored）：这里断言「信息不在图形里」——
-    // 每行的两侧芯片都必须是真实文本，屏幕阅读器与键盘用户完全不依赖连线。
-    // 连线现在是每行一张小 Canvas（颜色按"容器 id + 该映射自身"取，逐行可区分）
+    // The link layer is decoration only (marked Accessible.ignored in QML): assert the information is not
+    // in the graphics — both chips of every row are real text, so screen readers need no links.
+    // Each row now has its own small Canvas (colour from "container id + the mapping itself", rows differ)
     QSet<QString> linkColors;
     int linkLayers = 0;
     std::function<void(QQuickItem *)> collectLinks = [&](QQuickItem *item) {
@@ -4651,12 +4649,12 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         }
     };
     collectLinks(topology);
-    // 每个分组一张 Canvas（两条分支共用同一张，起点只画一次）
+    // One Canvas per group (both branches share it; the origin is drawn once)
     QCOMPARE(linkLayers, 2);
     QVERIFY2(linkColors.size() >= 2, "branches of different bindings must be distinguishable");
 
-    // 起点圆环的颜色取**最下方那条**分支：分支越靠下越在上层，
-    // 起点与"穿过起点的那条线"同色才连贯（用户反馈）
+    // The origin ring takes the colour of the **bottom** branch: lower branches stack higher, and the
+    // origin only looks continuous when it matches the line passing through it (user feedback)
     {
         QQuickItem *link = nullptr;
         std::function<void(QQuickItem *)> findLink = [&](QQuickItem *item) {
@@ -4674,7 +4672,7 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         const QVariantList colors = link->property("branchColors").toList();
         QCOMPARE(colors.size(), 2);
         QCOMPARE(link->property("originColor").value<QColor>().name(), colors.last().toString());
-        // 夹具特意挑了颜色不同的两条绑定：因此"起点用最上面那条的颜色"会立刻失败
+        // The fixture picks two differently coloured bindings, so "origin uses the top colour" fails at once
         QVERIFY2(colors.first().toString() != colors.last().toString(), "the fixture must use two distinct branch colours");
         QVERIFY2(link->property("originColor").value<QColor>().name() != colors.first().toString(),
                  "the origin ring must use the bottom branch's colour, not the top one");
@@ -4692,16 +4690,16 @@ void QmlLoadTest::topologyDrawsDecoratedLinksForPublishedPorts()
         }
     };
     checkText(topology);
-    // 合并后：2 枚容器端口芯片 + 3 枚宿主绑定芯片，全部有文字（信息不在图形里）
+    // After merging: 2 container-port chips + 3 host-binding chips, all with text (info is not in graphics)
     QCOMPARE(nonEmptyChips, 5);
 }
 
 /*!
- * 挂载行的排版约定（ARCH_V4 §2.1.1，2026-09-18 用户反馈）：
+ * Mount row layout contract (ARCH_V4 §2.1.1, user feedback 2026-09-18):
  *
- *   宿主路径占满剩余宽度、过长时**从中间省略**；容器路径**贴右边缘**、
- *   最多占四成宽度。曾经的写法给两个标签都设了 fillWidth，于是容器路径落在
- *   半宽处、跟着宿主路径的长度左右漂移——用户看到的是"映射点位置有点奇怪"。
+ *   The host path takes the leftover width and elides **in the middle** when too long; the container path
+ *   **hugs the right edge** and takes at most 40% of the width. Setting fillWidth on both labels left the
+ *   container path at half width, drifting with the host path's length — a "strange mapping spot".
  */
 void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
 {
@@ -4737,7 +4735,7 @@ void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
     QVERIFY(page);
     m_backend->completeRefresh();
 
-    // 布局断言需要真实宽度：给它一个窗口（与用户看到该分区时的状态一致）
+    // Layout assertions need real widths: give it a window (the state users see this section in)
     QQuickWindow window;
     window.resize(900, 700);
     page->setParentItem(window.contentItem());
@@ -4748,7 +4746,7 @@ void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
 
     QQuickItem *tabBar = childByObjectName(page, QStringLiteral("detailTabBar"));
     QVERIFY(tabBar);
-    QVERIFY(tabBar->setProperty("currentIndex", 3)); // 挂载分区
+    QVERIFY(tabBar->setProperty("currentIndex", 3)); // mounts section
 
     QList<QQuickItem *> rows;
     std::function<void(QQuickItem *)> collect = [&](QQuickItem *item) {
@@ -4770,19 +4768,19 @@ void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
         QTRY_VERIFY(source->width() > 0 && destination->width() > 0);
         const qreal linkRowWidthHint = destination->parentItem() ? destination->parentItem()->width() : row->width();
 
-        // 容器路径的**文本框贴合文字**（不再占半行）：靠右对齐的前提
-        // ——旧写法给两个标签都设了 fillWidth，目标路径的盒子占一半宽度，
-        //   文字虽然"靠右对齐"在盒子里，看起来却落在行的中间（用户反馈的"位置奇怪"）
+        // The container path's **text box hugs its text** (no longer half a row): the precondition for
+        // right alignment — with fillWidth on both labels the box filled half the row, so text aligned
+        // right inside the box still looked centred (the "strange position" users reported)
         const qreal destinationContent = destination->property("contentWidth").toReal();
-        // 允许一点内边距与取整误差；关键是"贴合文字"而不是半个行宽
+        // Allow some padding and rounding error; what matters is hugging the text, not half the row width
         const qreal hugTolerance = qMax<qreal>(8.0, linkRowWidthHint * 0.05);
         QVERIFY2(destination->width() <= destinationContent + hugTolerance,
                  qPrintable(QStringLiteral("row %1: the container path box must hug its text (%2 vs %3)")
                                 .arg(i)
                                 .arg(destination->width())
                                 .arg(destinationContent)));
-        // 目标路径排在宿主路径之后（不重叠），且文字**靠右**对齐：
-        // 宿主路径左对齐、容器路径右对齐——两者必须不同，否则目标路径又会飘到中间
+        // The destination follows the source without overlapping and is **right** aligned:
+        // source left, container path right — they must differ, else the destination drifts to the middle
         QQuickItem *linkRow = destination->parentItem();
         QVERIFY(linkRow);
         const qreal sourceRight = source->x() + source->width();
@@ -4791,13 +4789,13 @@ void QmlLoadTest::mountRowsPutTheContainerPathOnTheRight()
                  qPrintable(QStringLiteral("row %1: the container path must be right-aligned").arg(i)));
     }
 
-    // 说明：无头测试里页面的宽度链条不稳定（行的实际宽度可能超过页面），
-    // 因此"超长宿主路径真的出现省略号"这一条不在这里断言，而是靠渲染复核：
+    // Note: in headless tests the page's width chain is unstable (a row may end up wider than the page),
+    // so "a very long host path really gets an ellipsis" is not asserted here but reviewed by rendering:
     //   KCM_DOCKER_RENDER_LONG_PATHS=1 tests/tools/render_ui.sh container-detail 1200 620 light /tmp/m.png 3
 }
 
 /*!
- * 只 EXPOSE、没有映射到宿主的端口：列出来，但没有线上的端点。
+ * Ports that are only EXPOSEd and never published: they are listed but have no endpoint on a line.
  */
 void QmlLoadTest::unpublishedPortsAreListedWithoutLinks()
 {

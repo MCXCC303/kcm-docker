@@ -13,10 +13,10 @@
 using namespace Kontainer;
 
 /*!
- * 配置文件改名与一次性迁移（软件从 kontainer 更名为 kcm-docker）。
+ * Config file rename and one-time migration (the app was renamed kontainer -> kcm-docker).
  *
- * 用户已有的挂载预设 / 命令历史存在 `~/.config/kontainerrc`，新版本读 `kcm_dockerrc`——
- * 不迁移就等于把用户数据"弄丢"了（用户看不见，但确实是丢）。
+ * Existing mount presets and command history live in `~/.config/kontainerrc` while new
+ * versions read `kcm_dockerrc`, so without migration the user's data is silently lost.
  */
 class AppConfigPathTest : public QObject
 {
@@ -46,7 +46,7 @@ void AppConfigPathTest::migratesTheLegacyFileOnce()
     QFile copied(path);
     QVERIFY(copied.open(QIODevice::ReadOnly));
     QVERIFY(copied.readAll().contains("/srv/data"));
-    // 旧文件保留：用户回退旧版本还能用
+    // The legacy file is kept so downgrading still works
     QVERIFY2(QFile::exists(legacy), "the legacy file must be kept");
 }
 
@@ -66,7 +66,7 @@ void AppConfigPathTest::keepsAnExistingNewFileUntouched()
     QCOMPARE(defaultAppConfigPath(dir.path()), dir.filePath(QStringLiteral("kcm_dockerrc")));
     QFile current(dir.filePath(QStringLiteral("kcm_dockerrc")));
     QVERIFY(current.open(QIODevice::ReadOnly));
-    // 迁移只做一次：新文件已经有内容时**不能**被旧文件覆盖
+    // Migration happens once: a non-empty new file must not be overwritten by the old one
     QVERIFY(current.readAll().contains("new"));
 }
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-# SPDX-FileCopyrightText: 2026 kontainer developers
+# SPDX-FileCopyrightText: 2026 kcm-docker developers
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""最小假 Docker Engine —— 仅用于 UI 开发/验证，不属于产品代码。
+"""Minimal fake Docker Engine — for UI development/verification only, not product code.
 
-用途：在没有 Docker（或不想触碰真实 daemon）的情况下验证 KCM 的
-Loading / Empty / Error 状态，以及四期的写操作界面（启动 / 停止 / 重启 / 删除、
-镜像拉取与删除）。实现的端点：
+Purpose: exercise the KCM's loading / empty / error states and the write-operation UI
+(start / stop / restart / remove, image pull and remove) without Docker, or without
+touching a real daemon. Implemented endpoints:
 
     GET    /_ping
     GET    /version
-    GET    /info                  (以及 /v1.xx/info)
+    GET    /info                  (and /v1.xx/info)
     GET    /containers/json
     GET    /images/json
     GET    /system/df
@@ -17,16 +17,17 @@ Loading / Empty / Error 状态，以及四期的写操作界面（启动 / 停�
     GET    /containers/{id}/stats
     POST   /containers/{id}/start | stop | restart
     DELETE /containers/{id}
-    POST   /images/create         (chunked 进度流)
+    POST   /images/create         (chunked progress stream)
     DELETE /images/{name}
 
-用法：
+Usage:
     tests/tools/fake_docker_server.py /tmp/fake-docker.sock [--empty] [--api-version 1.56]
 
     DOCKER_HOST=unix:///tmp/fake-docker.sock kcmshell6 kcm_docker
 
-状态只存在于**本进程内存**里（启动 / 删除会真的改变列表，便于观察界面刷新），
-绝不触碰任何真实 Docker 资源。socket 权限是 0600，因此写权限门会放行。
+All state lives in this process only (start/remove really change the lists so the UI
+refresh is visible) and no real Docker resource is touched. The socket is 0600, so the
+write-permission gate stays open.
 """
 
 from __future__ import annotations
@@ -93,7 +94,7 @@ PULL_LINES = [
 
 
 def make_handler(empty: bool, api_version: str):
-    # 每个进程一份内存状态：写操作真的改动它，界面因此能看到刷新
+    # In-memory state, one copy per process: writes really mutate it, so a UI refresh shows them
     containers = [] if empty else [dict(entry) for entry in CONTAINERS]
     images = [] if empty else [dict(entry) for entry in IMAGES]
 
@@ -113,7 +114,7 @@ def make_handler(empty: bool, api_version: str):
         def do_GET(self) -> None:  # noqa: N802 (http.server API)
             path = self.path.split("?", 1)[0]
             parts = path.split("/")
-            # 去掉可选 /v1.xx 前缀
+            # Strip the optional /v1.xx prefix
             if len(parts) > 1 and parts[1].startswith("v1."):
                 path = "/" + "/".join(parts[2:])
 
@@ -133,9 +134,9 @@ def make_handler(empty: bool, api_version: str):
                     }
                 )
             elif path == "/info":
-                # 注意：这里不要重新绑定 containers / images，
-                # 否则 do_GET 内部会把它们当成局部变量（UnboundLocalError）；
-                # 计数直接取内存态，写操作之后界面上的数字才会跟着变
+                # Do NOT rebind containers / images here: assigning them inside do_GET
+                # makes them locals of the whole method (UnboundLocalError).
+                # Counts read the in-memory state, so they follow writes.
                 self._json(
                     {
                         "Name": "fake-engine",
@@ -233,7 +234,7 @@ def make_handler(empty: bool, api_version: str):
             return None
 
         def _pull_stream(self, query: str) -> None:
-            """chunked 逐行推送拉取进度（与真实 daemon 的形态一致）。"""
+            """Push pull progress chunk by chunk, one JSON line at a time (like the real daemon)."""
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Transfer-Encoding", "chunked")
@@ -243,7 +244,7 @@ def make_handler(empty: bool, api_version: str):
                 self.wfile.write(b"%x\r\n" % len(payload) + payload + b"\r\n")
                 self.wfile.flush()
             self.wfile.write(b"0\r\n\r\n")
-            # 拉取成功后镜像列表里真的多一个（界面刷新就能看到）
+            # A successful pull really appends an image (visible after a UI refresh)
             images.append(
                 {
                     "Id": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
@@ -255,7 +256,7 @@ def make_handler(empty: bool, api_version: str):
                 }
             )
 
-        def log_message(self, *args: object) -> None:  # 静默
+        def log_message(self, *args: object) -> None:  # silent
             return
 
     return Handler

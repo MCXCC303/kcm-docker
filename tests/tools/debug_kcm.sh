@@ -1,19 +1,19 @@
 #!/bin/sh
-# SPDX-FileCopyrightText: 2026 kontainer developers
+# SPDX-FileCopyrightText: 2026 kcm-docker developers
 # SPDX-License-Identifier: GPL-2.0-or-later
 #
-# 调试用启动器（见 DEBUGGING.md）：把 KCM 在**系统设置**或**独立窗口**里跑起来，
-# 并把日志、调试开关、崩溃取证都准备好。
+# Debug launcher (see DEBUGGING.md): runs the KCM inside **System Settings** or **standalone**,
+# with logging, debug switches and crash forensics ready.
 #
-# 用法：
-#   tests/tools/debug_kcm.sh                      # 在系统设置里打开本模块
-#   tests/tools/debug_kcm.sh standalone           # 用 kcmshell6 独立窗口打开
-#   tests/tools/debug_kcm.sh settings --gdb       # 在 gdb 里跑系统设置（断点/回溯）
-#   tests/tools/debug_kcm.sh standalone --isolated # 用临时 HOME（不碰真实 ~/.config/kcm_dockerrc）
-#   tests/tools/debug_kcm.sh --coredumps          # 看最近的崩溃（coredumpctl）
+# Usage:
+#   tests/tools/debug_kcm.sh                      # open the module in System Settings
+#   tests/tools/debug_kcm.sh standalone           # open it in a kcmshell6 window
+#   tests/tools/debug_kcm.sh settings --gdb       # run System Settings under gdb (breakpoints/backtrace)
+#   tests/tools/debug_kcm.sh standalone --isolated # temp HOME (leaves real ~/.config/kcm_dockerrc alone)
+#   tests/tools/debug_kcm.sh --coredumps          # inspect the latest crash (coredumpctl)
 #
-# 关键点：插件可以直接从**构建目录**加载（`QT_PLUGIN_PATH=build/bin`），
-# 因此改完代码只要 `cmake --build build`，不必每次 `cmake --install`。
+# Key point: the plugin loads straight from the **build dir** (`QT_PLUGIN_PATH=build/bin`), so
+# after editing code a `cmake --build build` is enough — no `cmake --install` round trip.
 set -e
 
 MODE=settings
@@ -35,7 +35,7 @@ for arg in "$@"; do
     esac
 done
 
-# 仓库根（本脚本在 tests/tools/ 下）
+# Repo root (this script lives in tests/tools/)
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BUILD="$ROOT/build"
 PREFIX="${KCM_DOCKER_PREFIX:-$HOME/kde/usr}"
@@ -45,30 +45,30 @@ if [ ! -f "$BUILD/bin/plasma/kcms/systemsettings/kcm_docker.so" ]; then
     exit 1
 fi
 
-# ① 让宿主找到插件：构建目录本身就是一个合法的插件根
+# ① Let the host find the plugin: the build dir is itself a valid plugin root
 QT_PLUGIN_PATH="$BUILD/bin${QT_PLUGIN_PATH:+:$QT_PLUGIN_PATH}"
 export QT_PLUGIN_PATH
-# ② 翻译与桌面集成（已装的资源；缺了也只是没有中文，不影响调试）
+# ② Translations and desktop integration (installed resources; missing only means no Chinese UI)
 XDG_DATA_DIRS="$PREFIX/share:/usr/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
 export XDG_DATA_DIRS
-# ③ 我们的日志类别（ARCH §5.17）：默认就开；这里只是确保不被会话配置关掉
+# ③ Our logging categories (ARCH §5.17): on by default; this keeps session config from disabling them
 QT_LOGGING_RULES="kontainer.*=true;${QT_LOGGING_RULES:-}"
 export QT_LOGGING_RULES
 
 if [ "$ACTION" = "--verbose-qml" ]; then
-    # QML 绑定被覆盖、属性被重设之类的"静默"问题只有打开这些才看得见
+    # Silent QML problems (overwritten bindings, reset properties) only show up with these on
     QT_LOGGING_RULES="qt.qml.binding.removal.info=true;qt.qml.connections=true;kontainer.*=true;$QT_LOGGING_RULES"
     export QT_LOGGING_RULES
 fi
 if [ "$ACTION" = "--fatal-warnings" ]; then
-    # 把第一条 Qt 警告变成崩溃点：定位"到底哪一步先出错"很有效
+    # Turn the first Qt warning into a crash: finds "which step fails first" very effectively
     QT_FATAL_WARNINGS=1
     export QT_FATAL_WARNINGS
 fi
 
 if [ "$ISOLATED" = "1" ]; then
-    # 隔离 HOME：KCM 会读写 ~/.config/kcm_dockerrc（挂载预设、命令历史），
-    # 调试时不该动真实配置
+    # Isolated HOME: the KCM reads and writes ~/.config/kcm_dockerrc (mount presets, command
+    # history), and debugging must not touch the real config
     ISOLATED_HOME=$(mktemp -d)
     HOME="$ISOLATED_HOME"
     export HOME
@@ -98,5 +98,5 @@ if [ "$MODE" = "standalone" ]; then
     exec kcmshell6 kcm_docker
 fi
 
-# 系统设置里打开本模块（用法：systemsettings [选项] module）
+# Open the module in System Settings (usage: systemsettings [options] module)
 exec systemsettings kcm_docker

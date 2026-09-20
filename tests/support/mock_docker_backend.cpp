@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -66,7 +66,7 @@ void MockDockerBackend::setContainerStats(const ContainerStats &stats)
 void MockDockerBackend::setEndpointName(const QString &name)
 {
     m_endpointName = name;
-    Q_EMIT loadingChanged(); // 让依赖 endpoint 的绑定有机会刷新
+    Q_EMIT loadingChanged(); // let bindings that depend on the endpoint refresh
 }
 
 void MockDockerBackend::setNextFailure(Section section, const DockerError &error)
@@ -192,7 +192,7 @@ void MockDockerBackend::removeVolume(const QString &name)
 void MockDockerBackend::pruneVolumes()
 {
     ++m_pruneCalls;
-    // 目标键与真实后端一致：prune 不是针对某个卷，用专门的键
+    // Target key matches the real backend: prune targets no single volume, so it has its own key
     m_mutationCalls.append({Mutation::PruneVolumes, OperationTarget::volumePrune(), false});
 }
 
@@ -208,7 +208,7 @@ void MockDockerBackend::refreshStorageUsage()
 
 void MockDockerBackend::inspectContainer(const QString &id)
 {
-    // 按 id 取准备好的详情（渲染工具会同时准备多份）；没有就沿用最后设置的那份
+    // Take the detail prepared for this id (the render tool prepares several); else keep the last
     if (m_containerDetailsById.contains(id)) {
         m_containerDetail = m_containerDetailsById.value(id);
     } else {
@@ -243,7 +243,7 @@ bool MockDockerBackend::isSamplingStats(const QString &id) const
 void MockDockerBackend::setEndpoint(const DockerEndpoint &endpoint)
 {
     m_endpoint = endpoint;
-    Q_EMIT loadingChanged(); // 让依赖 endpoint 的绑定有机会刷新
+    Q_EMIT loadingChanged(); // let bindings that depend on the endpoint refresh
 }
 
 DockerEndpoint MockDockerBackend::endpoint() const
@@ -338,7 +338,7 @@ void MockDockerBackend::connectNetwork(const QString &networkId, const QString &
 {
     m_lastNetworkConnect = {networkId, containerId};
     m_lastNetworkConnectAliases = aliases;
-    // 目标键与真实后端一致（网络 + 容器）：控制器据此找到要重读的容器
+    // Target key matches the real backend (network + container): the controller re-reads that container
     m_mutationCalls.append({Mutation::ConnectNetwork, OperationTarget::network(networkId) + QLatin1Char('/') + containerId, false});
 }
 
@@ -369,7 +369,7 @@ void MockDockerBackend::checkRegistryAuth(const QString &serverAddress, const Re
     ++m_authCheckCount;
     m_lastAuthServerAddress = serverAddress;
     m_lastAuthCredential = credential;
-    // 默认立即回应；需要观察"进行中"的用例用 setAuthCheckDeferred(true) 自己控制时序
+    // Answer immediately by default; cases observing "in progress" use setAuthCheckDeferred(true)
     if (!m_authCheckDeferred) {
         completeAuthCheck();
         return;
@@ -391,7 +391,7 @@ void MockDockerBackend::completeAuthCheck()
 
 void MockDockerBackend::startContainerLogs(const QString &id, bool tty, bool follow, int tailLines)
 {
-    // 记录参数即可：真实读取由真实后端负责，这里只让控制器/界面能跑起来
+    // Only record the arguments: the real backend reads logs; this just keeps the UI running
     m_lastLogContainerId = id;
     m_lastLogTty = tty;
     m_lastLogFollow = follow;
@@ -432,8 +432,8 @@ void MockDockerBackend::completeRefresh()
 
         const DockerError failure = m_failures.take(int(section));
         if (failure.isError()) {
-            // 与真实 backend 一致：Engine 的"部分失败"（连接可用、/info 失败）
-            // 仍然先给出已有的域数据，再上报该数据集的失败（错误隔离，§15）
+            // Like the real backend: an Engine "partial failure" (connection up, /info failed)
+            // still delivers existing domain data first, then reports that dataset's failure (§15)
             if (section == Section::Engine && m_engine.available) {
                 Q_EMIT engineUpdated();
             }
@@ -482,7 +482,7 @@ bool MockDockerBackend::isLoading() const
 
 void MockDockerBackend::abandonInFlightRequests(const DockerError &error)
 {
-    // 与真实后端一致：把排队的请求按失败送出，并释放 loading
+    // Like the real backend: fail every queued request and release loading
     const QList<Section> sections = {Section::Engine,
                                      Section::Containers,
                                      Section::Images,

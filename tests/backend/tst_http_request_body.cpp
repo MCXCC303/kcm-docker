@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,11 +16,12 @@
 using namespace Kontainer;
 
 /*!
- * 流式上传请求体（ARCH_V5_V8 §5.1）。
+ * Streaming upload request body (ARCH_V5_V8 §5.1).
  *
- * 这是八期唯一的新传输能力：构建镜像要上传 tar 上下文，几十上百 MB 的体不能一次性进内存，
- * 也不能用"响应阶段"的空闲超时去卡上传。因此这里的用例都盯着边界：
- * 长度必须与文件一致、分块写出去的内容逐字节正确、远端提前关闭要报错、取消要能中断上传。
+ * The only new transport capability of phase 8: building an image uploads a tar context, and
+ * a body of tens to hundreds of MB cannot go into memory at once, nor may the "response phase"
+ * idle timeout be used to bound the upload. So these cases watch the edges: length matches the
+ * file, chunked bytes are written verbatim, an early remote close errors out, cancel aborts.
  */
 class HttpRequestBodyTest : public QObject
 {
@@ -36,7 +37,7 @@ private Q_SLOTS:
     void cancelStopsTheUpload();
 
 private:
-    /*! 极简 HTTP 服务端：把收到的字节原样交给测试。 */
+    /*! Minimal HTTP server: hands the received bytes to the test verbatim. */
     QLocalServer m_server;
     QLocalSocket *m_connection = nullptr;
     QByteArray m_received;
@@ -81,7 +82,7 @@ void HttpRequestBodyTest::onReadyRead()
     const int expected = lengthIndex >= 0 ? headers.mid(lengthIndex + 16).split('\r').value(0).toInt() : 0;
     const QByteArray body = m_received.mid(headerEnd + 4);
     if (body.size() < expected) {
-        return; // 还没收完
+        return; // body not complete yet
     }
     if (m_closeEarly) {
         m_connection->disconnectFromServer();
@@ -95,13 +96,13 @@ void HttpRequestBodyTest::onReadyRead()
     m_connection->disconnectFromServer();
 }
 
-/*! 大文件（> 一块）：分块上传的内容必须与文件完全一致。 */
+/*! Large file (> one chunk): the uploaded content must match the file exactly. */
 void HttpRequestBodyTest::uploadsChunkedLargeFile()
 {
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
     const QString path = dir.filePath(QStringLiteral("big-context.tar"));
-    // 1 MiB + 一点点：跨多个 256 KiB 的块
+    // 1 MiB and a bit: spans several 256 KiB chunks
     QByteArray payload;
     payload.reserve(1024 * 1024 + 7);
     for (int i = 0; i < payload.capacity(); ++i) {
@@ -130,7 +131,7 @@ void HttpRequestBodyTest::uploadsChunkedLargeFile()
     const QByteArray headers = m_received.left(headerEnd);
     QVERIFY(headers.contains("Content-Type: application/x-tar"));
     QVERIFY(headers.contains("Content-Length: " + QByteArray::number(payload.size())));
-    QCOMPARE(m_received.mid(headerEnd + 4), payload); // 逐字节一致
+    QCOMPARE(m_received.mid(headerEnd + 4), payload); // byte for byte
     reply->deleteLater();
 }
 
@@ -145,8 +146,9 @@ void HttpRequestBodyTest::reportsErrorWhenFileIsMissing()
                                          QByteArrayLiteral("application/x-tar"),
                                          5000,
                                          5000);
-    // 这里轮询状态而不是信号：失败可能是"连接建立后立刻发生"的，
-    // 调用方（以及本用例）拿到 reply 时信号可能已经发过——客户端因此把这类失败延后发出
+    // Poll the state instead of the signal: the failure can happen right after the connection
+    // is established, so the signal may already have fired when the caller (and this test) gets
+    // the reply - the client therefore defers emitting this kind of failure
     QTRY_COMPARE_WITH_TIMEOUT(reply->state(), DockerReply::State::Failed, 10000);
     QCOMPARE(reply->error().kind(), DockerError::Kind::PreconditionFailed);
     reply->deleteLater();
