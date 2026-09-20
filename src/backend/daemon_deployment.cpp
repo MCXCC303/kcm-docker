@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -57,12 +57,12 @@ bool DaemonDeploymentDetector::configIsWritable(const QString &path)
     }
     const QFileInfo info(path);
     if (info.exists()) {
-        // 已存在的文件：只信它自己的权限位（父目录可写但文件只读 = 不能改）
+        // Existing file: trust its own permission bits (writable parent + read-only file = no edit)
         return info.isWritable();
     }
-    // 还不存在：能创建就算可写。向上找到最近的已存在目录来判断，
-    // 因为 ~/.config/docker 可能整条链都还没建
-    // （注意不能用 QDir::cdUp()：它要求目标目录已存在，正好是这里要处理的情况）
+    // Absent: creatable counts as writable. Walk up to the nearest existing directory, since the
+    // whole ~/.config/docker chain may be missing.
+    // (Not QDir::cdUp(): it requires the target to exist, exactly the case handled here.)
     QString dir = info.absolutePath();
     while (!dir.isEmpty() && !QFileInfo::exists(dir)) {
         const QString parent = QFileInfo(dir).absolutePath();
@@ -80,7 +80,7 @@ DaemonDeployment DaemonDeploymentDetector::detect(const EngineInfo &info, const 
     deployment.systemConfigPath = QString::fromLatin1(kSystemConfigPath);
     deployment.userConfigPath = userConfigPathFor(homeDir);
 
-    // 形态判定只看 `SecurityOptions`：rootless daemon 会带 `name=rootless`
+    // Form comes only from `SecurityOptions`: a rootless daemon carries `name=rootless`
     bool rootless = false;
     for (const QString &option : info.securityOptions) {
         if (option.contains(QLatin1String("rootless"))) {
@@ -91,13 +91,13 @@ DaemonDeployment DaemonDeploymentDetector::detect(const EngineInfo &info, const 
     if (rootless) {
         deployment.form = DaemonForm::Rootless;
     } else if (!info.securityOptions.isEmpty()) {
-        // 有 SecurityOptions 但不含 rootless → 系统级 root daemon
+        // SecurityOptions present but no rootless → system root daemon
         deployment.form = DaemonForm::SystemRoot;
     }
 
-    // 配置路径：形态已知时直接用该形态的路径；形态未知时只在用户配置确实存在时采信它。
-    // 不知道是哪个 daemon 就绝不猜系统路径——按猜测往 /etc 写是不可接受的
-    // （界面本来就会按作用域给出路径，这里只是"探测出来的默认值"）
+    // Config path: use the form's path when the form is known; when unknown, trust the user config
+    // only if it exists. Never guess the system path — a guessed write to /etc is unacceptable
+    // (the UI offers a path per scope anyway; this is just the detected default).
     const QFileInfo userInfo(deployment.userConfigPath);
 
     QString chosen;
@@ -116,8 +116,8 @@ DaemonDeployment DaemonDeploymentDetector::detect(const EngineInfo &info, const 
     deployment.configSize = deployment.configExists ? chosenInfo.size() : 0;
     deployment.configModified = deployment.configExists ? chosenInfo.lastModified() : QDateTime();
 
-    // 数据目录在家目录里：常见于"系统级 daemon + 用户家目录数据"的混合配置，
-    // 值得在界面上点出来（用户容易误以为是 rootless）
+    // Data root inside $HOME: typical of "system daemon + user home data", worth calling out in
+    // the UI (users easily mistake it for rootless)
     deployment.dataRootInHomeDir = pathIsInside(info.dockerRootDir, homeDir);
     return deployment;
 }

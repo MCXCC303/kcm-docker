@@ -1,13 +1,13 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Docker disk usage（ARCH_V2 §23/§30 / ARCH_V3 §2.4）。
+    Docker disk usage (ARCH_V2 §23/§30 / ARCH_V3 §2.4).
 
-    数据来自 `/system/df` 结构化 API。可视化（堆叠条 + 图例）交给
-    components/StorageBar，本文件只负责标题、错误隔离与合计。
+    Data comes from the `/system/df` structured API. Visualization (stacked bar + legend) lives in
+    components/StorageBar; this file only handles the heading, error isolation and the total.
 
-    某项不可用时显示 “—” 而不是 0；失败只影响本区块。
+    An unavailable section shows "—" rather than 0; a failure only affects this block.
 */
 
 import QtQuick
@@ -26,7 +26,7 @@ ColumnLayout {
 
     readonly property var storage: controller.storage
 
-    /*! 某一段被点击（转发给页面：数据卷那段可以跳转到卷列表）。 */
+    /*! A segment was clicked (forwarded to the page: the volumes segment opens the volume list). */
     signal segmentActivated(string entryKey)
 
     spacing: Kirigami.Units.smallSpacing

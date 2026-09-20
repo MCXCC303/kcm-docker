@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -38,14 +38,15 @@ DockerEndpoint DockerEndpoint::fromEnvironment()
             return unixSocket(host.mid(int(sizeof(unixScheme)) - 1));
         }
         DockerEndpoint endpoint;
-        // 只记录 scheme：DOCKER_HOST 可能形如 tcp://user:pass@host，不能把原值写进日志（§25）
+        // Log the scheme only: DOCKER_HOST may look like tcp://user:pass@host, so the
+        // raw value must never reach the log (§25)
         const QString scheme = host.left(host.indexOf(QLatin1String("://")) + 3);
         endpoint.m_problem = QStringLiteral("DOCKER_HOST scheme '%1' is not supported in phase 1 (only unix:// is)").arg(scheme);
         return endpoint;
     }
 
-    // rootless Docker 使用 $XDG_RUNTIME_DIR/docker.sock，系统级 Docker 使用 /run/docker.sock
-    // （/var/run 通常只是 /run 的符号链接，这里保留为最后兜底）。
+    // rootless Docker uses $XDG_RUNTIME_DIR/docker.sock, system Docker /run/docker.sock
+    // (/var/run is usually just a symlink to /run, kept as the last fallback).
     QStringList candidates;
     const QString runtimeDir = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
     if (!runtimeDir.isEmpty()) {
@@ -59,7 +60,8 @@ DockerEndpoint DockerEndpoint::fromEnvironment()
         }
     }
 
-    // 都不存在时给出默认路径，让连接阶段产生明确的 “Docker 不可用” 错误
+    // If none exists, return the default path so connecting fails with a clear
+    // "Docker unavailable" error
     return unixSocket(QStringLiteral("/var/run/docker.sock"));
 }
 

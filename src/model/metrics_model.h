@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,25 +18,26 @@ class QTimer;
 namespace Kontainer
 {
 
-/*! 一次采样在 presentation 层的形态（百分比与速率已经算好，QML 不做数学，§18）。 */
+/*! One sample as the presentation layer sees it (rates/percentages precomputed; no QML math, §18). */
 struct MetricsPoint {
     QDateTime timestamp;
     double cpuPercent = 0.0;
     quint64 memoryUsedBytes = 0;
     quint64 memoryLimitBytes = 0;
-    double memoryPercent = -1.0; /*!< < 0 表示没有有效 limit */
-    double networkRxPerSecond = -1.0; /*!< < 0 表示尚不可计算（首个采样/计数器回绕） */
+    double memoryPercent = -1.0; /*!< < 0 = no effective limit */
+    double networkRxPerSecond = -1.0; /*!< < 0 = not computable yet (first sample / counter wrap) */
     double networkTxPerSecond = -1.0;
     double blockReadPerSecond = -1.0;
     double blockWritePerSecond = -1.0;
 };
 
 /*!
- * 容器资源指标模型（ARCH_V2 §17–§22/§27/§44）。
+ * Container resource metrics model (ARCH_V2 §17–§22/§27/§44).
  *
- * - 只保留内存中的短期环形缓冲（默认 60 × 5s ≈ 5 分钟），不写磁盘、不做历史数据库（§21）
- * - 速率由相邻采样差分得到；首个采样与计数器回绕都标记为“未知”（-1）而不是编造数字
- * - 页面离开时 stop()：停止采样并释放历史（§27）
+ * - in-memory short ring buffer only (default 60 × 5s ≈ 5 minutes), no disk, no history database (§21)
+ * - rates come from differencing adjacent samples; the first sample and counter wraps are marked
+ *   "unknown" (-1) instead of inventing numbers
+ * - stop() when the page is left: stop sampling and drop the history (§27)
  */
 class MetricsModel : public QObject
 {
@@ -48,7 +49,7 @@ class MetricsModel : public QObject
     Q_PROPERTY(qint64 memoryUsedBytes READ memoryUsedBytes NOTIFY updated)
     Q_PROPERTY(qint64 memoryLimitBytes READ memoryLimitBytes NOTIFY updated)
     Q_PROPERTY(double memoryPercent READ memoryPercent NOTIFY updated)
-    /*! 是否存在“真实”的内存上限（等于宿主内存视为无限制，§19）。 */
+    /*! Whether a "real" memory limit exists (host-memory-sized limits count as unlimited, §19). */
     Q_PROPERTY(bool memoryLimitEffective READ memoryLimitEffective NOTIFY updated)
     Q_PROPERTY(double networkRxPerSecond READ networkRxPerSecond NOTIFY updated)
     Q_PROPERTY(double networkTxPerSecond READ networkTxPerSecond NOTIFY updated)
@@ -56,10 +57,11 @@ class MetricsModel : public QObject
     Q_PROPERTY(double blockWritePerSecond READ blockWritePerSecond NOTIFY updated)
     Q_PROPERTY(int sampleCount READ sampleCount NOTIFY updated)
     /*!
-     * 环形缓冲容量（= RefreshPolicy::kMetricsHistorySamples）。
+     * Ring buffer capacity (= RefreshPolicy::kMetricsHistorySamples).
      *
-     * 趋势图按固定条数渲染（不够的槽位留空），这样 Repeater 的 model 永远不变，
-     * 采样时不会销毁/创建任何柱子——这是 ARCH_V3 附录 A.1g 那条崩溃路径的根治办法。
+     * The trend chart renders a fixed number of slots (missing ones stay empty), so the Repeater's
+     * model never changes and sampling neither destroys nor creates bars — the root fix for the
+     * crash path in ARCH_V3 appendix A.1g.
      */
     Q_PROPERTY(int historyCapacity READ historyCapacity CONSTANT)
     Q_PROPERTY(QVariantList cpuHistory READ cpuHistory NOTIFY updated)
@@ -71,9 +73,9 @@ public:
 
     void setBackend(DockerBackendInterface *backend);
 
-    /*! 开始对指定容器采样（进入详情页）。 */
+    /*! Start sampling the given container (entering the detail page). */
     void start(const QString &containerId);
-    /*! 停止采样并释放历史（离开详情页）。 */
+    /*! Stop sampling and drop the history (leaving the detail page). */
     void stop();
 
     bool sampling() const
@@ -104,11 +106,11 @@ public:
     QVariantList networkHistory() const;
     QVariantList memoryHistory() const;
 
-    /*! 由 controller 在收到新的原始采样时调用。 */
+    /*! Called by the controller when a new raw sample arrives. */
     void addSample(const ContainerStats &stats);
-    /*! 采样定时器触发（间隔来自 RefreshPolicy，不散落 magic number）。 */
+    /*! Sample timer fired (the interval comes from RefreshPolicy; no scattered magic numbers). */
     void requestSample();
-    /*! 采样失败：用于停止对已经停止/消失的容器的轮询。 */
+    /*! Sampling failed: used to stop polling a container that stopped or vanished. */
     void noteFailure();
 
 Q_SIGNALS:

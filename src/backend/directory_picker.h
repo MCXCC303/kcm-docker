@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,17 +12,17 @@ namespace Kontainer
 {
 
 /*!
- * 让用户挑一个目录（挂载预设的宿主路径、构建上下文目录都用它）。
+ * Lets the user pick a directory (mount preset host paths, build context dirs).
  *
- * 做成接口而不是直接调 `QFileDialog`：
- * - 测试与离屏渲染不能弹出真实对话框（会阻塞），需要注入替身；
- * - KCM 是纯 QML 的形态，弹窗这件事只在这一层发生，QML 侧只拿返回值。
+ * An interface instead of calling `QFileDialog` directly:
+ * - tests and offscreen rendering must not open a real dialog (it blocks), so a stub is injected;
+ * - the KCM is pure QML, so the dialog stays in this layer and QML only receives the result.
  *
- * 实现走 `QFileDialog::getExistingDirectory`，但**显式要求 Qt 自己的对话框**
- * （`DontUseNativeDialog`）：Plasma 下的"原生"对话框是 KIO 的 KFileWidget，
- * 它在 kcmshell6 这种 QML 宿主进程里会崩——
- * 实测栈：`QFileDialog::getExistingDirectory` → KIO 的 QTreeView 绘制 → `libKF6KIOWidgets` SEGV。
- * 用 Qt 自己的实现就绕开了那条路径（见 `systemDialogOptions()` 与对应用例）。
+ * The implementation uses `QFileDialog::getExistingDirectory` but **forces Qt's own dialog**
+ * (`DontUseNativeDialog`): Plasma's "native" dialog is KIO's KFileWidget, which crashes in QML
+ * hosts such as kcmshell6 — observed stack: `QFileDialog::getExistingDirectory` → KIO QTreeView
+ * painting → `libKF6KIOWidgets` SEGV. Qt's own implementation avoids that path (see
+ * `systemDialogOptions()` and the matching test case).
  */
 class DirectoryPicker : public QObject
 {
@@ -33,15 +33,15 @@ public:
     ~DirectoryPicker() override;
 
     /*!
-     * 返回选中的目录；用户取消或失败时返回空串（调用方保持原值）。
+     * Returns the chosen directory; empty string on cancel or failure (the caller keeps its value).
      *
-     * `Q_INVOKABLE` 是必需的：QML 只能调用 Q_INVOKABLE / 槽 / 属性，
-     * 普通虚函数在 QML 里是 undefined（调用会抛 "is not a function"）。
+     * `Q_INVOKABLE` is required: QML can only call Q_INVOKABLE / slots / properties, so a plain
+     * virtual function is undefined there (the call throws "is not a function").
      */
     Q_INVOKABLE virtual QString chooseDirectory(const QString &startPath) = 0;
 };
 
-/*! 真实实现：系统原生目录对话框。 */
+/*! Real implementation: the native system directory dialog. */
 class SystemDirectoryPicker : public DirectoryPicker
 {
     Q_OBJECT
@@ -50,10 +50,10 @@ public:
     explicit SystemDirectoryPicker(QObject *parent = nullptr);
 
     /*!
-     * 目录对话框使用的选项。
+     * Options used by the directory dialog.
      *
-     * 单独暴露出来是为了让**用例**把"必须避开 KIO 的进程内对话框"这条钉死：
-     * 去掉 `DontUseNativeDialog` 就会重新走回崩溃的那条路径。
+     * Exposed separately so a **test** can pin "must avoid KIO's in-process dialog": removing
+     * `DontUseNativeDialog` walks right back into the crashing path.
      */
     static int systemDialogOptions();
 

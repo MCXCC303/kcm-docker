@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,7 +16,7 @@ NetworkDetailController::NetworkDetailController(DockerBackendInterface *backend
     , m_options(new DetailListModel(this))
 {
     Q_ASSERT(m_backend);
-    // 列表刷新后重新取快照：详情页显示的是"当前这一刻"的网络
+    // re-snapshot after a list refresh: the detail page shows the network as it is right now
     connect(m_backend, &DockerBackendInterface::networksUpdated, this, &NetworkDetailController::reload);
 }
 
@@ -142,10 +142,10 @@ void NetworkDetailController::reload()
         entry.label = member.name.isEmpty() ? member.containerId.left(12) : member.name;
         entry.value = member.ipv4Address;
         entry.detail = member.macAddress;
-        // 容器 id 放在 entryKey 里：QML 用它做"跳到容器详情"（列表行不显示 id）
+        // container id in entryKey: QML uses it to jump to the container detail (the row shows no id)
         entry.entryKey = member.containerId;
         entry.target = member.containerId;
-        // 状态图标：与镜像的"关联容器"列表保持同一种视觉（用户反馈要统一）
+        // state icon: same look as the image "used by" list (users asked for consistency)
         for (const Container &container : m_backend->containers()) {
             if (container.id == member.containerId) {
                 entry.stateKey = container.stateKey();

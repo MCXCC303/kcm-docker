@@ -1,14 +1,16 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    容器卡片（ARCH_V2 §6 / ARCH_V3 §2.1 / ARCH_V4 §2.3）：整张卡片是一个可点击导航区域。
+    Container card (ARCH_V2 §6 / ARCH_V3 §2.1 / ARCH_V4 §2.3): the whole card is one navigation target.
 
-    - 使用 QQC2.ItemDelegate：自带 hover / focus / Enter / Space 行为（§6.2/§38）
-    - 行内只放**可逆**操作（启动 / 停止）；删除只在详情页 footer，减少误触面（ARCH_V4 §2.3）
-    - 写入口只在 socket 允许写时出现（权限门），忙碌时禁用并显示进度指示
-    - 状态用统一的 StatusChip 呈现（图标 + 颜色 + 文字三重编码，§12）
-    - 复制入口：只复制标识（容器 ID），不复制整个 inspect JSON（ARCH_V2 §41）
+    - QQC2.ItemDelegate supplies hover / focus / Enter / Space behavior (§6.2/§38)
+    - Only reversible actions inline (start / stop); delete stays in the detail footer,
+      shrinking the misclick surface (ARCH_V4 §2.3)
+    - Write actions appear only when the socket allows writes, and are disabled with a busy
+      indicator while one is in flight
+    - State uses the shared StatusChip (icon + color + text, §12)
+    - Copy copies the identifier (container ID) only, never the whole inspect JSON (ARCH_V2 §41)
 */
 
 import QtQuick
@@ -25,8 +27,8 @@ QQC2.ItemDelegate {
 
     objectName: "containerCard"
 
-    /*! 模型角色：缺少 required 声明时，delegate 内的标识符无法解析
-        （点击时会抛 ReferenceError: containerId is not defined）。 */
+    /*! Model roles: without the `required` declaration these identifiers do not resolve inside the
+        delegate, and clicking throws ReferenceError: containerId is not defined. */
     required property string containerId
     required property string name
     required property string shortId
@@ -39,7 +41,7 @@ QQC2.ItemDelegate {
     required property string portsSummary
     required property var created
 
-    /*! 写操作控制器（由 MainPage 传入：组件不自己去找 kcm）。 */
+    /*! Write-operation controller, passed in by MainPage: the component never looks up the KCM itself. */
     required property var operations
 
     signal activated
@@ -53,12 +55,13 @@ QQC2.ItemDelegate {
     Accessible.description: card.image
     Accessible.role: Accessible.ListItem
 
-    /*! 状态语义：健康问题优先于状态（Unhealthy 的 Running 必须看起来有问题，§11.3） */
+    /*! State semantics: health outranks state, so an Unhealthy Running container must look wrong (§11.3) */
     readonly property string stateSemanticKey: Kontainer.Presentation.stateSemanticKey(card.stateKey, card.healthKey)
     readonly property bool healthVisible: card.healthKey === "healthy" || card.healthKey === "unhealthy" || card.healthKey === "starting"
-    /*! 这个容器是否有操作在途（启动 / 停止 / 重启 / 删除都算）。 */
+    /*! Whether any operation is in flight for this container (start / stop / restart / delete). */
     readonly property bool targetBusy: {
-        // Q_INVOKABLE 调用不会被 QML 追踪：先读一次可通知属性，忙碌状态变化时才能重新求值
+        // Q_INVOKABLE calls are not tracked by QML: read a notifiable property first,
+        // so this re-evaluates when busy changes
         card.operations.stateRevision;
         return card.operations.isContainerBusy(card.containerId);
     }
@@ -89,8 +92,8 @@ QQC2.ItemDelegate {
 
                 QQC2.Label {
                     objectName: "containerTitleLabel"
-                    // 名称后面用括号带短 ID（用户实测：原来的"运行时长 · 创建于 … · ID …"一行太挤，
-                    // 而 ID 又是复制/排查时最常要的，所以只保留它并挪到名字后面）
+                    // Short ID in parentheses after the name: user testing found the old
+                    // "uptime · created … · ID …" line too cramped, and the ID is the part people copy
                     text: i18nc("@info container name with short id", "%1 (%2)", card.name, card.shortId)
                     font.bold: true
                     elide: Text.ElideRight
@@ -129,12 +132,12 @@ QQC2.ItemDelegate {
                 opacity: 0.8
             }
 
-            // 运行时长 / 创建时间 / 端口映射都不在这里显示了（用户实测：列表信息密度太大）。
-            // 这些信息在容器详情页里都有，而且更完整。
+            // Uptime, creation time and port mappings are gone from here: user testing found the
+            // list too dense. The container detail page shows all of them, more completely.
         }
 
-        // 行内生命周期操作（ARCH_V4 §2.3）：可逆操作放列表，破坏性操作放详情页。
-        // 按钮自己接受鼠标事件，因此不会触发卡片导航。
+        // Inline lifecycle actions (ARCH_V4 §2.3): reversible in the list, destructive in the detail page.
+        // The buttons accept mouse events themselves, so they never trigger card navigation.
         QQC2.BusyIndicator {
             objectName: "containerBusyIndicator"
             visible: card.targetBusy
@@ -196,8 +199,8 @@ QQC2.ItemDelegate {
             onClicked: card.operations.stopContainer(card.containerId)
         }
 
-        // 列表里的复制入口（§1.3）：复制容器 ID——点击本按钮不会触发卡片导航，
-        // 因为 AbstractButton 会接受鼠标事件，不再向父 delegate 传播。
+        // List copy entry (§1.3): copies the container ID. Clicking here does not navigate, because
+        // AbstractButton swallows the mouse event instead of letting it reach the parent delegate.
         Components.CopyButton {
             value: card.containerId
             fieldLabel: i18n("container ID")

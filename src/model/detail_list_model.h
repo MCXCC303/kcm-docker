@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,9 +14,10 @@ namespace Kontainer
 {
 
 /*!
- * 通用「只读条目列表」模型（端口 / 网络 / 挂载 / 标签 / 环境变量 / 镜像层 / 关联容器）。
+ * Generic read-only entry list model (ports / networks / mounts / labels / env vars / image layers /
+ * related containers).
  *
- * 只承载 presentation 数据，不访问 Docker，也不解析 JSON。
+ * Carries presentation data only; never accesses Docker or parses JSON.
  */
 class DetailListModel : public QAbstractListModel
 {
@@ -26,11 +27,11 @@ class DetailListModel : public QAbstractListModel
     Q_PROPERTY(int totalCount READ totalCount NOTIFY countChanged)
     Q_PROPERTY(bool empty READ empty NOTIFY countChanged)
     /*!
-     * 只暴露前 N 条（0 = 不限制）。
+     * Expose only the first N entries (0 = unlimited).
      *
-     * 用于「镜像层默认只显示前 5 层、展开后显示全部」（ARCH_V3 §2.3）：
-     * QAbstractListModel 无法在 QML 里切片，而视图也不应该创建看不见的 delegate，
-     * 因此把可见条数交给 model 层控制。
+     * Used for "image layers show the first 5 by default, all when expanded" (ARCH_V3 §2.3):
+     * QAbstractListModel cannot be sliced from QML, and a view should not create delegates it never
+     * shows, so the visible count is controlled here.
      */
     Q_PROPERTY(int limit READ limit WRITE setLimit NOTIFY limitChanged)
 
@@ -40,9 +41,9 @@ public:
         ValueRole,
         DetailRole,
         EntryKeyRole,
-        /*! 关联容器的状态 key（图标与语义）。 */
+        /*! Related container's state key (icon and semantics). */
         StateKeyRole,
-        /*! 点击跳转的目标（容器 id）；空 = 该行不可跳转。 */
+        /*! Click-through target (container id); empty = row not clickable. */
         TargetRole,
     };
     Q_ENUM(Roles)
@@ -54,7 +55,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     int count() const;
-    /*! 全部条目数（不受 limit 影响）。 */
+    /*! Total entry count (unaffected by limit). */
     int totalCount() const;
     bool empty() const;
 
@@ -72,7 +73,7 @@ Q_SIGNALS:
 
 private:
     QList<DetailEntry> m_entries;
-    int m_limit = 0; /*!< 0 = 不限制 */
+    int m_limit = 0; /*!< 0 = unlimited */
 };
 
 } // namespace Kontainer

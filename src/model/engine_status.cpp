@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -27,7 +27,7 @@ void EngineStatus::clear()
 
 bool EngineStatus::rootless() const
 {
-    // Docker 以 `name=rootless` 标记 rootless 模式（SecurityOptions 里的字符串）
+    // Docker marks rootless mode with `name=rootless` (a string in SecurityOptions)
     for (const QString &option : m_info.securityOptions) {
         if (option.contains(QLatin1String("rootless"))) {
             return true;

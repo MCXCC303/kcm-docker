@@ -1,28 +1,30 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Overview 统计块（仪表盘）。
+    Overview statistic tile (dashboard).
 
-    取色与排版全部跟随主题：圆角用 Kirigami.Units.cornerRadius、背景用
-    Kirigami.Theme.backgroundColor、边框由 textColor 派生、数值字号用
-    Kirigami.Heading；语义 key → 颜色的映射统一在 StatusPalette（ARCH_V3 §2.1）。
+    Colors and typography all follow the theme: corners use Kirigami.Units.cornerRadius,
+    background Kirigami.Theme.backgroundColor, the border is derived from textColor, the
+    value uses Kirigami.Heading; the semantic key → color map lives in StatusPalette
+    (ARCH_V3 §2.1).
 
-    ## 为什么不用 Kirigami.AbstractCard（ARCH_V3 §四）
+    ## Why not Kirigami.AbstractCard (ARCH_V3 §4)
 
-    §2.5 原本按 ARCH_V3_pre §1.3 把统计卡改成 AbstractCard，但实际会话中出现了
-    段错误，core dump 的栈落在**嵌套布局的尺寸计算**上：
+    §2.5 first turned the stat cards into AbstractCards per ARCH_V3_pre §1.3, but real
+    sessions then segfaulted, with the core dump stack in **nested layout size
+    computation**:
 
         qmlAttachedPropertiesObject ← QQuickLayoutAttached::sizeHint
         ← QGridLayoutEngine::fillRowData ← QQuickLayout::effectiveSizeHints_helper
         ← QQuickLayout::updatePolish
 
-    AbstractCard 内部会再套三层布局（Padding → HeaderFooterLayout → Padding），
-    并且用 `Connections` 在 contentItem 的 x/y 上挂了一个读取布局属性的
-    `Qt.binding`（Kirigami 6.30 templates/AbstractCard.qml:110-140）。
-    统计块是**静态展示**元素，不需要卡片的 hover/点击反馈，
-    因此这里改回自绘容器：只保留一层内容布局，颜色仍全部取自主题，
-    视觉与卡片一致但不再往 GridLayout 里塞嵌套布局树。
+    AbstractCard nests three more layouts inside (Padding → HeaderFooterLayout → Padding)
+    and hangs a `Qt.binding` on the contentItem's x/y via `Connections` that reads layout
+    properties (Kirigami 6.30 templates/AbstractCard.qml:110-140). Stat tiles are **static
+    display** elements needing no card hover/click feedback, so this went back to a
+    self-drawn container: one content layout only, colors still all from the theme, visually
+    identical to a card but without another nested layout tree inside the GridLayout.
 */
 
 import QtQuick
@@ -42,13 +44,14 @@ Rectangle {
     required property string value
     required property string iconName
 
-    /*! 状态语义 key（positive / neutral / negative）；空表示该项没有状态语义。 */
+    /*! Status semantic key (positive / neutral / negative); empty means the tile has no status semantics. */
     property string semanticKey: ""
 
     /*!
-        数值非零且带状态语义时，给卡片一层很淡的同色背景（ARCH_V3_pre §1.9
-        「已停止卡片加背景色区分」）。计数为 0 时不着色：0 个已停止不是「问题」，
-        不该把整张卡染红。三重编码（图标 + 颜色 + 文字）本身不因着色而退化。
+        When the value is non-zero and carries status semantics, tint the tile with a very
+        faint version of the color (ARCH_V3_pre §1.9 "tint stopped cards to set them apart").
+        A count of 0 gets no tint: 0 stopped is not a "problem", so the tile must not be
+        painted red. Triple encoding (icon + color + text) does not degrade when tinted.
     */
     property bool tintWhenNonZero: false
 
@@ -60,7 +63,7 @@ Rectangle {
     implicitWidth: Kirigami.Units.gridUnit * 7
     implicitHeight: Kirigami.Units.gridUnit * 4.5
 
-    // 圆角与边框跟随主题（与 Kirigami 卡片的观感一致）
+    // Corners and border follow the theme (matching the look of a Kirigami card)
     radius: Kirigami.Units.cornerRadius
     color: tile.tinted ? Local.StatusPalette.tintColor(tile.semanticKey) : Kirigami.Theme.backgroundColor
     border.width: 1

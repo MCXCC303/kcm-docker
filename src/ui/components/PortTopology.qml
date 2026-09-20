@@ -1,34 +1,38 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    端口映射拓扑（ARCH_V4 §2.1.2）。
+    Port mapping topology (ARCH_V4 §2.1.2).
 
-    形态：左列容器端口、右列宿主绑定，中间是**带端点圆点的彩色连线**；
-    同一个容器端口映射到多个宿主地址时，左列只出现**一枚**芯片，连线从同一个
-    起点**分支**出去（每条的终点在右侧对应芯片的垂直中心），而不是把同一个端口
-    在左列重复很多遍（ARCH_V5_V8 §2.1 拓扑形态修订）。
-    两列之上各有一个节点标题（容器名 / 宿主主机名）。连线只是**装饰**——
+    Shape: container ports in the left column, host bindings in the right, **colored links
+    with end dots** in between. When one container port maps to several host addresses the
+    left column shows **one** chip and the links **branch** from a single origin (each branch
+    ending at the vertical center of its chip on the right), instead of repeating the same
+    port many times on the left (ARCH_V5_V8 §2.1 topology revision).
+    Each column has a node title above it (container name / host hostname). The links are
+    **decoration** only:
 
-      - 全部信息都写在芯片的文字里（`80/tcp` / `0.0.0.0:8080`）
-      - 连线层 `Accessible.ignored`，键盘与屏幕阅读器完全不需要它
-      - 未发布的端口没有宿主端点，因此不画线，由页面单独成组呈现
+      - all information is in the chip texts (`80/tcp` / `0.0.0.0:8080`)
+      - the link layer is `Accessible.ignored`; keyboard and screen readers never need it
+      - unpublished ports have no host endpoint, so no link is drawn; the page groups them apart
 
-    连线颜色由 `colorSeed`（容器 id）决定，同一个容器永远同色（见
-    `ChartPalette.connectionColor`）：颜色不表达任何语义，只让"同一个容器的图"
-    看起来是一体的；端口号与绑定地址由两侧芯片的文字承载，颜色不是唯一区分手段。
+    Link color is derived from `colorSeed` (the container id), so one container always keeps
+    its color (see `ChartPalette.connectionColor`): colors carry no semantics, they only make
+    "the diagram of one container" look like one piece; port numbers and bind addresses are
+    carried by the chip texts, so color is not the sole differentiator.
 
-    分支的纵向位置同样由 index 推导：第 i 条绑定的终点在组内第 i 行的中心，
-    起点在整组的垂直中心。因此组的高度是 `bindingCount * rowHeight`。
+    Branch vertical positions are likewise derived from the index: the i-th binding ends at
+    the center of row i in the group, and the origin sits at the group's vertical center.
+    The group height is therefore `bindingCount * rowHeight`.
 
-    为什么几何全部由 index 推导（而不是读取芯片的实际位置）：
-    读测量值会引入「先测量 → 再布局 → 再画线」的一帧延迟，
-    刷新时连线会短暂错位；`headerHeight + index * rowHeight` 是确定性的。
+    Why all geometry is derived from indices (instead of reading actual chip positions):
+    reading measurements adds a frame of "measure → lay out → draw" delay, so links briefly
+    misalign on refresh; `headerHeight + index * rowHeight` is deterministic.
 
-    为什么用 Canvas 而不是 Shape：Shape 的子对象必须是 ShapePath，
-    「一条映射一条线」只能靠 Repeater，而 Repeater 是 Item（未定义用法）。
-    Canvas 是单个 Item、一次 onPaint 画 N 条线，没有 delegate、不参与布局
-    （ARCH_V4 §2.1.2 与附录 A.1）。
+    Why Canvas instead of Shape: Shape children must be ShapePaths, so "one link per mapping"
+    would need a Repeater, and a Repeater is an Item (undefined usage). Canvas is a single
+    Item drawing N links in one onPaint, with no delegates and no layout participation
+    (ARCH_V4 §2.1.2 and appendix A.1).
 */
 
 import QtQuick
@@ -43,48 +47,51 @@ Item {
     id: topology
 
     /*!
-     * 已发布端口的分组模型（`PortMappingGroupModel`）。
+     * Grouped model of published ports (`PortMappingGroupModel`).
      *
-     * 每行 = 一个容器端口 + 它的全部宿主绑定：`hostChipTexts` 是右侧每一枚芯片的文本。
+     * One row = one container port plus all of its host bindings; `hostChipTexts` holds the
+     * text of each chip on the right.
      */
     required property var model
-    /*! 容器节点标题（通常是容器名）。 */
+    /*! Container node title (usually the container name). */
     required property string containerLabel
-    /*! 宿主节点标题（通常是 daemon 报告的宿主主机名）。 */
+    /*! Host node title (usually the host hostname reported by the daemon). */
     required property string hostLabel
     /*!
-     * 连线颜色的种子（通常传容器 id）。
+     * Seed for link colors (usually the container id).
      *
-     * 同一个种子永远得到同一种颜色，因此刷新页面、重新打开详情、切换主题时，
-     * 同一个容器的拓扑不会变色。
+     * One seed always yields one color, so a container's topology keeps its color across
+     * refreshes, reopening the details, and theme changes.
      */
     property string colorSeed
 
-    /*! 本容器拓扑的连线颜色（由 `colorSeed` 决定）。 */
+    /*! Link color of this container's topology (derived from `colorSeed`). */
     readonly property color connectionColor: Local.ChartPalette.connectionColor(topology.colorSeed)
 
     objectName: "portTopology"
 
-    /*! 容器端口那一行的高度（左侧芯片所在行）。 */
+    /*! Height of the container-port row (the row holding the left chip). */
     readonly property real rowHeight: Math.ceil(Kirigami.Units.gridUnit * 1.6)
     /*!
-     * 右侧**每条绑定**占的高度。
+     * Height of **each binding** on the right.
      *
-     * 比容器端口行更高：右边是"一个端口可能挂好几条绑定"的密集区域，
-     * 行高与芯片一样高时上下会挤在一起（用户反馈）。分支终点按这个值居中，
-     * 因此加大它同时也让曲线更舒展。
+     * Taller than the container-port row: the right side is the dense area where one port
+     * may carry several bindings, and with chip-height rows they squeeze together (user
+     * feedback). Branch endpoints center on this value, so enlarging it also spreads the
+     * curves out.
      */
     readonly property real bindingRowHeight: Math.ceil(Kirigami.Units.gridUnit * 2.4)
-    /*! 节点标题行的高度。 */
+    /*! Height of the node title row. */
     readonly property real headerHeight: Math.ceil(Kirigami.Units.gridUnit * 2.2)
-    /*! 中间连线区的左右缩进：芯片列宽度。 */
+    /*! Horizontal inset of the middle link area: the width of a chip column. */
     readonly property real chipColumnWidth: Math.ceil(Kirigami.Units.gridUnit * 9)
 
-    // 高度按"行数 × 行高"算出（不读测量值）：连线几何与行位置由同一个数推导，
-    // 刷新时不会出现"线已经画好、行还没布局"的错位（ARCH_V4 §2.1.2）
+    // Height is computed from "rows × row height" (no measured values): link geometry and row
+    // positions derive from the same number, so a refresh never shows links drawn before the
+    // rows are laid out (ARCH_V4 §2.1.2)
     implicitHeight: headerHeight + model.bindingCount * bindingRowHeight
 
-    /* ---------- 两列的节点标题 ---------- */
+    /* ---------- Node titles of both columns ---------- */
     RowLayout {
         id: header
 
@@ -160,11 +167,13 @@ Item {
     }
 
     /* ------------------------------------------------------------------ */
-    /* 分组行：一行 = 一个容器端口 + 它的全部宿主绑定                       */
+    /* Group row: one row = one container port + all of its host bindings  */
     /*                                                                     */
-    /* 左列只有一枚芯片，**对齐该组的第一条宿主绑定**（用户反馈 A5：参考      */
-    /* network-example.svg，第一条连线是水平的；居中会让它斜着穿过去）；     */
-    /* 右侧每条绑定各占一行，连线从左侧同一个起点分支到每个绑定的终点。      */
+    /* The left column has a single chip, **aligned with the group's first */
+    /* host binding** (user feedback A5: as in network-example.svg, the    */
+    /* first link is horizontal; centering would slant it across). Each    */
+    /* binding on the right takes one row, and the links branch from that  */
+    /* one left origin to each binding's endpoint.                         */
     /* ------------------------------------------------------------------ */
     Column {
         id: rowsColumn
@@ -183,9 +192,9 @@ Item {
 
                 required property int index
                 required property string containerChipText
-                /*! 右侧每一枚芯片的文本（一个容器端口可能有多条绑定）。 */
+                /*! Text of each chip on the right (one container port may have several bindings). */
                 required property var hostChipTexts
-                /*! 与 `hostChipTexts` 同序：该绑定是否代表 IPv4 + IPv6（画双环）。 */
+                /*! Same order as `hostChipTexts`: whether the binding is IPv4 + IPv6 (double ring). */
                 required property var dualStackFlags
 
                 objectName: "portMappingRow"
@@ -200,18 +209,19 @@ Item {
                     anchors.fill: parent
                     Accessible.ignored: true
 
-                    /*! 画了几条分支（= 该容器端口的绑定数）；用例据此断言"合并"确实发生。 */
+                    /*! Branches drawn (= bindings of this container port); tests assert the merging. */
                     readonly property int branchCount: group.hostChipTexts.length
                     /*!
-                     * 起点的 y（相对本组）：对齐**第一条**绑定的中心。
+                     * Origin y (relative to this group): aligned with the center of the **first** binding.
                      *
-                     * 暴露成属性是为了让用例能断言"第一条连线是水平的"（§A5），
-                     * 而不是只能看芯片位置——两者由不同的代码决定，得分别守住。
+                     * Exposed as a property so tests can assert "the first link is horizontal" (§A5)
+                     * rather than only looking at chip positions — the two are decided by different
+                     * code and must be guarded separately.
                      */
                     readonly property real originY: topology.bindingRowHeight * 0.5
-                    /*! 起点圆环的颜色（= 最下方分支的颜色）。 */
+                    /*! Color of the origin ring (= color of the lowest branch). */
                     readonly property color originColor: link.branchColor(group.hostChipTexts[group.hostChipTexts.length - 1])
-                    /*! 每条分支的颜色（顺序与右侧芯片一致）：同一个容器 + 同一条映射永远同色。 */
+                    /*! Color of each branch (chip order): same container + mapping, same color. */
                     readonly property var branchColors: {
                         const colors = [];
                         for (let i = 0; i < group.hostChipTexts.length; ++i) {
@@ -221,12 +231,13 @@ Item {
                     }
 
                     /*!
-                     * 每条分支的颜色。
+                     * Color of each branch.
                      *
-                     * 种子 = 容器 id + 容器端口芯片文本 + 该绑定的芯片文本：
-                     * 同一个容器、同一条映射永远同色（刷新、重开页面都不变），
-                     * 同一容器内的多条绑定又能彼此区分。颜色不承载语义（纯装饰，
-                     * `Accessible.ignored`），信息在两侧芯片的文字里。
+                     * Seed = container id + container port chip text + that binding's chip text:
+                     * one container and one mapping always keep their color (across refreshes and
+                     * reopened pages), while several bindings in one container stay distinct.
+                     * Colors carry no semantics (pure decoration, `Accessible.ignored`); the
+                     * information is in the chip texts on both sides.
                      */
                     function branchColor(hostChipText: string): color {
                         return Local.ChartPalette.connectionColor(
@@ -244,20 +255,20 @@ Item {
                         const ctx = getContext("2d");
                         ctx.reset();
 
-                        // 起点：左侧芯片列之后；终点：右侧芯片列之前
+                        // Origin: after the left chip column; endpoints: before the right chip column
                         const left = topology.chipColumnWidth;
                         const right = link.width - topology.chipColumnWidth;
                         const gap = Kirigami.Units.smallSpacing;
                         const originX = left + gap + link.dotRadius;
                         const targetX = right - gap - link.dotRadius;
                         if (targetX <= originX) {
-                            return; // 宽度不够：不画（信息仍在芯片文字里）
+                            return; // Not enough width: draw nothing (the chips still carry the information)
                         }
 
                         const count = group.hostChipTexts.length;
-                        // 分支的纵向间距 = 右侧绑定的行高：终点因此正好落在芯片中心
+                        // Branch vertical spacing = binding row height, so endpoints land on chip centers
                         const step = topology.bindingRowHeight;
-                        // 起点高度见 originY 属性：对齐第一条绑定的中心（§A5）
+                        // Origin height comes from originY: aligned with the first binding's center (§A5)
                         const originY = link.originY;
 
                         ctx.lineWidth = link.lineWidth;
@@ -271,21 +282,22 @@ Item {
                             ctx.fillStyle = color;
                             ctx.beginPath();
                             ctx.moveTo(originX, originY);
-                            // 三次贝塞尔：控制点让线"先直后弯"，与示意图一致
+                            // Cubic bezier: control points make the link straight, then bend, as sketched
                             const bend = Math.max(Kirigami.Units.gridUnit, (targetX - originX) * 0.45);
                             ctx.bezierCurveTo(originX + bend, originY, targetX - bend, targetY, targetX, targetY);
                             ctx.stroke();
 
-                            // 终点画成"插座"：外圈连线色、中心掏空成背景色
+                            // Endpoint drawn as a "socket": ring in the link color, center punched to bg
                             ctx.beginPath();
                             ctx.arc(targetX, targetY, link.dotRadius, 0, Math.PI * 2);
                             ctx.fill();
                             /*
-                             * 双栈（IPv4 + IPv6 通配）：外面再套一圈**另一种颜色**的环。
+                             * Dual stack (IPv4 + IPv6 wildcard): wrap another ring in a **second color**.
                              *
-                             * Docker 对"没指定宿主地址"的映射会同时建 `0.0.0.0:<port>` 与
-                             * `[::]:<port>`；控制器已把它们合并成一条，这里用双环表示"两种协议栈"，
-                             * 免得看起来像只映射了一次。
+                             * For a mapping without an explicit host address Docker creates both
+                             * `0.0.0.0:<port>` and `[::]:<port>`; the controller already merges them
+                             * into one entry, so the double ring shows "two protocol stacks" and it
+                             * does not look like a single mapping.
                              */
                             const dualStack = group.dualStackFlags.length > i && group.dualStackFlags[i] === true;
                             if (dualStack) {
@@ -303,9 +315,9 @@ Item {
                             ctx.fill();
                         }
 
-                        // 起点只画一次（多条分支共用）。颜色取**最下方那条**分支：
-                        // 分支按顺序绘制，越靠下的越在上层，因此起点圆环与"穿过起点的
-                        // 那一条线"同色看起来才连贯（用户反馈：用最上面的颜色不协调）
+                        // The origin is drawn once (shared by all branches). Its color is the **lowest**
+                        // branch's: branches are painted in order, lower ones on top, so the origin ring is
+                        // continuous with the link through it (user feedback: the topmost color looked off)
                         const originColor = link.branchColor(group.hostChipTexts[count - 1]);
                         ctx.fillStyle = originColor;
                         ctx.beginPath();
@@ -318,8 +330,8 @@ Item {
                     }
                 }
 
-                /* 容器芯片包一层：高度 = 一条绑定的行高，芯片在其中垂直居中 ——
-                   这样它的中心正好落在第一条宿主绑定的中心（起点高度）上 */
+                /* Wrapper around the container chip: height = one binding row, chip vertically centered —
+                   putting its center exactly on the first host binding's center (the origin height) */
                 Item {
                     objectName: "portContainerChipSlot"
                     anchors.right: parent.right
@@ -333,14 +345,15 @@ Item {
 
                         objectName: "portContainerChip"
                         anchors.verticalCenter: parent.verticalCenter
-                        // 端口文本是数据，等宽字体更易比对（§1.5）
+                        // Port text is data; a monospace font makes it easier to compare (§1.5)
                         font.family: "monospace"
                         text: group.containerChipText
                     }
                 }
 
                 Column {
-                    // 靠**左**（紧接节点之后）：与容器侧一起把两列拉向中间
+                    // Left aligned, right after the node: together with the container side this pulls both
+                    // columns toward the middle
                     anchors.left: parent.left
                     anchors.leftMargin: Math.min(topology.width, topology.width - topology.chipColumnWidth + Kirigami.Units.smallSpacing)
                     anchors.verticalCenter: parent.verticalCenter
@@ -355,7 +368,7 @@ Item {
                             required property string modelData
 
                             width: hostChip.width
-                            // 与分支终点的间距一致：芯片中心 = bindingRowHeight * (i + 0.5)
+                            // Same spacing as branch endpoints: chip center = bindingRowHeight * (i + 0.5)
                             height: topology.bindingRowHeight
 
                             Local.FieldChip {

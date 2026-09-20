@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,11 @@ namespace Kontainer
 
 namespace
 {
-/*! 钱包条目只允许这两个字段；读到别的内容一律当损坏（不猜）。 */
+/*! Wallet entries hold only these two fields; anything else read back counts as corrupt (no guessing). */
 /*
- * KWallet 的**目录名刻意保持旧值**：软件从 kontainer 更名为 kcm-docker，但用户已经存进去的
- * 仓库凭据就在这个目录下——改名字等于让它们凭空消失（还得重新登录每个仓库）。
- * 名字本身不影响功能，因此不动。
+ * The KWallet folder name keeps its old value on purpose: the app was renamed from
+ * kontainer to kcm-docker, but stored credentials live in this folder -- renaming it
+ * would make them vanish (a re-login per registry), so it stays.
  */
 constexpr auto kFolder = "Kontainer";
 } // namespace
@@ -57,14 +57,14 @@ void KWalletBackend::open(const std::function<void(bool)> &callback)
         return;
     }
 
-    // 钱包子系统被用户关掉时不要去开（会直接失败，还会打扰用户）
+    // Do not open the wallet when the user disabled it (it fails and nags the user)
     if (!KWallet::Wallet::isEnabled()) {
         m_unavailableReason = QStringLiteral("walletDisabled");
         callback(false);
         return;
     }
 
-    // 已经在等一次打开了：把回调挂上去，不再发起第二次请求
+    // An open is already pending: attach this callback, do not fire a second request
     const auto finish = [this, callback](bool success) {
         if (!success) {
             m_unavailableReason = m_unavailableReason.isEmpty() ? QStringLiteral("walletOpenFailed") : m_unavailableReason;
@@ -86,7 +86,7 @@ void KWalletBackend::open(const std::function<void(bool)> &callback)
             m_wallet.reset();
             m_unavailableReason = QStringLiteral("walletOpenFailed");
         } else if (!useFolder()) {
-            // 打开成功但没有文件夹：新建失败也不能算可用（否则读写会落到错误的文件夹）
+            // Opened but no folder: a failed createFolder is unusable too (I/O would hit the wrong folder)
             m_unavailableReason = QStringLiteral("walletFolderFailed");
             m_wallet.reset();
             success = false;
@@ -106,7 +106,7 @@ bool KWalletBackend::useFolder() const
     if (!m_wallet) {
         return false;
     }
-    // 只在我们自己的文件夹里读写：绝不碰别的应用的条目
+    // Read/write only inside our own folder, never other apps' entries
     if (m_wallet->setFolder(folderName())) {
         return true;
     }
@@ -147,7 +147,7 @@ bool KWalletBackend::remove(const QString &key)
         return false;
     }
     if (!m_wallet->hasEntry(key)) {
-        return true; // 不存在也算删除成功
+        return true; // a missing entry counts as deleted
     }
     return m_wallet->removeEntry(key) == 0;
 }

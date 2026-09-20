@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,12 @@ namespace Kontainer
 {
 
 /*!
- * 一条日志片段（ARCH_V5_V8 §3.1.1）。
+ * One log fragment (ARCH_V5_V8 §3.1.1).
  *
- * `text` **不含行尾换行符**：是否成行由 `complete` 说明，控制台据此决定追加还是
- * 替换最后一行（`\r` 覆盖的进度行就是这样处理的：每次覆盖发一条 `complete == false`
- * 的临时行，控制台替换掉上一行，因此进度条不会把控制台刷爆，也不会只有等到换行才可见）。
+ * `text` has **no trailing newline**; `complete` says whether the line ended, and the console
+ * uses it to append or replace the last line (a `\r`-overwritten progress line emits a
+ * `complete == false` provisional line that replaces the previous one, so a progress bar
+ * neither floods the console nor stays invisible until a newline arrives).
  */
 struct LogLine {
     enum class Stream {
@@ -28,7 +29,7 @@ struct LogLine {
 
     Stream stream = Stream::Stdout;
     QString text;
-    /*! 是否由 `\n` 结束（false = 流结束时残留的半行）。 */
+    /*! Terminated by `\n` (false = partial line left at end of stream). */
     bool complete = false;
 
     bool operator==(const LogLine &other) const
@@ -38,74 +39,74 @@ struct LogLine {
 };
 
 /*!
- * Docker 日志字节流 → 行（ARCH_V5_V8 §3.1.1）。
+ * Docker log byte stream → lines (ARCH_V5_V8 §3.1.1).
  *
- * 这是**纯计算**：不碰 socket、不碰界面，因此"半帧、跨包、畸形帧、ANSI、回车覆盖"
- * 这些最容易出错的细节可以单独钉死。
+ * Pure computation: no socket, no UI, so the error-prone details — partial frames, frames split
+ * across packets, malformed frames, ANSI, carriage-return overwrites — can be pinned down alone.
  *
- * 两种流形态（实测结论见 ARCH_V5_V8 附录 A.4）：
+ * Two stream shapes (measured; see ARCH_V5_V8 appendix A.4):
  *
- *  - **非 TTY**：每帧 8 字节头（1 = stdout / 2 = stderr，3 字节保留，4 字节大端长度）+ 载荷；
- *    帧可以跨包（半帧要留在缓冲里等后续字节）
- *  - **TTY**：没有帧，就是原始字节流（因此必须按 `Config.Tty` 分支，不能一律当帧解析）
+ *  - **non-TTY**: each frame is an 8-byte header (1 = stdout / 2 = stderr, 3 reserved bytes,
+ *    4-byte big-endian length) plus payload; frames may span packets (keep partial frames buffered)
+ *  - **TTY**: no frames at all, just raw bytes (so branch on `Config.Tty`, never always parse frames)
  *
- * 另外两件真实日志里一定会遇到的事：
+ * Two things real logs always contain:
  *
- *  - **ANSI 转义序列**（颜色）：默认剥离——控制台不做主题定制（§3.1 范围）
- *  - **`\r` 回车覆盖**（进度条）：视为"重写当前行"，因此只保留最后一次覆盖后的内容，
- *    避免进度条把控制台刷爆
+ *  - **ANSI escapes** (colors): stripped by default — the console does no theming (§3.1 scope)
+ *  - **`\r` overwrites** (progress bars): treated as "rewrite the current line", keeping only the
+ *    last overwrite so a progress bar cannot flood the console
  */
 class LogFrameReader
 {
 public:
-    /*! `tty` 为真时按原始字节流处理（没有 8 字节帧头）。 */
+    /*! When `tty` is true, treat input as a raw byte stream (no 8-byte frame header). */
     explicit LogFrameReader(bool tty = false);
 
-    /*! 追加一段来自 socket 的字节；返回其中已经成行的部分。 */
+    /*! Append socket bytes; returns the lines completed by them. */
     QList<LogLine> feed(const QByteArray &data);
 
     /*!
-     * 流结束：交出残留的半行（如果有），并清空状态。
+     * End of stream: hand over any leftover partial line and clear state.
      *
-     * `complete` 为 false——它确实没有以换行结束（容器可能正在输出提示符）。
+     * `complete` is false — it really did not end with a newline (the container may show a prompt).
      */
     QList<LogLine> flush();
 
-    /*! 当前是否处于 TTY（原始）模式。 */
+    /*! Whether TTY (raw) mode is active. */
     bool isTty() const
     {
         return m_tty;
     }
 
-    /*! 被丢弃的畸形数据字节数（非法帧头 / 超长帧）：用于自检与断言。 */
+    /*! Bytes dropped as malformed (bad frame header / oversized frame); for self-checks and assertions. */
     qint64 discardedBytes() const
     {
         return m_discardedBytes;
     }
 
-    /*! 单个帧载荷上限：超过它的一定不是日志行，直接丢弃（防止一个坏长度吃掉内存）。 */
+    /*! Payload cap per frame; anything larger is dropped, so one bad length cannot eat memory. */
     static constexpr int kMaxFrameBytes = 1024 * 1024;
 
 private:
-    /*! 把一段 UTF-8 文本按行/回车切分并发出（ANSI 已剥离）。 */
+    /*! Split UTF-8 text into lines / at `\r` and emit it (ANSI already stripped). */
     void appendText(LogLine::Stream stream, const QByteArray &data, QList<LogLine> *out);
-    /*! 把当前待定行作为一条完整行发出。 */
+    /*! Emit the pending line as a complete line. */
     void closePendingLine(LogLine::Stream stream, QList<LogLine> *out);
-    /*! 把当前待定行作为**临时行**发出（`\r` 覆盖与流结束用）。 */
+    /*! Emit the pending line as a **provisional** line (for `\r` overwrites and end of stream). */
     void emitProvisionalLine(QList<LogLine> *out);
 
     bool m_tty = false;
-    /*! 非 TTY 模式下未凑齐一帧的字节。 */
+    /*! Bytes of an incomplete frame (non-TTY mode). */
     QByteArray m_frameBuffer;
-    /*! 当前待定行（尚未遇到 `\n`）。 */
+    /*! Pending line (no `\n` seen yet). */
     QByteArray m_pendingLine;
     LogLine::Stream m_pendingStream = LogLine::Stream::Stdout;
     bool m_hasPending = false;
-    /*! 上一次输出以 `\n` 结束（用于把不带换行的片段正确接到新行）。 */
+    /*! Last output ended with `\n` (keeps fragments without a newline on a fresh line). */
     bool m_pendingStartsNewLine = true;
-    /*! 刚读到 `\r`，还没确定它是 CRLF 的行尾还是"覆盖当前行"。 */
+    /*! `\r` just seen; not yet known whether it is a CRLF line end or an overwrite. */
     bool m_crPending = false;
-    /*! 被切断的 ANSI 转义序列：留到下一次 feed 继续解析。 */
+    /*! Truncated ANSI escape sequence, resumed on the next feed. */
     QByteArray m_ansiPending;
     qint64 m_discardedBytes = 0;
 };

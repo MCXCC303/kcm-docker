@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -23,16 +23,18 @@ namespace Kontainer
 
 namespace
 {
-/*! 步骤 key：插入或调整顺序时不要依赖下标（界面上按钮与校验都用 key）。 */
+/*! Step keys: never rely on indices when inserting or reordering (UI buttons and validation use keys). */
 const QStringList &stepKeyList()
 {
     /*
-     * 步骤顺序（用户实测反馈）：镜像 → 基础 → 环境与标签 → **交互** → 端口 → 挂载 → 资源 → 总览。
+     * Step order (user feedback): image -> basics -> environment and labels -> **interactive** -> ports ->
+     * mounts -> resources -> summary.
      *
-     * 依据："先确定挂载什么、再确定跑什么命令"的直觉，以及"端口属于交互之后才关心的细节"：
-     * 交互（命令/入口点/工作目录/用户 + -i/-t）从原来挤在"基础"里的几个字段独立成一步，
-     * 端口排到它后面，环境变量排在它前面。步骤用**稳定 key**，因此顺序调整不会影响
-     * 校验、总览与界面按钮的对应关系（只影响 stepKeys() 的顺序）。
+     * Rationale: "decide what to mount, then what to run", plus "ports are a detail you care about after
+     * interactive settings": interactive (command/entrypoint/workdir/user + -i/-t) became a step of its
+     * own instead of being crammed into "basics", ports moved after it, environment before it. Steps use
+     * **stable keys**, so reordering cannot break validation, the summary or the UI buttons (only the
+     * order of stepKeys()).
      */
     static const QStringList keys = {
         QStringLiteral("image"),
@@ -74,15 +76,16 @@ CreateContainerController::CreateContainerController(OperationController *operat
         Q_EMIT presetsChanged();
         Q_EMIT changed();
     });
-    // 后端数据变了会影响重名与端口冲突的判断；镜像/网络列表还要重铺选择列表
+    // Backend data feeds the duplicate-name and port-conflict checks; image/network lists also repopulate
+    // the choice lists
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &CreateContainerController::changed);
     connect(m_backend, &DockerBackendInterface::imagesUpdated, this, [this] {
         Q_EMIT choiceListsChanged();
         Q_EMIT changed();
     });
     connect(m_backend, &DockerBackendInterface::networksUpdated, this, [this] {
-        // 网络列表是异步到的：如果用户还没选网络，就采用第一个（界面上那个下拉显示的就是它，
-        // 不能出现"看着选了、实际提交空"）
+        // The network list arrives asynchronously: with no network chosen yet, take the first one (that is
+        // what the dropdown shows; we must never submit an empty value that looks selected)
         if (m_network.isEmpty()) {
             const QVariantList choices = availableNetworks();
             if (!choices.isEmpty()) {
@@ -92,7 +95,7 @@ CreateContainerController::CreateContainerController(OperationController *operat
         Q_EMIT choiceListsChanged();
         Q_EMIT changed();
     });
-    // 创建成功：把 id 交给界面跳转
+    // Created: hand the id to the UI so it can navigate
     connect(m_backend, &DockerBackendInterface::containerCreated, this, [this](const QString &id, const QString &) {
         m_createdContainerId = id;
         Q_EMIT submitted(id);
@@ -242,7 +245,7 @@ QVariantList CreateContainerController::presets() const
 
 namespace
 {
-/*! 只在这些真正改变表单内容时才发 changed（避免每敲一个字符就重算整份总览）。 */
+/*! Emit changed only for real form changes (so no keystroke recomputes the whole summary). */
 template<typename T>
 bool assignIfDifferent(T &target, const T &value)
 {
@@ -452,7 +455,7 @@ void CreateContainerController::reset(const QString &presetImage)
     m_memoryLimitBytes = 0;
     m_cpus = 0.0;
     m_privileged = false;
-    // 交互能力默认开：容器因此能保持运行（用户实测：默认参数下 alpine 会立刻退出）
+    // Interactive on by default so the container stays up (user-tested: alpine exits at once by default)
     m_openStdin = true;
     m_tty = true;
     m_stdinOnce = false;
@@ -473,7 +476,7 @@ QVariantList CreateContainerController::availableImages() const
     const QList<Image> images = m_backend->images();
     for (const Image &image : images) {
         for (const QString &tag : image.repoTags) {
-            // 悬空镜像（<none>:<none>）不进选择列表：没法用引用去创建容器
+            // Dangling images (<none>:<none>) stay out of the choices: no reference to create from
             if (tag.isEmpty() || tag.startsWith(QLatin1String("<none>"))) {
                 continue;
             }
@@ -507,12 +510,12 @@ QString CreateContainerController::suggestedName() const
 {
     const QString base = m_name.trimmed();
     if (base.isEmpty()) {
-        // 还没有名字：按镜像给一个 docker 风格的候选（`alpine:3.19` → `alpine-3-19-4f2a`）。
-        // 之前这里直接返回空，界面上「用建议名称」因此永远没反应（用户实测反馈的 ③）。
+        // No name yet: derive a docker-style candidate from the image (`alpine:3.19` -> `alpine-3-19-4f2a`).
+        // This used to return empty, so the UI's "use suggested name" never reacted (user feedback ③).
         QString stem = m_image.trimmed();
         const int slash = stem.lastIndexOf(QLatin1Char('/'));
         if (slash >= 0) {
-            stem = stem.mid(slash + 1); // 去掉仓库前缀，留 `alpine:3.19`
+            stem = stem.mid(slash + 1); // Drop the repository prefix, keep `alpine:3.19`
         }
         const int colon = stem.indexOf(QLatin1Char(':'));
         if (colon > 0) {
@@ -528,7 +531,7 @@ QString CreateContainerController::suggestedName() const
         if (sanitized.isEmpty()) {
             sanitized = QStringLiteral("container");
         }
-        // 后缀用镜像标签/时间的短哈希，避免两次点击拿到同一个名字
+        // Suffix is a short hash of image + time, so two clicks never yield the same name
         const uint suffix = qHash(m_image + QString::number(QDateTime::currentMSecsSinceEpoch())) & 0xffff;
         QString candidate = QStringLiteral("%1-%2").arg(sanitized, QString::number(suffix, 16).rightJustified(4, QLatin1Char('0')));
         int counter = 2;
@@ -538,7 +541,7 @@ QString CreateContainerController::suggestedName() const
         }
         return candidate;
     }
-    // 已有名字（克隆进来的）：原名 + `-copy`，被占用就继续加序号（§4.5）
+    // Name already present (cloned in): original + `-copy`, appending a counter while taken (§4.5)
     QString candidate = base + QStringLiteral("-copy");
     int counter = 2;
     while (m_operations->containerNameTaken(candidate)) {
@@ -559,9 +562,9 @@ bool CreateContainerController::prefillFromContainer(const QString &containerId)
     }
     const Container &container = *it;
 
-    // 列表项只有基本信息；命令/入口点/环境/标签/重启策略这些只在 inspect 里，
-    // 因此当调用方从容器详情页进来（详情控制器里就是同一个容器）时，把**完整配置**一并克隆过来。
-    // 只复制配置，不复制运行时状态（§4.5）
+    // List entries carry basics only; command/entrypoint/env/labels/restart policy live only in inspect,
+    // so when the caller comes from the container detail page (same container in the detail controller) the
+    // **full config** is cloned along. Config only, never runtime state (§4.5)
     const bool hasDetail = m_containerDetail && m_containerDetail->hasDetail()
         && m_containerDetail->containerId() == container.id;
     reset(hasDetail ? m_containerDetail->image() : container.image);
@@ -584,7 +587,7 @@ bool CreateContainerController::prefillFromContainer(const QString &containerId)
         }
         m_labelRows.clear();
         if (DetailListModel *labels = m_containerDetail->labels()) {
-            // DetailListModel 只按 role 暴露：这里按 LabelRole/ValueRole 读回键值对
+            // DetailListModel exposes roles only: read the key/value pairs back via LabelRole/ValueRole
             for (int row = 0; row < labels->count(); ++row) {
                 const QModelIndex index = labels->index(row, 0);
                 m_labelRows.append(QVariantMap {
@@ -626,8 +629,8 @@ bool CreateContainerController::nextStep()
     if (!canAdvance()) {
         return false;
     }
-    // 名称的最终确认发生在"基础"这一步之后：进入后续步骤前先填好名字，
-    // 否则用户会在总览里才发现没名字
+    // The name is finalized after the "basics" step: fill it in before advancing, or the user only finds
+    // out on the summary that it is missing
     if (stepKey() == QLatin1String("basics") && m_name.trimmed().isEmpty()) {
         const QString suggestion = suggestedName();
         if (!suggestion.isEmpty()) {
@@ -656,7 +659,7 @@ bool CreateContainerController::goToStep(const QString &key)
     if (target < 0) {
         return false;
     }
-    // 不能跳过没填完的步骤：往前跳要逐步校验（总览只能从最后一步进）
+    // Unfinished steps cannot be skipped: jumping forward validates each one (the summary comes last)
     for (int step = m_stepIndex; step < target; ++step) {
         const int saved = m_stepIndex;
         m_stepIndex = step;
@@ -768,8 +771,8 @@ bool CreateContainerController::addMountFromPreset(const QString &presetId)
             return false; // already added
         }
     }
-    // 只读**不**从预设带过来：同一条预设在不同容器里可能一次只读、一次可写，
-    // 因此挂载行默认可写，由用户在该行的「只读」开关上决定（用户实测反馈）
+    // Read-only is **not** carried over from the preset: the same preset may be read-only in one container
+    // and writable in another, so rows default to writable and the row's "read-only" switch decides
     m_mountRows.append(QVariantMap {
         {QStringLiteral("type"), it->type},
         {QStringLiteral("source"), it->source},
@@ -810,7 +813,7 @@ QVariantMap CreateContainerController::portRowStatus(int row) const
     const int hostPort = entry.value(QStringLiteral("hostPort")).toInt();
     const QString hostIp = entry.value(QStringLiteral("hostIp")).toString();
 
-    // 必填与范围先于"冲突"（它们是输入本身的问题，不是占用问题）
+    // Required/range checks come before "conflict" (they are input problems, not occupancy problems)
     if (containerPort == 0) {
         status.insert(QStringLiteral("errorKey"), QStringLiteral("portRequired"));
         return status;
@@ -821,10 +824,11 @@ QVariantMap CreateContainerController::portRowStatus(int row) const
     }
     status.insert(QStringLiteral("hostPort"), hostPort);
     if (hostPort == 0) {
-        return status; // 随机分配：不冲突，也不给建议
+        return status; // Random assignment: no conflict, and no suggestion either
     }
 
-    // 本请求里**其它行**已经填了的宿主端口（含通配重叠）——建议端口也要避开它们
+    // Host ports already filled by **other rows** of this request (incl. wildcard overlap); suggestions
+    // must avoid them too
     QList<int> otherPorts;
     bool duplicate = false;
     for (int other = 0; other < m_portRows.size(); ++other) {
@@ -869,7 +873,7 @@ QVariantList CreateContainerController::portRowStatuses() const
 
 QString CreateContainerController::validatePorts() const
 {
-    // 逐行状态是唯一判断处（同一份逻辑也供界面的行内提示使用，见 portRowStatuses）
+    // Row status is the single source of truth (the inline UI hints use the same logic; see portRowStatuses)
     for (int row = 0; row < m_portRows.size(); ++row) {
         const QString errorKey = portRowStatus(row).value(QStringLiteral("errorKey")).toString();
         if (!errorKey.isEmpty()) {
@@ -896,8 +900,8 @@ QString CreateContainerController::validateMounts() const
 
         const QString source = row.value(QStringLiteral("source")).toString();
         const QString type = row.value(QStringLiteral("type"), QStringLiteral("bind")).toString();
-        // 宿主路径的缺失**只提示不阻断**（Docker 会自己建目录），但格式必须对：
-        // bind 要绝对路径、命名卷要合法卷名
+        // A missing host path only **warns**, it does not block (Docker creates the directory itself), but
+        // the format must be right: bind needs an absolute path, a named volume a valid volume name
         const QString sourceError = MountPresetStore::validateSource(source, type);
         if (!sourceError.isEmpty()) {
             return sourceError;
@@ -908,7 +912,7 @@ QString CreateContainerController::validateMounts() const
 
 QString CreateContainerController::stepErrorKeyForStep(const QString &key) const
 {
-    // 临时切到该步骤求值：校验逻辑只写一份，避免"界面校验"与"诊断校验"分叉
+    // Switch to that step temporarily: validation is written once, so UI and diagnostics cannot diverge
     auto *self = const_cast<CreateContainerController *>(this);
     const int saved = m_stepIndex;
     const int target = int(stepKeyList().indexOf(key));
@@ -943,7 +947,7 @@ QString CreateContainerController::validateCurrentStep() const
         return {};
     }
     if (key == QLatin1String("interactive")) {
-        // 交互步骤只收集字段：命令/入口点是自由文本，-i/-t 是开关，没有阻断性校验
+        // Interactive only collects fields: command/entrypoint are free text and -i/-t are switches
         return {};
     }
     if (key == QLatin1String("ports")) {
@@ -954,7 +958,7 @@ QString CreateContainerController::validateCurrentStep() const
             const QVariantMap row = entry.toMap();
             const QString key_ = row.value(QStringLiteral("key")).toString();
             if (key_.trimmed().isEmpty()) {
-                continue; // 空行会被忽略，不算错误
+                continue; // Empty rows are ignored, not an error
             }
             const QString keyError = validateEnvironmentKey(key_);
             if (!keyError.isEmpty()) {
@@ -988,7 +992,7 @@ QString CreateContainerController::validateCurrentStep() const
         }
         return validateCpus(m_cpus);
     }
-    // 总览：能走到这里说明前面都通过了
+    // Summary: reaching here means every earlier step passed
     return {};
 }
 
@@ -1003,7 +1007,7 @@ QVariantList CreateContainerController::summary() const
 
     add(i18n("Image"), m_image);
     add(i18n("Name"), m_name);
-    // 命令与入口点：填了就要能在总览里核对（用户实测反馈 ⑧）
+    // Command and entrypoint: once filled in they must be verifiable in the summary (user feedback ⑧)
     if (!m_commandText.trimmed().isEmpty()) {
         add(i18n("Command"), splitLines(m_commandText).join(QLatin1Char(' ')));
     }
@@ -1022,7 +1026,7 @@ QVariantList CreateContainerController::summary() const
     if (m_restartPolicy != QLatin1String("no")) {
         add(i18n("Restart policy"), m_restartPolicy);
     }
-    // 端口/挂载/环境只列数量与关键信息：总览是"核对"，不是把整张表单再抄一遍
+    // Ports/mounts/env list only counts and key facts: the summary verifies, it does not recopy the form
     if (!m_portRows.isEmpty()) {
         QStringList ports;
         for (const QVariant &entry : m_portRows) {
@@ -1045,7 +1049,7 @@ QVariantList CreateContainerController::summary() const
         }
         add(i18n("Mounts"), mounts.join(QStringLiteral(", ")));
     }
-    // 环境变量只列**键名**：值可能是密码（§4.4 与四期 §40 的敏感字段处理一致）
+    // Env vars list **names only**: values may be passwords (§4.4, consistent with phase four §40)
     if (!m_environmentRows.isEmpty()) {
         QStringList keys;
         for (const QVariant &entry : m_environmentRows) {
@@ -1069,7 +1073,7 @@ QVariantList CreateContainerController::summary() const
     if (m_privileged) {
         add(i18n("Privileged"), i18n("Yes (equivalent to root on the host)"));
     }
-    // 交互能力：两项都开才写一行，单项也如实写出（用户要能核对）
+    // Interactive: both on still writes one row, and a single one is reported faithfully (users verify)
     if (m_openStdin || m_tty) {
         QStringList interactive;
         if (m_openStdin) {
@@ -1102,7 +1106,7 @@ QVariantMap CreateContainerController::requestMap() const
     QVariantMap request;
     request.insert(QStringLiteral("name"), m_name.trimmed());
     request.insert(QStringLiteral("image"), m_image.trimmed());
-    // 命令/入口点：按行拆分（与 docker CLI 的写法一致），空行忽略
+    // Command/entrypoint: split by line (as the docker CLI does), empty lines ignored
     request.insert(QStringLiteral("command"), splitLines(m_commandText));
     request.insert(QStringLiteral("entrypoint"), splitLines(m_entrypointText));
     request.insert(QStringLiteral("workingDirectory"), m_workingDirectory.trimmed());
@@ -1122,7 +1126,7 @@ QVariantMap CreateContainerController::requestMap() const
     request.insert(QStringLiteral("stdinOnce"), m_stdinOnce);
     request.insert(QStringLiteral("startAfterCreate"), m_startAfterCreate);
 
-    // 环境变量：`KEY=value` 形式（与 Docker API 一致）
+    // Environment: `KEY=value` form (as the Docker API expects)
     QStringList environment;
     for (const QVariant &entry : m_environmentRows) {
         const QVariantMap row = entry.toMap();
@@ -1160,7 +1164,7 @@ bool CreateContainerController::submit()
     if (!m_operations->createContainer(requestMap(), m_pullIfMissing)) {
         return false;
     }
-    // 创建成功后把本次挂载并入"最近使用"（预设由此自动积累，§4.1）
+    // After a successful create, merge these mounts into "recently used" (presets accumulate, §4.1)
     QList<ContainerMountRequest> mounts;
     for (const QVariant &entry : m_mountRows) {
         const QVariantMap row = entry.toMap();
@@ -1172,7 +1176,7 @@ bool CreateContainerController::submit()
         mounts.append(mount);
     }
     m_presets->noteUsed(mounts);
-    // 成功提交后记下命令（F3：下次可以直接从历史里挑）
+    // Record the command after a successful submit (F3: pick it from history next time)
     if (m_commandHistory && !m_commandText.trimmed().isEmpty()) {
         m_commandHistory->record(m_commandText);
     }

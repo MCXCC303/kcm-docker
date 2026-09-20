@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -39,8 +39,8 @@ void CredentialStore::open()
     }
 
     setState(State::Opening);
-    // 后端可能同步回调（内存实现）也可能异步（KWallet 等用户解锁）；
-    // 这里不做任何假设，只认回调。
+    // The backend may call back synchronously (in-memory) or asynchronously (KWallet waits for
+    // unlock); assume nothing here and trust only the callback.
     m_backend->open([this](bool success) {
         if (success) {
             setState(State::Ready);
@@ -79,8 +79,8 @@ QStringList CredentialStore::serverAddresses() const
     if (!m_backend || m_state != State::Ready) {
         return {};
     }
-    // 键在写入时已经规范化；这里仍然再规范化一次并去重 ——
-    // 钱包里的条目可能来自旧版本或用户手工编辑，不能假设它们干净
+    // Keys were normalized on write, but normalize and dedup again here: wallet entries may come
+    // from older versions or manual edits and cannot be assumed clean
     QStringList addresses;
     const QStringList keys = m_backend->keys();
     for (const QString &key : keys) {
@@ -115,7 +115,7 @@ RegistryCredential CredentialStore::credential(const QString &serverAddress) con
     QString errorKey;
     const RegistryCredential decoded = decodeEntry(normalized, value, &errorKey);
     if (decoded.isEmpty()) {
-        // 只记键与原因，不记内容（§40）
+        // Log the key and reason only, never the content (§40)
         qCWarning(kontainerModel) << "credential entry is unusable:" << normalized << errorKey;
     }
     return decoded;

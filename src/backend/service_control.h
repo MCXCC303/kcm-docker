@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,9 +12,9 @@ namespace Kontainer
 {
 
 /*!
- * 对 systemd 服务能做的动作（ARCH_V5_V8 §B1）。
+ * Actions allowed on a systemd service (ARCH_V5_V8 §B1).
  *
- * 只有这五个：**固定动词**，不接受任意 systemctl 参数。
+ * Exactly these five **fixed verbs**; arbitrary systemctl arguments are not accepted.
  */
 enum class ServiceVerb {
     Start,
@@ -24,31 +24,31 @@ enum class ServiceVerb {
     Disable,
 };
 
-/*! 稳定 key（界面与测试都用它，不传枚举）→ `start` / `stop` / `restart` / `enable` / `disable`。 */
+/*! Stable key (UI and tests use it) -> `start` / `stop` / `restart` / `enable` / `disable`. */
 QString serviceVerbKey(ServiceVerb verb);
-/*! key → 枚举；不认识时返回 false（调用方据此拒绝）。 */
+/*! key -> enum; returns false when unknown (callers reject on that). */
 bool serviceVerbFromKey(const QString &key, ServiceVerb *verb);
-/*! 全部动词（界面铺按钮、测试遍历用）。 */
+/*! All verbs (used to lay out UI buttons and to iterate in tests). */
 QStringList managedServiceVerbs();
 
-/*! 该 unit 是否在我们管理的白名单里（`managedServiceUnits()`）。 */
+/*! Whether the unit is on our managed whitelist (`managedServiceUnits()`). */
 bool isManagedServiceUnit(const QString &unit);
 
-/*! 动词对应的 KAuth 动作名（`org.kde.kcm.docker.service.start`）。 */
+/*! KAuth action name for a verb (`org.kde.kcm.docker.service.start`). */
 QString serviceActionName(ServiceVerb verb);
-/*! 动词对应的 helper 槽名（`service_start`）。 */
+/*! Helper slot name for a verb (`service_start`). */
 QString serviceHelperSlot(ServiceVerb verb);
 
 /*!
- * 校验一个"控制服务"的请求，返回**稳定错误 key**（空 = 通过）。
+ * Validate a "control service" request and return a **stable error key** (empty = accepted).
  *
- * 这是提权边界上最重要的一段逻辑，因此是纯函数、可单测：
- *  - `unitNotManaged`：不在白名单里的 unit（拒绝任意 unit 名）
- *  - `verbNotManaged`：不认识的动词
- *  - `unitRequired` / `verbRequired`：空值
+ * This is the most important logic on the privilege boundary, hence a pure, unit-testable function:
+ *  - `unitNotManaged`: unit not on the whitelist (rejects arbitrary unit names)
+ *  - `verbNotManaged`: unknown verb
+ *  - `unitRequired` / `verbRequired`: empty value
  *
- * 会话侧与 helper 侧都会调用它（纵深防御）：即使会话侧被绕过，
- * helper 也不会执行白名单之外的任何东西。
+ * Both the session side and the helper call it (defense in depth): even if the session side is
+ * bypassed, the helper executes nothing outside the whitelist.
  */
 QString serviceControlArgumentError(const QString &unit, const QString &verbKey);
 

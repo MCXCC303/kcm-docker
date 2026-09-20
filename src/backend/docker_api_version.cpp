@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -37,15 +37,15 @@ std::optional<ApiVersion> ApiVersion::fromString(const QString &version)
 std::optional<ApiVersion> ApiVersion::negotiate(const ApiVersion &server, const std::optional<ApiVersion> &serverMin)
 {
     if (!server.isValid() || server.major() != 1) {
-        // 只支持 Engine API v1.x
+        // Engine API v1.x only
         return std::nullopt;
     }
     if (server.minor() < clientMinMinor()) {
-        // 服务端过旧，低于客户端支持的下限
+        // Server too old, below the client minimum
         return std::nullopt;
     }
     if (serverMin.has_value() && serverMin->major() == 1 && serverMin->minor() > clientMaxMinor()) {
-        // 服务端要求的最低版本高于客户端支持的上限
+        // The server's required minimum is above the client maximum
         return std::nullopt;
     }
     return ApiVersion(1, std::min(server.minor(), clientMaxMinor()));

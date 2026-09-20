@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,9 +16,10 @@ namespace Kontainer
 {
 
 /*!
- * `GET /containers/{id}/stats?stream=false` 的 DTO。
+ * DTO for `GET /containers/{id}/stats?stream=false`.
  *
- * Docker 只给出累加计数器与原始内存数据；百分比与速率都不在这里计算（§17.2/§18）。
+ * Docker only gives cumulative counters and raw memory numbers; percentages and rates are not
+ * computed here (§17.2/§18).
  */
 struct DockerStatsDTO {
     QString containerId;
@@ -43,7 +44,7 @@ struct DockerStatsDTO {
     static std::optional<DockerStatsDTO> fromPayload(const QByteArray &payload, QString *error = nullptr);
 };
 
-/*! DTO → domain（§26）。 */
+/*! DTO → domain (§26). */
 ContainerStats containerStatsFromDto(const DockerStatsDTO &dto);
 
 } // namespace Kontainer

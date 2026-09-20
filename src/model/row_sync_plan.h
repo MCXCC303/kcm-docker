@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,17 +12,18 @@ namespace Kontainer
 {
 
 /*!
- * 一行数据该怎么动（ARCH_V5_V8 §体验修复）。
+ * How one row should move (ARCH_V5_V8 §UX fixes).
  *
- * 之所以只做"计划"而不直接改模型：`beginInsertRows()` 这些是 `QAbstractItemModel` 的
- * **protected** 成员，只有模型自己（或其派生类）能调用。因此这里只算"要做什么"，
- * 由各模型用自己的 protected API 执行——算法仍然只有一份，也能单独测。
+ * A plan rather than a direct model edit because `beginInsertRows()` and friends are **protected**
+ * members of `QAbstractItemModel` that only the model (or a derived class) may call. This computes
+ * "what to do" and each model executes it through its own protected API — one algorithm, testable
+ * on its own.
  */
 struct RowOperation {
     enum class Kind {
-        Remove, /*!< 删掉 `from` 这一行 */
-        Insert, /*!< 在 `to` 位置插入（数据来自新列表） */
-        Move, /*!< 把 `from` 移到 `to` */
+        Remove, /*!< remove the row at `from` */
+        Insert, /*!< insert at `to` (data comes from the new list) */
+        Move, /*!< move `from` to `to` */
     };
 
     Kind kind = Kind::Remove;
@@ -36,13 +37,14 @@ struct RowOperation {
 };
 
 /*!
- * 把"当前键序列"变成"目标键序列"所需的最小操作序列。
+ * Minimal operation sequence turning the current key sequence into the target one.
  *
- * 语义与 ListView 的体验直接相关：
- *   - **只改值**（键序列相同）→ 返回空计划：模型只需发 `dataChanged`，视图不动；
- *   - 有增删或换位 → 视图才会调整位置（这是必要的，用户也能理解）。
+ * The semantics directly drive the ListView experience:
+ *   - **values only** (same key sequence) → empty plan: the model emits `dataChanged`, the view stays;
+ *   - inserts, removals or moves → the view adjusts positions (necessary, and users understand it).
  *
- * 顺序规则：先删（从后往前，索引不串），再逐个就位（换位优先于插入）。
+ * Order: removals first (back to front, so indices stay valid), then place each key (moves before
+ * inserts).
  */
 QList<RowOperation> planRowSync(const QStringList &currentKeys, const QStringList &incomingKeys);
 

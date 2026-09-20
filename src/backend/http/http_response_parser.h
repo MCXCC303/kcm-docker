@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,10 +14,10 @@ namespace Kontainer
 {
 
 /*!
- * 增量式 HTTP/1.1 响应解析器（ARCH_V1 §10：薄封装，不引入外部 HTTP 库）。
+ * Incremental HTTP/1.1 response parser (ARCH_V1 §10: thin wrapper, no external HTTP library).
  *
- * 纯计算、无 I/O、无线程：喂入字节流即可，便于单元测试覆盖
- * Content-Length / chunked / 连接关闭 三种结束方式与各种畸形输入。
+ * Pure computation, no I/O, no threads: feed it bytes, so unit tests can cover the
+ * Content-Length / chunked / connection-close endings and all kinds of malformed input.
  */
 class HttpResponseParser
 {
@@ -34,9 +34,9 @@ public:
         Failed,
     };
 
-    /*! 追加收到的字节并尽力推进解析。 */
+    /*! Append received bytes and parse as far as possible. */
     void feed(const QByteArray &data);
-    /*! 对端关闭连接：判定响应是否已经完整（用于 Connection: close 的响应）。 */
+    /*! Peer closed: decide whether the response is complete (for Connection: close responses). */
     void finishInput();
     void reset();
 
@@ -61,18 +61,18 @@ public:
     {
         return m_reasonPhrase;
     }
-    /*! 大小写不敏感的头部读取；不存在时返回空。 */
+    /*! Case-insensitive header lookup; empty when absent. */
     QByteArray header(const QByteArray &name) const;
-    /*! 已完成解码的响应体（chunked 已合并）。 */
+    /*! Fully decoded body (chunks already merged). */
     QByteArray body() const
     {
         return m_body;
     }
     /*!
-     * 取走尚未被消费的响应体增量（ARCH_V4 §2.2.1）。
+     * Take the body delta not yet consumed (ARCH_V4 §2.2.1).
      *
-     * `body()` 的全量语义不变；本方法只把「已取走」的位置向前推进，
-     * 供流式响应（镜像拉取进度）边收边解析。非流式调用方完全不需要它。
+     * body() keeps its whole-body semantics; this only advances the "already taken" offset,
+     * for streaming responses (image pull progress). Non-streaming callers never need it.
      */
     QByteArray takeBody();
     QString errorString() const
@@ -96,7 +96,7 @@ private:
 
     QByteArray m_buffer;
     QByteArray m_body;
-    /*! 已被 takeBody() 取走的字节数（body() 仍然返回全量）。 */
+    /*! Bytes already taken by takeBody() (body() still returns everything). */
     qsizetype m_bodyConsumed = 0;
     QList<QPair<QByteArray, QByteArray>> m_headers;
 

@@ -1,22 +1,26 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    端口映射编辑器（节点图风格 + 行内冲突提示）。
+    Port mapping editor (node-graph style + inline conflict hints).
 
-    创建容器时要填端口，用户实测反馈"建议同样使用节点图风格，并且标注宿主机/容器"：
-    端口拓扑（PortTopology）是**只读展示**，这里要的是**可编辑**的同一个视觉语言——
-    左边宿主机（IP + 端口），中间一条带圆点的连线，右边容器端口，顶部标注两侧是什么。
+    Ports are filled in when creating a container; user feedback: "use the node graph
+    style here too, and label host/container". PortTopology is **read-only display**;
+    this is the **editable** version of that same visual language — host (IP + port)
+    on the left, a dotted link in the middle, container port on the right, labels on top.
 
-    行内提示（用户实测反馈）：填的宿主端口如果被**运行中**的容器占用，或者与同一张表单里
-    其它行重复，就在那一行下面直接说明，并给一个「使用建议端口 N」一键采用——
-    不要等到启动时才收到 `Bind for 0.0.0.0:8100 failed: port is already allocated`。
-    **空闲时不显示任何提示**；已停止的容器声明过的端口也不算冲突（没运行就不占端口）。
+    Inline hints (user feedback): if a host port is taken by a **running** container or
+    duplicates another row of the same form, say so directly under that row and offer a
+    one-click "Use port N" — do not wait for
+    `Bind for 0.0.0.0:8100 failed: port is already allocated` at start time.
+    **Show nothing while idle**; ports declared by stopped containers are not conflicts
+    (a stopped container holds no port).
 
-    为什么行编辑走控制器：delegate 在 `pragma ComponentBehavior: Unbound` 下拿不到根对象 id
-    （见 CreateContainer.qml 里的说明），因此这里只通过 `editor` 这个**非根**中转对象回写。
+    Why row edits go through the controller: under `pragma ComponentBehavior: Unbound`
+    a delegate cannot reach the root object id (see CreateContainer.qml), so write-back
+    only happens through `editor`, a **non-root** intermediary.
 
-    用法：
+    Usage:
 
         Components.PortMappingEditor {
             controller: page.controller
@@ -35,13 +39,13 @@ import "." as Local
 ColumnLayout {
     id: root
 
-    /*! 创建向导的控制器（提供 addPortRow/setPortRow/removePortRow 与 portRowStatuses）。 */
+    /*! Create-wizard controller (provides addPortRow/setPortRow/removePortRow and portRowStatuses). */
     required property var controller
 
     objectName: "portMappingEditor"
     spacing: Kirigami.Units.smallSpacing
 
-    /*! delegate 用的中转对象：Unbound 下 delegate 里不能引用根对象 id。 */
+    /*! Intermediary for delegates: under Unbound a delegate cannot reference the root id. */
     QtObject {
         id: editor
 
@@ -62,7 +66,7 @@ ColumnLayout {
         id: portRows
     }
 
-    /*! 行内状态 key → 文案（C++ 只给稳定 key，文案在 QML）。 */
+    /*! Inline status key → text (C++ supplies stable keys only, texts live in QML). */
     function portStatusText(status): string {
         switch (String(status.errorKey ?? "")) {
         case "portInUse":
@@ -78,18 +82,19 @@ ColumnLayout {
         }
     }
 
-    /*! 「使用建议端口 N」按钮的文案（没有建议时为空 → 按钮不出现）。 */
+    /*! Text of the "Use port N" button (empty when there is no suggestion → no button). */
     function portSuggestionText(status): string {
         const suggestion = status ? Number(status.suggestion ?? 0) : 0;
         return suggestion > 0 ? i18n("Use port %1", suggestion) : "";
     }
 
     /*
-     * 控制器 → 编辑缓冲。
+     * Controller → edit buffer.
      *
-     * **就地更新**，行数不变时绝不 clear()+append()：重建 ListModel 会销毁正在输入的
-     * delegate（焦点与光标一起丢），这本身也会造成"输入被打断"。
-     * 行数变化（增删行）时才重建，这是必要的。
+     * **Update in place**; never clear()+append() while the row count is unchanged:
+     * rebuilding the ListModel destroys the delegate being typed in (focus and cursor
+     * are lost), which itself interrupts input. Rebuild only when rows are added or
+     * removed, which is unavoidable.
      */
     function syncRows(): void {
         const rows = editor.controller.portRows;
@@ -132,7 +137,7 @@ ColumnLayout {
 
     Component.onCompleted: root.syncRows()
 
-    /* ---------------------------- 两侧的标注 ---------------------------- */
+    /* ---------------------------- Labels for both sides ---------------------------- */
     RowLayout {
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
@@ -175,16 +180,17 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing / 2
 
-            /*! 这一行的状态（来自控制器的 `portRowStatuses`；空闲时 `errorKey` 为空）。 */
+            /*! This row's status (from `portRowStatuses`; `errorKey` is empty while idle). */
             readonly property var rowStatus: {
                 const statuses = editor.controller.portRowStatuses;
                 return portRowItem.index < statuses.length ? statuses[portRowItem.index] : null;
             }
             /*!
-             * 这一行是否有冲突/错误。
+             * Whether this row has a conflict/error.
              *
-             * 注意 `statuses[index]` 越界时是 `undefined` 而不是 `null`：只判 `!== null`
-             * 会在布局早期读到 `undefined.errorKey` 抛错（实测踩到），因此统一用这个布尔属性。
+             * Note that an out-of-bounds `statuses[index]` is `undefined`, not `null`:
+             * testing `!== null` alone then throws on `undefined.errorKey` during early
+             * layout (hit in practice), hence this single boolean.
              */
             readonly property bool hasStatusError: {
                 const status = portRowItem.rowStatus;
@@ -195,7 +201,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
 
-                /* ---- 宿主机一侧：IP + 端口（0 = 随机） ---- */
+                /* ---- Host side: IP + port (0 = random) ---- */
                 QQC2.TextField {
                     objectName: "wizardPortHostIp"
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 5
@@ -206,13 +212,14 @@ ColumnLayout {
                 }
 
                 /*
-                 * 宿主端口用**带校验的文本框**而不是 SpinBox。
+                 * Host port is a **validated TextField**, not a SpinBox.
                  *
-                 * 用户实测：SpinBox 在每次外部改值时会重排自己的文本（并把光标推到末尾），
-                 * 于是"输入 8000"变成 8→重新选中→0→重新选中…… 这里改用 TextField：
-                 *  - 输入期间**不回写**控制器（只在 editingFinished 时回写），因此不会有
-                 *    "模型 → 文本"的回环把光标弄丢；
-                 *  - 校验交给 IntValidator（0…65535；留空/0 = 随机分配）。
+                 * User report: a SpinBox reflows its text on every external value change
+                 * (pushing the cursor to the end), so typing "8000" became 8 → reselect →
+                 * 0 → reselect… A TextField instead:
+                 *  - does **not** write back to the controller while typing (only on
+                 *    editingFinished), so no "model → text" loop can steal the cursor;
+                 *  - validates with IntValidator (0…65535; empty/0 = random assignment).
                  */
                 QQC2.TextField {
                     objectName: "wizardHostPort"
@@ -226,15 +233,16 @@ ColumnLayout {
                         bottom: 0
                         top: 65535
                     }
-                    // 只在输入结束时回写：输入过程中不动模型，光标因此不会被抢走
+                    // Write back on editingFinished only: leaving the model alone keeps the cursor
                     onEditingFinished: editor.setField(portRowItem.index, "hostPort", text.length === 0 ? 0 : parseInt(text, 10))
                 }
 
-                /* ---- 中间的连线：与端口拓扑同一视觉语言（两端插座圆点） ----
-                   用户要求"复用容器信息里网络图的节点图样式，颜色可以任意指定，
-                   编辑时不需要做特征标注"：因此这里只画线 + 两端的插座圆点，没有文字；
-                   颜色按**行内容**取（同一个映射永远同色，不同映射彼此可区分），
-                   不表达任何语义（纯装饰，Accessible.ignored）。 */
+                /* ---- Middle link: same visual language as the port topology (socket dots at both ends) ----
+                   The user asked to "reuse the node graph style of the network diagram on the
+                   container info page; colors can be arbitrary and the editor needs no feature
+                   labels", so this draws only a line plus socket dots, no text. The color comes
+                   from the **row content** (same mapping = same color, different mappings stay
+                   distinguishable) and carries no semantics (pure decoration, Accessible.ignored). */
                 Canvas {
                     objectName: "wizardPortLink"
                     Layout.fillWidth: true
@@ -242,7 +250,7 @@ ColumnLayout {
                     Layout.preferredHeight: Kirigami.Units.gridUnit
                     Accessible.ignored: true
 
-                    /*! 该行的连线颜色（可被用例读取，用来断言"每行一种颜色"）。 */
+                    /*! Link color of this row (readable by tests to assert "one color per row"). */
                     readonly property color linkColor: Local.ChartPalette.connectionColor(
                         "editor|" + portRowItem.containerPort + "/" + portRowItem.protocol
                         + "|" + portRowItem.hostIp + ":" + portRowItem.hostPort)
@@ -272,7 +280,8 @@ ColumnLayout {
                         ctx.lineTo(right, middle);
                         ctx.stroke();
 
-                        // 两端都画成"插座"：外圈连线色、中心掏空成背景色（与拓扑一致）
+                        // Draw both ends as "sockets": ring in the link color, center punched out to the
+                        // background (same as the topology)
                         for (const x of [left, right]) {
                             ctx.fillStyle = linkColor;
                             ctx.beginPath();
@@ -297,7 +306,7 @@ ColumnLayout {
                         bottom: 1
                         top: 65535
                     }
-                    // 同上：失焦/回车才回写，输入中间不打断
+                    // As above: write back on focus loss/Enter only, never mid-typing
                     onEditingFinished: editor.setField(portRowItem.index,
                                                        "containerPort",
                                                        text.length === 0 ? 0 : parseInt(text, 10))
@@ -326,11 +335,13 @@ ColumnLayout {
             }
 
             /*
-             * 行内状态：只在**有问题**时出现（用户要求：空闲不写任何提示）。
+             * Inline status: shown only when there **is** a problem (the user asked for
+             * no hint while idle).
              *
-             * 数据来自控制器的 `portRowStatuses`（**属性**，所以容器列表一变提示就会更新）：
-             * 被运行中的容器占用 → 说清是谁占着 + 「使用建议端口 N」一键采用；
-             * 与同一请求里的其它行重复 → 说明原因（建议端口已避开本表单用过的端口）。
+             * Data comes from the controller's `portRowStatuses` (a **property**, so hints
+             * update as soon as the container list changes): taken by a running container →
+             * say who holds it + one-click "Use port N"; duplicate within the same request →
+             * explain (suggestions avoid ports already used in this form).
              */
             Kirigami.InlineMessage {
                 objectName: "wizardPortRowStatus"
@@ -341,11 +352,12 @@ ColumnLayout {
             }
 
             /*
-             * 「使用建议端口 N」：一键把建议端口写进这一行。
+             * "Use port N": writes the suggested port into this row with one click.
              *
-             * 单独做成一个按钮而不是 InlineMessage 的 `actions`：`actions` 里放的是
-             * `Kirigami.Action`（QObject，不是 Item），用例既找不到也点不到；
-             * 而这个按钮要能被"点一下提示就消失"的用例真的点到。
+             * A standalone button rather than the InlineMessage `actions`: those hold
+             * `Kirigami.Action` (a QObject, not an Item), which tests can neither find nor
+             * click, while this button must be clickable by the "click the hint and it
+             * disappears" test.
              */
             QQC2.Button {
                 objectName: "wizardPortSuggestionButton"

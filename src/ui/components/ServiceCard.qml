@@ -1,17 +1,20 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Docker 相关服务的状态与管理（ARCH_V5_V8 §B1）。
+    Status and management of the Docker-related services (ARCH_V5_V8 §B1).
 
-    用户实测：`docker.service` 停掉后本工具仍显示"已连接"（`docker.socket` 还在），
-    而且停掉服务后没有任何入口能把它拉起来——因此这里给出三件套（socket / service /
-    containerd）的状态，并提供**受限提权**的五个动作（启动 / 停止 / 重启 / 启用 / 禁用）。
+    User report: after `docker.service` was stopped this tool still showed "connected"
+    (`docker.socket` was still up), and nothing offered a way to start the service again.
+    Hence the state of all three units (socket / service / containerd) plus five
+    **privilege-restricted** actions (start / stop / restart / enable / disable).
 
-    设计要点：
-      - 动作走 `controller.controlService(unit, verb)`：白名单校验在 C++（非法请求不发提权动作）
-      - 停止 / 禁用要**二次确认**并说明影响（"停掉 socket 后本工具将无法连接"）
-      - 状态是只读查询（systemd D-Bus），操作成功后由控制器重新查询
+    Design points:
+      - actions go through `controller.controlService(unit, verb)`: whitelist validation
+        lives in C++ (an illegal request sends no privileged action)
+      - stop / disable ask for **confirmation** and state the impact ("after stopping the
+        socket this tool cannot connect")
+      - status is a read-only query (systemd D-Bus); the controller re-queries after a success
 */
 
 import QtQuick
@@ -25,19 +28,19 @@ import "." as Local
 Kirigami.AbstractCard {
     id: root
 
-    /*! 引擎页的 daemon 配置控制器（同时承载服务控制的结果通道）。 */
+    /*! Daemon settings controller of the engine page (also carries the service-control result channel). */
     required property var controller
-    /*! 服务状态来源（`kcm.controller.services`）。 */
+    /*! Service state source (`kcm.controller.services`). */
     required property var services
 
     objectName: "serviceCard"
     showClickFeedback: false
 
-    /*! 正在等待确认的 (unit, verb)；确认后才真的发请求。 */
+    /*! (unit, verb) awaiting confirmation; the request is only sent after it. */
     property string pendingUnit: ""
     property string pendingVerb: ""
 
-    /*! 单位名 → 界面文案（unit 名本身是数据，不翻译）。 */
+    /*! Unit name → UI text (the unit name itself is data and is never translated). */
     function unitLabel(unit: string): string {
         switch (unit) {
         case "docker.socket":
@@ -51,7 +54,7 @@ Kirigami.AbstractCard {
         }
     }
 
-    /*! 状态 key → 文案。 */
+    /*! State key → text. */
     function stateText(stateKey: string): string {
         switch (stateKey) {
         case "running":
@@ -69,7 +72,7 @@ Kirigami.AbstractCard {
         }
     }
 
-    /*! 状态 key → 配色（与项目其它状态色一致）。 */
+    /*! State key → color (consistent with the project's other status colors). */
     function stateColor(stateKey: string): color {
         switch (stateKey) {
         case "running":
@@ -79,12 +82,12 @@ Kirigami.AbstractCard {
         case "stopped":
             return Local.StatusPalette.color("warning");
         default:
-            // 未知：不猜状态，用中性色（状态色统一在 StatusPalette 里映射）
+            // Unknown: do not guess a state, use the neutral color (mapped once in StatusPalette)
             return Local.StatusPalette.color("disabled");
         }
     }
 
-    /*! 动作 key → 文案。 */
+    /*! Action key → text. */
     function verbText(verb: string): string {
         switch (verb) {
         case "start":
@@ -102,12 +105,12 @@ Kirigami.AbstractCard {
         }
     }
 
-    /*! 危险动作（停止 / 禁用）要二次确认。 */
+    /*! Dangerous actions (stop / disable) need confirmation. */
     function verbNeedsConfirmation(verb: string): bool {
         return verb === "stop" || verb === "disable";
     }
 
-    /*! 请求一个动作：危险的先弹确认，其余直接发。 */
+    /*! Request an action: dangerous ones ask first, the rest go straight out. */
     function requestAction(unit: string, verb: string): void {
         if (root.verbNeedsConfirmation(verb)) {
             root.pendingUnit = unit;
@@ -118,7 +121,7 @@ Kirigami.AbstractCard {
         root.controller.controlService(unit, verb);
     }
 
-    /*! 危险动作的后果说明（每种动作说清楚会发生什么）。 */
+    /*! Consequence of a dangerous action (each spells out what will happen). */
     function consequenceText(unit: string, verb: string): string {
         if (verb === "stop" && unit === "docker.socket") {
             return i18n("Kontainer will not be able to reach the Docker daemon until the socket is started again.");
@@ -167,7 +170,7 @@ Kirigami.AbstractCard {
                     elide: Text.ElideRight
                 }
 
-                // 状态 = 颜色点 + 文本（颜色不能是唯一区分手段：文本同样给出来）
+                // State = dot + text (color is not the only differentiator, the text is there too)
                 RowLayout {
                     objectName: "serviceStateChip"
                     Layout.preferredWidth: Kirigami.Units.gridUnit * 6
@@ -202,7 +205,7 @@ Kirigami.AbstractCard {
                     Layout.fillWidth: true
                 }
 
-                // 启动 / 停止：按当前状态显示（运行中给"停止"，否则给"启动"）
+                // Start / stop: shown by current state (running offers "stop", otherwise "start")
                 QQC2.Button {
                     objectName: "serviceStartButton"
                     visible: serviceRow.modelData.known && !serviceRow.modelData.active

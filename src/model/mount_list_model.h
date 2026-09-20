@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,24 +13,24 @@ namespace Kontainer
 {
 
 /*!
- * 挂载条目（ARCH_V4 §2.1.1）。
+ * One mount entry (ARCH_V4 §2.1.1).
  *
- * 与 `DetailEntry`（label/value/detail 三行文本）的区别：挂载行需要**结构化字段**
- * ——类型徽标、读写模式、宿主路径、容器路径、命名卷名、宿主路径是否真的存在，
- * 以及「能不能打开」。把这些塞进三个字符串里会让 QML 端反向解析文本。
+ * Unlike `DetailEntry` (label/value/detail text) a mount row needs **structured fields**: type
+ * badge, rw mode, host path, container path, named volume, whether the host path really exists,
+ * and whether it can be opened. Squeezing those into three strings would make QML parse text back.
  */
 struct MountEntry {
-    /*! bind / volume / tmpfs（引擎原文，小写）。 */
+    /*! bind / volume / tmpfs (raw engine text, lowercase). */
     QString typeKey;
-    /*! 宿主路径；tmpfs 为空。 */
+    /*! Host path; empty for tmpfs. */
     QString source;
-    /*! 容器内路径。 */
+    /*! Path inside the container. */
     QString destination;
-    /*! rw / ro。 */
+    /*! rw / ro. */
     QString mode;
-    /*! 命名卷名；bind / 匿名卷为空。 */
+    /*! Named volume name; empty for bind mounts and anonymous volumes. */
     QString volumeName;
-    /*! directory / missing / notADirectory / notApplicable。 */
+    /*! directory / missing / notADirectory / notApplicable. */
     QString sourceStateKey;
 
     bool isOpenable() const
@@ -46,11 +46,12 @@ struct MountEntry {
 };
 
 /*!
- * 挂载列表模型（ARCH_V4 §2.1.1）。
+ * Mount list model (ARCH_V4 §2.1.1).
  *
- * 只承载 presentation 数据；宿主路径探测的结果由控制器填入（模型不做 I/O）。
- * 沿用 `DetailListModel` 的约定：内容未变时不发任何信号——详情页每 30 秒复核一次，
- * 无条件重置模型会让 QML 里的行反复销毁重建（ARCH_V3 附录 A.1g 的段错误诱因）。
+ * Presentation data only; the controller fills in host-path probe results (the model does no I/O).
+ * Follows the `DetailListModel` convention of emitting nothing when unchanged — the detail page
+ * re-checks every 30 seconds, and an unconditional reset would destroy and rebuild QML rows over
+ * and over (the segfault trigger in ARCH_V3 appendix A.1g).
  */
 class MountListModel : public QAbstractListModel
 {
@@ -58,7 +59,7 @@ class MountListModel : public QAbstractListModel
 
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(bool empty READ empty NOTIFY countChanged)
-    /*! 打不开的挂载数量（没有宿主路径或路径不存在），供页面给出提示。 */
+    /*! Mounts that cannot be opened (no host path, or it is missing) so the page can warn. */
     Q_PROPERTY(int blockedCount READ blockedCount NOTIFY countChanged)
 
 public:

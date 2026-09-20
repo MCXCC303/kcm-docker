@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -9,10 +9,10 @@ namespace Kontainer
 {
 
 /*!
- * 注册 QML 类型（org.kde.kcm.docker）。
+ * Register the QML types (org.kde.kcm.docker).
  *
- * KCM 与 QML 加载测试共用同一份注册代码，避免两边漂移。
- * 幂等：重复调用不会有副作用（Qt 会忽略重复注册）。
+ * The KCM and the QML load test share this registration code so the two cannot drift apart.
+ * Idempotent: repeated calls have no effect (Qt ignores duplicate registrations).
  */
 void registerKontainerQmlTypes();
 

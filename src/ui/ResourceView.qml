@@ -1,17 +1,15 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    容器资源视图（ARCH_V2 §22 / ARCH_V3 §2.4、§2.5）：
+    Container resource view (ARCH_V2 §22 / ARCH_V3 §2.4, §2.5): CPU / memory / network / block I/O.
 
-    CPU / 内存 / 网络 / 块 I/O。
-
-    - 所有百分比与速率都由 C++ 的 MetricsModel 算好（§18：统计公式不属于 UI），
-      QML 只做单位与文本格式化。
-    - 趋势线使用 ChartPalette 的**数据序列色**，不再借用 positive/negative
-      这类状态语义色（§1.4 把数据可视化列为语义色的例外）。
-    - 数值统一右对齐（§1.5）：同一列数字上下对齐，避免「12.3% / 97.4 MiB / 38.2 GiB」
-      这种参差观感。
+    - All percentages and rates are computed in C++ by MetricsModel (§18: statistics formulas do
+      not belong in the UI); QML only formats units and text.
+    - Trend lines use ChartPalette's **data series colors**, not status semantics such as
+      positive/negative (§1.4 lists data visualization as an exception to semantic colors).
+    - Numbers are right-aligned (§1.5): figures in one column line up, avoiding the ragged look
+      of "12.3% / 97.4 MiB / 38.2 GiB".
 */
 
 import QtQuick
@@ -97,7 +95,7 @@ ColumnLayout {
                         return i18n("—");
                     }
                     const used = Kontainer.Format.byteSize(view.metrics.memoryUsedBytes);
-                    // 没有真实 limit 时只显示用量，避免“97 MiB / 38 GiB”这种误导（§19）
+                    // With no real limit show usage only: "97 MiB / 38 GiB" misleads (§19)
                     if (view.metrics.memoryLimitEffective) {
                         return i18nc("@info memory usage and limit", "%1 / %2", used, Kontainer.Format.byteSize(view.metrics.memoryLimitBytes));
                     }
@@ -108,7 +106,7 @@ ColumnLayout {
             }
             QQC2.Label {
                 Layout.fillWidth: true
-                // 没有有效 memory limit 时不显示虚假百分比（§19）
+                // No fake percentage without an effective memory limit (§19)
                 visible: view.metrics.memoryLimitEffective && view.metrics.memoryPercent >= 0
                 text: view.percentText(view.metrics.memoryPercent)
                 horizontalAlignment: Text.AlignRight

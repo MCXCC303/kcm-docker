@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -66,9 +66,10 @@ void HostPortFilterModel::setSortKey(const QString &key)
 void HostPortFilterModel::updateSorting()
 {
     /*
-     * 只有一列数据，因此"换排序键"对 QSortFilterProxyModel 来说看起来什么都没变
-     * （列与方向都一样）→ `sort()` 直接变成空操作，排序键换了也不重排（用户实测：排序失效）。
-     * 显式 invalidate() 强制按新的 lessThan 重排。
+     * With a single column, changing the sort key looks like no change at all to QSortFilterProxyModel
+     * (same column and direction) -> `sort()` becomes a no-op and nothing reorders even though the key
+     * changed (user-reported: sorting did nothing). An explicit invalidate() forces a re-sort with the
+     * new lessThan.
      */
     sort(0, Qt::AscendingOrder);
     invalidate();
@@ -83,7 +84,7 @@ bool HostPortFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &sou
 
     if (m_stateFilter != QLatin1String("all")) {
         const QString stateKey = index.data(HostPortModel::StateKeyRole).toString();
-        // "未启动"这一类同时包含"端口还空着"和"端口已经被别人占了"两种
+        // "Not started" covers both "port still free" and "port already taken by someone else"
         const bool matches = m_stateFilter == QLatin1String("reserved")
             ? (stateKey == QLatin1String("reserved") || stateKey == QLatin1String("reservedTaken"))
             : stateKey == m_stateFilter;

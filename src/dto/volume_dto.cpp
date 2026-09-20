@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,7 +20,7 @@ using namespace JsonHelpers;
 
 namespace
 {
-/*! 对象形式（`Labels` / `Options`）→ 按键排序的键值对列表（顺序稳定）。 */
+/*! Object form (`Labels` / `Options`) -> key-sorted pair list (stable order). */
 QList<QPair<QString, QString>> pairsFromObject(const QJsonValue &value)
 {
     QList<QPair<QString, QString>> pairs;
@@ -66,13 +66,13 @@ std::optional<DockerVolumeDTO> DockerVolumeDTO::fromJson(const QJsonObject &obje
     dto.scope = stringValue(object, QStringLiteral("Scope"));
     dto.status = object.value(QStringLiteral("Status")).toObject().value(QStringLiteral("Text")).toString();
     if (dto.status.isEmpty()) {
-        // 有的引擎把 Status 直接写成字符串
+        // Some engines write Status as a plain string
         dto.status = stringValue(object, QStringLiteral("Status"));
     }
     dto.labels = pairsFromObject(object.value(QStringLiteral("Labels")));
     dto.options = pairsFromObject(object.value(QStringLiteral("Options")));
 
-    // UsageData 是可选的（引擎可能没扫、也可能被关掉）：缺失就是"未知"（-1）
+    // UsageData is optional (not scanned or disabled): missing means unknown (-1)
     const QJsonValue usage = object.value(QStringLiteral("UsageData"));
     if (usage.isObject()) {
         const QJsonObject usageObject = usage.toObject();
@@ -107,7 +107,7 @@ QList<DockerVolumeDTO> DockerVolumeDTO::listFromPayload(const QByteArray &payloa
         *warnings = stringListValue(root, QStringLiteral("Warnings"));
     }
 
-    // 空列表时 `Volumes` 是 null（本机实测）：这不是错误，返回空即可
+    // `Volumes` is null for an empty list (observed locally): not an error, just return empty
     const QJsonValue volumesValue = root.value(QStringLiteral("Volumes"));
     if (volumesValue.isNull() || volumesValue.isUndefined()) {
         return result;

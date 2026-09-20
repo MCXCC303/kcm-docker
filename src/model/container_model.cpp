@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -19,8 +19,8 @@ namespace
 {
 
 /*!
- * 端口概要：已发布端口显示为 "8080→80/tcp"，未发布显示为 "80/tcp"。
- * 这是端口数据本身，不是界面文案。
+ * Port summary: published ports render as "8080→80/tcp", unpublished as "80/tcp".
+ * This is the port data itself, not UI copy.
  */
 QString portsSummary(const Container &container)
 {
@@ -118,9 +118,10 @@ QHash<int, QByteArray> ContainerModel::roleNames() const
 void ContainerModel::setContainers(const QList<Container> &containers)
 {
     /*
-     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
-     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
-     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     * Incremental sync instead of a full reset: users reported "the list jumps back to the top after
+     * start/stop, or when returning from the detail page" -- the cause was an unconditional
+     * `beginResetModel()`, and a model reset always scrolls a ListView back to the top. Now the view is
+     * only adjusted when the row count/order really changed; pure data changes just emit `dataChanged`.
      */
     const bool touched = syncRows(
         m_containers,

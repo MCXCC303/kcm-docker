@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,50 +17,51 @@ namespace Kontainer
 {
 
 /*!
- * 一条宿主端口占用（ARCH_next_ports.md §2/§3）。
+ * One host port occupancy (ARCH_next_ports.md §2/§3).
  *
- * 数据只来自**容器列表**（`/containers/json` 的 `Ports`，即"实际发布"的绑定）——
- * 本期不做 `reserved`（已停止容器声明过什么），因此不读 inspect。
+ * Data comes only from the **container list** (`Ports` in `/containers/json`, i.e. the bindings actually
+ * published) -- this phase has no `reserved` (what stopped containers declared) and reads no inspect.
  */
 struct HostPortEntry {
-    /*! 宿主端口（区间时是起点）。 */
+    /*! Host port (the range start when part of a range). */
     quint16 hostPort = 0;
-    /*! 区间终点；单端口时等于 `hostPort`。 */
+    /*! Range end; equals `hostPort` for a single port. */
     quint16 hostPortEnd = 0;
-    /*! IPv4 通配可用（`0.0.0.0` 或具体 IPv4 地址）。 */
+    /*! IPv4 wildcard usable (`0.0.0.0` or a concrete IPv4 address). */
     bool ipv4 = false;
-    /*! IPv6 通配可用（`::`）。 */
+    /*! IPv6 wildcard usable (`::`). */
     bool ipv6 = false;
     /*!
-     * 这一条同时代表 IPv4 与 IPv6 的通配绑定。
+     * This row stands for the IPv4 and IPv6 wildcard bindings at once.
      *
-     * Docker 对"没指定宿主地址"的映射会同时建 `0.0.0.0:<port>` 与 `[::]:<port>`；
-     * 界面（端口页、端口拓扑）都把它们显示成**一条**，并用双环表示两种协议栈。
+     * For a mapping with no host address, Docker creates both `0.0.0.0:<port>` and `[::]:<port>`; the UI
+     * (ports page, port topology) shows them as **one** row with a double ring for the two stacks.
      */
     bool dualStack = false;
-    /*! 具体绑定地址（通配时为空；用于展示 `127.0.0.1:8100` 这种）。 */
+    /*! Concrete bind address (empty for wildcards; used to display e.g. `127.0.0.1:8100`). */
     QString hostIp;
-    /*! 容器侧端口与协议。 */
+    /*! Container-side port and protocol. */
     quint16 containerPort = 0;
     QString protocol;
-    /*! `inUse`（运行中的容器真的发布了它）/ `declaredNotPublished`（本期不产生）。 */
+    /*! `inUse` (a running container really published it) / `declaredNotPublished` (not produced here). */
     QString stateKey;
-    /*! 占用者。 */
+    /*! Occupant. */
     QString containerId;
     QString containerName;
     QString containerImage;
-    /*! 容器状态 key（界面按它决定"跳转 / 停止"等动作）。 */
+    /*! Container state key (the UI uses it to pick actions such as "navigate / stop"). */
     QString containerStateKey;
 
-    /*! 展示用的一行地址：`20004`（所有接口）/ `127.0.0.1:8100` / `47300-47309`。 */
+    /*! Display address for a row: `20004` (all interfaces) / `127.0.0.1:8100` / `47300-47309`. */
     QString displayAddress() const;
-    /*! 端口文本（区间写成 `47300-47309`）。 */
+    /*! Port text (a range renders as `47300-47309`). */
     QString portText() const;
 
     friend bool operator==(const HostPortEntry &lhs, const HostPortEntry &rhs)
     {
-        // 注意：**展示用的字段也要比**（容器名/镜像）——漏掉它们时改名或换镜像不会
-        // 触发 dataChanged，页面就会一直显示旧值（用例 refreshKeepsTheModelIntact 守住这一点）
+        // Note: **display fields must be compared too** (container name/image) -- skipping them means a
+        // rename or image change emits no dataChanged and the page keeps the stale value
+        // (test refreshKeepsTheModelIntact pins this down)
         return lhs.hostPort == rhs.hostPort && lhs.hostPortEnd == rhs.hostPortEnd && lhs.ipv4 == rhs.ipv4 && lhs.ipv6 == rhs.ipv6
             && lhs.dualStack == rhs.dualStack && lhs.hostIp == rhs.hostIp && lhs.containerPort == rhs.containerPort
             && lhs.protocol == rhs.protocol && lhs.stateKey == rhs.stateKey && lhs.containerId == rhs.containerId
@@ -70,20 +71,20 @@ struct HostPortEntry {
 };
 
 /*!
- * 区间地图里的一段（ARCH_next_ports.md §4.B，里程碑 M4）。
+ * One range segment of the range map (ARCH_next_ports.md §4.B, milestone M4).
  *
- * 端口分布通常集中在几段（例如 8000-8010、20001-20004），把 0-65535 全画出来
- * 只会让人看到一片空白；因此按"相邻已用端口的间隔"聚类成若干段再画。
+ * Port usage clusters into a few bands (e.g. 8000-8010, 20001-20004); drawing all of 0-65535 would show
+ * almost nothing but blanks, so adjacent used ports are clustered into segments and drawn per segment.
  */
 struct HostPortRange {
-    /*! 段的范围（含两端；`last - first + 1` 是这一段覆盖的端口数）。 */
+    /*! Segment bounds, inclusive; `last - first + 1` is how many ports it covers. */
     quint16 first = 0;
     quint16 last = 0;
-    /*! 这一段实际渲染的方块数（受 `tilesPerRange` 限制）。 */
+    /*! Tiles actually rendered for this segment (capped by `tilesPerRange`). */
     int tileCount = 0;
-    /*! 因为上限而没渲染出来的端口数（> 0 时界面显示"还有 N 个"）。 */
+    /*! Ports not rendered because of the cap (UI shows "N more" when > 0). */
     int hiddenCount = 0;
-    /*! 这一段里有几个端口被容器占着（标题上给个摘要）。 */
+    /*! How many ports in this segment are held by containers (summary for the title). */
     int usedCount = 0;
 
     friend bool operator==(const HostPortRange &lhs, const HostPortRange &rhs)
@@ -94,83 +95,83 @@ struct HostPortRange {
 };
 
 /*!
- * 宿主端口占用表（ARCH_next_ports.md §3 的 `HostPortUsage`）。
+ * Host port occupancy table (ARCH_next_ports.md §3's `HostPortUsage`).
  *
- * 纯函数式的门面：输入容器列表，输出"哪个宿主端口被谁占着"。
- * 端口页（M3）、区间地图（M4）与创建表单的冲突检测（M2）都从这里取数——
- * 不要再各自实现一遍（`hostBindingsOverlap` 曾经就有两份，见 `PortBindingRules`）。
+ * A purely functional facade: container list in, "which host port is held by whom" out.
+ * The ports page (M3), the range map (M4) and create-form conflict checks (M2) all read from here -- do
+ * not reimplement it (`hostBindingsOverlap` once existed twice; see `PortBindingRules`).
  */
 class HostPortUsage
 {
 public:
     /*!
-     * 从容器列表构造占用表。
+     * Build the occupancy table from the container list.
      *
-     * 规则：
-     *   - 只算**跑着的**容器（`Running` / `Paused` / `Restarting`）：没运行的容器不持有宿主端口，
-     *     把它们的声明算作占用会挡住其它应用（用户已确认）；
-     *   - IPv4 与 IPv6 通配的同端口绑定合并成一条并标记 `dualStack`；
-     *   - 结果按宿主端口升序，同一端口按容器名排序（刷新时行不会跳）。
+     * Rules:
+     *   - only **running** containers count (`Running` / `Paused` / `Restarting`): a stopped container
+     *     holds no host port, and counting its declarations would block other apps (user-confirmed);
+     *   - IPv4 and IPv6 wildcard bindings of the same port merge into one row marked `dualStack`;
+     *   - sorted by host port, then container name, so rows do not jump on refresh.
      */
     /*!
-     * 端口页用：把"实际发布"（容器列表）与"声明"（inspect，只对**运行中**的容器取）
-     * 合到一张表里（用户拍板决定 3：按"声明 vs 实际发布"的语义）。
+     * For the ports page: merge "actually published" (container list) with "declared" (inspect, taken
+     * only for **running** containers) into one table (user decision 3: declared vs published semantics).
      *
-     * - 声明且**真的发布了** → 一条 `inUse`（以发布为准，地址/端口取实际的）
-     * - 声明了但**没有发布**（容器在跑） → 一条 `declaredNotPublished`
-     * - 容器没在运行、端口现在是空的 → 一条 `reserved`
-     * - 容器没在运行、但端口**已经被别的容器占着** → 一条 `reservedTaken`
-     *   （用户要求：这种要标红"被占用"——它启动时会因为端口冲突直接失败）
-     * - 只发布没声明（理论上不该有） → 仍然按 `inUse` 收进来
+     * - declared and **really published** -> one `inUse` row (published wins; address/port are the real ones)
+     * - declared but **not published** (container running) -> one `declaredNotPublished` row
+     * - container not running, port free right now -> one `reserved` row
+     * - container not running but the port is **already held by another container** -> one `reservedTaken`
+     *   row (the user asked for a red "taken" mark -- it would fail on start with a port conflict)
+     * - published without a declaration (should not happen) -> still collected as `inUse`
      *
-     * `declared` 的键是容器 id；缺省（空）时行为与单参数版本完全一致。
+     * `declared` is keyed by container id; when empty the behavior matches the single-argument version.
      */
     static QList<HostPortEntry> entriesFor(const QList<Container> &containers,
                                            const QHash<QString, QList<DeclaredPortBinding>> &declared = {});
 
     /*!
-     * 占用该宿主端口的容器名（没有则空）。
+     * Name of the container holding that host port (empty when none).
      *
-     * `hostIp` 为空/通配时与任何绑定都算冲突（见 `PortBindingRules::hostBindingsOverlap`）。
+     * An empty/wildcard `hostIp` conflicts with any binding (see `PortBindingRules::hostBindingsOverlap`).
      */
     static QString holderFor(const QList<Container> &containers, const QString &hostIp, int hostPort);
 
     /*!
-     * `afterPort` 之后的第一个空闲宿主端口（用于"建议端口"；找不到时返回 0）。
+     * First free host port after `afterPort` (for "suggest a port"; 0 when none is found).
      *
-     * 只在**已知被占用**的端口之外找，且不超过 65535；`afterPort <= 0` 时从 8000 起找
-     * （低于 1024 需要特权，不作为建议）。
+     * Only avoids ports **known to be taken**, and never exceeds 65535; `afterPort <= 0` starts at 8000
+     * (below 1024 needs privileges, so it is never suggested).
      *
-     * `extraUsed` 用于"正在编辑的这张表单"：同一请求里其它行已经填了的宿主端口也要避开，
-     * 否则建议出来的端口会在提交时因为"请求内重复"被自己拦下。
+     * `extraUsed` is for the form being edited: host ports filled in by other rows of the same request
+     * must be avoided too, or the suggestion would be rejected on submit as a duplicate within the request.
      */
     static int nextFreePort(const QList<Container> &containers, int afterPort, const QList<int> &extraUsed = {});
 
     /*!
-     * 把占用表聚类成区间（区间地图用）。
+     * Cluster the occupancy table into ranges (for the range map).
      *
-     * 规则：
-     *  - 端口升序后，相邻**已占用**端口的间隔 ≤ `gap` 就归为同一段；
-     *  - 每段向两侧各扩展 `margin` 个端口（让用户看到"附近哪里还空着"）；
-     *  - 每段渲染的方块数不超过 `tilesPerRange`，超出的部分记进 `hiddenCount`
-     *    （界面显示"还有 N 个"）——没有这个上限，1000-1100 这种区间会拖垮界面。
+     * Rules:
+     *  - with ports ascending, adjacent **used** ports at most `gap` apart join the same segment;
+     *  - each segment expands `margin` ports to both sides (so users see where it is still free);
+     *  - a segment renders at most `tilesPerRange` tiles and puts the excess into `hiddenCount` (the UI
+     *    shows "N more") -- without that cap a range like 1000-1100 drags the UI down.
      */
     static QList<HostPortRange> clusterRanges(const QList<HostPortEntry> &entries, int gap = 5, int margin = 2,
                                              int tilesPerRange = 64);
 
     /*!
-     * 某个端口在占用表里的状态 key（区间地图的方块按它上色）。
+     * State key of a port in the occupancy table (range-map tiles are colored by it).
      *
-     * - 区间（`47300-47309`）按整段算——落在区间里也算被占；
-     * - 同一个端口上可能有多条（例如 20003 既"被运行中的容器占着"，又被某个未运行的容器声明过）：
-     *   按**优先级**取 `inUse > reservedTaken > reserved > declaredNotPublished`，
-     *   因此"全部端口"视图里运行中永远压过被占用/未占用（用户要求）；
-     * - `preferred` 非空时优先取其中的状态：地图切到某个筛选时，只有该状态的方块才该显示出来。
+     * - a range (`47300-47309`) counts as a whole: any port inside it is taken;
+     * - one port can carry several rows (e.g. 20003 held by a running container and also declared by a
+     *   stopped one): priority is `inUse > reservedTaken > reserved > declaredNotPublished`, so in the
+     *   "all ports" view running always beats taken/free (user-requested);
+     * - a non-empty `preferred` wins: when the map switches to a filter, only that state's tiles show.
      */
     static QString stateKeyForPort(const QList<HostPortEntry> &entries, quint16 port,
                                    const QStringList &preferred = {});
 
-    /*! 该端口上占用它的容器（用于地图里点击跳转；没有则空）。 */
+    /*! Container holding that port (for click-through from the map; empty when none). */
     static HostPortEntry entryForPort(const QList<HostPortEntry> &entries, quint16 port,
                                       const QStringList &preferred = {});
 };

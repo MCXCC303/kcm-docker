@@ -1,18 +1,19 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    仓库认证页（ARCH_V5_V8 §2.6/§2.7）。
+    Registry credentials page (ARCH_V5_V8 §2.6/§2.7).
 
-    这一页只做三件事，且都不碰凭据内容本身：
+    Three jobs only, none of which touches credential contents:
 
-      1. **说明现状**：钱包是否可用、存了哪些仓库（地址 + 用户名，绝不含密码/令牌）；
-      2. **登录与测试**：登录走 `RegistryLoginDialog`，由控制器先 `POST /auth` 校验、
-         成功才写钱包；"测试连接"用已保存的凭据再校验一次；
-      3. **从 docker CLI 一次性导入**：只读扫描 `~/.docker/config.json`，
-         列出钱包里还没有的仓库，用户勾选后导入（已有条目不会被覆盖）。
+      1. **State the situation**: whether the wallet works and which registries are stored
+         (address + user name, never passwords/tokens);
+      2. **Log in and test**: login goes through `RegistryLoginDialog`; the controller validates
+         with `POST /auth` first and only then writes the wallet. "Test" re-checks stored credentials;
+      3. **One-off import from the docker CLI**: read-only scan of `~/.docker/config.json`, listing
+         registries not yet in the wallet for the user to select (existing entries are not overwritten).
 
-    文案全部由这里的 key → 文本映射负责（C++ 只给稳定 key）。
+    All wording comes from the key → text mapping here (C++ only emits stable keys).
 */
 
 import QtQuick
@@ -28,10 +29,10 @@ KCM.AbstractKCM {
     id: page
 
     readonly property var auth: kcm.controller.registryAuth
-    /*! 预填的仓库地址（从"去登录…"引导带过来；空则用默认值）。 */
+    /*! Pre-filled registry address (passed in from the "Log in…" hint; empty means use the default). */
     property string presetServerAddress: ""
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
-    /*! 正在等待"移除"确认的仓库地址。 */
+    /*! Address of the registry awaiting "Remove" confirmation. */
     property string pendingRemovalAddress: ""
 
     signal closeRequested
@@ -45,7 +46,7 @@ KCM.AbstractKCM {
         }
     }
 
-    /*! 结果 / 错误 key → 用户文案（C++ 只给 key，文案在这里）。 */
+    /*! Result / error key → user-facing text (C++ emits only keys, the text lives here). */
     function messageFor(key: string): string {
         switch (key) {
         case "loginSucceeded":
@@ -80,7 +81,7 @@ KCM.AbstractKCM {
         }
     }
 
-    /*! 钱包不可用的原因 key → 说明。 */
+    /*! Wallet-unavailable reason key → explanation. */
     function walletReasonText(): string {
         switch (page.auth.walletUnavailableReason) {
         case "walletDisabled":
@@ -92,7 +93,7 @@ KCM.AbstractKCM {
         }
     }
 
-    /*! 打开登录对话框（可带预填仓库）。 */
+    /*! Open the login dialog (optionally with a pre-filled registry). */
     function openLoginDialog(serverAddress: string): void {
         loginDialog.reset(serverAddress);
         page.auth.clearResult();
@@ -103,7 +104,7 @@ KCM.AbstractKCM {
         target: page.auth
 
         function onResultChanged() {
-            // 登录成功后关闭对话框（失败则把原因留在对话框里）
+            // Close the dialog on success (on failure keep the reason visible inside it)
             if (page.auth.lastResultKey === "loginSucceeded") {
                 loginDialog.close();
             } else if (loginDialog.opened) {
@@ -147,7 +148,7 @@ KCM.AbstractKCM {
                     text: i18n("Registry credentials")
                 }
 
-                /* ---------------- 结果 / 错误 ---------------- */
+                /* ---------------- Result / error ---------------- */
                 Kirigami.InlineMessage {
                     objectName: "authResultMessage"
                     Layout.fillWidth: true
@@ -176,7 +177,7 @@ KCM.AbstractKCM {
                     }
                 }
 
-                /* ---------------- 钱包状态 ---------------- */
+                /* ---------------- Wallet state ---------------- */
                 Kirigami.InlineMessage {
                     objectName: "walletBanner"
                     Layout.fillWidth: true
@@ -185,8 +186,8 @@ KCM.AbstractKCM {
                     text: page.auth.walletStateKey === "opening"
                         ? i18n("Waiting for KWallet to be unlocked…")
                         : page.walletReasonText()
-                    // 动作数组直接内联（QML 不接受"三元 + 对象数组字面量"），
-                    // 是否需要它由 Action.visible 决定
+                    // Actions array is inlined (QML rejects a ternary with an object-array literal);
+                    // Action.visible decides whether it is needed
                     actions: [
                         Kirigami.Action {
                             text: i18n("Try again")
@@ -197,7 +198,7 @@ KCM.AbstractKCM {
                     ]
                 }
 
-                /* ---------------- 已保存的仓库 ---------------- */
+                /* ---------------- Stored registries ---------------- */
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -208,7 +209,7 @@ KCM.AbstractKCM {
                         text: i18n("Stored credentials")
                     }
 
-                    // 新增凭据：工具栏之外再给一个显眼入口（实测反馈：不好找）
+                    // Prominent second entry for adding credentials (testing: toolbar one was hard to find)
                     QQC2.Button {
                         objectName: "addCredentialButton"
                         text: i18n("Add credential…")
@@ -218,8 +219,8 @@ KCM.AbstractKCM {
                     }
                 }
 
-                // 由外部凭据助手管理的条目：我们**不**调用它们，但要如实说明，
-                // 否则用户会奇怪"为什么我在 CLI 里登录的仓库没出现"
+                // Entries owned by an external credential helper: we **never** call them, but must
+                // say so, otherwise users wonder why a registry they logged into via the CLI is missing
                 QQC2.Label {
                     objectName: "helperManagedHint"
                     Layout.fillWidth: true

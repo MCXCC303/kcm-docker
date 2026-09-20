@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,10 +18,11 @@ namespace Kontainer
 {
 
 /*!
- * Image Detail 的 controller（ARCH_V2 §8/§27/§52）。
+ * Controller for Image Detail (ARCH_V2 §8/§27/§52).
  *
- * 页面进入 start()、离开 stop()。Image 没有动态 metrics，因此不需要采样定时器；
- * “使用该镜像的容器”是从容器列表（只读）派生出来的关联关系。
+ * Page entry calls start(), leaving calls stop(). Images have no dynamic metrics, so no sampling
+ * timer is needed; "containers using this image" is a read-only association derived from the
+ * container list.
  */
 class ImageDetailController : public QObject
 {
@@ -33,9 +34,9 @@ class ImageDetailController : public QObject
     Q_PROPERTY(bool hasDetail READ hasDetail NOTIFY changed)
 
     Q_PROPERTY(QString shortId READ shortId NOTIFY changed)
-    /*! repository:tag（页面标题用）。 */
+    /*! repository:tag (for the page title). */
     Q_PROPERTY(QString primaryTag READ primaryTag NOTIFY changed)
-    /*! 只有 tag 名（"Tag:" 行用）。 */
+    /*! Tag name only (for the "Tag:" row). */
     Q_PROPERTY(QString tagName READ tagName NOTIFY changed)
     Q_PROPERTY(QString primaryRepository READ primaryRepository NOTIFY changed)
     Q_PROPERTY(QDateTime created READ created NOTIFY changed)

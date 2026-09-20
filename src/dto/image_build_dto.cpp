@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -38,12 +38,12 @@ void DockerImageBuildLineDTO::parseStepLine()
     if (stream.isEmpty()) {
         return;
     }
-    // 经典构建器的步骤行形如：`Step 3/7 : RUN make`（也有 `Step 3/7 : RUN make` 后跟缓存提示）
+    // Classic builder step lines look like `Step 3/7 : RUN make` (a cache hint may follow)
     static const QRegularExpression stepPattern(
         QStringLiteral(R"(^\s*Step\s+(\d+)\s*/\s*(\d+)\s*:\s*(.*)$)"));
     const QRegularExpressionMatch match = stepPattern.match(stream);
     if (!match.hasMatch()) {
-        // 缓存提示单独出现（` ---> Using cache`）时附在最近一步上，这里只标记出来
+        // A standalone cache hint (` ---> Using cache`) belongs to the latest step; just flag it
         if (stream.contains(QLatin1String("Using cache")) || stream.contains(QLatin1String("CACHED"))) {
             cached = true;
         }

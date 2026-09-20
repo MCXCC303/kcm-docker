@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -30,7 +30,7 @@ std::optional<QJsonObject> objectFromPayload(const QByteArray &payload, QString 
     return document.object();
 }
 
-/*! `/version` 的 `Components[]` → 组件表（Name + Version）。 */
+/*! `/version` `Components[]` → component table (Name + Version). */
 QList<DockerComponentDTO> parseComponents(const QJsonObject &object)
 {
     QList<DockerComponentDTO> components;
@@ -51,7 +51,7 @@ QList<DockerComponentDTO> parseComponents(const QJsonObject &object)
     return components;
 }
 
-/*! 从 /version 的 Components 数组中取出 Engine 组件的 Details。 */
+/*! Pull the Engine component's Details out of the /version Components array. */
 QJsonObject engineComponentDetails(const QJsonObject &object)
 {
     const QJsonArray components = object.value(QStringLiteral("Components")).toArray();
@@ -91,7 +91,7 @@ std::optional<DockerVersionDTO> DockerVersionDTO::fromJson(const QJsonObject &ob
         }
     }
 
-    // ApiVersion 是版本协商的必要信息，缺失即视为响应不可用
+    // ApiVersion is required for version negotiation; without it the response is unusable
     if (dto.apiVersion.isEmpty()) {
         if (error) {
             *error = QStringLiteral("version payload without ApiVersion");

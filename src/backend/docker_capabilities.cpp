@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -26,8 +26,8 @@ QString writeAccessKey(WriteAccess access)
 
 WriteAccess writeAccessFor(const DockerEndpoint &endpoint)
 {
-    // 远程 endpoint 的只读不变式（ARCH_V3 §1.3）：四期不实现远程连接，
-    // 但这条判断先写在这里，未来加 TCP endpoint 时自动继承。
+    // Read-only invariant for remote endpoints (ARCH_V3 §1.3). Remote connections are out of
+    // scope for now, but this guard lets a future TCP endpoint inherit it.
     if (!endpoint.isValid() || endpoint.type() != DockerEndpoint::Type::LocalUnixSocket) {
         return WriteAccess::UnsupportedEndpoint;
     }
@@ -36,8 +36,8 @@ WriteAccess writeAccessFor(const DockerEndpoint &endpoint)
     if (!socketInfo.exists()) {
         return WriteAccess::SocketMissing;
     }
-    // Unix 上 isWritable() 反映 access(2) 的结果，也就是内核认为当前进程
-    // 能不能写这个 socket 文件——正是连接 Unix socket 所需的权限。
+    // On Unix isWritable() reflects access(2): whether the kernel lets this process write the
+    // socket file — exactly the permission needed to connect a unix socket.
     if (!socketInfo.isWritable()) {
         return WriteAccess::SocketNotWritable;
     }

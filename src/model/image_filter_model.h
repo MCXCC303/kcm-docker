@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,11 @@ namespace Kontainer
 {
 
 /*!
- * 镜像列表的搜索 / 过滤 / 排序代理（ARCH_V2 §9/§10）。
+ * Search / filter / sort proxy for the image list (ARCH_V2 §9/§10).
  *
- * - Search：repository / tag / ID 的大小写不敏感 substring 匹配
- * - Filter：all / in-use / dangling（dangling = 没有可用 tag）
- * - 默认排序：Repository 升序（§10）
+ * - Search: case-insensitive substring match on repository / tag / ID
+ * - Filter: all / in-use / dangling (dangling = no usable tag)
+ * - Default sort: Repository ascending (§10)
  */
 class ImageFilterModel : public QSortFilterProxyModel
 {

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,15 +16,16 @@ namespace Kontainer
 {
 
 /*!
- * 刷新调度（ARCH_V2 §13/§14/§15/§16）。
+ * Refresh scheduling (ARCH_V2 §13/§14/§15/§16).
  *
- * 职责：
- *  - 持有页面级定时器（高频数据集 + 中频 storage），间隔来自 RefreshPolicy 集中定义
- *  - 记录最近一次刷新尝试时间与最近一次成功更新时间（§15）
- *  - 统计连续失败周期数并给出 stale 判定（§16）
+ * Responsibilities:
+ *  - own the page-level timers (fast data set + medium-frequency storage), with intervals defined
+ *    centrally in RefreshPolicy
+ *  - track the last refresh attempt and the last successful update (§15)
+ *  - count consecutive failed cycles and decide staleness (§16)
  *
- * 不负责：HTTP、JSON、UI 文本；也不知道用户在哪个页面（§43）。
- * 详情页的 stats 采样节奏由 MetricsModel 自己管理（生命周期与页面绑定，§27）。
+ * Not responsible for: HTTP, JSON, UI text; it does not know which page the user is on either (§43).
+ * The detail page's stats sampling is managed by MetricsModel itself (life cycle tied to the page, §27).
  */
 class RefreshScheduler : public QObject
 {
@@ -46,17 +47,17 @@ public:
         return m_autoRefreshEnabled;
     }
 
-    /*! 触发一次高频数据集刷新（引擎 + 容器 + 镜像）。 */
+    /*! Trigger a refresh of the fast data set (engine + containers + images). */
     void requestRefresh(Reason reason);
 
-    /*! 高频数据集成功更新（由 controller 在 *Updated 时调用）。 */
+    /*! Fast data set updated successfully (controllers call this on *Updated). */
     void noteFastUpdateSucceeded();
-    /*! 高频数据集失败（由 controller 在 sectionFailed 时调用）。 */
+    /*! Fast data set failed (controllers call this on sectionFailed). */
     void noteFastUpdateFailed();
     /*!
-     * 一个刷新周期的失败计数语义（§16）：
-     * 周期内只要有一个高频分区失败，就记为一次失败周期；只有整周期无失败才清零。
-     * 否则同一次刷新里 “containers 失败 + images 成功” 会把失败计数抹掉。
+     * Failure counting for one refresh cycle (§16): the cycle counts as failed if any fast section
+     * failed, and the counter only resets after a fully clean cycle — otherwise "containers failed
+     * + images succeeded" within one refresh would wipe the count.
      */
     void onBackendLoadingChanged();
 
@@ -72,7 +73,7 @@ public:
     {
         return m_consecutiveFailures;
     }
-    /*! 连续失败达到阈值且曾经成功过：已有数据已过期（§16）。 */
+    /*! Failures reached the threshold after at least one success: cached data is stale (§16). */
     bool isStale() const;
 
     int refreshIntervalMs() const;

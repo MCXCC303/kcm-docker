@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,34 +13,36 @@ namespace Kontainer
 {
 
 /*!
- * 已保存的仓库凭据列表（ARCH_V5_V8 §2.7）。
+ * List of saved registry credentials (ARCH_V5_V8 §2.7).
  *
- * **只暴露仓库地址与用户名**：密码/令牌永远不进模型——它们会顺着 model role 流到
- * QML、日志、报表里。界面要显示"有没有凭据""用哪种方式登录"，这些字段就够了。
+ * **Exposes the registry address and user name only**: passwords/tokens never enter the model,
+ * because model roles flow into QML, logs and reports. Those fields suffice for the UI to show
+ * whether a credential exists and which login method it uses.
  */
 class RegistryCredentialModel : public QAbstractListModel
 {
     Q_OBJECT
 
-    /*! 行数 / 是否为空：界面用它决定空状态（QML 看不到普通的 C++ 方法）。 */
+    /*! Row count / empty: the UI derives its empty state from them (QML cannot see plain C++ methods). */
     Q_PROPERTY(int count READ count NOTIFY countChanged)
     Q_PROPERTY(bool empty READ empty NOTIFY countChanged)
 
 public:
     enum Roles {
-        /*! 规范化后的仓库地址（索引键，也是界面上的主标识）。 */
+        /*! Normalized registry address (the lookup key and the main UI identifier). */
         ServerAddressRole = Qt::UserRole + 1,
-        /*! 登录方式：`password` / `token`。 */
+        /*! Login method: `password` / `token`. */
         AuthKindRole,
-        /*! 用户名；令牌登录时为空。 */
+        /*! User name; empty for token logins. */
         UsernameRole,
     };
     Q_ENUM(Roles)
 
     /*!
-     * `store` 为凭据来源（可为空 = 空列表）。
+     * `store` is the credential source (may be null = empty list).
      *
-     * 模型只从存储读，不写：写入一律走控制器，这样"校验成功后才保存"的规则只有一处。
+     * The model only reads from the store: every write goes through the controller, so "save only
+     * after a successful check" lives in one place.
      */
     explicit RegistryCredentialModel(CredentialStore *store, QObject *parent = nullptr);
 
@@ -50,12 +52,12 @@ public:
 
     int count() const;
     bool empty() const;
-    /*! 是否已经存有该仓库的凭据（界面据此决定按钮可用性）。 */
+    /*! Whether a credential exists for the registry (the UI enables its buttons accordingly). */
     Q_INVOKABLE bool contains(const QString &serverAddress) const;
-    /*! 行号；没有返回 -1。 */
+    /*! Row for the address, -1 if absent. */
     Q_INVOKABLE int rowForAddress(const QString &serverAddress) const;
 
-    /*! 从存储重新加载（凭据只读，模型只做展示）。 */
+    /*! Reload from the store (credentials are read-only; the model only presents them). */
     void reload();
 
 Q_SIGNALS:

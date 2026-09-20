@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -25,20 +25,20 @@ DockerKcm::DockerKcm(QObject *parent, const KPluginMetaData &metaData)
     , m_privilegedClient(new PrivilegedConfigClient(this))
     , m_controller(new StatusController(m_backend, m_hostPaths, this))
 {
-    // 提权客户端只在这里注入：core/测试里没有它时，配置页会自动走"自己动手"的降级路径
+    // Injected only here: without it (core/tests) the config page falls back to doing it by hand
     m_controller->daemonConfigUser()->setPrivilegedClient(m_privilegedClient);
     m_controller->daemonConfigSystem()->setPrivilegedClient(m_privilegedClient);
     setupTranslationDomain();
 
-    // 只读状态面板：没有需要保存的配置，也没有写操作按钮
+    // Read-only status panel: no configuration to save and no mutation buttons
     setButtons(NoAdditionalButton);
 
-    // 暴露给 QML（org.kde.kcm.docker）。注册代码与 QML 加载测试共用。
+    // Exposed to QML (org.kde.kcm.docker). Shared with the QML load test.
     registerKontainerQmlTypes();
 
     qCDebug(kontainerKcm) << "Kontainer KCM created; build:" << m_controller->buildStamp() << "endpoint:" << m_backend->endpointDisplayName();
 
-    // 打开 KCM 立即刷新（ARCH_V1 §15）
+    // Refresh as soon as the KCM opens (ARCH_V1 §15)
     m_controller->refresh();
 }
 

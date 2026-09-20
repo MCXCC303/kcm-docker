@@ -1,24 +1,25 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    受限提权 helper（ARCH_V5_V8 §2.4）。
+    Restricted privileged helper (ARCH_V5_V8 §2.4).
 
-    它只做两件事，而且只按固定路径做：
+    It does exactly two things, always on fixed paths:
 
-      1. `org.kde.kcm.docker.daemon.save`：把白名单键的编辑合并进
-         `/etc/docker/daemon.json`（读取由 helper 自己做，调用方给不了任意内容）
-      2. `org.kde.kcm.docker.daemon.restart`：通过 **systemd 的 D-Bus 接口**重启 `docker.service`
+      1. `org.kde.kcm.docker.daemon.save`: merge whitelisted-key edits into
+         `/etc/docker/daemon.json` (the helper does the reading itself; callers supply no content)
+      2. `org.kde.kcm.docker.daemon.restart`: restart `docker.service` over the **systemd D-Bus API**
 
-    槽名不是随便起的：KAuth 按"动作名去掉 helper id 前缀、`.` 换成 `_`"来查槽
-    （见 KAuth 的 DBusHelperProxy），所以上面两个动作对应 daemon_save / daemon_restart。
-    名字写错不会编译失败，只会在真机上表现为"没有这个动作"。
+    The slot names are not arbitrary: KAuth looks a slot up by "action name minus the helper id
+    prefix, `.` replaced by `_`" (see KAuth's DBusHelperProxy), so the two actions above map to
+    daemon_save / daemon_restart. A wrong name still compiles and only shows up on a real machine as
+    "no such action".
 
-    刻意不提供的能力（否则就是提权后门）：
-      - 不接受路径参数（路径是编译期常量）
-      - 不接受任意 JSON / 任意键
-      - 不执行任何外部命令（重启走 D-Bus，不用 `systemctl` 二进制）
-      - 不做"运行任意命令"的通用接口
+    Deliberately not provided (each would be a privilege-escalation backdoor):
+      - no path arguments (paths are compile-time constants)
+      - no arbitrary JSON or keys
+      - no external commands (restart goes over D-Bus, not the `systemctl` binary)
+      - no generic "run any command" interface
 */
 
 #include "backend/daemon_config.h"
@@ -43,9 +44,9 @@ namespace Kontainer
 
 namespace
 {
-/*! 固定路径：helper 只碰这一个文件。 */
+/*! Fixed path: the helper touches this one file only. */
 constexpr auto kDaemonConfigPath = "/etc/docker/daemon.json";
-/*! 固定单元名：helper 只重启这一个单元。 */
+/*! Fixed unit name: the helper restarts this one unit only. */
 constexpr auto kDockerUnit = "docker.service";
 
 QByteArray readConfigFile()
@@ -67,15 +68,15 @@ class KontainerHelper : public QObject
 
 private:
     /*!
-     * 五个服务动作的共用实现（定义见下方 private 区）。
+     * Shared implementation of the five service actions (defined further down, private section).
      *
-     * 只接受 `unit` 一个参数，且必须命中 `managedServiceUnits()` 白名单——
-     * 这样即使有人绕过会话侧直接调用 D-Bus 动作，也执行不了白名单之外的东西。
+     * It takes only the `unit` argument, which must hit the `managedServiceUnits()` whitelist, so
+     * even a direct D-Bus call that bypasses the session side cannot reach anything else.
      */
     ActionReply runServiceAction(ServiceVerb verb, const QVariantMap &arguments);
 
 public Q_SLOTS:
-    /*! 写入 daemon.json（白名单键的编辑意图）。对应动作 org.kde.kcm.docker.daemon.save。 */
+    /*! Write daemon.json (edit intents for whitelisted keys). Action ...daemon.save. */
     ActionReply daemon_save(const QVariantMap &arguments)
     {
         PrivilegedConfigRequest request;
@@ -86,14 +87,14 @@ public Q_SLOTS:
         }
 
         if (request.dryRun()) {
-            // 「解锁」路径：只做授权与校验，绝不写盘
+            // The "unlock" path: authorize and validate only, never write
             return ActionReply::SuccessReply();
         }
 
         const QByteArray existing = readConfigFile();
         const QByteArray merged = request.mergeInto(existing);
         if (merged.isEmpty()) {
-            // 既有文件不可解析：拒绝写入而不是覆盖（与界面侧同一条规则）
+            // Unparsable existing file: refuse to write instead of overwriting (same rule as the UI)
             return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::UnparsableConfig));
         }
 
@@ -105,7 +106,7 @@ public Q_SLOTS:
         }
 
         ActionReply reply = ActionReply::SuccessReply();
-        // 只回报"写了哪些键 + 备份名"，不回显值（值里可能有内网地址）
+        // Report only the keys written and the backup name, never values (they may hold LAN addresses)
         QVariantMap data;
         data.insert(QStringLiteral("backup"), backupPath);
         data.insert(QStringLiteral("keys"), PrivilegedConfigRequest::allowedKeys());
@@ -114,10 +115,11 @@ public Q_SLOTS:
     }
 
     /*!
-     * 服务管理（B1）：三个固定 unit × 五个固定动词。
+     * Service management (B1): three fixed units × five fixed verbs.
      *
-     * 每个动词一个槽（动作名 → 槽名的规则见 .actions 里的说明），
-     * 但实现共用：**参数校验在白名单函数里**（会话侧与这里都调用它，纵深防御）。
+     * One slot per verb (the action-name → slot-name rule is documented in .actions) over a shared
+     * implementation: **argument validation lives in the whitelist function**, which both the
+     * session side and this file call (defense in depth).
      */
     ActionReply service_start(const QVariantMap &arguments)
     {
@@ -140,13 +142,13 @@ public Q_SLOTS:
         return runServiceAction(ServiceVerb::Disable, arguments);
     }
 
-    /*! 通过 systemd D-Bus 重启 docker.service（不调用 systemctl 二进制）。
+    /*! Restart docker.service over systemd D-Bus (never the systemctl binary).
 
-        对应动作 org.kde.kcm.docker.daemon.restart。 */
+        Action org.kde.kcm.docker.daemon.restart. */
     ActionReply daemon_restart(const QVariantMap &arguments)
     {
         if (!arguments.isEmpty() && !arguments.contains(QStringLiteral("confirm"))) {
-            // 允许一个可选的确认标记，但不接受任何其他参数
+            // One optional confirmation flag is allowed, nothing else
             for (auto it = arguments.constBegin(); it != arguments.constEnd(); ++it) {
                 if (it.key() != QLatin1String("confirm")) {
                     return ActionReply::HelperErrorReply(static_cast<int>(ErrorCode::InvalidRequest));
@@ -172,7 +174,7 @@ public Q_SLOTS:
     }
 
 private:
-    /*! 错误码（与客户端约定的稳定值，客户端据此选文案）。 */
+    /*! Error codes (stable values agreed with the client, which picks the message from them). */
     enum class ErrorCode {
         InvalidRequest = 1,
         UnparsableConfig = 2,
@@ -184,8 +186,8 @@ private:
 
 ActionReply KontainerHelper::runServiceAction(ServiceVerb verb, const QVariantMap &arguments)
 {
-    // 纵深防御：会话侧已经校验过一次，这里**再校验一次**——即使有人绕过会话侧
-    // 直接调用 D-Bus 动作，也只能操作白名单里的三个 unit 与五个固定动词。
+    // Defense in depth: the session side already validated, and we validate **again** — a direct
+    // D-Bus call can still only reach the three whitelisted units and the five fixed verbs.
     const QString unit = arguments.value(QStringLiteral("unit")).toString();
     const QString errorKey = serviceControlArgumentError(unit, serviceVerbKey(verb));
     if (!errorKey.isEmpty()) {
@@ -202,11 +204,11 @@ ActionReply KontainerHelper::runServiceAction(ServiceVerb verb, const QVariantMa
     }
 
     if (verb == ServiceVerb::Enable || verb == ServiceVerb::Disable) {
-        // Enable/Disable 的返回类型与 Start/Stop 不同，单独走消息调用
+        // Enable/Disable return a different type than Start/Stop, so they use a message call
         const bool enable = verb == ServiceVerb::Enable;
         const QDBusMessage reply = manager.call(enable ? QStringLiteral("EnableUnitFiles") : QStringLiteral("DisableUnitFiles"),
                                                 QStringList {unit},
-                                                false, // runtime=false：写盘（持久）
+                                                false, // runtime=false: write to disk (persistent)
                                                 true); // force
         if (reply.type() == QDBusMessage::ErrorMessage) {
             qCWarning(kontainerModel) << "helper could not" << serviceVerbKey(verb) << unit << reply.errorMessage();
@@ -233,8 +235,8 @@ ActionReply KontainerHelper::runServiceAction(ServiceVerb verb, const QVariantMa
 
 } // namespace Kontainer
 
-// helper id 取自单一来源常量：它与会话侧的 setHelperId()、.actions 的动作名前缀、
-// D-Bus 系统策略的 allow own 必须是同一个字符串
+// The helper id comes from the single-source constant: it must equal the session side's
+// setHelperId(), the action prefix in .actions and the D-Bus system policy's allow own
 KAUTH_HELPER_MAIN(Kontainer::kHelperId, Kontainer::KontainerHelper)
 
 #include "kcm_docker_helper.moc"

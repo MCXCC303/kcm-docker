@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -74,7 +74,7 @@ bool DockerBackend::isSamplingStats(const QString &id) const
 bool DockerBackend::beginRequest(const QString &key)
 {
     if (m_inFlightRequests.contains(key)) {
-        // 同一资源同类请求已在途：合并本次请求（ARCH_V2 §29 coalescing）
+        // Same request type already in flight for this resource: coalesce (ARCH_V2 §29)
         qCDebug(kontainerBackend) << "coalesced request" << key;
         return false;
     }
@@ -106,13 +106,13 @@ void DockerBackend::updateLoading()
 }
 
 /* ------------------------------------------------------------------------- */
-/* Engine：/_ping → /version（协商 API 版本）→ /info                          */
+/* Engine: /_ping → /version (negotiate API version) → /info                 */
 /* ------------------------------------------------------------------------- */
 
 void DockerBackend::refreshEngine()
 {
     if (m_engineInFlight) {
-        // 请求去重：同一数据集不重复创建请求（ARCH_V1 §17）
+        // Deduplication: never create a second request for the same dataset (ARCH_V1 §17)
         qCDebug(kontainerBackend) << "coalesced engine refresh";
         return;
     }
@@ -120,7 +120,7 @@ void DockerBackend::refreshEngine()
     updateLoading();
 
     if (m_handshakeInFlight) {
-        return; // 已有握手在途（可能由 containers/images 触发）
+        return; // a handshake is already in flight (possibly triggered by containers/images)
     }
     m_handshakeInFlight = true;
     startPing();
@@ -190,7 +190,7 @@ void DockerBackend::startVersionRequest()
         m_engine.osType = version->os;
         m_engine.architecture = version->arch;
         m_engine.kernelVersion = version->kernelVersion;
-        // 组件表（dockerd / containerd / runc …）：引擎版本之外的信息同样要能展示
+        // Component table (dockerd / containerd / runc …): also shown next to the engine version
         m_engine.components.clear();
         m_engine.components.reserve(version->components.size());
         for (const DockerComponentDTO &component : version->components) {
@@ -214,8 +214,8 @@ void DockerBackend::startInfoRequest()
         reply->deleteLater();
 
         if (failed) {
-            // 错误隔离（§15）：版本信息已经可用，容器/镜像仍然可以继续加载。
-            // 但 /info 的汇总计数必须作废，否则 UI 会把上一次的旧计数当成当前值。
+            // Error isolation (§15): version info is usable and containers/images still load,
+            // but the /info counts must be dropped or the UI shows the previous read's values.
             qCWarning(kontainerBackend) << "GET /info failed, engine summary counts are now unavailable";
             resetEngineCounts();
             finishHandshakeSuccess();
@@ -251,7 +251,7 @@ void DockerBackend::startInfoRequest()
         m_engine.loggingDriver = info->loggingDriver;
         m_engine.registryMirrors = info->registryMirrors;
         m_engine.liveRestoreEnabled = info->liveRestoreEnabled;
-        // /info 的信息比 /version 更完整时优先采用
+        // Prefer /info values over /version when they are present
         if (!info->kernelVersion.isEmpty()) {
             m_engine.kernelVersion = info->kernelVersion;
         }
@@ -308,7 +308,7 @@ void DockerBackend::finishHandshakeFailure(const DockerError &error)
     Q_EMIT engineUpdated();
     Q_EMIT sectionFailed(Section::Engine, error);
 
-    // 依赖握手的数据集一并失败，但各自独立上报（错误隔离）
+    // Handshake-dependent sections fail together but report separately (error isolation)
     flushReadyCallbacks(error);
 }
 
@@ -323,7 +323,7 @@ void DockerBackend::flushReadyCallbacks(const DockerError &error)
         }
     }
 
-    // 等待握手的写操作：成功则执行，失败则作为 mutation 失败上报
+    // Writes waiting for the handshake: run on success, report a mutation failure otherwise
     const QList<PendingMutation> mutations = std::exchange(m_pendingMutations, {});
     for (const PendingMutation &pending : mutations) {
         if (error.isError()) {
@@ -356,7 +356,7 @@ void DockerBackend::failSection(Section section, const DockerError &error)
     case Section::ContainerDetail:
     case Section::ImageDetail:
     case Section::Stats:
-        // 这些分区的在途状态由 m_inFlightRequests 管理
+        // These sections track their in-flight state in m_inFlightRequests
         break;
     }
     updateLoading();
@@ -376,7 +376,7 @@ void DockerBackend::withApiVersion(Section section, ReadyCallback callback)
     m_readyCallbacks.append({section, std::move(callback)});
     if (!m_handshakeInFlight) {
         m_handshakeInFlight = true;
-        m_engineInFlight = true; // 握手同时会填充 Engine 状态
+        m_engineInFlight = true; // the handshake also fills the Engine state
         updateLoading();
         startPing();
     }
@@ -424,7 +424,7 @@ void DockerBackend::startContainersRequest()
         }
 
         m_containers = containersFromDto(dtos);
-        // 容器列表是网络成员的来源：它更新后网络页的"连接数"也要跟着对（幂等重算）
+        // The container list is the source of network membership: recompute here (idempotent)
         refreshNetworkMembership();
         m_containersInFlight = false;
         updateLoading();
@@ -501,7 +501,7 @@ void DockerBackend::startNetworksRequest()
         reply->deleteLater();
 
         if (failed) {
-            // 保留上一次的列表：网络是低频数据，"读失败"不该让界面突然空掉
+            // Keep the previous list: networks change rarely, so a failed read must not blank the UI
             m_networksInFlight = false;
             updateLoading();
             failSection(Section::Networks, error);
@@ -524,7 +524,7 @@ void DockerBackend::startNetworksRequest()
         m_networks = networksFromDto(dtos);
         m_networksInFlight = false;
         updateLoading();
-        // 网络接口自己的 `Containers` 在列表端点里是空的（实测）：成员必须从容器侧汇总
+        // Measured: the list endpoint returns an empty `Containers`, so members come from containers
         refreshNetworkMembership();
         Q_EMIT networksUpdated();
     });
@@ -545,7 +545,7 @@ void DockerBackend::refreshVolumes(bool includeUsage)
 
 void DockerBackend::startVolumesRequest(bool includeUsage)
 {
-    // 不算占用：引擎不必去扫每个卷的大小（大环境下这一步很慢）
+    // `no-usage`: the engine need not scan every volume's size (slow on large hosts)
     QUrlQuery query;
     if (!includeUsage) {
         query.addQueryItem(QStringLiteral("no-usage"), QStringLiteral("1"));
@@ -559,7 +559,7 @@ void DockerBackend::startVolumesRequest(bool includeUsage)
         reply->deleteLater();
 
         if (failed) {
-            // 与网络列表同一约定：低频数据读失败时保留上一次的列表，只把状态标成失败
+            // Same rule as networks: keep the previous list on a failed read, mark the failure only
             m_volumesInFlight = false;
             updateLoading();
             failSection(Section::Volumes, error);
@@ -577,7 +577,7 @@ void DockerBackend::startVolumesRequest(bool includeUsage)
             return;
         }
         for (const QString &warning : warnings) {
-            // 引擎的提醒（例如"某个卷的驱动不可用"）不该被丢掉
+            // Engine warnings (e.g. a volume whose driver is unavailable) must not be dropped
             qCWarning(kontainerBackend) << "volume list warning:" << warning;
         }
         if (skipped > 0) {
@@ -592,7 +592,7 @@ void DockerBackend::startVolumesRequest(bool includeUsage)
 }
 
 /* ------------------------------------------------------------------------- */
-/* 二期：Storage / Container Detail / Image Detail / Stats                     */
+/* Phase 2: Storage / Container Detail / Image Detail / Stats                */
 /* ------------------------------------------------------------------------- */
 
 void DockerBackend::refreshStorageUsage()
@@ -635,7 +635,7 @@ void DockerBackend::startStorageRequest()
 void DockerBackend::inspectContainer(const QString &id)
 {
     if (id.isEmpty()) {
-        return; // 没有资源可查：不发请求，也不算失败
+        return; // nothing to look up: send no request and report no failure
     }
     const QString key = QStringLiteral("container-inspect:") + id;
     if (!beginRequest(key)) {
@@ -722,7 +722,7 @@ void DockerBackend::requestContainerStats(const QString &id)
     m_statsWanted.insert(id);
     const QString key = QStringLiteral("stats:") + id;
     if (!beginRequest(key)) {
-        return; // 上一次采样还没回来：本轮跳过（§29）
+        return; // previous sample still in flight: skip this round (§29)
     }
     withApiVersion(Section::Stats, [this, id] {
         startStatsRequest(id);
@@ -731,7 +731,7 @@ void DockerBackend::requestContainerStats(const QString &id)
 
 void DockerBackend::stopContainerStats(const QString &id)
 {
-    // 只结束本地采样兴趣：在途请求返回后会被丢弃（§27）
+    // Only drops local interest: an in-flight reply is discarded on arrival (§27)
     m_statsWanted.remove(id);
 }
 
@@ -748,7 +748,7 @@ void DockerBackend::startStatsRequest(const QString &id)
         reply->deleteLater();
         endRequest(QStringLiteral("stats:") + id);
 
-        // 页面已经离开：丢弃结果，也不上报错误（避免给已关闭的页面弹错误）
+        // Page already left: drop the result and report no error (no popup for a closed page)
         if (!m_statsWanted.contains(id)) {
             return;
         }
@@ -771,7 +771,7 @@ void DockerBackend::startStatsRequest(const QString &id)
 }
 
 /* ============================================================================
- * 写操作（ARCH_V4 §2.2.4 / §2.3 / §2.4）
+ * Write operations (ARCH_V4 §2.2.4 / §2.3 / §2.4)
  * ==========================================================================*/
 
 namespace
@@ -787,13 +787,13 @@ int pullIdleTimeoutMs()
     return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kPullIdleTimeout).count());
 }
 
-/*! 上传构建上下文阶段的静默超时：上传几十 MB 时"多久没进展"才是异常。 */
+/*! Idle timeout while uploading the build context: a stalled upload of tens of MB is the anomaly. */
 int buildUploadTimeoutMs()
 {
     return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kBuildUploadTimeout).count());
 }
 
-/*! 构建响应阶段的静默超时：构建本身可能很久没有输出。 */
+/*! Idle timeout for the build response phase: a build may produce no output for a long time. */
 int buildIdleTimeoutMs()
 {
     return int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kBuildIdleTimeout).count());
@@ -852,7 +852,7 @@ DockerBackendInterface::MutationOutcome outcomeFor(DockerReply *reply)
     using Outcome = DockerBackendInterface::MutationOutcome;
     switch (reply->state()) {
     case DockerReply::State::Succeeded:
-        // 304 是引擎对 start（已运行）/ stop（已停止）的「已处于目标状态」语义
+        // 304 is the engine's "already in target state" answer to start (running) / stop (stopped)
         return reply->httpStatus() == 304 ? Outcome::Unchanged : Outcome::Succeeded;
     case DockerReply::State::Cancelled:
         return Outcome::Cancelled;
@@ -872,14 +872,14 @@ DockerEndpoint DockerBackend::endpoint() const
 
 void DockerBackend::emitMutationFinished(Mutation mutation, const QString &targetKey, MutationOutcome outcome, const DockerError &error)
 {
-    // 只记录操作、目标 key 与结果：不记录请求体、响应体或挂载路径（ARCH_V1 §27 / ARCH_V2 §40）
+    // Log only operation, target key, result: no bodies or mount paths (ARCH_V1 §27 / ARCH_V2 §40)
     const char *result = outcome == MutationOutcome::Succeeded     ? "succeeded"
         : outcome == MutationOutcome::Unchanged                    ? "unchanged"
         : outcome == MutationOutcome::Cancelled                    ? "cancelled"
                                                                    : "failed";
     if (outcome == MutationOutcome::Failed) {
-        // 失败必须可诊断：分类 + 引擎原文（HTTP 状态码也在里面）。
-        // 这里出现的是镜像引用 / 容器 ID / 引擎消息，不含凭据与挂载路径。
+        // Failures must stay diagnosable: kind + engine detail (including the HTTP status).
+        // What appears here is image refs / container IDs / engine text, never credentials or mounts.
         qCWarning(kontainerBackend) << "mutation" << mutationName(mutation) << targetKey << result
                                     << "kind" << int(error.kind()) << "http" << error.httpStatus() << "detail" << error.detail();
     } else {
@@ -894,7 +894,7 @@ void DockerBackend::runMutation(Mutation mutation, const QString &targetKey, Rea
         run();
         return;
     }
-    // 还没握手：排队等版本协商结束（写请求同样需要版本前缀）
+    // Not yet handshaken: queue until version negotiation ends (writes need the prefix too)
     m_pendingMutations.append({mutation, targetKey, std::move(run)});
     if (!m_handshakeInFlight) {
         m_handshakeInFlight = true;
@@ -935,7 +935,7 @@ void DockerBackend::restartContainer(const QString &id)
 {
     QUrlQuery query;
     query.addQueryItem(QStringLiteral("t"), QString::number(RefreshPolicy::kStopTimeoutSeconds));
-    // restart 对已停止的容器会直接启动，因此没有 304 语义
+    // restart starts a stopped container outright, so there is no 304 semantics
     runContainerMutation(Mutation::RestartContainer, id, ApiPaths::containerRestart(id), query);
 }
 
@@ -951,7 +951,7 @@ void DockerBackend::unpauseContainer(const QString &id)
 
 void DockerBackend::removeContainer(const QString &id)
 {
-    // 不带 v（保留匿名卷与命名卷）、不带 force（运行中的容器必须由引擎拒绝）
+    // No v (keep anonymous and named volumes), no force (the engine must reject running ones)
     runContainerMutation(Mutation::RemoveContainer, id, ApiPaths::containerRemove(id), QUrlQuery());
 }
 
@@ -975,11 +975,11 @@ void DockerBackend::removeImage(const QString &id, bool force)
 namespace
 {
 /*!
- * 引擎把"联系不上仓库"包在 5xx 里返回（DNS / 连接被拒 / TLS / 代理 / 超时），
- * 与"凭据不对"（401/403）在状态码上是分开的，但都可能是 5xx。
+ * The engine reports an unreachable registry inside 5xx (DNS / connection refused / TLS /
+ * proxy / timeout), separate from bad credentials (401/403), but both can arrive as 5xx.
  *
- * 这是**启发式**：只认引擎（Go）网络栈的稳定措辞，认不出来就归到普通失败，
- * 不会因为猜错而把"用户名密码错误"说成"仓库不可达"。
+ * Heuristic: match only stable Go network-stack wording; anything else stays a plain failure,
+ * so a wrong guess never calls "bad username or password" an unreachable registry.
  */
 bool looksLikeUnreachableRegistry(const QString &detail)
 {
@@ -994,12 +994,12 @@ bool looksLikeUnreachableRegistry(const QString &detail)
         QStringLiteral("server misbehaving"),
         QStringLiteral("network is unreachable"),
         QStringLiteral("lookup "),
-        // 实测：仓库不可达时引擎回 500，原文是 context deadline exceeded /
-        // request canceled while waiting for connection（超时措辞，不带 dial tcp）
+        // Measured: an unreachable registry returns 500 with context deadline exceeded /
+        // request canceled while waiting for connection (timeout wording, no dial tcp)
         QStringLiteral("context deadline exceeded"),
         QStringLiteral("awaiting headers"),
-        // 实测（离线环境）：引擎回 500，原文是 `Get "https://…/v2/": EOF`——
-        // 传输层直接断了，属于"连不上仓库"，不该当成"我们请求格式错"的普通失败
+        // Measured (offline): the engine returns 500 with `Get "https://…/v2/": EOF` — the
+        // transport died, so this is an unreachable registry, not a malformed request
         QStringLiteral(": eof"),
         QStringLiteral("no route to host"),
         QStringLiteral("connection reset by peer"),
@@ -1016,7 +1016,7 @@ bool looksLikeUnreachableRegistry(const QString &detail)
 
 int DockerBackend::authCheckTimeoutMs() const
 {
-    // 引擎要真的去联系仓库：与写操作同一个量级，避免用户干等
+    // The engine really contacts the registry: same order of magnitude as a mutation, no long wait
     return mutationTimeoutMs();
 }
 
@@ -1024,7 +1024,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
 {
     const QString address = RegistryAuth::normalizeServerAddress(serverAddress.isEmpty() ? credential.serverAddress : serverAddress);
     if (address.isEmpty() || credential.isEmpty()) {
-        // 参数不全就不发请求：既省一次往返，也避免把半个凭据发出去
+        // Incomplete arguments: skip the round trip and avoid sending half a credential
         Q_EMIT registryAuthChecked(address, AuthCheckResult::InvalidCredentials, QStringLiteral("incomplete credentials"));
         return;
     }
@@ -1033,16 +1033,17 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
         return;
     }
 
-    // 没握手时先等版本协商：`/auth` 同样需要版本前缀，否则新后端上的第一次校验会打到不带版本的路径
+    // Wait for version negotiation first: `/auth` also needs the version prefix, otherwise the
+    // first check against a new backend hits an unversioned path
     withApiVersion(Section::Engine, [this, address, credential] {
-        // serveraddress 以调用方给的仓库为准：界面上的"仓库 + 用户名密码"是两个字段，
-        // 凭据结构里的同名字段只在参数为空时兜底，避免两者不一致时把凭据发给错误的仓库
+        // serveraddress follows the caller's registry: the UI keeps registry and credentials in
+        // separate fields, so the credential's own address is only a fallback when none is given
         RegistryCredential outgoing = credential;
         outgoing.serverAddress = address;
 
-        // **凭据放在请求体里**（与 docker CLI 一致）：实测引擎只认 body —— 只发
-        // `X-Registry-Auth` 头、body 为空时它会回 400 `invalid X-Registry-Auth header: invalid JSON: EOF`，
-        // 于是"每个仓库都校验失败"。体里也带服务器地址，避免引擎把它当成别的仓库。
+        // Credentials go in the body (like the docker CLI): measured, sending only an
+        // `X-Registry-Auth` header with an empty body gives 400 `invalid X-Registry-Auth header:
+        // invalid JSON: EOF` and every registry check fails. The body also carries the address.
         QJsonObject payload;
         payload.insert(QStringLiteral("username"), outgoing.username);
         if (!outgoing.password.isEmpty()) {
@@ -1053,7 +1054,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
         }
         payload.insert(QStringLiteral("serveraddress"), RegistryAuth::headerServerAddress(address));
 
-        // 凭据只在请求体里：不进 URL、不进日志（DockerClient 只记录方法与路径）
+        // Credentials stay in the body: never in the URL or logs (DockerClient logs method + path)
         DockerReply *reply = m_client.post(ApiPaths::auth(),
                                            QUrlQuery(),
                                            authCheckTimeoutMs(),
@@ -1061,7 +1062,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
                                            QJsonDocument(payload).toJson(QJsonDocument::Compact));
         connect(reply, &DockerReply::finished, this, [this, reply, address] {
             const DockerError error = reply->error();
-            // 失败时 reply->httpStatus() 是 0（它只在成功路径上被赋值），状态码在错误对象里
+            // On failure reply->httpStatus() is 0 (only set on success); the code is in the error
             const int status = error.httpStatus() > 0 ? error.httpStatus() : reply->httpStatus();
             reply->deleteLater();
 
@@ -1071,7 +1072,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
                 result = AuthCheckResult::Succeeded;
                 break;
             case DockerError::Kind::PermissionDenied:
-                // 401/403：用户名、密码或令牌不对
+                // 401/403: wrong username, password or token
                 result = AuthCheckResult::InvalidCredentials;
                 break;
             case DockerError::Kind::Timeout:
@@ -1085,7 +1086,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
                 break;
             }
 
-            // detail 是引擎原文：只用于日志与"技术细节"，不当作用户文案
+            // detail is raw engine text: for logs and "technical details", never user-facing copy
             if (result != AuthCheckResult::Succeeded) {
                 qCWarning(kontainerApi) << "registry auth check failed for" << address << "result" << int(result) << "status" << status;
             }
@@ -1096,7 +1097,7 @@ void DockerBackend::checkRegistryAuth(const QString &serverAddress, const Regist
 
 int DockerBackend::logHistoryTimeoutMs() const
 {
-    // 历史日志（follow=0）用普通超时；follow 流交给取消与页面生命周期结束（§3.1.1）
+    // History logs (follow=0) use a normal timeout; follow streams end via cancel/page close (§3.1.1)
     return mutationTimeoutMs();
 }
 
@@ -1108,10 +1109,10 @@ void DockerBackend::startContainerLogs(const QString &id, bool tty, bool follow,
         return;
     }
 
-    // 一个容器最多一路流：重连/换容器时先停掉旧的（旧流会以 Cancelled 结束，调用方据此忽略）
+    // One stream per container: stop the old one first (it ends as Cancelled, which callers ignore)
     stopContainerLogs(id);
 
-    // 排队等握手时用户可能已经离开日志分区：那时不该再去开流
+    // The user may have left the log section while queued for the handshake: do not open a stream
     m_cancelledLogRequests.remove(id);
 
     withApiVersion(Section::ContainerDetail, [this, id, tty, follow, tailLines] {
@@ -1139,7 +1140,7 @@ void DockerBackend::startContainerLogs(const QString &id, bool tty, bool follow,
 
         connect(reply, &DockerReply::bodyChunk, this, [this, reply, id] {
             if (reply->httpStatus() >= 400) {
-                return; // 4xx/5xx 交给 finished 统一处理
+                return; // 4xx/5xx handled by finished
             }
             const auto it = m_logStreams.find(id);
             if (it == m_logStreams.end()) {
@@ -1158,17 +1159,17 @@ void DockerBackend::startContainerLogs(const QString &id, bool tty, bool follow,
 
             const auto it = m_logStreams.find(id);
             if (it == m_logStreams.end() || it->reply != reply) {
-                // 已经被 stopContainerLogs 清算，或者已被新的流取代。
-                // 这一条是**防御性**的：`DockerReply::cancel()` 目前同步发 finished，
-                // 所以"旧流晚于新流收尾"的顺序今天构造不出来——但不要依赖这个实现细节，
-                // 一旦 cancel() 改成异步，旧流的收尾会把新流的状态擦掉。
+                // Already settled by stopContainerLogs, or replaced by a newer stream.
+                // Defensive: `DockerReply::cancel()` emits finished synchronously today, so an old
+                // stream finishing after a new one cannot happen yet — but do not rely on that:
+                // once cancel() is async, the old stream's teardown would wipe the new stream's state.
                 return;
             }
             const bool cancelled = it->cancelled;
             const qint64 discarded = it->reader.discardedBytes();
             QList<LogLine> tail;
             if (replyState != DockerReply::State::Cancelled) {
-                // 收尾：最后一行可能没有换行（容器输出提示符、或流被切断）
+                // Flush: the last line may lack a newline (container prompt, or a cut stream)
                 tail = it->reader.flush();
             }
             m_logStreams.erase(it);
@@ -1195,24 +1196,24 @@ void DockerBackend::startContainerLogs(const QString &id, bool tty, bool follow,
 
 void DockerBackend::stopContainerLogs(const QString &id)
 {
-    // 还在等版本握手的情况：记下来，让排队的 lambda 自己放弃
+    // Still awaiting the handshake: record it so the queued lambda gives up
     m_cancelledLogRequests.insert(id);
 
     const auto it = m_logStreams.find(id);
     if (it == m_logStreams.end()) {
-        return; // 幂等：没有在跑的流什么都不做
+        return; // idempotent: nothing to do when no stream is running
     }
     m_cancelledLogRequests.remove(id);
     it->cancelled = true;
     if (it->reply) {
-        // cancel() 之后 finished 仍会来一次，届时按 Cancelled 收尾
+        // finished still arrives once after cancel(); it settles there as Cancelled
         it->reply->cancel();
     }
 }
 
 void DockerBackend::buildImage(const ImageBuildRequest &request)
 {
-    // 目标键用构建 id：同一路重复提交会被拒绝，而不是并发跑两次构建
+    // Target key is the build id: a resubmit is rejected instead of running two builds in parallel
     const QString targetKey = QStringLiteral("build:") + request.id;
 
     runMutation(Mutation::BuildImage, targetKey, [this, request, targetKey] {
@@ -1248,7 +1249,7 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
             query.addQueryItem(QStringLiteral("rm"), QStringLiteral("1"));
         }
         if (!request.buildArgs.isEmpty()) {
-            // buildargs 是一个 JSON 对象（值为字符串）
+            // buildargs is a JSON object whose values are strings
             QJsonObject args;
             for (const QString &entry : request.buildArgs) {
                 const int separator = entry.indexOf(QLatin1Char('='));
@@ -1277,7 +1278,7 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
         state.update.statusText = i18n("Uploading the build context…");
         m_builds.insert(request.id, state);
 
-        // 上传 tar：写入阶段用较宽的静默超时，响应阶段沿用流式空闲超时（§5.1）
+        // Tar upload: wide idle timeout while writing, streaming idle timeout for the response (§5.1)
         DockerReply *reply = m_client.postFile(ApiPaths::buildImage(),
                                                query,
                                                request.contextArchive,
@@ -1320,7 +1321,7 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
 
             auto it = m_builds.find(id);
             if (it == m_builds.end()) {
-                return; // 已经被取消并清算过
+                return; // already cancelled and settled
             }
             it->reply = nullptr;
 
@@ -1340,7 +1341,7 @@ void DockerBackend::buildImage(const ImageBuildRequest &request)
                 return;
             }
             if (it->failed) {
-                // 流内的 error 行才是真正的失败原因（此时 HTTP 是 200）
+                // The real failure reason is the error line inside the stream (HTTP is 200 here)
                 finishBuild(id, MutationOutcome::Failed, DockerError(DockerError::Kind::EngineError, it->update.errorText));
                 return;
             }
@@ -1372,7 +1373,7 @@ void DockerBackend::refreshNetworkMembership()
                 break;
             }
         }
-        // 网络接口自己给的成员（有些引擎/版本会填）也要保留：按容器 id 去重后合并
+        // Keep the network endpoint's own members (some engines fill them), deduped by container id
         for (const NetworkMember &existing : std::as_const(network.members)) {
             const bool known = std::any_of(members.cbegin(), members.cend(), [&existing](const NetworkMember &member) {
                 return member.containerId == existing.containerId;
@@ -1395,8 +1396,8 @@ void DockerBackend::abandonInFlightRequests(const DockerError &error)
 {
     qCWarning(kontainerBackend) << "abandoning in-flight requests:" << error.detail();
 
-    // 在途的回复对象由各自的 finished 处理器负责收尾；这里先把"标志"复位，
-    // 再把排队的回调统一按失败送出——否则 isLoading() 会一直是 true。
+    // Each reply's finished handler still does its own teardown; reset the flags here and fail
+    // all queued callbacks together — otherwise isLoading() would stay true forever.
     m_engineInFlight = false;
     m_containersInFlight = false;
     m_imagesInFlight = false;
@@ -1413,7 +1414,7 @@ void DockerBackend::abandonInFlightRequests(const DockerError &error)
 
 void DockerBackend::pruneBuildCache()
 {
-    // 构建缓存是全局的：目标键用 `buildCache:` 前缀，避免与某个构建的取消混淆
+    // Build cache is global: the `buildCache:` target key keeps it apart from a build's cancel
     runMutation(Mutation::PruneBuildCache, QStringLiteral("buildCache:"), [this] {
         DockerReply *reply = m_client.post(ApiPaths::buildPrune(), QUrlQuery(), mutationTimeoutMs());
         connect(reply, &DockerReply::finished, this, [this, reply] {
@@ -1431,7 +1432,7 @@ void DockerBackend::pruneBuildCache()
             }
 
             const QJsonObject object = QJsonDocument::fromJson(body).object();
-            // 引擎回的是 {"CachesDeleted":[…],"SpaceReclaimed":123}
+            // Engine response: {"CachesDeleted":[…],"SpaceReclaimed":123}
             const qint64 reclaimed = qint64(object.value(QStringLiteral("SpaceReclaimed")).toDouble());
             Q_EMIT buildCachePruned(reclaimed);
             emitMutationFinished(Mutation::PruneBuildCache, QStringLiteral("buildCache:"), MutationOutcome::Succeeded, DockerError());
@@ -1445,7 +1446,7 @@ void DockerBackend::cancelImageBuild(const QString &buildId)
     if (it == m_builds.constEnd() || !it->reply) {
         return;
     }
-    // 取消走 reply：finished 会带着 Cancelled 回来，临时 tar 在那条路径上删掉
+    // Cancel through the reply: finished returns Cancelled, and that path deletes the temp tar
     it->reply->cancel();
 }
 
@@ -1455,7 +1456,7 @@ void DockerBackend::handleBuildLine(ImageBuildState &state, const QJsonObject &o
 
     if (!line.error.isEmpty() || !line.errorDetail.isEmpty()) {
         state.failed = true;
-        // 失败原因要**带上失败的步骤**：只给"构建失败"没法排查（§5.3）
+        // The reason must name the failing step: "build failed" alone is undiagnosable (§5.3)
         const QString reason = line.errorDetail.isEmpty() ? line.error : line.errorDetail;
         state.update.errorText = state.update.stepIndex > 0 && !state.update.stepCommand.isEmpty()
             ? i18n("Step %1/%2 (%3) failed: %4",
@@ -1508,7 +1509,7 @@ void DockerBackend::finishBuild(const QString &buildId, MutationOutcome outcome,
         imageId = it->update.auxImageId;
     }
     m_builds.erase(it);
-    // 临时 tar 用完就删（无论成功、失败还是取消）
+    // Delete the temp tar once used (success, failure or cancel alike)
     if (!archive.isEmpty()) {
         QFile::remove(archive);
     }
@@ -1518,11 +1519,11 @@ void DockerBackend::finishBuild(const QString &buildId, MutationOutcome outcome,
 
 void DockerBackend::createContainer(const ContainerCreateRequest &request)
 {
-    // 目标键用容器名：同名重复提交会被拒绝，而不是并发建出两个（与引擎的 name 冲突语义一致）
+    // Target key is the container name: duplicates are rejected, not created twice (engine name clash)
     const QString targetKey = OperationTarget::container(request.name);
 
     runMutation(Mutation::CreateContainer, targetKey, [this, request, targetKey] {
-        // 名字是 query 参数；体由 ContainerCreateRequest::toJson() 生成
+        // The name is a query parameter; the body comes from ContainerCreateRequest::toJson()
         QUrlQuery query;
         query.addQueryItem(QStringLiteral("name"), request.name);
 
@@ -1549,7 +1550,7 @@ void DockerBackend::createContainer(const ContainerCreateRequest &request)
                 qCWarning(kontainerBackend) << "container create warning:" << warning;
             }
             if (id.isEmpty()) {
-                // 201 却没有 id：当成不可读响应，别让界面以为创建成功了
+                // 201 without an id: treat as unreadable, so the UI does not report success
                 emitMutationFinished(Mutation::CreateContainer,
                                      targetKey,
                                      MutationOutcome::Failed,
@@ -1600,7 +1601,7 @@ void DockerBackend::removeVolume(const QString &name)
     const QString targetKey = OperationTarget::volume(name);
 
     runMutation(Mutation::RemoveVolume, targetKey, [this, name, targetKey] {
-        // 不传 force：被容器使用时让引擎拒绝，界面把原因说清楚
+        // No force: let the engine refuse a volume still in use, and show its reason
         DockerReply *reply = m_client.del(ApiPaths::volume(name), QUrlQuery(), mutationTimeoutMs());
         connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
             const DockerError error = reply->error();
@@ -1627,7 +1628,7 @@ void DockerBackend::pruneVolumes()
                 return;
             }
 
-            // 响应里带"删了哪些、回收了多少"：这份明细经 volumesPruned 交给界面
+            // Response carries what was deleted and how much was reclaimed; sent via volumesPruned
             const QJsonObject object = QJsonDocument::fromJson(body).object();
             QStringList names;
             const QJsonArray deleted = object.value(QStringLiteral("VolumesDeleted")).toArray();
@@ -1645,11 +1646,11 @@ void DockerBackend::pruneVolumes()
 
 void DockerBackend::createNetwork(const NetworkCreateRequest &request)
 {
-    // 目标键用网络名：同一个名字重复提交会被拒绝，而不是并发建出两个
+    // Target key is the network name: a duplicate submit is rejected, not created twice
     const QString targetKey = OperationTarget::network(request.name);
 
     runMutation(Mutation::CreateNetwork, targetKey, [this, request, targetKey] {
-        // 创建是 JSON 体（四期的写操作都靠 query）：见 DockerClient::post 的 body 参数
+        // Creation uses a JSON body (other writes use query parameters): see DockerClient::post
         DockerReply *reply = m_client.post(ApiPaths::networkCreate(), QUrlQuery(), mutationTimeoutMs(), {}, request.toJson());
         connect(reply, &DockerReply::finished, this, [this, reply, targetKey] {
             const DockerReply::State state = reply->state();
@@ -1662,7 +1663,7 @@ void DockerBackend::createNetwork(const NetworkCreateRequest &request)
                 return;
             }
 
-            // 引擎可以在 201 里带一条 Warning（例如"这个名字会被截断"）：写进日志并透出给界面
+            // A 201 may carry a Warning (e.g. "this name will be truncated"): log it and pass it on
             const QJsonObject object = QJsonDocument::fromJson(body).object();
             const QString warning = object.value(QStringLiteral("Warning")).toString();
             if (!warning.isEmpty()) {
@@ -1694,7 +1695,7 @@ void DockerBackend::removeNetwork(const QString &id)
 
 void DockerBackend::connectNetwork(const QString &networkId, const QString &containerId, const QStringList &aliases)
 {
-    // 目标键是"网络 + 容器"：同一个网络上的不同容器可以并发连接
+    // Target key is network + container: different containers may connect concurrently
     const QString targetKey = OperationTarget::network(networkId) + QLatin1Char('/') + containerId;
 
     runMutation(Mutation::ConnectNetwork, targetKey, [this, networkId, containerId, aliases, targetKey] {
@@ -1754,7 +1755,7 @@ void DockerBackend::pullImage(const QString &reference, const RegistryCredential
 {
     const QString targetKey = OperationTarget::image(ImageReference::normalized(reference));
 
-    // 同一个引用重复拉取：拒绝并给出明确文案（不同引用可以并发）
+    // A duplicate pull of the same reference is rejected with a clear message (others run in parallel)
     if (m_pulls.contains(targetKey)) {
         emitMutationFinished(Mutation::PullImage,
                              targetKey,
@@ -1793,15 +1794,15 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
         query.addQueryItem(QStringLiteral("tag"), parts->tag);
     }
 
-    // 注意：QHash 的引用在插入时可能失效，因此这里先插入、再用迭代器访问，
-    // 并且后续所有回调都通过 targetKey 重新查找状态，不保存引用。
+    // Note: a QHash reference can be invalidated by the insert, so insert first and use the
+    // returned iterator; every later callback re-looks-up state by targetKey instead of holding one.
     ImagePullState state;
     state.reference = ImageReference::normalized(reference);
     state.targetKey = targetKey;
     state.progress.reference = state.reference;
     const auto inserted = m_pulls.insert(targetKey, state);
-    // 凭据只走请求头（空凭据不加头，保持匿名拉取的原样）；serveraddress 用镜像所在的仓库，
-    // 避免调用方给的凭据结构里写着别的仓库
+    // Credentials go only in a header (none when empty, keeping anonymous pulls unchanged);
+    // serveraddress uses the image's own registry, never some other registry the caller passed.
     QMap<QByteArray, QByteArray> headers;
     if (!credential.isEmpty()) {
         RegistryCredential outgoing = credential;
@@ -1819,7 +1820,7 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
 
     connect(reply, &DockerReply::streamStarted, this, [this, reply, targetKey] {
         if (reply->httpStatus() >= 400) {
-            return; // 4xx/5xx 交给 finished 统一处理
+            return; // 4xx/5xx handled by finished
         }
         if (const auto it = m_pulls.constFind(targetKey); it != m_pulls.constEnd()) {
             emitPullProgress(*it);
@@ -1836,7 +1837,7 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
         }
         const QList<QJsonObject> lines = it->reader.feed(reply->takeBody());
         for (const QJsonObject &line : lines) {
-            // 订阅者可能在 imagePullProgress 里同步取消：取消后不要再写进度
+            // A subscriber may cancel synchronously inside imagePullProgress: stop writing progress then
             if (reply->isFinished() || !m_pulls.contains(targetKey)) {
                 return;
             }
@@ -1851,12 +1852,12 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
 
         auto it = m_pulls.find(targetKey);
         if (it == m_pulls.end()) {
-            return; // 已经被取消并清算过
+            return; // already cancelled and settled
         }
         it->reply = nullptr;
 
         if (state != DockerReply::State::Cancelled) {
-            // 收尾：最后一行可能没有换行符
+            // Flush: the last line may lack a newline
             const QList<QJsonObject> tail = it->reader.finish();
             for (const QJsonObject &line : tail) {
                 handlePullLine(*it, line);
@@ -1877,7 +1878,7 @@ void DockerBackend::startPullRequest(const QString &reference, const QString &ta
             return;
         }
         if (it->failed) {
-            // 流内的 error 行才是真正的失败原因（此时 HTTP 状态是 200）
+            // The real failure reason is the error line inside the stream (HTTP status is 200 here)
             const QString message = it->progress.errorText;
             finishPull(targetKey, MutationOutcome::Failed, DockerError(DockerError::Kind::EngineError, message));
             return;
@@ -1906,7 +1907,7 @@ void DockerBackend::cancelImagePull(const QString &reference)
         return;
     }
     qCDebug(kontainerBackend) << "cancelling image pull" << targetKey;
-    // 取消后紧接着会收到 finished（state = Cancelled），由那里统一清算
+    // finished (state = Cancelled) arrives right after, and settles the pull there
     if (it->reply) {
         it->reply->cancel();
     } else {
@@ -1943,7 +1944,7 @@ void DockerBackend::handlePullLine(ImagePullState &state, const QJsonObject &obj
     }
 
     if (!line.status.isEmpty()) {
-        // status 是引擎原文（"Downloading"、"Pull complete"…），按数据显示，不翻译
+        // status is raw engine text ("Downloading", "Pull complete", …): shown as data, not translated
         state.progress.statusText = line.status;
         const ImagePullProgress::Phase phase = DockerImagePullLineDTO::phaseForStatus(line.status);
         if (phase != ImagePullProgress::Phase::Waiting) {
@@ -1952,7 +1953,7 @@ void DockerBackend::handlePullLine(ImagePullState &state, const QJsonObject &obj
     }
     if (!line.id.isEmpty()) {
         state.progress.layerId = line.id;
-        // "Pulling from <repo>" 这类行也带 id（那是 tag，不是层），不能算进层数
+        // Lines like "Pulling from <repo>" also carry an id (a tag, not a layer): do not count them
         if (line.isLayerStatus()) {
             PullLayerState &layer = state.layers[line.id];
             if (line.hasProgress) {

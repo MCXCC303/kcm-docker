@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -87,18 +87,18 @@ void RegistryCredentialModel::reload()
         for (const QString &address : addresses) {
             const RegistryCredential credential = m_store->credential(address);
             if (credential.isEmpty()) {
-                continue; // 坏条目不出现在列表里（控制器另有"有问题"的提示）
+                continue; // broken entries stay out of the list (the controller reports them separately)
             }
             Entry entry;
             entry.serverAddress = address;
-            // 只复制"可以给界面看"的字段：密码/令牌绝不进模型
+            // copy only fields fit for the UI: passwords/tokens never enter the model
             entry.authKind = credential.usesIdentityToken() ? QStringLiteral("token") : QStringLiteral("password");
             entry.username = credential.username;
             refreshed.append(entry);
         }
     }
 
-    // 内容未变就不动模型：否则每次刷新都会重建 delegate（列表抖动）
+    // unchanged content leaves the model alone: otherwise every refresh rebuilds the delegates (jitter)
     if (refreshed.size() == m_entries.size()) {
         bool identical = true;
         for (int row = 0; row < refreshed.size(); ++row) {

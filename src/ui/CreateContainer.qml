@@ -1,15 +1,17 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    创建容器向导（ARCH_V5_V8 §4.4）。
+    Create-container wizard (ARCH_V5_V8 §4.4).
 
-    分步表单，但**状态与校验全在 `CreateContainerController` 里**（C++）：
-    七期的校验矩阵有一半要对照后端数据（重名、端口冲突、镜像是否在本地），
-    放在 QML 里既测不到、也会和控制器里的规则分叉。这一页只做三件事：
-    把输入写进控制器、按 `controller.stepKey` 铺对应的表单、把总览画出来。
+    A stepwise form, but **all state and validation live in `CreateContainerController`** (C++): half
+    the validation matrix compares against backend data (duplicate names, port conflicts, whether an
+    image is local), which QML could not test and would fork from the controller's rules. This page
+    does three things only: write input into the controller, lay out the form for
+    `controller.stepKey`, and render the summary.
 
-    最后一步是**只读总览**：环境变量只列键名（值可能是密码），确认后才提交。
+    The last step is a **read-only summary**: environment variables list key names only (values may be
+    secrets), and nothing is submitted before confirmation.
 */
 
 import QtQuick
@@ -24,59 +26,61 @@ import "components" as Components
 Kirigami.Page {
     id: page
 
-    /*! 从镜像卡片/详情进入时预选的镜像引用。 */
+    /*! Image reference preselected when entering from an image card or detail page. */
     property string presetImage: ""
-    /*! 克隆：用这个容器（id）预填配置。 */
+    /*! Clone: prefill the form from this container ID. */
     property string cloneFromContainerId: ""
 
     readonly property var controller: kcm.controller.createContainer
     readonly property var operations: kcm.controller.operations
 
     signal closeRequested
-    /*! 创建成功：跳到新容器详情页。 */
+    /*! Created successfully: jump to the new container's detail page. */
     signal containerCreated(string containerId)
 
     objectName: "createContainerPage"
 
-    /*! 预设管理面板是否展开（挂载步骤里）。 */
+    /*! Whether the preset manager panel is open (inside the mounts step). */
     property bool presetPanelOpen: false
 
-    /*! 点击步骤按钮被拒绝时的原因 key（空 = 没有）。 */
+    /*! Reason key when a step-button jump was rejected (empty = none). */
     property string stepJumpErrorKey: ""
 
     /*!
-     * 特权勾选框的**视图**状态。
+     * **View** state of the privileged checkbox.
      *
-     * 不能把 `checked` 直接绑到控制器再在处理器里赋值：那样会把绑定破坏掉，
-     * 之后控制器变成 true 也不会再同步（用户实测 F4：确认后框还是空的）。
+     * Do not bind `checked` to the controller and then assign it in a handler: that breaks the
+     * binding, so a later controller change to true never syncs (user report F4: the box stayed
+     * empty after confirming).
      */
     property bool privilegedVisual: false
 
     Connections {
         target: page.controller
-        // 控制器是唯一事实来源：它变了就把视图对齐
+        // The controller is the single source of truth: realign the view when it changes
         function onChanged() {
             page.privilegedVisual = page.controller.privileged;
             /*
-             * 同时清掉"跳转被拒绝"的原因。
+             * Also clear the "jump rejected" reason.
              *
-             * 用户实测：镜像已经选好了，"请选择一个镜像"还一直挂着（只有点标签页才消失）。
-             * 原因是那条提示来自 stepJumpErrorKey，而它原来只在**点击步骤按钮成功**时才清；
-             * 用"下一步"前进或直接改表单都不会清它。现在表单一有变化就清，
-             * 横幅因此回落到当前步骤的真实状态（stepErrorKey）——该消失时立刻消失。
+             * User report: with an image already chosen, "Choose an image." kept showing (only
+             * clicking a tab cleared it). That banner came from stepJumpErrorKey, which was cleared
+             * only on a **successful step-button click** — neither Next nor editing the form cleared
+             * it. Now any form change clears it, so the banner falls back to the current step's real
+             * state (stepErrorKey) and vanishes when it should.
              */
             page.stepJumpErrorKey = "";
         }
     }
 
     /*!
-     * delegate 用的中转对象（八期后的修正）。
+     * Relay object for delegates (fix from phase 8).
      *
-     * `Repeater` 的 delegate 里引用**根对象的 id**（page）会抛
-     * `ReferenceError: page is not defined`——用户实测的"删不掉端口映射 / 加不了挂载"就是这个：
-     * delegate 里的处理器调用 `page.pushPorts()` 直接抛错，改动没写回控制器。
-     * 同一文件里**非根**对象的 id 在 delegate 里是可用的，因此这里把 delegate 需要的能力
-     * （控制器 + 行同步）集中转发一次。
+     * Referencing the **root object's id** (page) inside a `Repeater` delegate throws
+     * `ReferenceError: page is not defined` — the user-reported "cannot delete port mappings /
+     * cannot add mounts": the handler called `page.pushPorts()`, threw, and the edit never reached
+     * the controller. Ids of **non-root** objects in the same file do work in delegates, so the
+     * capabilities delegates need (controller + row sync) are relayed here once.
      */
     QtObject {
         id: wizard
@@ -84,7 +88,7 @@ Kirigami.Page {
         readonly property var controller: page.controller
         readonly property var operations: page.operations
 
-        /*! 端口/挂载行的编辑一律交给控制器（规则在 C++ 里，delegate 只报"第几行、哪个字段"）。 */
+        /*! Port/mount edits go to the controller (rules in C++); delegates report row and field only. */
         function addPort() {
             wizard.controller.addPortRow(80, 0, "", "tcp");
         }
@@ -108,7 +112,7 @@ Kirigami.Page {
         }
     }
 
-    /*! 步骤 key → 标题（顺序由控制器给出，界面不另抄一份）。 */
+    /*! Step key → title (the controller owns the order; the UI keeps no copy). */
     function stepTitle(key: string): string {
         switch (key) {
         case "image":
@@ -130,7 +134,7 @@ Kirigami.Page {
         }
     }
 
-    /*! 校验 key → 文案。 */
+    /*! Validation key → message. */
     function errorText(key: string): string {
         switch (key) {
         case "imageRequired":
@@ -189,11 +193,12 @@ Kirigami.Page {
         target: page.controller
 
         /*
-         * 走到"端口"步骤时刷新一次容器列表。
+         * Refresh the container list when entering the "ports" step.
          *
-         * 端口冲突是拿**已发布端口**判断的（`hostPortHolder()`），而容器列表是 5 秒轮询；
-         * 用户刚在别处启动了一个占用该端口的容器时，本地列表可能还是旧的——于是"提前拦截"
-         * 失效，最后在启动时才收到 `Bind for 0.0.0.0:8100 failed: port is already allocated`。
+         * Port conflicts are decided from **published ports** (`hostPortHolder()`), and the
+         * container list polls every 5 s. A container started elsewhere a moment ago may be missing
+         * from the stale list, so early interception fails and the error only surfaces at start:
+         * `Bind for 0.0.0.0:8100 failed: port is already allocated`.
          */
         function onStepKeyChanged() {
             if (page.controller.stepKey === "ports") {
@@ -203,8 +208,8 @@ Kirigami.Page {
     }
 
     Component.onCompleted: {
-        // 网络选择列表是低频数据（进网络页才刷新）：向导自己再保一次险，
-        // 否则"没点过网络标签页就选不到网络"（实测反馈 ②）
+        // The network list refreshes only when the Networks tab is entered, so the wizard refetches
+        // it: otherwise no network can be picked without visiting that tab first (user report ②)
         if (page.controller.availableNetworks.length === 0) {
             kcm.controller.refreshNetworks();
         }
@@ -224,7 +229,7 @@ Kirigami.Page {
         }
     }
 
-    /* 步骤指示：已完成的步骤可点击回看/修改，未完成的不让跳 */
+    /* Step indicator: finished steps are clickable for review or editing, unfinished ones are not */
     header: QQC2.ToolBar {
         contentItem: RowLayout {
             spacing: Kirigami.Units.smallSpacing
@@ -241,16 +246,17 @@ Kirigami.Page {
                     objectName: "wizardStepButton"
                     flat: true
                     /*
-                     * 只读地跟随当前步骤：**不要** checkable。
+                     * Follows the current step read-only: deliberately **not** checkable.
                      *
-                     * checkable 的按钮在点击时 Qt 会先自行翻转 checked；如果 goToStep() 因为
-                     * 校验不通过而拒绝跳转，这个翻转不会被纠正——用户看到的就是"点了几下像多选了
-                     * 好几步，但页面还停在第一步"（实测反馈 A3）。
+                     * With checkable, Qt flips checked itself on click; when goToStep() rejects the
+                     * jump because validation fails, that flip is never undone, so the user sees
+                     * "several steps look selected but the page is still on the first one"
+                     * (user report A3).
                      */
                     checked: page.controller.stepIndex === stepButton.index
                     text: (stepButton.index + 1) + ". " + page.stepTitle(stepButton.modelData)
                     onClicked: {
-                        // 被拒绝时要说清为什么：原来只是"没反应"，用户会以为界面坏了
+                        // Explain rejections: silently doing nothing made users think the UI was broken
                         if (!page.controller.goToStep(stepButton.modelData)) {
                             page.stepJumpErrorKey = page.controller.stepErrorKey;
                         } else {
@@ -273,7 +279,7 @@ Kirigami.Page {
         Kirigami.InlineMessage {
             objectName: "wizardStepError"
             Layout.fillWidth: true
-            // 当前步骤的问题，以及"点了别的步骤但没跳过去"的原因，都走这一条提示
+            // One banner covers the current step's problem and the reason a step jump was rejected
             visible: page.controller.stepErrorKey.length > 0 || page.stepJumpErrorKey.length > 0
             type: Kirigami.MessageType.Error
             text: page.errorText(page.stepJumpErrorKey.length > 0 ? page.stepJumpErrorKey : page.controller.stepErrorKey)
@@ -298,7 +304,7 @@ Kirigami.Page {
                 x: Math.max(0, (parent.width - width) / 2)
                 spacing: Kirigami.Units.largeSpacing
 
-                /* ---------------------------- ① 镜像 ---------------------------- */
+                /* ---------------------------- ① Image ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "image"
@@ -335,7 +341,7 @@ Kirigami.Page {
                         visible: page.controller.availableImages.length > 0
                     }
 
-                    // 可搜索下拉（用户实测 F3：镜像版本多时逐个点选太慢）
+                    // Searchable dropdown (user report F3: clicking through many image versions was too slow)
                     Components.FilteredComboBox {
                         id: imageCombo
 
@@ -359,7 +365,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ② 基础 ---------------------------- */
+                /* ---------------------------- ② Basics ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "basics"
@@ -389,7 +395,8 @@ Kirigami.Page {
                         QQC2.Button {
                             objectName: "wizardSuggestNameButton"
                             text: i18n("Suggest")
-                            // 名称为空时按镜像生成（见控制器里的说明），因此只要有镜像就能点
+                            // A name is derived from the image when empty (see the controller),
+                            // so this is enabled as soon as an image exists
                             enabled: page.controller.suggestedName().length > 0
                             onClicked: {
                                 const suggestion = page.controller.suggestedName();
@@ -409,8 +416,9 @@ Kirigami.Page {
                         valueRole: "name"
                         model: page.controller.availableNetworks
                         onActivated: page.controller.network = currentText
-                        // 下拉里显示的就是会提交的那个网络：不要出现"看着选了 A、实际提交空"。
-                        // 网络列表是异步到的，因此 count 变化时也要补一次（创建页面时它可能还是空的）
+                        // The dropdown shows exactly the network that will be submitted: never "A looks
+                        // selected but empty is submitted". The list arrives asynchronously, so sync on
+                        // count changes too (it may still be empty when the page is created)
                         onCountChanged: syncNetworkSelection()
                         onCurrentIndexChanged: syncNetworkSelection()
                         Component.onCompleted: syncNetworkSelection()
@@ -418,8 +426,8 @@ Kirigami.Page {
                             if (networkCombo.count === 0) {
                                 return;
                             }
-                            // 模型是异步到的：先把下标摆正（此时 currentText 可能还是空的），
-                            // 再据它回填控制器——否则会一直停在"看着选了、实际提交空"
+                            // The model arrives asynchronously: fix the index first (currentText may still
+                            // be empty), then backfill the controller — otherwise the mismatch persists
                             if (networkCombo.currentIndex < 0) {
                                 networkCombo.currentIndex = Math.max(0, networkCombo.indexOfValue(page.controller.network));
                             }
@@ -463,8 +471,8 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ④ 交互 ---------------------------- */
-                /* 从"基础"里拆出来（用户实测）：先确定挂载/环境，再决定跑什么命令与工作区 */
+                /* ---------------------------- ④ Interactive ---------------------------- */
+                /* Split out of "Basics" (user testing): mounts/environment come before command and workdir */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "interactive"
@@ -482,7 +490,8 @@ Kirigami.Page {
                         font.bold: true
                     }
 
-                    // 用户实测：默认参数下 alpine 的 /bin/sh 读到 EOF 就退出；-i -t 才是常见预期
+                    // User testing: with default arguments alpine's /bin/sh exits on EOF;
+                    // -i -t is what people expect
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
@@ -508,7 +517,8 @@ Kirigami.Page {
                     }
 
 
-                    // 命令历史（F3）：本地记录 + 已有容器的命令，挑一条直接填进下面的输入框
+                    // Command history (F3): local log plus commands from existing containers,
+                    // filled into the field below
                     Components.FilteredComboBox {
                         id: commandHistoryCombo
 
@@ -567,7 +577,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ⑤ 端口 ---------------------------- */
+                /* ---------------------------- ⑤ Ports ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "ports"
@@ -587,7 +597,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ------------------------ ③ 环境变量与标签 ------------------------ */
+                /* ------------------------ ③ Environment & labels ------------------------ */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "environment"
@@ -604,7 +614,8 @@ Kirigami.Page {
 
                         objectName: "wizardEnvironmentEditor"
                         Layout.fillWidth: true
-                        // 值默认按密码显示：环境变量里经常是密钥（四期 §40 的同一约定）
+                        // Values are masked by default: environment variables often hold secrets
+                        // (same rule as §40 of phase 4)
                         secretValues: true
                         envPasteEnabled: true
                         onChanged: page.controller.environmentRows = environmentEditor.entries()
@@ -625,7 +636,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ⑥ 挂载 ---------------------------- */
+                /* ---------------------------- ⑥ Mounts ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "mounts"
@@ -637,7 +648,8 @@ Kirigami.Page {
                         text: i18n("Mounts")
                     }
 
-                    // 预设改成**可搜索下拉**（用户实测：镜像/预设多时逐个点按钮太慢）
+                    // Presets became a **searchable dropdown** (user testing: clicking through
+                    // many of them was too slow)
                     Components.FilteredComboBox {
                         id: presetCombo
 
@@ -716,7 +728,8 @@ Kirigami.Page {
                         }
                     }
 
-                    // 手动输入：点一下加一行可编辑的挂载（与预设两条路都可用）
+                    // Manual entry: one click adds an editable mount row (both paths, presets and
+                    // manual entry, stay available)
                     QQC2.Button {
                         objectName: "wizardAddMount"
                         text: i18n("Add mount manually")
@@ -726,7 +739,7 @@ Kirigami.Page {
 
                 }
 
-                /* ---------------------------- ⑦ 资源 ---------------------------- */
+                /* ---------------------------- ⑦ Resources ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "resources"
@@ -774,7 +787,7 @@ Kirigami.Page {
                             from: 0
                             to: 64
                             stepSize: 1
-                            // 0 = 不限制；用 0.5 这样的值需要文本输入
+                            // 0 = no limit; fractional values such as 0.5 must be typed into the field
                             editable: true
                             value: Math.round(page.controller.cpus)
                             textFromValue: function (value) {
@@ -789,22 +802,23 @@ Kirigami.Page {
 
                         objectName: "wizardPrivilegedCheck"
                         /*
-                         * 这里**刻意不用 CheckBox 自己的勾选机制**（checkable: false）。
+                         * Deliberately **not** using CheckBox's own check mechanism (checkable: false).
                          *
-                         * 用户实测反馈 F4：确认通过后勾选框仍是空的。根因是 CheckBox 点击时会直接给
-                         * `checked` 赋值，这会破坏 `checked: …` 这条绑定，之后数据变了也不再同步。
-                         * 关掉 checkable 后，点击只是"切换意图"，勾选态完全由 `privilegedVisual`
-                         * （进而由控制器）决定，绑定永远不会被破坏。
+                         * User report F4: the box stayed empty after confirming. CheckBox assigns
+                         * `checked` directly on click, breaking the `checked: …` binding, so later data
+                         * changes never sync. With checkable off, a click only toggles intent and the
+                         * checked state comes from `privilegedVisual` (hence the controller), leaving
+                         * the binding intact.
                          */
                         checkable: false
                         checked: page.privilegedVisual
                         text: i18n("Run with extended privileges (--privileged)")
                         onClicked: {
                             if (page.controller.privileged) {
-                                // 已启用：直接关掉（可逆，不需要确认）
+                                // Already on: turn it off directly (reversible, no confirmation)
                                 page.controller.privileged = false;
                             } else {
-                                // 未启用：强确认（要把容器名原样输入一遍）
+                                // Off: strong confirmation (the container name must be typed out)
                                 privilegedDialog.open();
                             }
                         }
@@ -819,7 +833,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------------------- ⑧ 总览 ---------------------------- */
+                /* ---------------------------- ⑧ Summary ---------------------------- */
                 ColumnLayout {
                     Layout.fillWidth: true
                     visible: page.controller.stepKey === "summary"
@@ -868,8 +882,8 @@ Kirigami.Page {
         }
     }
 
-    /* 端口的行模型：QML 里改一行要回写整个列表（控制器持有状态），
-       因此用一个 ListModel 做"编辑缓冲"，字段改动立刻回写控制器。 */
+    /* Port row model: editing one row would rewrite the whole list (the controller owns state), so a
+       ListModel acts as an edit buffer and each field change is written straight back to the controller. */
     ListModel {
         id: portRowsModel
     }
@@ -886,7 +900,7 @@ Kirigami.Page {
         }
     }
 
-    /*! 把控制器的行数据同步进编辑缓冲（只在内容不同时重建，避免打断正在输入的行）。 */
+    /*! Sync controller rows into the buffer, rebuilding only on difference so typing is not disrupted. */
     function syncModels(): void {
         if (!rowsEqual(portRowsModel, page.controller.portRows)) {
             portRowsModel.clear();
@@ -912,7 +926,7 @@ Kirigami.Page {
         }
     }
 
-    /*! 编辑缓冲与控制器是否一致（不一致才重建，避免打断正在输入的那一行）。 */
+    /*! Whether buffer and controller agree (rebuild only when they differ, sparing the row being typed). */
     function rowsEqual(model, rows): bool {
         if (model.count !== rows.length) {
             return false;
@@ -941,7 +955,7 @@ Kirigami.Page {
         consequenceText: i18n("The container can access all devices and host files. Only continue if you trust the image. Type the container name to confirm.")
         acceptText: i18n("Yes, run privileged")
         destructive: true
-        // 强确认：把容器名原样输入一遍（用户确认过的方案；--privileged 不需要也不能靠 polkit 提权）
+        // Strong confirmation: type the container name (agreed design; --privileged cannot use polkit)
         requireText: page.controller.name
         onConfirmed: page.controller.privileged = true
     }

@@ -1,21 +1,24 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    存储占用可视化（ARCH_V3 §2.4 / ARCH_V3_pre §1.9）：
+    Storage usage visualization (ARCH_V3 §2.4 / ARCH_V3_pre §1.9):
 
-    横向堆叠条 + 图例。四段分别是 镜像 / 容器 / 数据卷 / 构建缓存，
-    使用同一色相的四级明度（属于中性数据展示，不是状态语义，因此
-    使用 ChartPalette 的专用色阶而不是 positive/negative 这类语义色）。
+    Horizontal stacked bar + legend. The four segments are images / containers / volumes /
+    build cache, using four brightness levels of one hue (neutral data display, not status
+    semantics, so this uses a dedicated ChartPalette scale rather than semantic colors such
+    as positive/negative).
 
-    设计要点：
+    Design points:
 
-    - **不伪装**：API 未提供的类别（值为负）既不画进条里，也不显示为 0，
-      图例里显示 “—”（沿用 ARCH_V2 §23 的约定：不可用 ≠ 0）。
-    - **不靠颜色区分**（§1.8）：段与段之间有背景色分隔线，图例提供
-      「色块 + 文字 + 数值」三重编码，整条还提供可访问名称。
-    - **不新增统计口径**：本组件只做可视化，数值全部来自 StorageStatus；
-      即使某些类别不可用导致各段之和小于 Total，也如实呈现，不做归一化。
+    - **No faking**: categories the API does not provide (negative value) are neither drawn
+      in the bar nor shown as 0; the legend shows "—" (following ARCH_V2 §23: unavailable ≠ 0).
+    - **Not distinguished by color alone** (§1.8): segments are separated by a
+      background-colored line, the legend provides "swatch + text + value" triple encoding,
+      and the whole bar has an accessible name.
+    - **No new accounting**: this component only visualizes; all values come from
+      StorageStatus. Even when unavailable categories make the segment sum smaller than
+      Total, it is shown as-is, without normalization.
 */
 
 import QtQuick
@@ -30,14 +33,15 @@ import "." as Local
 ColumnLayout {
     id: bar
 
-    /*! 数据源：Kontainer.StorageStatus（`controller.storage`）。 */
+    /*! Data source: Kontainer.StorageStatus (`controller.storage`). */
     required property var storage
 
     spacing: Kirigami.Units.smallSpacing
 
     /*!
-        全部类别（图例用）。构建缓存不存在时整行不出现——
-        这与「不可用显示 —」不同：前者是 API 没有这个字段，后者是有字段但取不到值。
+        All categories (for the legend). The whole build-cache row disappears when it does not
+        exist — unlike "unavailable shows —": the API has no such field, versus a field whose
+        value cannot be read.
     */
     readonly property var segments: {
         const list = [
@@ -71,13 +75,13 @@ ColumnLayout {
         return list;
     }
 
-    /*! 可以画进条里的类别：值必须有效（≥ 0）。 */
+    /*! Categories that can be drawn in the bar: value must be valid (≥ 0). */
     readonly property var drawableSegments: bar.segments.filter(segment => segment.value >= 0)
 
-    /*! 可绘制类别的合计，用作各段宽度基准。 */
+    /*! Total of the drawable categories, used as the width basis for each segment. */
     readonly property real drawableTotal: bar.drawableSegments.reduce((sum, segment) => sum + segment.value, 0)
 
-    /*! 是否有任何可绘制数据。 */
+    /*! Whether there is any drawable data. */
     readonly property bool hasDrawableData: bar.drawableTotal > 0
 
     function sizeText(bytes) {
@@ -85,7 +89,7 @@ ColumnLayout {
         return text.length > 0 ? text : i18n("—");
     }
 
-    /*! 可访问名称：把各段一次性读出来，不依赖颜色（§1.8）。 */
+    /*! Accessible name: reads all segments at once, not relying on color (§1.8). */
     function accessibleSummary(): string {
         const parts = [];
         for (const segment of bar.segments) {
@@ -95,7 +99,7 @@ ColumnLayout {
     }
 
     /* ------------------------------------------------------------------ */
-    /* 堆叠条                                                              */
+    /* Stacked bar                                                         */
     /* ------------------------------------------------------------------ */
     Rectangle {
         id: track
@@ -108,7 +112,7 @@ ColumnLayout {
         border.color: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.15)
         clip: true
 
-        // 数据不可用时条是空的：此时给出文字说明，而不是一个看不懂的空槽
+        // The bar is empty while data is unavailable: explain it in words, not with an unreadable empty slot
         visible: bar.hasDrawableData
 
         Accessible.role: Accessible.Indicator
@@ -117,8 +121,9 @@ ColumnLayout {
         Row {
             anchors.fill: parent
 
-            /* model 用长度而不是 JS 数组：数组每次刷新都会重新求值，
-               直接当 model 会导致条目被销毁重建（见 MainPage 里同样的说明）。 */
+            /* model takes a length rather than a JS array: an array is re-evaluated on every
+               refresh, and using it directly as model destroys and recreates the entries
+               (see the same note in MainPage). */
             Repeater {
                 model: bar.drawableSegments.length
 
@@ -131,7 +136,7 @@ ColumnLayout {
                     height: track.height
                     color: segment.color
 
-                    // 相邻段的明度差只有约 1.2:1，必须有分隔线才能稳定区分（§1.8）
+                    // Adjacent segments differ by only ~1.2:1 in brightness, so a separator is needed (§1.8)
                     Rectangle {
                         visible: index > 0
                         width: 1
@@ -153,7 +158,7 @@ ColumnLayout {
     }
 
     /* ------------------------------------------------------------------ */
-    /* 图例：色块 + 名称 + 数值（三重编码，§1.8）                            */
+    /* Legend: swatch + name + value (triple encoding, §1.8)              */
     /* ------------------------------------------------------------------ */
     ColumnLayout {
         Layout.fillWidth: true

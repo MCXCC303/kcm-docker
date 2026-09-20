@@ -1,16 +1,20 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    「键 = 值」只读列表（ARCH_V3 §2.1）：
+    Read-only "key = value" list (ARCH_V3 §2.1):
 
-    渲染 DetailListModel（环境变量 / 标签 / 驱动选项 …）的 label + value 两列。
+    Renders the label + value columns of a DetailListModel (environment variables /
+    labels / driver options …).
 
-    实测反馈：「驱动选项」里选项名（`com.docker.network.bridge.name` 这种很长）**全被挡住**——
-    原来给键列固定了 10 个 gridUnit 宽，长键被省略号吃掉。现在反过来：
-    **键占剩余宽度**（真的放不下才省略），**值贴右对齐**（值通常很短）。
+    Measured feedback: in "driver options", long names such as
+    `com.docker.network.bridge.name` were **cut off everywhere** — the key column had a
+    fixed 10 gridUnit width, so the ellipsis ate long keys. Inverted now: the **key takes
+    the remaining width** (elided only when it truly does not fit) and the **value is
+    right-aligned** (values are usually short).
 
-    调用方负责把它放进 Kirigami.FormLayout 之外的容器（例如 CollapsibleSection）。
+    The caller puts it into a container other than Kirigami.FormLayout (e.g.
+    CollapsibleSection).
 */
 
 import QtQuick
@@ -25,9 +29,10 @@ ColumnLayout {
     required property var model
 
     /*!
-     * 值列的宽度上限（占整行比例）。
+     * Upper bound for the value column width (share of the whole row).
      *
-     * 值通常很短（`true` / `172.18.0.0/16`），给个上限是为了让长值也不会把键挤没。
+     * Values are usually short (`true` / `172.18.0.0/16`); the cap keeps a long value from
+     * squeezing the key away.
      */
     property real valueWidthRatio: 0.45
 
@@ -43,7 +48,7 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
-            // 键：占据剩余宽度（长键只有在真的放不下时才省略）
+            // Key: takes the remaining width (long keys are elided only when they truly do not fit)
             QQC2.Label {
                 objectName: "keyValueListKey"
                 text: label
@@ -51,7 +56,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
             }
-            // 值：贴右对齐，长度有上限，过长时中间省略
+            // Value: right-aligned, width capped, elided in the middle when too long
             QQC2.Label {
                 objectName: "keyValueListValue"
                 text: value

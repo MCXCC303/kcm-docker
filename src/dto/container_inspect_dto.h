@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,10 +20,10 @@
 namespace Kontainer
 {
 
-/*! inspect → Mounts[]。 */
+/*! inspect → Mounts[]. */
 struct DockerMountDTO {
     QString type;
-    /*! 命名卷名（Mounts[].Name）；bind 与匿名卷为空。 */
+    /*! Named volume name (Mounts[].Name); empty for bind and anonymous volumes. */
     QString name;
     QString source;
     QString destination;
@@ -32,10 +32,10 @@ struct DockerMountDTO {
 };
 
 /*!
- * `GET /containers/{id}/json` 的 DTO（ARCH_V2 §26：DTO 镜像 API schema）。
+ * DTO for `GET /containers/{id}/json` (ARCH_V2 §26: a DTO mirrors the API schema).
  *
- * 只提取界面需要的字段；时间保持 Docker 返回的原始 ISO 字符串，
- * 在映射到 domain 时统一解析（含纳秒精度的兼容处理）。
+ * Only fields the UI needs; timestamps stay the raw ISO strings Docker returns and are parsed
+ * once when mapping to domain (including nanosecond-precision handling).
  */
 struct DockerContainerInspectDTO {
     QString id;
@@ -62,18 +62,18 @@ struct DockerContainerInspectDTO {
     QStringList environment;
     QStringList command;
     QStringList entrypoint;
-    QStringList labels; /*!< 原始 "key=value" */
+    QStringList labels; /*!< raw "key=value" */
     QString workingDirectory;
     QString user;
     QString hostname;
-    /*! `Config.Tty`：日志流按它分支（TTY = 原始字节，非 TTY = stdcopy 帧）。 */
+    /*! `Config.Tty`: picks the log stream format (TTY = raw bytes, non-TTY = stdcopy frames). */
     bool tty = false;
     QString restartPolicy;
 
     QDateTime created;
 
     QList<DockerPortDTO> ports;
-    /*! `HostConfig.PortBindings`：容器**声明**的宿主绑定（与"实际发布"的 `ports` 分开）。 */
+    /*! `HostConfig.PortBindings`: bindings the container **declares** (vs the published `ports`). */
     QList<DockerDeclaredPortDTO> declaredPorts;
     QList<ContainerNetworkDTO> networks;
     QList<DockerMountDTO> mounts;
@@ -82,7 +82,7 @@ struct DockerContainerInspectDTO {
     static std::optional<DockerContainerInspectDTO> fromPayload(const QByteArray &payload, QString *error = nullptr);
 };
 
-/*! DTO → domain（§26：方向 dto → domain）。 */
+/*! DTO → domain (§26: the direction is dto → domain). */
 ContainerDetail containerDetailFromDto(const DockerContainerInspectDTO &dto);
 
 } // namespace Kontainer

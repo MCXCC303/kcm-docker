@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -59,7 +59,7 @@ ContainerDetailController::ContainerDetailController(DockerBackendInterface *bac
         });
     }
 
-    // 静态信息低频复核（§28）：动态数据由 metrics 负责
+    // Low-frequency re-check of static info (§28): dynamic data belongs to metrics
     m_reinspectTimer->setInterval(
         int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kDetailRefreshInterval).count()));
     connect(m_reinspectTimer, &QTimer::timeout, this, [this] {
@@ -78,7 +78,7 @@ ContainerDetailController::~ContainerDetailController() = default;
 void ContainerDetailController::setContainerId(const QString &id)
 {
     if (m_containerId != id) {
-        // 换容器：旧容器可能还挂着日志流
+        // Switching containers: the old one may still hold a log stream
         m_logs->disconnect();
     }
     if (m_containerId == id) {
@@ -142,9 +142,9 @@ void ContainerDetailController::stop()
 {
     m_started = false;
     m_reinspectTimer->stop();
-    // 离开页面：停止 stats 采样并释放历史（§27）
+    // Leaving the page: stop stats sampling and drop history (§27)
     m_metrics->stop();
-    // 日志是长连接：离开页面必须断开，否则会一直挂着（§3.1.4）
+    // Logs are a long-lived stream: leaving the page must disconnect, or it stays open (§3.1.4)
     m_logs->disconnect();
 }
 
@@ -192,14 +192,14 @@ void ContainerDetailController::onDetailUpdated()
 {
     const ContainerDetail detail = m_backend->containerDetail();
     if (detail.id != m_containerId) {
-        return; // 不是当前页面关心的容器
+        return; // Not the container this page cares about
     }
 
     m_detail = detail;
     rebuildLists();
     setLoadState(QStringLiteral("ready"));
 
-    // 只有运行中/暂停的容器才有资源数据（§17）；已停止容器不轮询 stats
+    // Only running/paused containers have resource data (§17); stopped ones are not polled for stats
     if (running()) {
         m_metrics->start(m_containerId);
     } else {
@@ -226,7 +226,7 @@ void ContainerDetailController::onSectionFailed(Section section, const DockerErr
         return;
     }
     if (section == Section::ContainerDetail) {
-        // 详情失败不影响列表页（§31）
+        // A detail failure must not affect the list page (§31)
         setLoadState(QStringLiteral("error"), dockerErrorText(error));
         return;
     }
@@ -243,7 +243,7 @@ void ContainerDetailController::rebuildLists()
     QList<DetailEntry> networks;
     networks.reserve(m_detail.networks.size());
     for (const ContainerNetwork &network : m_detail.networks) {
-        // label=网络名 value=IPv4 detail=MAC，其余（IPv6/网关）作为附加条目展开
+        // label=network name, value=IPv4, detail=MAC; IPv6/gateway become extra entries
         networks.append({network.name, network.ipAddress, network.macAddress, QStringLiteral("network"), QString(), QString()});
         if (!network.ipv6Address.isEmpty()) {
             networks.append({i18n("IPv6"), network.ipv6Address, network.name, QStringLiteral("network-ipv6"), QString(), QString()});
@@ -278,13 +278,13 @@ void ContainerDetailController::rebuildLists()
 
 namespace
 {
-/*! 通配地址（IPv4 的 0.0.0.0 / IPv6 的 :: 或 [::]）。 */
+/*! Wildcard address (IPv4 0.0.0.0 / IPv6 :: or [::]). */
 bool isWildcardAddress(const QString &hostIp)
 {
     return hostIp.isEmpty() || hostIp == QLatin1String("0.0.0.0") || hostIp == QLatin1String("::") || hostIp == QLatin1String("[::]");
 }
 
-/*! 通配地址属于哪一族：4 / 6（非通配返回 0）。 */
+/*! Which family a wildcard address belongs to: 4 / 6 (0 when not a wildcard). */
 int wildcardFamily(const QString &hostIp)
 {
     if (hostIp.isEmpty() || hostIp == QLatin1String("0.0.0.0")) {
@@ -309,9 +309,9 @@ void ContainerDetailController::rebuildPorts()
         entry.hostPort = port.publicPort;
         if (entry.isPublished()) {
             /*
-             * IPv4/IPv6 通配合并（实测需求）：没指定宿主地址时 Docker 会同时建
-             * `0.0.0.0:<port>` 与 `[::]:<port>` 两条，画成两个节点会被误读成"映射了两份"。
-             * 同一个容器端口 + 同一个宿主端口 + 分别是两种通配 → 合成一条并标记 dualStack。
+             * Merge IPv4/IPv6 wildcards (user-requested): with no host address given, Docker creates both
+             * `0.0.0.0:<port>` and `[::]:<port>`, and two nodes read as "mapped twice". Same container
+             * port + same host port + one wildcard of each family -> merge into one row marked dualStack.
              */
             bool merged = false;
             for (PortMappingEntry &existing : published) {
@@ -332,7 +332,7 @@ void ContainerDetailController::rebuildPorts()
         }
     }
 
-    // 排序稳定：拓扑图的连线按行绘制，顺序抖动会让图形每次刷新都在跳
+    // Stable order: the topology draws its links per row, so jitter shakes the whole graph each refresh
     const auto byContainerPort = [](const PortMappingEntry &lhs, const PortMappingEntry &rhs) {
         if (lhs.containerPort != rhs.containerPort) {
             return lhs.containerPort < rhs.containerPort;
@@ -364,7 +364,7 @@ QList<MountEntry> ContainerDetailController::mountEntries() const
         if (mount.type == QLatin1String("tmpfs") || mount.source.isEmpty()) {
             entry.sourceStateKey = QStringLiteral("notApplicable");
         } else if (!m_hostPaths) {
-            // 没有注入探测服务（例如某些测试）：不谎报「存在」，也不提供打开动作
+            // No probe service injected (some tests): do not claim it exists, and offer no open action
             entry.sourceStateKey = QStringLiteral("notApplicable");
         } else {
             switch (m_hostPaths->probe(mount.source)) {
@@ -394,7 +394,7 @@ void ContainerDetailController::openMountHostPath(int row)
     }
     const MountEntry &mount = m_mounts->mounts().at(row);
     if (!mount.isOpenable()) {
-        // 按钮本不该出现；真被调用时给出原因，而不是静默什么都不做
+        // The button should never appear; if called anyway, give the reason instead of doing nothing
         setMountActionError(i18n("This mount has no host directory to open."));
         return;
     }
@@ -403,7 +403,7 @@ void ContainerDetailController::openMountHostPath(int row)
         return;
     }
     setMountActionError(QString());
-    // 路径本身不进日志（ARCH_V2 §40）；结果经 openFinished 回来
+    // The path itself never enters the log (ARCH_V2 §40); the result comes back via openFinished
     m_hostPaths->openDirectory(mount.source);
 }
 

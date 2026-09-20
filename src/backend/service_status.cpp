@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -115,14 +115,14 @@ void SystemdServiceStatus::query()
         state.unit = unit;
 
         if (!bus.isConnected() || !manager.isValid()) {
-            // systemd 不在（容器里、非 systemd 发行版）：如实给 unknown，界面据此不显示误导性的状态
+            // no systemd (container, non-systemd distro): report unknown so the UI shows no misleading state
             result.append(state);
             continue;
         }
 
-        // Unit 的 D-Bus 路径由 systemd 自己转义（`docker.service` → `docker_2eservice`：
-        // 非字母数字的字符转成 `_` + 两位十六进制）。这里只处理我们白名单里的名字，
-        // 因此按同一规则逐字符转义即可（不追求覆盖任意 unit 名）。
+        // systemd escapes the unit's D-Bus path itself (`docker.service` -> `docker_2eservice`:
+        // non-alphanumerics become `_` + two hex digits). We only handle whitelisted names, so
+        // escaping character by character with the same rule suffices (arbitrary names not needed).
         QString escaped;
         for (const QChar &character : std::as_const(unit)) {
             if (character.isLetterOrNumber()) {
@@ -145,7 +145,7 @@ void SystemdServiceStatus::query()
     }
 
     if (result == m_services) {
-        return; // 状态没变：不发信号（避免无意义的重绘）
+        return; // unchanged: skip the signal (avoids pointless repaints)
     }
     m_services = result;
     Q_EMIT servicesChanged();

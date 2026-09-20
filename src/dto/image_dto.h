@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,10 +18,11 @@ namespace Kontainer
 {
 
 /*!
- * `GET /images/json` 的单条记录（ARCH_V1 §40）。
+ * One record of `GET /images/json` (ARCH_V1 §40).
  *
- * RepoTags / RepoDigests 可能为 null（中间层镜像），Size 在新旧引擎上可能是
- * 数字或字符串，Containers 为 -1 表示没有容器使用该镜像 —— 全部按可选字段处理。
+ * RepoTags / RepoDigests may be null (intermediate layers), Size may be a number or a string
+ * depending on the engine, and Containers = -1 means no container uses the image — so all of them
+ * are treated as optional fields.
  */
 struct DockerImageDTO {
     QString id;
@@ -35,7 +36,7 @@ struct DockerImageDTO {
     static QList<DockerImageDTO> listFromJson(const QByteArray &payload, QString *error = nullptr, int *skipped = nullptr);
 };
 
-/*! DTO → domain object（方向：dto → domain）。 */
+/*! DTO → domain object (direction: dto → domain). */
 Image imageFromDto(const DockerImageDTO &dto);
 QList<Image> imagesFromDto(const QList<DockerImageDTO> &dtos);
 

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -40,8 +40,8 @@ DockerImagePullLineDTO DockerImagePullLineDTO::fromJson(const QJsonObject &objec
 
 ImagePullProgress::Phase DockerImagePullLineDTO::phaseForStatus(const QString &status)
 {
-    // 引擎的措辞（"Downloading"、"Extracting"、"Verifying Checksum"…）是稳定的，
-    // 但这里只用来选阶段；真正显示给用户的是引擎原文（按数据处理）。
+    // The engine wording ("Downloading", "Extracting", "Verifying Checksum"…) is stable, but it
+    // only picks the phase here; the UI shows the engine's own text (treated as data).
     if (status.contains(QLatin1String("Downloading"), Qt::CaseInsensitive)) {
         return ImagePullProgress::Phase::Downloading;
     }

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -51,7 +51,7 @@ DaemonConfigDocument DaemonConfigDocument::fromFile(const QString &path)
 
     QFile file(path);
     if (!file.exists()) {
-        // 不存在不算错误：Docker 允许没有配置文件
+        // Missing file is not an error: Docker allows having no config file
         document.m_valid = true;
         return document;
     }
@@ -149,11 +149,11 @@ QStringList DaemonConfigDocument::unmanagedKeys() const
 QByteArray DaemonConfigDocument::merged(const DaemonConfigEdits &edits) const
 {
     if (!m_valid) {
-        // 看不懂的文件绝不覆写（ARCH_V5_V8 §2.3 约束 2）
+        // Never overwrite a file we cannot parse (ARCH_V5_V8 §2.3 constraint 2)
         return {};
     }
 
-    QJsonObject root = m_root; // 未知键原样保留
+    QJsonObject root = m_root; // unknown keys preserved verbatim
     if (edits.setRegistryMirrors) {
         if (edits.registryMirrors.isEmpty()) {
             root.remove(QLatin1String(kRegistryMirrors));
@@ -218,7 +218,7 @@ QString DaemonConfigWriter::writeAtomically(const QString &path, const QByteArra
         return QStringLiteral("refusing to write empty content");
     }
 
-    // 写前备份：任何一次保存都必须留下可回退的上一版
+    // Back up before writing: every save must leave a revertible previous version
     if (QFile::exists(path)) {
         const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss"));
         const QString backup = path + backupPrefix() + stamp;
@@ -230,8 +230,8 @@ QString DaemonConfigWriter::writeAtomically(const QString &path, const QByteArra
         }
     }
 
-    // 原子写入：QSaveFile 写临时文件 + rename，失败时原文件保持不变
-    // 目录不存在时先建出来：新装的 rootless daemon 往往还没有 ~/.config/docker/
+    // Atomic write: QSaveFile writes a temp file + rename; the original survives a failure
+    // Create the directory first: a freshly installed rootless daemon often lacks ~/.config/docker/
     const QString parentDir = QFileInfo(path).absolutePath();
     if (!parentDir.isEmpty() && !QDir().mkpath(parentDir)) {
         return QStringLiteral("cannot create directory %1").arg(parentDir);
@@ -274,7 +274,7 @@ QByteArray DaemonConfigWriter::readBackup(const QString &backupPath)
     }
     const QByteArray content = file.readAll();
     file.close();
-    // 恢复前也校验一次：坏备份不能覆盖好配置
+    // Validate before restoring too: a bad backup must not overwrite a good config
     QJsonParseError parseError;
     const QJsonDocument parsed = QJsonDocument::fromJson(content, &parseError);
     if (parseError.error != QJsonParseError::NoError || !parsed.isObject()) {

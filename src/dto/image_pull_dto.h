@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,9 +14,9 @@ namespace Kontainer
 {
 
 /*!
- * 镜像拉取流的一行（`POST /images/create` 的响应是逐行 JSON）。
+ * One line of the image pull stream (`POST /images/create` answers with JSON lines).
  *
- * 只做字段提取与引擎状态文本 → Phase 的映射，不做聚合（聚合在 backend）。
+ * Only field extraction and engine status text → Phase mapping; aggregation lives in the backend.
  */
 struct DockerImagePullLineDTO {
     QString id;
@@ -28,16 +28,16 @@ struct DockerImagePullLineDTO {
     QString errorDetail;
 
     static DockerImagePullLineDTO fromJson(const QJsonObject &object);
-    /*! 引擎状态文本 → 阶段；识别不了时返回 Waiting。 */
+    /*! Engine status text → phase; Waiting when unrecognized. */
     static ImagePullProgress::Phase phaseForStatus(const QString &status);
-    /*! 该行是否表示这一层已经完成（下载完 / 已存在 / 拉取完）。 */
+    /*! Whether this line marks the layer as finished (downloaded / already exists / pulled). */
     bool layerFinished() const;
     /*!
-     * 该行是否是「层」级进度。
+     * Whether this line reports layer-level progress.
      *
-     * "Pulling from library/alpine" 这类行也带 id（id 是 tag，不是层），
-     * 如果把它算成一层，进度分母会凭空多一层。只有下载 / 解压 / 校验 / 等待
-     * 这类状态才属于层。
+     * Lines like "Pulling from library/alpine" also carry an id (the tag, not a layer); counting
+     * them as a layer inflates the progress denominator. Only download / extract / verify /
+     * waiting style statuses belong to a layer.
      */
     bool isLayerStatus() const;
 };

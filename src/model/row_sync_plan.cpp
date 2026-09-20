@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,7 +13,7 @@ QList<RowOperation> planRowSync(const QStringList &currentKeys, const QStringLis
     QList<RowOperation> plan;
     QStringList working = currentKeys;
 
-    // ① 删除：从后往前，前面的删除才不会让后面的索引失效
+    // ① removals: back to front, so earlier removals do not invalidate later indices
     for (int row = working.size() - 1; row >= 0; --row) {
         if (!incomingKeys.contains(working.at(row))) {
             plan.append({RowOperation::Kind::Remove, row, -1});
@@ -21,7 +21,7 @@ QList<RowOperation> planRowSync(const QStringList &currentKeys, const QStringLis
         }
     }
 
-    // ② 逐个就位：目标序列里第 index 个键，最终必须落在 index 这一行
+    // ② place each key: the key at `index` in the target sequence must end up in row `index`
     for (int index = 0; index < incomingKeys.size(); ++index) {
         const QString &key = incomingKeys.at(index);
         const int current = int(working.indexOf(key));

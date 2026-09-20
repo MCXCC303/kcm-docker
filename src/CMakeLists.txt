@@ -1,8 +1,9 @@
-# 提权与凭据：core 直接用到 KAuth 客户端 API 与 KWallet（helper 只在授权后以 root 执行）
+# Privileges/credentials: core uses the KAuth client API and KWallet (helper runs as root after auth)
 find_package(KF6 6.5 REQUIRED COMPONENTS Auth Wallet Config Archive)
 
-# --- 核心库 -------------------------------------------------------------------
-# backend + model：与 KCM 插件、单元测试共同链接，保证分层可测试（ARCH_V1 §28/§30/§35）
+# --- Core library ------------------------------------------------------------
+# backend + model: linked by the KCM plugin and the unit tests, keeping the
+# layers testable (ARCH_V1 §28/§30/§35)
 add_library(kcm_docker_core STATIC
     i18n.cpp
     logging.cpp
@@ -206,16 +207,16 @@ target_link_libraries(kcm_docker_core
         Qt6::Gui
         Qt6::Network
         Qt6::Qml
-        # 受限提权客户端：只有 KAuth/DBus 的**客户端** API，执行时才会发起授权
+        # Restricted privilege client: only the KAuth/DBus **client** API; authorization happens on call
         Qt6::DBus
         KF6::AuthCore
-        # 凭据存储：KWallet 是唯一持久化位置（ARCH_V5_V8 §2.6）
+        # Credential storage: KWallet is the only persistent location (ARCH_V5_V8 §2.6)
         KF6::Wallet
-        # 挂载预设持久化（~/.config/kcm_dockerrc，§4.1）
+        # Mount preset persistence (~/.config/kcm_dockerrc, §4.1)
         KF6::ConfigCore
-        # 构建上下文打包（八期 §5.2）
+        # Build context packaging (phase 8 §5.2)
         KF6::Archive
-        # 目录选择：QFileDialog（原生对话框由平台提供）
+        # Directory picking: QFileDialog (native dialog comes from the platform)
         Qt6::Widgets
         KF6::CoreAddons
         KF6::I18n
@@ -223,13 +224,13 @@ target_link_libraries(kcm_docker_core
 
 target_compile_definitions(kcm_docker_core PUBLIC KCM_DOCKER_VERSION="${PROJECT_VERSION}")
 
-# 插件是 MODULE 库，静态库必须是 PIC
+# The plugin is a MODULE library, so the static lib must be PIC
 set_target_properties(kcm_docker_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# --- KCM 插件 -----------------------------------------------------------------
-# 生成 kcm_docker.so，安装到 ${KDE_INSTALL_PLUGINDIR}/plasma/kcms/systemsettings/
-# （kcmshell6 / systemsettings 只在这个命名空间下查找 KCM，
-#  插件内嵌的 kcm_docker.json 提供模块元数据）
+# --- KCM plugin --------------------------------------------------------------
+# Builds kcm_docker.so into ${KDE_INSTALL_PLUGINDIR}/plasma/kcms/systemsettings/
+# (kcmshell6 / systemsettings only look for KCMs under that namespace; the
+#  plugin's embedded kcm_docker.json carries the module metadata)
 set(CMAKE_AUTOMOC_MACRO_NAMES
     ${CMAKE_AUTOMOC_MACRO_NAMES}
     K_PLUGIN_FACTORY_WITH_JSON
@@ -242,8 +243,10 @@ kcoreaddons_add_plugin(kcm_docker
         kcm/docker_kcm.cpp
         kcm/docker_kcm.h
         kcm/kcm_docker.json
-        # KIO 实现只进插件（不进 core）：单元测试不应该因为链接 KIO 而需要桌面服务。
-        # 「打开宿主目录」是四期唯一的外部动作，且被限制在这一个文件里（§2.1.1）。
+        # The KIO implementation goes into the plugin only, never into core:
+        # unit tests must not need desktop services just because of KIO.
+        # "Open host directory" is the only external action of phase 4 and is
+        # confined to this one file (§2.1.1).
         backend/kio_host_path_service.cpp
         backend/kio_host_path_service.h
 )
@@ -259,12 +262,12 @@ target_link_libraries(kcm_docker PRIVATE
     KF6::KIOGui
 )
 
-# --- QML 界面 -----------------------------------------------------------------
-# 打进插件自己的 qrc，资源路径必须是 :/kcm/<插件id>/main.qml
-# （KQuickConfigModule::mainUi() 就从这个位置加载界面）
+# --- QML UI ------------------------------------------------------------------
+# Compiled into the plugin's own qrc; the resource path must be
+# :/kcm/<plugin id>/main.qml (KQuickConfigModule::mainUi() loads the UI there).
 #
-# 文件清单定义在顶层 CMakeLists.txt（KCM_DOCKER_QML_FILES），
-# 与 tests/ui/tst_qml_resource.cpp 共用，避免两处清单不一致。
+# The file list lives in the top-level CMakeLists.txt (KCM_DOCKER_QML_FILES) and
+# is shared with tests/ui/tst_qml_resource.cpp so the two cannot diverge.
 qt_add_resources(kcm_docker "kcm_docker_qml"
     PREFIX "/kcm/kcm_docker"
     BASE "${KCM_DOCKER_QML_BASE_DIR}"
@@ -272,10 +275,10 @@ qt_add_resources(kcm_docker "kcm_docker_qml"
         ${KCM_DOCKER_QML_FILES}
 )
 
-# --- 受限提权 helper（ARCH_V5_V8 §2.4） ----------------------------------------
-# 只有这一个可执行文件以 root 运行；它的能力被 PrivilegedConfigRequest 限制在
-# 白名单键 + 固定路径 + 固定单元。校验逻辑与 core 共用，因此可以在无 root 的
-# 单元测试里验证"越权请求会被拒绝"。
+# --- Restricted privilege helper (ARCH_V5_V8 §2.4) ---------------------------
+# The only executable that runs as root; PrivilegedConfigRequest limits it to
+# whitelisted keys + fixed paths + fixed units. The validation logic is shared
+# with core, so "an out-of-scope request is rejected" is testable without root.
 add_executable(kcm_docker_helper kauth/kcm_docker_helper.cpp)
 target_link_libraries(kcm_docker_helper PRIVATE
     kcm_docker_core
@@ -284,42 +287,46 @@ target_link_libraries(kcm_docker_helper PRIVATE
     KF6::AuthCore
 )
 
-# 提权组件的系统集成：polkit 策略、helper 的 D-Bus 服务文件、D-Bus 系统策略。
+# System integration of the privileged pieces: polkit policy, the helper's D-Bus
+# service file, D-Bus system policy.
 #
-# 关于 polkit 策略的来源（ARCH_V5_V8 附录 C）：**源头是 .actions（INI）**，
-# .policy（XML）是构建产物，由 KAuth 自带的 kauth-policy-gen 生成。
-# 把 XML 直接交给 kauth_install_actions() 不会报错，而是生成一个"有文件、没有动作"
-# 的空策略——打包出来的系统上授权永远失败（真实踩过，别改回去）。
+# Where the polkit policy comes from (ARCH_V5_V8 appendix C): **the source is
+# .actions (INI)**, the .policy (XML) is a build product made by KAuth's
+# kauth-policy-gen. Handing XML to kauth_install_actions() does not fail; it
+# produces a policy file with no actions, so authorization always fails on the
+# packaged system (really happened, do not revert).
 set(KCM_DOCKER_ACTIONS_FILE "${CMAKE_CURRENT_SOURCE_DIR}/kauth/org.kde.kcm.docker.actions")
 set(KCM_DOCKER_POLICY_FILE "${CMAKE_CURRENT_BINARY_DIR}/org.kde.kcm.docker.policy")
 
-# 注意：KAuth 的标准宏把文件装到**系统绝对路径**（/usr/lib/kf6/kauth、
-# /usr/share/polkit-1/actions、/usr/share/dbus-1/...）——那是给发行版打包用的，需要 root。
-# 开发者常用的前缀安装（cmake --install 装到 ~/kde/usr）如果也走这些规则，
-# 就会在普通用户下直接失败（真实踩过）。因此拆成两条路：
+# Note: KAuth's standard macros install to **absolute system paths**
+# (/usr/lib/kf6/kauth, /usr/share/polkit-1/actions, /usr/share/dbus-1/...) — that
+# is for distribution packaging and needs root. Developer prefix installs
+# (cmake --install into ~/kde/usr) would fail outright as a normal user (really
+# happened). Hence two paths:
 #
-#   - 默认：只把 helper 二进制装进前缀，另外**生成**策略；系统部分由一个显式脚本完成（需要 sudo）
-#   - 打包/系统安装：-DKCM_DOCKER_INSTALL_PRIVILEGED_HELPER=ON，走 KAuth 标准宏（含 D-Bus 策略）
+#   - default: install only the helper binary into the prefix and **generate** the policy;
+#              an explicit script does the system part (needs sudo)
+#   - packaging/system install: -DKCM_DOCKER_INSTALL_PRIVILEGED_HELPER=ON uses the KAuth macros
 option(KCM_DOCKER_INSTALL_PRIVILEGED_HELPER
        "Install the polkit policy and the helper D-Bus service into system paths (requires root)" OFF)
 
 if(KCM_DOCKER_INSTALL_PRIVILEGED_HELPER)
-    # helper 必须装到 KAUTH_HELPER_INSTALL_DIR：D-Bus 激活文件里的 Exec 就是
-    # <KAUTH_HELPER_INSTALL_DIR>/kcm_docker_helper，装到别处（例如 /usr/bin）时
-    # 包里其它文件都对，但一提权就报"找不到 helper"（KAuth 官方宏的注释里也明确要求这一点；
-    # 我们的 PKGBUILD 会在打包时自检这四个文件是否齐全）。
+    # The helper must land in KAUTH_HELPER_INSTALL_DIR: the D-Bus activation file's
+    # Exec is <KAUTH_HELPER_INSTALL_DIR>/kcm_docker_helper, so anywhere else
+    # (e.g. /usr/bin) gives a package that looks fine yet reports "helper not
+    # found" on every escalation (KAuth requires this; PKGBUILD checks all four).
     install(TARGETS kcm_docker_helper RUNTIME DESTINATION ${KAUTH_HELPER_INSTALL_DIR})
 
-    # 官方宏：生成并安装 <helper_id>.conf（D-Bus 系统策略：放行 root own 该名字）、
-    # <helper_id>.service（D-Bus 激活）、以及由 .actions 生成的 polkit .policy
+    # Official macros: generate/install <helper_id>.conf (D-Bus policy allowing root to own
+    # the name), <helper_id>.service (activation), and the polkit .policy from .actions
     kauth_install_helper_files(kcm_docker_helper org.kde.kcm.docker root)
     kauth_install_actions(org.kde.kcm.docker "${KCM_DOCKER_ACTIONS_FILE}")
 else()
-    # 开发前缀安装：helper 进 bin（install-privileged-helper.sh 从 build/bin 取它）。
+    # Dev prefix install: helper goes into bin (install-privileged-helper.sh takes it from build/bin).
     install(TARGETS kcm_docker_helper ${KDE_INSTALL_TARGETS_DEFAULT_ARGS})
 
-    # 同一套官方工具与输入格式，只是不往系统路径装（由 install-privileged-helper.sh 提权安装）。
-    # 少了这一步，下面的脚本就没有策略文件可装——所以生成目标是 ALL。
+    # Same official tool and input format, just not into system paths (the install
+    # script does that as root); without it the script has no policy — hence ALL.
     add_custom_command(OUTPUT "${KCM_DOCKER_POLICY_FILE}"
                        COMMAND KF6::kauth-policy-gen "${KCM_DOCKER_ACTIONS_FILE}" "${KCM_DOCKER_POLICY_FILE}"
                        MAIN_DEPENDENCY "${KCM_DOCKER_ACTIONS_FILE}"
@@ -329,19 +336,20 @@ else()
                    "run the generated install-privileged-helper.sh with sudo (see README)")
 endif()
 
-# 显式的一步提权安装脚本：路径与官方宏使用的系统路径一致，用 sudo 执行即可。
-# 四个文件缺一不可（ARCH_V5_V8 附录 C）：
-#   helper 二进制、polkit 策略、D-Bus 服务文件（激活）、D-Bus 系统策略（own 总线名）
+# Explicit one-step privileged install script, same system paths as the official
+# macros, run with sudo. All four files are required (ARCH_V5_V8 appendix C):
+# helper binary, polkit policy, D-Bus service file (activation), D-Bus system policy (own bus name).
 set(KCM_DOCKER_PRIVILEGED_INSTALL_SCRIPT "${CMAKE_BINARY_DIR}/install-privileged-helper.sh")
-# 安装/卸载脚本由 CMake 生成：四个文件的路径只有一份定义，避免 README 里再抄一遍
+# CMake generates install/uninstall: the four paths are defined once, not copied into the README
 file(WRITE "${KCM_DOCKER_PRIVILEGED_INSTALL_SCRIPT}"
 "#!/bin/sh\n"
-"# 由 CMake 生成（见 src/CMakeLists.txt）：把受限 helper 及其系统集成文件\n"
-"# 安装到系统路径，或用 uninstall 参数把它们删干净。四个文件缺一不可：\n"
-"#   helper 二进制、polkit 策略、D-Bus 服务文件（激活）、D-Bus 系统策略（own 总线名）\n"
-"# 用法：\n"
-"#   install-privileged-helper.sh            安装（需要 root）\n"
-"#   install-privileged-helper.sh uninstall  卸载（需要 root）\n"
+"# Generated by CMake (see src/CMakeLists.txt): install the restricted helper and\n"
+"# its system integration files, or remove them all with the uninstall argument.\n"
+"# All four files are required: helper binary, polkit policy, D-Bus service file\n"
+"# (activation), D-Bus system policy (own the bus name).\n"
+"# Usage:\n"
+"#   install-privileged-helper.sh            install (needs root)\n"
+"#   install-privileged-helper.sh uninstall  uninstall (needs root)\n"
 "set -e\n"
 "KAUTH_DIR=/usr/lib/kf6/kauth\n"
 "POLKIT_DIR=/usr/share/polkit-1/actions\n"
@@ -352,7 +360,8 @@ file(WRITE "${KCM_DOCKER_PRIVILEGED_INSTALL_SCRIPT}"
 "SERVICE=\"\$DBUS_SERVICE_DIR/org.kde.kcm.docker.service\"\n"
 "BUSCONF=\"\$DBUS_POLICY_DIR/org.kde.kcm.docker.conf\"\n"
 "\n"
-"# 旧名字（软件原名 kontainer）：安装时一并清掉，避免系统里同时存在两套提权组件\n"
+"# Old name (the project was once kontainer): cleaned up on install so two sets of\n"
+"# privileged components cannot coexist on one system\n"
 "LEGACY_HELPER=\"\$KAUTH_DIR/kontainer_helper\"\n"
 "LEGACY_POLICY=\"\$POLKIT_DIR/org.kde.kontainer.policy\"\n"
 "LEGACY_SERVICE=\"\$DBUS_SERVICE_DIR/org.kde.kontainer.service\"\n"
@@ -365,7 +374,7 @@ file(WRITE "${KCM_DOCKER_PRIVILEGED_INSTALL_SCRIPT}"
 "    install -m 0755 \"${CMAKE_BINARY_DIR}/bin/kcm_docker_helper\" \"\$HELPER\"\n"
 "    install -m 0644 \"${KCM_DOCKER_POLICY_FILE}\" \"\$POLICY\"\n"
 "\n"
-"    # D-Bus 激活：总线在第一次调用时按这个文件以 root 启动 helper\n"
+"    # D-Bus activation: on the first call the bus starts the helper as root from this file\n"
 "    cat > \"\$SERVICE\" <<'EOF'\n"
 "[D-BUS Service]\n"
 "Name=org.kde.kcm.docker\n"
@@ -373,9 +382,9 @@ file(WRITE "${KCM_DOCKER_PRIVILEGED_INSTALL_SCRIPT}"
 "User=root\n"
 "EOF\n"
 "\n"
-"    # D-Bus 系统策略：系统总线默认 <deny own=\"*\"/> + <deny send_type=\"method_call\"/>，\n"
-"    # 每个服务必须在自己 .conf 里打洞，否则 helper 连总线名都 own 不了\n"
-"    # （KAuth 的 dbus_policy.stub 就是这个洞；这里额外放行调用方 send_destination）\n"
+"    # D-Bus policy: the system bus defaults to <deny own=\"*\"/> + <deny send_type=\"method_call\"/>,\n"
+"    # so every service must open its own hole in .conf or the helper cannot even own the bus\n"
+"    # name (KAuth's dbus_policy.stub is that hole; we also allow the caller's send_destination)\n"
 "    cat > \"\$BUSCONF\" <<'EOF'\n"
 "<!DOCTYPE busconfig PUBLIC \"-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN\" \"http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd\">\n"
 "<busconfig>\n"
@@ -394,7 +403,7 @@ file(WRITE "${KCM_DOCKER_PRIVILEGED_INSTALL_SCRIPT}"
 "    echo \"installed: \$BUSCONF\"\n"
 "    ;;\n"
 "uninstall)\n"
-"    # 只删这四个我们自己装的文件；不用通配符，避免误删系统目录里的别的东西\n"
+"    # Remove only these four files, no wildcards, so nothing else in /usr is deleted by accident\n"
 "    rm -f \"\$HELPER\" \"\$POLICY\" \"\$SERVICE\" \"\$BUSCONF\"\n"
 "    rm -f \"\$LEGACY_HELPER\" \"\$LEGACY_POLICY\" \"\$LEGACY_SERVICE\" \"\$LEGACY_BUSCONF\"\n"
 "    echo \"removed: \$HELPER\"\n"

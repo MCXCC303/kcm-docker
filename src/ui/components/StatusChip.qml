@@ -1,14 +1,14 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    状态徽标（ARCH_V3 §2.1 / ARCH_V3_pre §1.3）：
+    Status badge (ARCH_V3 §2.1 / ARCH_V3_pre §1.3):
 
-    把状态统一呈现为 **图标 + 颜色 + 文字** 三重编码，
-    禁止在各个页面里各自 if-else 拼颜色（颜色与徽标类型只在
-    Local.StatusPalette 里映射一次）。
+    Presents status as **icon + color + text** triple encoding, and forbids pages from
+    building their own if-else colors (colors and badge types are mapped once in
+    Local.StatusPalette).
 
-    用法（状态语义与图标名都来自 C++，QML 不判断状态字符串）：
+    Usage (status semantics and icon names both come from C++; QML does not test status strings):
 
         Components.StatusChip {
             semanticKey: Kontainer.Presentation.stateSemanticKey(stateKey, healthKey)
@@ -26,14 +26,14 @@ import "." as Local
 Kirigami.Badge {
     id: chip
 
-    /*! 语义 key：positive / neutral / negative / disabled。 */
+    /*! Semantic key: positive / neutral / negative / disabled. */
     required property string semanticKey
-    /*! 图标名；为空时不显示图标（例如没有健康检查的容器）。 */
+    /*! Icon name; empty means no icon (e.g. a container without a health check). */
     property string iconName: ""
 
     type: Local.StatusPalette.badgeType(chip.semanticKey)
 
-    // §1.6/§1.8：颜色永不单独承担语义——徽标始终带文字，图标作为第二重编码
+    // §1.6/§1.8: the badge always has text and the icon is second encoding, so color carries no semantics
     icon.name: chip.iconName
     icon.width: Kirigami.Units.iconSizes.sizeForLabels
     icon.height: Kirigami.Units.iconSizes.sizeForLabels

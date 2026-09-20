@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -28,7 +28,7 @@ QString ImageDetail::primaryRepository() const
         }
         const QStringList parts = partsOf(tag);
         if (parts.size() >= 2) {
-            // tag 可能是 host:port/path:tag，因此最后一个 ':' 之后才是 tag
+            // A tag can be host:port/path:tag, so only the last ':' starts the tag
             const int lastColon = tag.lastIndexOf(QLatin1Char(':'));
             const int lastSlash = tag.lastIndexOf(QLatin1Char('/'));
             if (lastColon > lastSlash) {

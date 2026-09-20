@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,13 +13,13 @@ namespace Kontainer
 {
 
 /*!
- * Docker Engine API 版本策略（ARCH_V1 §8）。
+ * Docker Engine API version policy (ARCH_V1 §8).
  *
- * 这是项目中唯一允许出现 "v1.xx" 的地方：任何其他源文件都不得散落版本字符串，
- * 而是通过本类型获取路径前缀。
+ * The only place in the project where "v1.xx" may appear: no other source file holds version
+ * strings, they get the path prefix through this type.
  *
- * 协商流程：GET /version → 取服务端 ApiVersion 与 MinAPIVersion →
- * 在客户端支持区间内取 min(服务端 ApiVersion, 客户端上限)。
+ * Negotiation: GET /version → server ApiVersion and MinAPIVersion →
+ * min(server ApiVersion, client maximum) within the client's supported range.
  */
 class ApiVersion
 {
@@ -31,24 +31,25 @@ public:
     {
     }
 
-    /*! 客户端支持的最低 Engine API 版本（Docker 20.10 起）。 */
+    /*! Lowest Engine API version the client supports (since Docker 20.10). */
     static constexpr int clientMinMinor()
     {
         return 41;
     }
-    /*! 客户端支持的最高 Engine API 版本（Docker 29.x）。 */
+    /*! Highest Engine API version the client supports (Docker 29.x). */
     static constexpr int clientMaxMinor()
     {
         return 56;
     }
 
-    /*! 解析 "1.56" 这类版本字符串；非法输入返回 nullopt。 */
+    /*! Parses version strings like "1.56"; invalid input returns nullopt. */
     static std::optional<ApiVersion> fromString(const QString &version);
 
     /*!
-     * 在客户端支持区间内协商出一个双方都支持的版本。
-     * 服务端过旧（低于客户端下限）或过新（最低要求高于客户端上限）时返回 nullopt，
-     * 调用方应转成 DockerError::Kind::ApiVersionMismatch。
+     * Negotiates a version both sides support, within the client's range.
+     * Returns nullopt when the server is too old (below the client minimum) or too new (its
+     * required minimum is above the client maximum); callers map that to
+     * DockerError::Kind::ApiVersionMismatch.
      */
     static std::optional<ApiVersion> negotiate(const ApiVersion &server, const std::optional<ApiVersion> &serverMin);
 
@@ -66,7 +67,7 @@ public:
     }
 
     QString toString() const;
-    /*! 请求路径前缀，例如 "v1.56"。 */
+    /*! Request path prefix, e.g. "v1.56". */
     QString pathPrefix() const;
 
     friend bool operator==(const ApiVersion &lhs, const ApiVersion &rhs)

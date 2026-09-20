@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,7 +20,7 @@ namespace
 {
 using namespace PortBindingRules;
 
-/*! 只有跑着的容器才真的占着宿主端口（用户已确认：没运行的自然不占用）。 */
+/*! Only running containers really hold host ports (user-confirmed: stopped ones do not occupy ports). */
 bool holdsHostPorts(ContainerState state)
 {
     switch (state) {
@@ -33,7 +33,7 @@ bool holdsHostPorts(ContainerState state)
     }
 }
 
-/*! 建议端口的起点：低于 1024 需要特权，不适合作为建议。 */
+/*! Start of suggested ports: below 1024 needs privileges, so it is unsuitable as a suggestion. */
 constexpr int kFirstSuggestedPort = 8000;
 } // namespace
 
@@ -48,7 +48,7 @@ QString HostPortEntry::portText() const
 QString HostPortEntry::displayAddress() const
 {
     if (dualStack || hostIp.isEmpty() || isWildcardAddress(hostIp)) {
-        // 所有接口：地址由图形（双环）或"所有接口"语义表达，文字只留端口
+        // All interfaces: the graphic (double ring) conveys the address, so the text keeps only the port
         return portText();
     }
     return QStringLiteral("%1:%2").arg(hostIp, portText());
@@ -68,8 +68,8 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
             }
             const QString hostIp = port.ip;
             /*
-             * IPv4/IPv6 通配合并：同容器 + 同容器端口 + 同协议 + 同宿主端口，
-             * 一条 IPv4 通配一条 IPv6 通配 → 合成一条 dualStack（与端口拓扑页同一规则）。
+             * Merge IPv4/IPv6 wildcards: same container + container port + protocol + host port, one IPv4
+             * wildcard and one IPv6 wildcard -> one dualStack row (same rule as the port topology page).
              */
             bool merged = false;
             for (HostPortEntry &existing : entries) {
@@ -108,16 +108,18 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
     }
 
     /*
-     * 声明的绑定：已经真的发布了的不再重复出现（发布那条就是它），
-     * 剩下的就是"声明了但没生效"——端口页要如实标出来（决定 3）。
+     * Declared bindings: those already really published are not repeated (the published row is them);
+     * what remains is "declared but not in effect" -- the ports page must report it (decision 3).
      */
     for (const Container &container : containers) {
         /*
-         * 这里**故意**不过滤运行状态（与 `holderFor()` 相反）：
-         *  - 运行中容器声明了却没发布的 → `declaredNotPublished`（"占着却连不上"）；
-         *  - 未运行容器声明过的 → `reserved`："端口现在是空的，但那个容器一起来就会要回去"。
-         * 用户实测反馈：这两种都要能在端口页看到（早前决定"不做 reserved"已被这次反馈推翻）。
-         * 冲突判断（`holderFor`）仍然只算运行中的容器——没运行就不该拦住别人。
+         * Run state is **deliberately** not filtered here (unlike `holderFor()`):
+         *  - running container, declared but not publishing -> `declaredNotPublished` (held but unreachable);
+         *  - stopped container's declaration -> `reserved`: "the port is free now, but that container takes
+         *    it back as soon as it starts".
+         * User feedback: both must be visible on the ports page (the earlier "no reserved" decision was
+         * overturned by it). Conflict checks (`holderFor`) still count running containers only -- a
+         * stopped one must not block others.
          */
         const QList<DeclaredPortBinding> bindings = declared.value(container.id);
         for (const DeclaredPortBinding &binding : bindings) {
@@ -141,8 +143,8 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
                 entry.stateKey = QStringLiteral("declaredNotPublished");
             } else {
                 /*
-                 * 没在运行的容器：端口声明还在，但**这个端口现在被别的容器占着**时
-                 * 它一起来就会因为端口冲突失败（用户要求标红"被占用"）。
+                 * Stopped container: its declaration stands, but if the port is **currently held by
+                 * another container** it will fail on start with a port conflict (user wants it marked red).
                  */
                 const bool taken = std::any_of(entries.cbegin(), entries.cend(), [&](const HostPortEntry &other) {
                     if (other.stateKey != QLatin1String("inUse") || other.containerId == container.id) {
@@ -163,7 +165,7 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
         }
     }
 
-    // 顺序稳定：端口 → 容器名（刷新时行不会跳）
+    // Stable order: port, then container name (rows do not jump on refresh)
     std::sort(entries.begin(), entries.end(), [](const HostPortEntry &lhs, const HostPortEntry &rhs) {
         if (lhs.hostPort != rhs.hostPort) {
             return lhs.hostPort < rhs.hostPort;
@@ -179,7 +181,7 @@ QList<HostPortEntry> HostPortUsage::entriesFor(const QList<Container> &container
 QString HostPortUsage::holderFor(const QList<Container> &containers, const QString &hostIp, int hostPort)
 {
     if (hostPort <= 0) {
-        return {}; // 0 = 随机分配，不冲突
+        return {}; // 0 = random assignment, so no conflict
     }
     for (const Container &container : containers) {
         if (!holdsHostPorts(container.state)) {
@@ -217,11 +219,11 @@ int HostPortUsage::nextFreePort(const QList<Container> &containers, int afterPor
 namespace
 {
 /*!
- * 筛选 key 是否"选中"了某个条目状态。
+ * Whether a filter key "selects" an entry state.
  *
- * `reserved` 这一档同时包含 `reserved`（未启动）与 `reservedTaken`（被占用）——
- * 与 `HostPortFilterModel` 的过滤规则保持一致，否则地图切到"未启动 / 被占用"时
- * 被占用的方块仍会按优先级显示成运行中。
+ * The `reserved` bucket covers both `reserved` (not started) and `reservedTaken` (taken), matching
+ * `HostPortFilterModel`; otherwise, with the map on "not started / taken", taken tiles would still be
+ * shown as running by priority.
  */
 bool preferredMatches(const QString &stateKey, const QStringList &preferred)
 {
@@ -232,7 +234,7 @@ bool preferredMatches(const QString &stateKey, const QStringList &preferred)
         && (stateKey == QLatin1String("reserved") || stateKey == QLatin1String("reservedTaken"));
 }
 
-/*! 状态优先级：运行中 > 被占用 > 未启动 > 未占用（"全部端口"视图里靠它决定方块颜色）。 */
+/*! State priority: in use > taken > not started > free (tile color in the "all ports" view). */
 int statePriority(const QString &stateKey)
 {
     if (stateKey == QLatin1String("inUse")) {
@@ -260,7 +262,7 @@ HostPortEntry HostPortUsage::entryForPort(const QList<HostPortEntry> &entries, q
         if (port < entry.hostPort || port > last) {
             continue;
         }
-        // 有筛选时先照顾筛选选中的状态；否则按固定优先级
+        // With a filter, favor the states it selects; otherwise use the fixed priority
         const int priority = preferred.isEmpty()
             ? statePriority(entry.stateKey)
             : (preferredMatches(entry.stateKey, preferred) ? 100 + statePriority(entry.stateKey)
@@ -285,8 +287,8 @@ QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &en
         return ranges;
     }
 
-    // 已占用的端口（升序、去重）。用 QSet 去重：原来对 QList 调 contains() 是 O(n)，
-    // 端口多的容器（几十上百个区间端口）会变成平方级，切换筛选时肉眼可见地卡。
+    // Used ports (ascending, deduplicated). QSet avoids the old O(n) QList::contains(), which went
+    // quadratic for containers with dozens of range ports and visibly stalled filter switches.
     QSet<quint16> seen;
     QList<quint16> used;
     for (const HostPortEntry &entry : entries) {
@@ -313,7 +315,7 @@ QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &en
             last = used.at(cursor + 1);
             ++cursor;
         }
-        // 向两侧扩展几个空闲端口：让用户看到"这一段附近哪里空着"
+        // Expand a few free ports on both sides so users see where it is free around this segment
         const int expandedFirst = qMax(1, int(first) - safeMargin);
         const int expandedLast = qMin(65535, int(last) + safeMargin);
         first = quint16(expandedFirst);
@@ -326,10 +328,10 @@ QList<HostPortRange> HostPortUsage::clusterRanges(const QList<HostPortEntry> &en
         range.tileCount = qMin(total, safeTiles);
         range.hiddenCount = qMax(0, total - safeTiles);
         /*
-         * `usedCount` 数的是**端口个数**（去重），不是"声明了几条"。
+         * `usedCount` counts **ports** (deduplicated), not declarations.
          *
-         * 用户实测：`WinBoat` 声明了 5 段（每段 10 个）落在同一区间里，
-         * 其中两段还重叠，原来显示"5 个端口被占用"——而图上明明亮着几十个格子。
+         * User report: `WinBoat` declared 5 ranges of 10 ports inside one segment, two of them
+         * overlapping, and the old code said "5 ports used" while dozens of tiles were lit on the map.
          */
         QSet<quint16> covered;
         for (const HostPortEntry &entry : entries) {

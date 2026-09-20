@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,11 @@ namespace
 {
 
 /*!
- * 引用是否「像」一个合法镜像引用。
+ * Whether a reference "looks like" a valid image reference.
  *
- * 刻意不使用完整 docker/distribution 语法：这里的目标是挡住明显无意义的输入
- * （空格、URL、中文、裸 glob），而不是替引擎做最终裁决——引擎仍然会把
- * 它不认识的仓库名报回来，那条消息才是权威。
+ * Deliberately not the full docker/distribution grammar: the goal is to block obviously
+ * meaningless input (spaces, URLs, non-ASCII, bare globs), not to overrule the engine — the
+ * engine still reports repository names it does not know, and that message is authoritative.
  */
 bool looksValid(const QString &reference)
 {
@@ -31,7 +31,7 @@ bool looksValid(const QString &reference)
     if (reference.contains(QLatin1String("://"))) {
         return false;
     }
-    // 不允许任何空白（含首尾空格——调用方应先 trim）
+    // No whitespace at all (including surrounding spaces — callers should trim first)
     for (const QChar &ch : reference) {
         if (ch.isSpace()) {
             return false;
@@ -43,7 +43,7 @@ bool looksValid(const QString &reference)
         return false;
     }
 
-    // registry:port 里的冒号不能被当成 tag 分隔符，因此 tag 只取最后一个 '/' 之后的部分
+    // A colon in registry:port is not a tag separator, so the tag is only the part after the last '/'
     const int lastSlash = withoutDigest.lastIndexOf(QLatin1Char('/'));
     const QString lastSegment = withoutDigest.mid(lastSlash + 1);
     const int colon = lastSegment.indexOf(QLatin1Char(':'));
@@ -55,8 +55,8 @@ bool looksValid(const QString &reference)
         }
     }
 
-    // 仓库名必须是全小写（tag 允许大写，因此只检查 tag 之前的部分）：
-    // 提前挡住，比让引擎返回 "repository name must be lowercase" 更省事
+    // Repository names must be all lowercase (tags may be uppercase, so only the part before the
+    // tag is checked): catching this early beats the engine's "repository name must be lowercase"
     const QString namePart = colon >= 0 ? withoutDigest.left(withoutDigest.size() - lastSegment.size() + colon) : withoutDigest;
     if (namePart != namePart.toLower()) {
         return false;
@@ -91,7 +91,7 @@ std::optional<Parts> parse(const QString &reference)
         remaining = remaining.left(at);
     }
 
-    // tag 只可能出现在最后一个 '/' 之后（registry 的 :port 不算 tag）
+    // A tag can only appear after the last '/' (the registry :port is not a tag)
     const int lastSlash = remaining.lastIndexOf(QLatin1Char('/'));
     const int colon = remaining.indexOf(QLatin1Char(':'), lastSlash + 1);
     if (colon >= 0) {
@@ -99,7 +99,7 @@ std::optional<Parts> parse(const QString &reference)
         remaining = remaining.left(colon);
     }
 
-    // registry 判定沿用 Docker 的规则：第一段含 '.' 或 ':' 或是 localhost
+    // Registry detection follows Docker's rule: first segment contains '.' or ':' or is localhost
     const int firstSlash = remaining.indexOf(QLatin1Char('/'));
     if (firstSlash > 0) {
         const QString first = remaining.left(firstSlash);

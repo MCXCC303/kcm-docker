@@ -1,18 +1,21 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    拉取镜像对话框（ARCH_V4 §2.4）。
+    Pull image dialog (ARCH_V4 §2.4).
 
-    这是一个**只负责发起**的对话框：按下「拉取」后立即关闭，拉取在后台继续，
-    进度与结果都显示在镜像标签页的拉取列表里（`PullProgressList`）。
+    This dialog **only starts** a pull: it closes as soon as "Pull" is pressed, pulling
+    continues in the background, and both progress and result show up in the image tab's
+    pull list (`PullProgressList`).
 
-    为什么不在对话框里显示进度：拉取可能要几分钟，用户没有理由被一个模态窗口
-    按在座位上；关掉对话框也不该中断拉取。同一个引用重复拉取会被拒绝并给出说明，
-    不同镜像可以同时拉取。
+    Why progress is not shown here: a pull can take minutes and users have no reason to be
+    pinned down by a modal window; closing the dialog must not interrupt the pull either.
+    A repeated pull of the same reference is rejected with an explanation; different images
+    can pull concurrently.
 
-    另外：不要写 `button.trigger()`——`QQC2.Button` 没有这个方法（那是 Action 的），
-    运行时只会在按下回车时抛 TypeError（并因此什么都不做）。Enter 与按钮走同一个函数。
+    Also: do not write `button.trigger()` — `QQC2.Button` has no such method (that is
+    Action's), so it only throws a TypeError on Enter at runtime (and does nothing).
+    Enter and the button share one function.
 */
 
 import QtQuick
@@ -29,21 +32,21 @@ Kirigami.Dialog {
     required property var operations
 
     /*!
-        引用校验与提示都交给 ImageRefInput：组件内部调用 C++ 的单一实现
-        （`isValidImageReference` / `normalizedImageReference`），本文件不再重复。
+        Reference validation and hints are delegated to ImageRefInput, which calls the single
+        C++ implementation (`isValidImageReference` / `normalizedImageReference`); no duplicate here.
     */
     readonly property bool referenceValid: referenceInput.referenceValid
     readonly property string normalizedReference: referenceInput.normalizedReference
     readonly property bool alreadyPulling: referenceInput.alreadyPulling
 
     signal pullRequested(string reference)
-    /*! 「先去登录…」：把该镜像对应的仓库带到认证页（ARCH_V5_V8 §2.7）。 */
+    /*! "Log in first…": brings the registry of this image to the authentication page (ARCH_V5_V8 §2.7). */
     signal loginRequested(string serverAddress)
 
-    /*! 该镜像所在仓库是否已有凭据（由调用方从 RegistryAuthController 传入）。 */
+    /*! Whether this image's registry already has credentials (passed in from RegistryAuthController). */
     property bool credentialKnown: true
 
-    /*! 输入控件（调用方据此读当前引用与仓库地址）。 */
+    /*! Input control (the caller reads the current reference and registry address from it). */
     property alias referenceInput: referenceInput
 
     objectName: "pullImageDialog"
@@ -57,7 +60,7 @@ Kirigami.Dialog {
         referenceInput.forceActiveFocus();
     }
 
-    /*! 发起拉取（Enter 与「拉取」按钮共用这一条路径）。 */
+    /*! Start the pull (Enter and the "Pull" button share this one path). */
     function startPull() {
         if (!dialog.referenceValid || dialog.alreadyPulling) {
             return;
@@ -87,7 +90,7 @@ Kirigami.Dialog {
             onAccepted: dialog.startPull()
         }
 
-        // 该仓库还没登录：先说清楚"接下来会失败"，并给一条去登录的路
+        // Not logged in to this registry: say up front that the pull will fail, and offer a way to log in
         Kirigami.InlineMessage {
             objectName: "pullNeedsLoginHint"
             Layout.fillWidth: true

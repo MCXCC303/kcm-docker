@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -76,8 +76,8 @@ void RefreshScheduler::setAutoRefreshEnabled(bool enabled)
 
 void RefreshScheduler::requestRefresh(Reason reason)
 {
-    // 后台刷新请求去重由 backend 负责（§29）；这里只避免在高频数据集仍在途时堆积。
-    // 注意：详情 / 采样请求在途不应拖慢列表刷新（§13.2 分层刷新）。
+    // the backend deduplicates refresh requests (§29); this only avoids pile-ups while fast data is in flight
+    // note: in-flight detail/sampling requests must not slow list refreshes (§13.2 layered refresh).
     if (reason == Reason::Automatic && m_backend->isRefreshingFastData()) {
         qCDebug(kontainerModel) << "skipping automatic refresh: backend busy";
         return;
@@ -88,11 +88,12 @@ void RefreshScheduler::requestRefresh(Reason reason)
     m_cycleHadFailure = false;
     if (reason == Reason::Manual) {
         /*
-         * 手动刷新是"重新开始"：清掉上一轮的失败计数。
+         * A manual refresh is a fresh start: clear the previous round's failure count.
          *
-         * 用户实测 B2：把服务停下来再启动、数据其实已经更新了，界面却一直显示"更新失败"——
-         * 因为失败计数只在"整周期无失败"时才清零，而恢复后的第一次自动刷新可能又被
-         * 别的东西打断。手动刷新路径必须显式清一次，让状态跟上真实情况。
+         * User report B2: after stopping and restarting the service the data was in fact updated,
+         * yet the UI kept showing "update failed" — the counter only resets after a fully clean
+         * cycle, and the first automatic refresh after recovery may be interrupted again. The manual
+         * path must clear it explicitly so the state matches reality.
          */
         m_consecutiveFailures = 0;
     }
@@ -103,13 +104,13 @@ void RefreshScheduler::requestRefresh(Reason reason)
 void RefreshScheduler::onBackendLoadingChanged()
 {
     if (!m_cycleInProgress || m_backend->isLoading()) {
-        return; // 周期仍在进行中
+        return; // the cycle is still running
     }
     m_cycleInProgress = false;
     if (m_cycleHadFailure) {
-        ++m_consecutiveFailures; // 失败周期
+        ++m_consecutiveFailures; // failed cycle
     } else {
-        m_consecutiveFailures = 0; // 完整成功周期
+        m_consecutiveFailures = 0; // fully successful cycle
     }
     Q_EMIT stateChanged();
 }
@@ -117,14 +118,14 @@ void RefreshScheduler::onBackendLoadingChanged()
 void RefreshScheduler::triggerStorageRefresh()
 {
     if (m_backend->isRefreshingFastData()) {
-        return; // storage 是中频数据，被跳过也无妨
+        return; // storage is medium frequency, skipping it is harmless
     }
     m_backend->refreshStorageUsage();
 }
 
 void RefreshScheduler::noteFastUpdateSucceeded()
 {
-    // 只要有分区成功，Last Updated 就应前进（§15）；失败计数在周期结束时判定（§16）
+    // any successful section advances Last Updated (§15); failures are judged at the cycle's end (§16)
     m_lastSuccess = QDateTime::currentDateTimeUtc();
     Q_EMIT stateChanged();
 }

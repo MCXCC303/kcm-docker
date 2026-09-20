@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,43 +13,44 @@ namespace Kontainer
 {
 
 /*!
- * `daemon.json` 的编辑意图（ARCH_V5_V8 §2.3）。
+ * Edit intent for `daemon.json` (ARCH_V5_V8 §2.3).
  *
- * 只描述"我们管理的键"，其余键在合并时**原样保留**——
- * 用户可能配置了 data-root、features、runtimes 等我们不懂的东西，
- * 一个"配置编辑器"把它们弄丢是最不可接受的失败方式。
+ * Covers only "the keys we manage"; all other keys are **preserved verbatim** on merge —
+ * users may have configured data-root, features, runtimes or other things we do not understand,
+ * and losing them is the least acceptable way for a "config editor" to fail.
  */
 /*!
- * 标量键的编辑意图（ARCH_V5_V8 §2.3）。
+ * Edit intent for scalar keys (ARCH_V5_V8 §2.3).
  *
- * 为什么是三态而不是"用值域兼职"：并发下载数曾经用 `<= 0` 同时表示"不修改"，
- * 于是**没法表达"删掉这个键、回到 daemon 默认"**——用户把日志驱动设错之后
- * 只能靠备份或手动编辑回退。Set 与 Remove 分开，界面才能给出「默认」这一项。
+ * Why three states instead of overloading the value range: concurrent downloads once used `<= 0`
+ * for "do not modify", so there was **no way to express "delete this key, back to the daemon
+ * default"** — after setting a wrong log driver the user could only revert from a backup or edit
+ * by hand. Keeping Set and Remove apart lets the UI offer a "Default" choice.
  */
 enum class ConfigEdit {
-    /*! 不动这个键（文件里原来的值原样保留，哪怕我们不懂它）。 */
+    /*! Leave this key alone (keep the file's value verbatim, even if we do not understand it). */
     Unchanged,
-    /*! 写入新值。 */
+    /*! Write a new value. */
     Set,
-    /*! 删除这个键（回到 daemon 自己的默认值）。 */
+    /*! Delete this key (back to the daemon's own default). */
     Remove,
 };
 
 struct DaemonConfigEdits {
-    /*! 是否修改镜像加速器列表。 */
+    /*! Whether to modify the registry-mirror list. */
     bool setRegistryMirrors = false;
     QStringList registryMirrors;
-    /*! 是否修改不安全仓库列表。 */
+    /*! Whether to modify the insecure-registry list. */
     bool setInsecureRegistries = false;
     QStringList insecureRegistries;
-    /*! 并发下载数：Set 时取 maxConcurrentDownloads，Remove 时删除该键。 */
+    /*! Concurrent downloads: Set takes maxConcurrentDownloads, Remove deletes the key. */
     ConfigEdit concurrentDownloadsEdit = ConfigEdit::Unchanged;
     int maxConcurrentDownloads = 0;
-    /*! 日志驱动：Set 时取 logDriver，Remove 时删除该键。 */
+    /*! Log driver: Set takes logDriver, Remove deletes the key. */
     ConfigEdit logDriverEdit = ConfigEdit::Unchanged;
     QString logDriver;
 
-    /*! 是否什么都没改。 */
+    /*! Whether nothing was changed at all. */
     bool isEmpty() const
     {
         return !setRegistryMirrors && !setInsecureRegistries && concurrentDownloadsEdit == ConfigEdit::Unchanged
@@ -58,19 +59,20 @@ struct DaemonConfigEdits {
 };
 
 /*!
- * `daemon.json` 的读取结果与写回（ARCH_V5_V8 §2.3）。
+ * Reading and writing `daemon.json` (ARCH_V5_V8 §2.3).
  *
- * 读写都围绕一个"允许未知字段"的 JSON 文档：
- *  - 读：解析成功 → 可以按白名单键取值；解析失败 → 只读展示错误，**绝不覆写**
- *  - 写：在原始文档上合并白名单键，未知键逐键保留
+ * Both directions work on a JSON document that tolerates unknown fields:
+ *  - read: parse OK → whitelisted keys can be read; parse failure → show the error read-only,
+ *    **never overwrite**
+ *  - write: merge whitelisted keys into the original document, keeping unknown keys one by one
  */
 class DaemonConfigDocument
 {
 public:
-    /*! 从文件读取；文件不存在时返回空文档（`exists=false`）。 */
+    /*! Read from file; a missing file yields an empty document (`exists=false`). */
     static DaemonConfigDocument fromFile(const QString &path);
 
-    /*! 从内存内容构造（提权 helper 与合并逻辑复用同一套解析/合并语义）。 */
+    /*! Build from in-memory content (the privileged helper reuses the same parse/merge semantics). */
     static DaemonConfigDocument fromContent(const QByteArray &content, const QString &path = QString());
 
     bool exists() const
@@ -94,30 +96,31 @@ public:
         return m_root;
     }
 
-    /*! 原始文件内容（用于"字节级保留"的对照与备份校验）。 */
+    /*! Raw file content (for byte-level preservation checks and backup validation). */
     QByteArray rawContent() const
     {
         return m_rawContent;
     }
 
-    /* --- 白名单键的读取 --- */
+    /* --- Whitelisted key readers --- */
     QStringList registryMirrors() const;
     QStringList insecureRegistries() const;
     int maxConcurrentDownloads() const;
     QString logDriver() const;
     QString dataRoot() const;
     QString storageDriver() const;
-    /*! 我们管理的键之外的键名（界面显示"其他键：N 个（只读）"）。 */
+    /*! Names of keys other than the ones we manage (UI shows "Other keys: N (read-only)"). */
     QStringList unmanagedKeys() const;
 
-    /*! 我们管理的键集合（顺序即界面顺序）。 */
+    /*! The keys we manage (this order is the UI order). */
     static QStringList managedKeys();
 
     /*!
-     * 合并编辑意图并序列化。
+     * Merge the edit intent and serialize.
      *
-     * 返回空数组表示合并失败（例如原文档解析失败）。序列化格式：缩进 2 空格 + 末尾换行，
-     * 与 Docker 文档示例一致；键顺序由 QJsonObject 决定（JSON 对象无序，语义不受影响）。
+     * An empty array means the merge failed (e.g. the original document did not parse). Format:
+     * 2-space indent plus a trailing newline, matching Docker's docs; key order comes from
+     * QJsonObject (JSON objects are unordered, so semantics are unaffected).
      */
     QByteArray merged(const DaemonConfigEdits &edits) const;
 
@@ -131,26 +134,28 @@ private:
 };
 
 /*!
- * 写回与备份（ARCH_V5_V8 §2.4 的"原子写入 + 备份"）。
+ * Write-back and backup (ARCH_V5_V8 §2.4 "atomic write + backup").
  *
- * 这里只做"用户可写路径"的写入；系统级路径走 helper（helper 内部用同一套合并逻辑）。
+ * Only user-writable paths are written here; system paths go through the helper, which reuses
+ * the same merge logic.
  */
 class DaemonConfigWriter
 {
 public:
-    /*! 备份文件前缀：`daemon.json.kontainer-backup-<UTC 时间戳>`。 */
+    /*! Backup file prefix: `daemon.json.kontainer-backup-<UTC timestamp>`. */
     static QString backupPrefix();
 
     /*!
-     * 原子写入：先写同目录临时文件，再 `rename` 覆盖。
-     * 写前把现有文件备份（如果存在）。成功返回空字符串，失败返回原因（技术细节，不是 UI 文案）。
+     * Atomic write: write a temp file in the same directory, then `rename` over the target.
+     * The existing file is backed up first (if present). Empty on success, otherwise the reason
+     * (technical detail, not UI text).
      */
     static QString writeAtomically(const QString &path, const QByteArray &content, QString *backupPath = nullptr);
 
-    /*! 列出某个配置文件已有的备份（新的在前）。 */
+    /*! List existing backups for a config file (newest first). */
     static QStringList listBackups(const QString &path);
 
-    /*! 读取某个备份的内容（用于"恢复上一版"）。 */
+    /*! Read a backup's content (for "restore previous version"). */
     static QByteArray readBackup(const QString &backupPath);
 };
 

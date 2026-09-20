@@ -1,19 +1,21 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    操作结果的唯一呈现（ARCH_V4 §2.2.4）。
+    The single presentation of operation results (ARCH_V4 §2.2.4).
 
-    成功 / 已经处于目标状态 / 取消 / 失败都从 OperationController 的结果通道读，
-    页面不得各自 if-else 拼文案或选颜色：
+    Success / already in target state / cancelled / failure are all read from the
+    OperationController result channel; pages must not build their own text or
+    pick their own colors:
 
         Components.OperationMessage {
             Layout.fillWidth: true
             operations: root.controller.operations
         }
 
-    分级（resultCategoryKey）决定呈现强度——「用户自己能解决」用警告，
-    「环境问题 / 意外」用错误，成功与取消用信息/成功，避免所有失败都长成同一条红条。
+    The category (resultCategoryKey) sets the strength: "user can fix it themselves"
+    is a warning, "environment / unexpected" is an error, success and cancel are
+    info/positive — not every failure becomes the same red bar.
 */
 
 import QtQuick
@@ -31,7 +33,7 @@ Kirigami.InlineMessage {
         || operations.resultCategoryKey === "environment"
         || operations.resultCategoryKey === "unexpected"
 
-    /*! 引擎原文（不翻译）附在摘要后面：用户报问题时它是唯一的「为什么」。 */
+    /*! Raw engine text (untranslated) appended to the summary: it is the only "why" users can report. */
     readonly property string composedText: operations.resultDetailText.length > 0
         ? operations.resultText + "\n" + operations.resultDetailText
         : operations.resultText
@@ -39,10 +41,11 @@ Kirigami.InlineMessage {
     objectName: "operationMessage"
 
     /*!
-     * 成功/取消类横幅的存活时间（毫秒）；0 = 不自动消失。
+     * Lifetime of success/cancel banners in ms; 0 = never auto-dismiss.
      *
-     * 规则（用户实测反馈 A7）：**成功信息**在刷新/跳转后没有价值，也不该一直占着页面；
-     * **失败信息必须留着**——它往往是用户唯一能看到的"为什么"，只能手动关闭。
+     * Rule (user feedback A7): **success** messages have no value after a refresh or
+     * page change and must not occupy the page; **failure** messages stay — they are
+     * often the only "why" the user can see, and can only be closed manually.
      */
     property int autoDismissMs: 8000
 
@@ -72,7 +75,8 @@ Kirigami.InlineMessage {
 
     actions: [
         Kirigami.Action {
-            // 「目标已经消失」这类错误唯一的有效动作是把列表刷成真实状态（ARCH_V4 §2.2.2）
+            // For "the target is gone" errors the only useful action is refreshing the list to real
+            // state (ARCH_V4 §2.2.2)
             visible: message.operations.resultActionKey === "refresh"
             text: i18n("Refresh")
             icon.name: "view-refresh"

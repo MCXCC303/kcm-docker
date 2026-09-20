@@ -1,8 +1,8 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Engine 信息视图（ARCH_V2 §5：Engine 详情从页头移到这里，页头只保留紧凑状态行）。
+    Engine info view (ARCH_V2 §5: engine details live here; the page header keeps only a compact status row).
 */
 
 import QtQuick
@@ -16,7 +16,7 @@ ColumnLayout {
 
     required property var engine
 
-    /*! 构建标记，由 StatusController 提供。 */
+    /*! Build stamp, supplied by StatusController. */
     required property string buildStamp
 
     spacing: Kirigami.Units.smallSpacing
@@ -27,7 +27,7 @@ ColumnLayout {
         QQC2.Label {
             Kirigami.FormData.label: i18n("Endpoint:")
             text: view.engine && view.engine.engineName ? view.engine.engineName : i18n("Unknown")
-            visible: false // engine name 已由页头展示
+            visible: false // engine name is already shown in the page header
         }
 
         QQC2.Label {
@@ -92,8 +92,8 @@ ColumnLayout {
             text: String(view.engine.cpuCount)
         }
 
-        /* 组件版本（dockerd / containerd / runc / docker-init …）：
-           引擎版本只说明 dockerd，containerd 与 runc 的版本同样影响行为。 */
+        /* Component versions (dockerd / containerd / runc / docker-init …): the engine version
+           describes dockerd only, while containerd and runc versions change behavior too. */
         Repeater {
             model: view.engine.components
 
@@ -107,7 +107,7 @@ ColumnLayout {
         }
     }
 
-    /* 引擎自己报的问题（例如 swap 限制、iptables 不可用）：原样展示，不改写措辞 */
+    /* Problems the engine reports about itself (swap limits, iptables): shown verbatim, never reworded */
     Kirigami.InlineMessage {
         objectName: "engineWarnings"
         Layout.fillWidth: true
@@ -116,7 +116,7 @@ ColumnLayout {
         text: view.engine.warnings.join("\n")
     }
 
-    /* 构建标记：排查问题时用来确认运行的是哪一次构建（ARCH_V3 附录 A.1f）。 */
+    /* Build stamp: tells which build is running when troubleshooting (ARCH_V3 appendix A.1f). */
     QQC2.Label {
         Layout.fillWidth: true
         Layout.topMargin: Kirigami.Units.smallSpacing

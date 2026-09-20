@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -26,13 +26,14 @@ namespace Kontainer
 {
 
 /*!
- * Container Detail 的 controller（ARCH_V2 §7/§27/§28/§31/§43）。
+ * Controller for Container Detail (ARCH_V2 §7/§27/§28/§31/§43).
  *
- * 生命周期由页面驱动：页面进入调用 start()，离开调用 stop()。
- *  - start(): 请求 inspect + 启动资源采样（仅对 running/paused 容器）+ 低频复核静态信息
- *  - stop():  停止低频复核 + 停止 stats 采样 + 释放 metrics 历史（§27）
+ * The page drives its lifecycle: start() on entry, stop() on exit.
+ *  - start(): request inspect + start resource sampling (running/paused containers only) + low-frequency
+ *    re-check of static info
+ *  - stop():  stop the re-check + stop stats sampling + drop metrics history (§27)
  *
- * 不负责：HTTP、JSON、Docker 语义解释、UI 布局。
+ * Not responsible for: HTTP, JSON, Docker semantics, UI layout.
  */
 class ContainerDetailController : public QObject
 {
@@ -44,15 +45,15 @@ class ContainerDetailController : public QObject
     Q_PROPERTY(bool hasDetail READ hasDetail NOTIFY changed)
     Q_PROPERTY(bool running READ running NOTIFY changed)
 
-    /* Overview（一级信息，§7.2） */
+    /* Overview (primary info, §7.2) */
     Q_PROPERTY(QString name READ name NOTIFY changed)
     Q_PROPERTY(QString shortId READ shortId NOTIFY changed)
     Q_PROPERTY(QString image READ image NOTIFY changed)
     /*!
-     * 镜像的完整 ID（`sha256:…`）。
+     * Full image ID (`sha256:…`).
      *
-     * 详情页的「镜像」一行可以点进镜像详情，用这个 ID 打开（为空说明引擎没给，
-     * 那一行就不可点）。
+     * The detail page's image row can open the image detail with this ID (empty means the engine did not
+     * report one, and that row is not clickable).
      */
     Q_PROPERTY(QString imageId READ imageId NOTIFY changed)
     Q_PROPERTY(QString stateKey READ stateKey NOTIFY changed)
@@ -72,53 +73,53 @@ class ContainerDetailController : public QObject
     Q_PROPERTY(int pid READ pid NOTIFY changed)
     Q_PROPERTY(QString restartPolicy READ restartPolicy NOTIFY changed)
 
-    /* Configuration（三级信息，默认折叠） */
+    /* Configuration (tertiary info, collapsed by default) */
     Q_PROPERTY(QStringList command READ command NOTIFY changed)
     Q_PROPERTY(QStringList entrypoint READ entrypoint NOTIFY changed)
     Q_PROPERTY(QString workingDirectory READ workingDirectory NOTIFY changed)
     Q_PROPERTY(QString user READ user NOTIFY changed)
     Q_PROPERTY(QString hostname READ hostname NOTIFY changed)
     Q_PROPERTY(int environmentCount READ environmentCount NOTIFY changed)
-    /*! 环境变量的真实值（§40：只有用户显式展开时才应由 QML 读取渲染）。 */
+    /*! Actual environment values (§40: QML should read them only when the user expands the section). */
     Q_PROPERTY(QStringList environment READ environment NOTIFY changed)
 
-    /* 结构化子列表 */
-    /*! 已发布的端口映射：端口拓扑的数据源（ARCH_V4 §2.1.2）。 */
+    /* Structured sub-lists */
+    /*! Published port mappings: the data source for the port topology (ARCH_V4 §2.1.2). */
     Q_PROPERTY(Kontainer::PortMappingModel *publishedPorts READ publishedPorts CONSTANT)
-    /*! 只 EXPOSE、没有映射到宿主的端口。 */
+    /*! Ports that are only EXPOSEd and never mapped to the host. */
     Q_PROPERTY(Kontainer::PortMappingModel *unpublishedPorts READ unpublishedPorts CONSTANT)
     /*!
-     * 按容器端口分组后的已发布映射（拓扑图用）。
+     * Published mappings grouped by container port (for the topology view).
      *
-     * 同一个容器端口映射到多个宿主地址时，左列只出现一次、右侧用分支连出去
-     * （ARCH_V5_V8 §2.1 拓扑形态修订）。
+     * When one container port maps to several host addresses, the left column shows it once and the right
+     * side branches out (ARCH_V5_V8 §2.1 topology revision).
      */
     Q_PROPERTY(Kontainer::PortMappingGroupModel *portGroups READ portGroups CONSTANT)
     Q_PROPERTY(Kontainer::DetailListModel *networks READ networks CONSTANT)
     Q_PROPERTY(Kontainer::MountListModel *mounts READ mounts CONSTANT)
-    /*! 最近一次「打开宿主目录」的失败说明；为空表示没有失败。 */
+    /*! Message from the last failed "open host directory"; empty means no failure. */
     Q_PROPERTY(QString mountActionError READ mountActionError NOTIFY mountActionErrorChanged)
     Q_PROPERTY(Kontainer::DetailListModel *labels READ labels CONSTANT)
     Q_PROPERTY(Kontainer::DetailListModel *environmentVariables READ environmentVariables CONSTANT)
 
-    /* 资源（§22） */
+    /* Resources (§22) */
     Q_PROPERTY(Kontainer::MetricsModel *metrics READ metrics CONSTANT)
-    /*! 日志控制台（§3.1）：文本、状态与暂停/清空都在它身上。 */
+    /*! Log console (§3.1): text, state, pause and clear all live on it. */
     Q_PROPERTY(Kontainer::ContainerLogController *logs READ logs CONSTANT)
 
     /*!
-     * 已连接的网络名（**属性**，不是函数）。
+     * Names of the connected networks (a **property**, not a function).
      *
-     * 实测反馈：断开某个网络后，"连接网络"面板里那个网络仍标着"已连接"、按钮还是灰的。
-     * 根因是这里原来只有 `Q_INVOKABLE`：QML 里 `isConnectable(name)` 是**函数调用**，
-     * 不建立依赖，数据变了绑定不会重新求值（本项目第五次踩这个坑）。
+     * Reported after disconnecting a network: the "connect network" panel still marked it connected and
+     * kept the button disabled. Cause: only `Q_INVOKABLE` existed, and in QML `isConnectable(name)` is a
+     * **function call**, which builds no dependency, so bindings never re-evaluated (fifth time here).
      */
     Q_PROPERTY(QStringList connectedNetworkNames READ connectedNetworkNames NOTIFY changed)
 
 public:
     /*!
-     * `hostPaths` 由组合根（DockerKcm）注入；测试传 Fake，因此单测不会真的弹出文件管理器。
-     * 允许为空：为空时挂载行不提供打开动作。
+     * `hostPaths` is injected by the composition root (DockerKcm); tests pass a Fake so unit tests never
+     * launch a real file manager. May be null: mount rows then offer no open action.
      */
     explicit ContainerDetailController(DockerBackendInterface *backend, HostPathService *hostPaths = nullptr, QObject *parent = nullptr);
     ~ContainerDetailController() override;
@@ -275,42 +276,43 @@ public:
         return m_metrics;
     }
 
-    /*! 在系统文件管理器中打开第 `row` 条挂载的宿主目录（ARCH_V4 §2.1.1）。 */
+    /*! Open the host directory of mount `row` in the system file manager (ARCH_V4 §2.1.1). */
     Q_INVOKABLE void openMountHostPath(int row);
-    /*! 清掉打开失败的提示。 */
+    /*! Clear the open-failure message. */
     Q_INVOKABLE void dismissMountActionError();
 
 public Q_SLOTS:
-    /*! 页面进入（§27）。 */
+    /*! Page entered (§27). */
     void start();
-    /*! 页面离开（§27）。 */
+    /*! Page left (§27). */
     void stop();
 
     /*!
-     * 进入 / 离开日志分区（ARCH_V5_V8 §3.1.4）。
+     * Enter / leave the logs section (ARCH_V5_V8 §3.1.4).
      *
-     * 进分区才连接、离开即断开：日志是长连接，不该在用户看别的分区时挂着。
-     * `tty` 取自容器详情（`Config.Tty`），判错会把 8 字节帧头当成日志正文。
+     * Connect on entry, disconnect on exit: logs are a long-lived stream that should not stay open while
+     * the user views another section. `tty` comes from container detail (`Config.Tty`); judging it wrong
+     * renders the 8-byte frame header as log text.
      */
     /*!
-     * 容器当前连接的网络名（界面据此把已连接的网络标出来、不给重复连接）。
+     * Networks the container is currently attached to (the UI marks them and blocks re-connecting).
      *
-     * 名字来自 inspect 的 `NetworkSettings.Networks`（以名字为键）；
-     * 连接/断开用的网络 Id 由 `NetworkModel::idForName()` 转换。
+     * Names come from inspect's `NetworkSettings.Networks` (keyed by name); the network Ids used for
+     * connect/disconnect are resolved by `NetworkModel::idForName()`.
      */
 
-    /*! 同上（供 C++/旧调用点使用；QML 请用同名属性）。 */
+    /*! As above (for C++/legacy call sites; QML should use the property of the same name). */
     QStringList connectedNetworkNames() const;
 
     Q_INVOKABLE void startLogs();
     Q_INVOKABLE void stopLogs();
-    /*! 详情加载失败后的重试（§31）。 */
+    /*! Retry after a failed detail load (§31). */
     void refresh();
     /*!
-     * 静默重读（ARCH_V4 §2.2.4「写后即读」）。
+     * Silent reload (ARCH_V4 §2.2.4 "read after write").
      *
-     * 写操作成功后调用：不把页面打回 loading（否则会闪一下「正在加载」），
-     * 只重新 inspect 一次，让状态徽标、资源分区与统计采样跟着切换。
+     * Called after a successful write: it does not push the page back to loading (which would flash
+     * "Loading"), it only runs inspect again so the state badge, resource section and sampling follow.
      */
     void reload();
 
@@ -326,9 +328,9 @@ private:
     void onStatsUpdated();
     void setLoadState(const QString &stateKey, const QString &errorText = QString());
     void rebuildLists();
-    /*! 挂载行：把 domain 挂载 + 宿主路径探测结果合成 presentation 条目。 */
+    /*! Mount rows: combine domain mounts and host path probe results into presentation entries. */
     QList<MountEntry> mountEntries() const;
-    /*! 端口行：已发布 / 未发布两组，排序稳定。 */
+    /*! Port rows: published / unpublished groups, with stable ordering. */
     void rebuildPorts();
     void setMountActionError(const QString &text);
 

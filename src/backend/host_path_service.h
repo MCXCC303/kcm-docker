@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,17 +11,17 @@
 namespace Kontainer
 {
 
-/*! 宿主路径的状态（ARCH_V4 §2.1.1）。 */
+/*! State of a host path (ARCH_V4 §2.1.1). */
 enum class HostPathState {
-    /*! 没有宿主路径（tmpfs、匿名挂载）：界面不提供打开动作。 */
+    /*! No host path (tmpfs, anonymous mount): the UI offers no open action. */
     NotApplicable,
     Missing,
-    /*! 路径存在但不是目录：bind 挂载指向文件时会出现。 */
+    /*! Path exists but is not a directory: happens when a bind mount points at a file. */
     NotADirectory,
     Directory,
 };
 
-/*! 打开目录的失败原因（backend 不产出 UI 文案，只给原因）。 */
+/*! Why opening a directory failed (the backend gives the cause, never UI text). */
 enum class HostPathError {
     None,
     Missing,
@@ -30,15 +30,15 @@ enum class HostPathError {
 };
 
 /*!
- * 宿主路径服务（ARCH_V4 §2.1.1）。
+ * Host path service (ARCH_V4 §2.1.1).
  *
- * 为什么单独抽一个接口：这是四期唯一一个「不经过 Docker 的外部动作」，
- * 抽出来之后
- *  - 探测与打开都能在测试里替换成 Fake（不需要真的弹出文件管理器）
- *  - 生产实现里对 KIO 的引用被限制在一个文件内（tst_source_conventions 断言）
+ * Why a separate interface: this is the only external action not going through Docker, and
+ * splitting it out means
+ *  - probe and open can be replaced by a Fake in tests (no real file manager pops up)
+ *  - production KIO references stay confined to one file (asserted by tst_source_conventions)
  *
- * 安全约定：只 stat，不读文件内容、不递归目录；挂载源路径属潜在敏感信息，
- * 实现与调用方都不得把它写进日志（ARCH_V2 §40）。
+ * Safety: stat only, never read file contents or recurse; mount source paths are potentially
+ * sensitive, so neither implementations nor callers may log them (ARCH_V2 §40).
  */
 class HostPathService : public QObject
 {
@@ -48,18 +48,18 @@ public:
     explicit HostPathService(QObject *parent = nullptr);
     ~HostPathService() override;
 
-    /*! 探测路径状态：一次 stat，不做任何 I/O 之外的事情。 */
+    /*! Probe the path state with one stat, nothing more. */
     virtual HostPathState probe(const QString &path) const = 0;
     /*!
-     * 用系统文件管理器打开目录。
+     * Open the directory in the system file manager.
      *
-     * 返回 false 表示请求在本地就被拒绝（没发出任何动作）；
-     * 真正的打开结果异步到来，经 openFinished 通知。
+     * false means the request was rejected locally (nothing was launched); the real outcome
+     * arrives asynchronously via openFinished.
      */
     virtual bool openDirectory(const QString &path) = 0;
 
 Q_SIGNALS:
-    /*! `detail` 是技术细节（供日志/调试），不是用户文案。 */
+    /*! `detail` is technical detail for logs/debugging, not user-facing text. */
     void openFinished(Kontainer::HostPathError error, const QString &detail);
 };
 

@@ -1,18 +1,19 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    端口区间地图（ARCH_next_ports.md §4.B，里程碑 M4）。
+    Port range map (ARCH_next_ports.md §4.B, milestone M4).
 
-    端口列表回答"哪个端口被谁占着"，地图回答另一个问题：**这一段里哪里还空着**——
-    不用读数字，扫一眼颜色就知道。
+    The port list answers "who holds which port"; the map answers **where a range is still
+    free** — no numbers to read, one glance at the colours.
 
-    设计取舍（实测）：
-      - 不画 0-65535：只画**用到的端口附近**那几段（聚类规则在 C++ 的
-        `HostPortUsage::clusterRanges`，每段两侧会留几个空闲端口）；
-      - 一段里最多画 N 个方块，超出部分显示"还有 N 个"——否则 1000-1100 这种
-        区间会一次性创建上百个方块，把界面拖垮；
-      - 颜色只是辅助：方块上写着端口号，图例也写全（无障碍要求）。
+    Design trade-offs (measured):
+      - no 0-65535: only the few ranges **around used ports** (clustering in C++
+        `HostPortUsage::clusterRanges`, a few free ports kept on each side);
+      - at most N tiles per range, the rest shown as "N more" — otherwise a range like
+        1000-1100 would build hundreds of tiles at once and stall the UI;
+      - colour is an aid only: every tile carries its port number and the legend is
+        complete (accessibility requirement).
 */
 
 import QtQuick
@@ -26,12 +27,12 @@ import "." as Local
 Item {
     id: root
 
-    /*! `{first, last, title, tileCount, hiddenCount, usedCount, tiles:[{port,text,stateKey,occupied}]}` 的列表。 */
+    /*! List of `{first, last, title, tileCount, hiddenCount, usedCount, tiles:[...]}`. */
     required property var ranges
-    /*! 下一个空闲宿主端口（0 = 找不到）。 */
+    /*! Next free host port (0 = none found). */
     required property int nextFreePort
 
-    /*! 点某个正在使用的端口：请求打开占用它的容器（运行中的端口只对应一个容器）。 */
+    /*! Click a used port: request the container behind it (a running port maps to one container). */
     signal containerRequested(string containerId, string containerName)
 
     objectName: "hostPortRangeMap"
@@ -40,7 +41,7 @@ Item {
         anchors.fill: parent
         spacing: Kirigami.Units.smallSpacing
 
-        /* 下一个空闲端口：只读页面不"跳"，给出来 + 一键复制（创建表单里才是"一键采用"） */
+        /* Next free port: read-only pages do not "jump", they show it + copy it (the form adopts it) */
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -62,13 +63,13 @@ Item {
             }
         }
 
-        /* 图例：颜色永远配文字 */
+        /* Legend: colour always comes with text */
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.largeSpacing
 
             Repeater {
-                // 与列表视图同一套措辞（用户要求统一）：运行中 / 未启动 / 被占用 / 未占用 / 空闲
+                // Same wording as the list view: Running / Not started / Taken / Not bound / Free
                 model: [
                     {text: i18n("Running"), stateKey: "inUse"},
                     {text: i18n("Not started"), stateKey: "reserved"},
@@ -86,8 +87,8 @@ Item {
                         Layout.preferredHeight: Kirigami.Units.gridUnit * 0.7
                         radius: 2
                         color: Local.StatusPalette.portTileColor(modelData.stateKey)
-                        // 空闲：细边框 + 极低对比的填充（"空"看起来就该是空的；
-                        // QML 的 Rectangle 没有 border.style，虚线只能靠 Canvas，不值当）
+                        // Free: thin border + very low-contrast fill ("empty" should look empty;
+                        // QML Rectangle has no border.style, dashes would need Canvas — not worth it)
                         border.width: modelData.stateKey.length === 0 ? 1 : 2
                         border.color: Local.StatusPalette.portTileBorderColor(modelData.stateKey)
                     }
@@ -133,7 +134,7 @@ Item {
 
                             QQC2.Label {
                                 objectName: "portMapRangeSummary"
-                                // 这一段里非空闲的端口既有"正在使用"也有"被声明"，措辞不要写成"in use"
+                                // Non-free ports here are both used and declared, so do not word it "in use"
                                 text: i18np("%1 port used by containers", "%1 ports used by containers", modelData.usedCount)
                                 font: Kirigami.Theme.smallFont
                                 opacity: 0.75
@@ -143,7 +144,7 @@ Item {
                                 Layout.fillWidth: true
                             }
 
-                            /* 超出上限的端口数：必须说出来，不能让用户以为这段就这么长 */
+                            /* Ports beyond the cap: state them, or users think the range is that short */
                             QQC2.Label {
                                 objectName: "portMapHiddenCount"
                                 visible: modelData.hiddenCount > 0
@@ -177,20 +178,22 @@ Item {
                                         objectName: "portMapTileLabel"
                                         anchors.centerIn: parent
                                         text: modelData.text
-                                        // 端口号用等宽字体（对齐好看），字号跟着主题的小字号
+                                        // Monospace ports (nice alignment), size from the theme small font
                                         font.family: "monospace"
                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                                         color: Local.StatusPalette.portTileTextColor(modelData.stateKey)
                                     }
 
                                     /*
-                                     * 点击跳转：只有"运行中"的端口能跳（容器唯一）。
+                                     * Click to navigate: only "running" ports do (unique container).
                                      *
-                                     * 这里**不放悬停提示**：`QQC2.ToolTip.text/visible` 是附着属性，
-                                     * 一个窗口共用同一个提示框，而地图里同时存在几十个方块、
-                                     * 切筛选/切视图时 delegate 还会被销毁重建 —— 实测会出现
-                                     * "鼠标停在哪都显示同一个容器名、切回列表还在"的残留提示。
-                                     * 容器名改由 `Accessible.name` 提供（读屏可见，不会残留）。
+                                     * **No tooltip here**: `QQC2.ToolTip.text/visible` are attached
+                                     * properties sharing one tooltip per window, while the map holds
+                                     * dozens of tiles whose delegates are destroyed and rebuilt on
+                                     * filter/view changes — measured leftovers showed the same
+                                     * container name wherever the mouse went and survived switching
+                                     * back to the list. The container name comes from
+                                     * `Accessible.name` instead (visible to screen readers, no leftovers).
                                      */
                                     MouseArea {
                                         objectName: "portMapTileClick"

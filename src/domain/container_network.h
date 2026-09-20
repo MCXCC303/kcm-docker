@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,10 +11,11 @@ namespace Kontainer
 {
 
 /*!
- * 容器连接的一个网络。
+ * One network a container is attached to.
  *
- * 单独成头文件是为了打破循环包含：容器**列表**（`domain/container.h`）与容器**详情**
- * （`domain/container_detail.h`）都需要它，而详情又依赖列表里的状态枚举。
+ * It lives in its own header to break an include cycle: both the container **list**
+ * (`domain/container.h`) and container **detail** (`domain/container_detail.h`) need it, and the
+ * detail type also needs the state enums declared in the list header.
  */
 struct ContainerNetwork {
     QString name;

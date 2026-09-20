@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,10 +14,10 @@ namespace Kontainer
 {
 
 /*!
- * 镜像 domain object。
+ * Image domain object.
  *
- * 一期按用户确认的范围扩展了 `GET /images/json`（ARCH_V1 §7.1 白名单之外的只读接口），
- * 仍然只读，且不涉及任何 pull/push/remove 操作。
+ * Phase one extended `GET /images/json` (a read-only endpoint beyond the ARCH_V1 §7.1 allowlist)
+ * as the user confirmed; it stays read-only and involves no pull/push/remove.
  */
 class Image
 {
@@ -27,20 +27,20 @@ public:
     QStringList repoDigests;
     qint64 sizeBytes = 0;
     QDateTime created; /*!< UTC */
-    int containerCount = -1; /*!< -1 表示引擎未提供（或未使用） */
+    int containerCount = -1; /*!< -1 = engine did not provide it (or it is unused) */
     bool inUse = false;
 
     bool isValid() const
     {
         return !id.isEmpty();
     }
-    /*! 去掉 "sha256:" 前缀后的 12 位短 ID。 */
+    /*! 12-character short ID with the "sha256:" prefix removed. */
     QString shortId() const;
-    /*! 首个仓库标签；没有标签（dangling）时返回空。 */
+    /*! First repo tag; empty when there is none (dangling). */
     QString primaryTag() const;
     bool isDangling() const;
 
-    /*! 值比较：数据未变时不触发模型重置（ARCH_V2 §32/§34）。 */
+    /*! Value comparison: unchanged data must not reset the model (ARCH_V2 §32/§34). */
     friend bool operator==(const Image &lhs, const Image &rhs)
     {
         return lhs.id == rhs.id && lhs.repoTags == rhs.repoTags && lhs.repoDigests == rhs.repoDigests && lhs.sizeBytes == rhs.sizeBytes

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,7 +20,7 @@ QString Network::shortId() const
 
 bool Network::isPredefined() const
 {
-    // daemon 的判定就是名字（实测错误文案：`bridge is a pre-defined network and cannot be removed`）
+    // The daemon also decides by name (observed 403: `bridge is a pre-defined network ...`)
     return name == QLatin1String("bridge") || name == QLatin1String("host") || name == QLatin1String("none");
 }
 
@@ -98,7 +98,7 @@ QString validateNetworkName(const QString &name)
     if (trimmed.isEmpty()) {
         return QStringLiteral("nameRequired");
     }
-    // Docker 的网络名允许字母数字与 _ . -，且不能含空白（实测 daemon 会拒绝含空格的名称）
+    // Docker network names allow alphanumerics, _ . - but no whitespace (the daemon rejects spaces)
     static const QRegularExpression allowed(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]*$"));
     if (!allowed.match(trimmed).hasMatch()) {
         return QStringLiteral("nameInvalid");
@@ -112,7 +112,7 @@ QString validateSubnet(const QString &subnet)
     if (trimmed.isEmpty()) {
         return {};
     }
-    // 只做"看起来像 CIDR"的检查：真正的合法性由 daemon 判定（它还要看是否与现有网络重叠）
+    // Only check that it looks like CIDR: the daemon decides real validity (it also checks overlaps)
     static const QRegularExpression cidr(QStringLiteral("^[0-9a-fA-F:.]+/[0-9]{1,3}$"));
     if (!cidr.match(trimmed).hasMatch()) {
         return QStringLiteral("subnetInvalid");
@@ -126,7 +126,7 @@ QString validateGateway(const QString &gateway, const QString &subnet)
     if (trimmed.isEmpty()) {
         return {};
     }
-    // 网关必须落在子网里：否则 daemon 会报一条很难读懂的错误
+    // The gateway must lie inside the subnet, otherwise the daemon reports a hard-to-read error
     if (subnet.trimmed().isEmpty()) {
         return QStringLiteral("gatewayNeedsSubnet");
     }

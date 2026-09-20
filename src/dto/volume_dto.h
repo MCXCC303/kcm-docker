@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,10 +18,10 @@ namespace Kontainer
 {
 
 /*!
- * `GET /volumes` 的单条记录（ARCH_V5_V8 §3.5）。
+ * One `GET /volumes` record (ARCH_V5_V8 §3.5).
  *
- * 注意载荷形态与 `/networks` **不同**：这里是**对象**（`{Volumes: [...] | null, Warnings: [...]}`），
- * 空列表时 `Volumes` 会是 `null`（本机实测如此），因此解析要同时接受 null 与缺失。
+ * Payload shape differs from `/networks`: an **object** (`{Volumes: [...] | null, Warnings: [...]}`), with
+ * `Volumes` = `null` when empty (observed locally), so parsing accepts null and missing.
  */
 struct DockerVolumeDTO {
     QString name;
@@ -36,14 +36,14 @@ struct DockerVolumeDTO {
     int refCount = -1;
 
     static std::optional<DockerVolumeDTO> fromJson(const QJsonObject &object, QString *error = nullptr);
-    /*! 解析整个响应体；`Warnings` 里的内容透出给调用方（引擎的提醒不该被丢掉）。 */
+    /*! Parse the whole payload; `Warnings` is handed to the caller (engine warnings matter). */
     static QList<DockerVolumeDTO> listFromPayload(const QByteArray &payload,
                                                   QStringList *warnings = nullptr,
                                                   QString *error = nullptr,
                                                   int *skipped = nullptr);
 };
 
-/*! DTO → domain object（方向：dto → domain）。 */
+/*! DTO -> domain object. */
 Volume volumeFromDto(const DockerVolumeDTO &dto);
 QList<Volume> volumesFromDto(const QList<DockerVolumeDTO> &dtos);
 

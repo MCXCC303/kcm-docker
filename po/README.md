@@ -1,23 +1,23 @@
-<!-- SPDX-FileCopyrightText: 2026 kontainer developers -->
+<!-- SPDX-FileCopyrightText: 2026 kcm-docker developers -->
 <!-- SPDX-License-Identifier: GPL-2.0-or-later -->
 
-# 翻译
+# Translations
 
-采用 KDE 标准布局：
+Standard KDE layout:
 
 ```
 po/
-├── kcm_docker.pot         # 模板（由 xgettext 提取，仅供参考/合并用）
+├── kcm_docker.pot         # template (extracted by xgettext; for reference/merging)
 └── <lang>/
-    └── kcm_docker.po      # 翻译域 = kcm_docker（= KCM 插件 id，与 kTranslationDomain 一致）
+    └── kcm_docker.po      # domain = kcm_docker (= KCM plugin id, same as kTranslationDomain)
 ```
 
-构建时 `ki18n_install(po)` 会把每个 `po/<lang>/kcm_docker.po` 编译成
-`${KDE_INSTALL_LOCALEDIR}/<lang>/LC_MESSAGES/kcm_docker.mo` 并安装。
-`source build/prefix.sh` 之后 `KDE_INSTALL_LOCALEDIR` 位于前缀内，KLocalizedString
-即可找到译文。
+At build time `ki18n_install(po)` compiles every `po/<lang>/kcm_docker.po` into
+`${KDE_INSTALL_LOCALEDIR}/<lang>/LC_MESSAGES/kcm_docker.mo` and installs it.
+After `source build/prefix.sh` that directory is inside the prefix, so
+KLocalizedString finds the translations.
 
-## 重新提取模板
+## Re-extracting the template
 
 ```bash
 find src -name '*.cpp' -o -name '*.h' -o -name '*.qml' | xargs xgettext \
@@ -26,34 +26,34 @@ find src -name '*.cpp' -o -name '*.h' -o -name '*.qml' | xargs xgettext \
   --package-name=kontainer -o po/kcm_docker.pot
 ```
 
-## 新增语言
+## Adding a language
 
 ```bash
 mkdir -p po/<lang>
 msginit -i po/kcm_docker.pot -o po/<lang>/kcm_docker.po -l <lang>
 ```
 
-## 验证
+## Verifying
 
 ```bash
-LANGUAGE=zh_CN kcmshell6 kcm_docker     # 需要先 source build/prefix.sh
+LANGUAGE=zh_CN kcmshell6 kcm_docker     # source build/prefix.sh first
 ```
 
-自动检查（`tst_i18n_consistency`，四条一起才说明 i18n 是好的）：
+Automated checks (`tst_i18n_consistency`; i18n is only healthy when all four pass):
 
-1. 翻译域 == 插件 id == 元数据 `TranslationDomain`
-2. `po/zh_CN` 没有未翻译条目（`msgfmt --check` 只查格式，不查漏译）
-3. `po/kcm_docker.pot` 与源码同步——测试会现场跑一遍上面那条 `xgettext` 命令并比对集合，
-   所以**改了界面文案就要重新提取模板**，否则测试直接失败（漏掉的那条在界面上表现为中英混排）
-4. 运行时真的能加载 `.mo`：按 `<XDG_DATA_DIRS>/locale/<lang>/LC_MESSAGES/kcm_docker.mo`
-   找一次并断言几条译文（域、语言、安装目录任一环错都会静默退回英文）
+1. translation domain == plugin id == metadata `TranslationDomain`
+2. `po/zh_CN` has no untranslated entries (`msgfmt --check` checks format, not gaps)
+3. `po/kcm_docker.pot` matches the sources — the test reruns the `xgettext` command above and
+   compares sets, so **a UI string change requires re-extracting** or the test fails (mixed-language UI)
+4. the `.mo` really loads: looked up at `<XDG_DATA_DIRS>/locale/<lang>/LC_MESSAGES/kcm_docker.mo`
+   and a few translations asserted (wrong domain, language or dir silently reverts to English)
 
-截图复核中文排版（中文比英文长，横幅折行与按钮宽度只有看截图才知道）：
+Screenshot review of the Chinese layout (Chinese is longer; wrapping and button widths only show there):
 
 ```bash
 KCM_DOCKER_RENDER_LANG=zh_CN tests/tools/render_ui.sh daemon-config 1200 950 dark /tmp/zh.png
 ```
 
-> `xgettext` 会对"待译字符串里带 URL"给出警告（例如示例地址）。
-> 处理方式是把它拆成参数：`i18n("… example %1", QStringLiteral("https://…"))`——
-> URL 不需要翻译，混进 msgid 只会让译者去改动它。
+> `xgettext` warns about URLs inside strings that need translation (e.g. example
+> addresses). Split them out as arguments: `i18n("… example %1", QStringLiteral("https://…"))` —
+> URLs need no translation, and leaving them in the msgid only invites translators to edit them.

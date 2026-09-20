@@ -1,23 +1,23 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    镜像引用输入（ARCH_V5_V8 §1.6）。
+    Image reference input (ARCH_V5_V8 §1.6).
 
-    拉取镜像、容器创建、Dockerfile 构建的目标 tag 都用它——**校验只有一份实现**：
-    组件自己不写正则，而是调用 C++ 侧的 `isValidImageReference` /
-    `normalizedImageReference`（四期就在 `ImageReference` 里实现并测过）。
+    Used for pulling images, creating containers and Dockerfile build tags — with
+    **validation implemented once**: no regex here, it calls C++ `isValidImageReference` /
+    `normalizedImageReference` (implemented and tested in `ImageReference` back in phase 4).
 
-    用法：
+    Usage:
 
         Components.ImageRefInput {
-            operations: root.operations        // 提供两个校验方法
+            operations: root.operations        // provides the two validation methods
             placeholderText: i18n("alpine:3.19")
             onAccepted: root.startPull(text)
         }
 
-    组件的对外面：`text`（可读可写）、`referenceValid`、`normalizedReference`、
-    `plainReference`（缺 tag 会补 latest）、`alreadyPulling`、信号 `accepted`。
+    Public surface: `text` (read/write), `referenceValid`, `normalizedReference`,
+    `plainReference` (a missing tag gets `latest`), `alreadyPulling`, signal `accepted`.
 */
 
 import QtQuick
@@ -33,40 +33,42 @@ ColumnLayout {
 
     objectName: "imageRefInput"
 
-    /*! 提供 `isValidImageReference` / `normalizedImageReference` / `pulls` 的对象。 */
+    /*! Object providing `isValidImageReference` / `normalizedImageReference` / `pulls`. */
     required property var operations
 
-    /*! 当前输入文本（调用方读写它）。 */
+    /*! Current input text (read and written by the caller). */
     property alias text: field.text
-    /*! 输入框占位文本。 */
+    /*! Field placeholder text. */
     property string placeholderText: i18n("alpine:3.19")
-    /*! 是否显示"已经在拉取"的提示（只有拉取场景需要）。 */
+    /*! Whether to show the "already pulling" hint (only the pull scenario needs it). */
     property bool checkAlreadyPulling: true
 
-    /*! 文本是否是合法的镜像引用。 */
+    /*! Whether the text is a valid image reference. */
     readonly property bool referenceValid: root.operations.isValidImageReference(root.text)
-    /*! 当前输入对应的仓库地址（无效引用时为空）：拉取对话框据此提示"还没登录"。 */
+    /*! Registry address of the input (empty when invalid); the pull dialog warns "not logged in" with it. */
     readonly property string serverAddress: root.referenceValid ? root.operations.serverAddressForImage(root.text) : ""
-    /*! 归一化后的引用（缺 tag 会补 `latest`）。 */
+    /*! Normalised reference (a missing tag gets `latest`). */
     readonly property string normalizedReference: root.operations.normalizedImageReference(root.text)
     /*!
-     * 归一化改变了引用（用户没写 tag）→ 必须显式告知会被拉取什么。
-     * 注意用 `trim()`：Qt 6 的 QML JS 不再把 QString 方法挂在字符串上（`trimmed()` 会抛 TypeError）。
+     * Normalisation changed the reference (the user typed no tag) → say explicitly what
+     * will be pulled. Note the `trim()`: Qt 6 QML JS no longer exposes QString methods on
+     * strings (`trimmed()` throws a TypeError).
      */
     readonly property bool plainReference: root.referenceValid && root.text.trim() !== root.normalizedReference
     /*!
-     * 该引用已经在进行中的拉取列表里。
+     * This reference is in the in-progress pull list.
      *
-     * 注意 `count > 0` 不是多余的：`rowForReference` 是 Q_INVOKABLE，QML 不会追踪函数调用，
-     * 必须同时读一个可通知属性（列表条数）才能让这个绑定在拉取开始/结束时重新求值。
+     * `count > 0` is not redundant: `rowForReference` is Q_INVOKABLE and QML does not track
+     * function calls, so the binding also needs a notifiable property (the row count) to
+     * re-evaluate when pulls start or finish.
      */
     readonly property bool alreadyPulling: root.checkAlreadyPulling && root.referenceValid
         && root.operations.pulls.count > 0
         && root.operations.pulls.rowForReference(root.normalizedReference) >= 0
-    /*! 是否可以提交（合法且没有重复拉取）。 */
+    /*! Whether submission is allowed (valid and not a duplicate pull). */
     readonly property bool acceptable: root.referenceValid && !root.alreadyPulling
 
-    /*! 用户按下回车（或调用 `forceActiveFocus()` 后确认）。 */
+    /*! The user pressed Enter (or confirmed after `forceActiveFocus()`). */
     signal accepted
 
     spacing: Kirigami.Units.smallSpacing
@@ -89,7 +91,7 @@ ColumnLayout {
         Layout.fillWidth: true
         visible: field.text.length > 0 && !root.referenceValid
         text: i18n("This is not a valid image reference.")
-        // 负面色只能经 StatusPalette 取（状态色单一来源，§12）
+        // Negative colour only via StatusPalette (single source of status colours, §12)
         color: Local.StatusPalette.color("negative")
         wrapMode: Text.WordWrap
         font: Kirigami.Theme.smallFont

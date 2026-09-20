@@ -1,12 +1,12 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    网络详情（ARCH_V5_V8 §3.2）。
+    Network details (ARCH_V5_V8 §3.2).
 
-    数据来自 `NetworkDetailController`（它是后端已拿到的 `/networks` 快照，不再单独发请求）。
-    页面上能做的动作只有两类：跳到某个成员容器的详情、复制 ID——网络本身的创建/删除
-    与连接/断开在 6C/6D 落地（那时会加动作条，保持在同一个页面）。
+    Data comes from `NetworkDetailController` (the existing `/networks` snapshot, no extra request).
+    Only two actions exist here: jump to a member container's details, and copy the ID. Network
+    create/remove and connect/disconnect land in 6C/6D, which adds an action bar to this same page.
 */
 
 import QtQuick
@@ -27,18 +27,19 @@ Kirigami.Page {
     readonly property var network: kcm.controller.networkModel
 
     signal closeRequested
-    /*! 跳到成员容器的详情（由 main.qml 负责导航）。 */
+    /*! Jump to a member container's details (navigation is handled by main.qml). */
     signal containerRequested(string containerId)
 
     readonly property var operations: kcm.controller.operations
     /*!
-     * 这是不是 daemon 预定义网络（`bridge` / `host` / `none`）。
+     * Whether this is a daemon pre-defined network (`bridge` / `host` / `none`).
      *
-     * 预定义网络删不掉：daemon 会回 403 `is a pre-defined network`。界面上**不出现**
-     * 删除入口，并在页面里说明原因——不让用户点到最后才失败（§3.2/§3.3）。
+     * These cannot be removed: the daemon replies 403 `is a pre-defined network`. The remove entry
+     * **never appears** and the page explains why, instead of letting the user fail at the last
+     * click (§3.2/§3.3).
      */
     readonly property bool removable: page.controller.valid && !page.controller.predefined
-    /*! 删除会不会影响已连接的容器（确认文案要写清楚）。 */
+    /*! Whether removal affects connected containers (the confirmation text must say so). */
     readonly property int connectedCount: page.controller.memberCount
 
     objectName: "networkDetailPage"
@@ -50,7 +51,7 @@ Kirigami.Page {
             objectName: "removeNetworkAction"
             text: i18n("Remove network…")
             icon.name: "edit-delete"
-            // 内置网络、没有写权限、或有操作在途时不出现/不可用
+            // Hidden/disabled for built-in networks, without write permission, or while busy
             visible: page.removable && page.operations.writeAllowed
             enabled: !page.operations.isTargetBusy("network:" + page.networkId)
             onTriggered: removeNetworkDialog.open()
@@ -92,7 +93,7 @@ Kirigami.Page {
                     text: page.controller.name.length > 0 ? page.controller.name : i18n("Network")
                 }
 
-                /* ---------------- 概览 ---------------- */
+                /* ---------------- Overview ---------------- */
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -124,7 +125,7 @@ Kirigami.Page {
                     }
                 }
 
-                // 内置网络删不掉：在详情页把原因写清楚（daemon 会回 403）
+                // Built-in networks cannot be removed: explain why here (daemon replies 403)
                 Kirigami.InlineMessage {
                     objectName: "networkPredefinedNotice"
                     Layout.fillWidth: true
@@ -148,9 +149,10 @@ Kirigami.Page {
 
                 Kirigami.FormLayout {
                     /*
-                     * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
-                     * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
-                     * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                     * Shrink to content and align left: Kirigami's FormLayout right-aligns the
+                     * `[label][field]` group, so at full width the block drifts into the right half
+                     * (observed in testing). Fields that need width (long commands) set
+                     * Layout.preferredWidth themselves.
                      */
                     Layout.fillWidth: false
                     Layout.alignment: Qt.AlignLeft
@@ -179,7 +181,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------- 成员容器 ---------------- */
+                /* ---------------- Member containers ---------------- */
                 Kirigami.Heading {
                     Layout.fillWidth: true
                     level: 3
@@ -207,17 +209,17 @@ Kirigami.Page {
 
                         objectName: "networkMemberRow"
                         Layout.fillWidth: true
-                        // 可跳转的行才响应点击（target 是容器 id）
+                        // Only rows with a target (a container id) are clickable
                         enabled: memberRow.target.length > 0
                         onClicked: page.containerRequested(memberRow.target)
 
                         contentItem: RowLayout {
                             spacing: Kirigami.Units.smallSpacing
 
-                            // 与「镜像 → 关联容器」同一种状态图标（用户反馈要统一）
+                            // Same state icon as Image → Related containers (user asked for consistency)
                             Kirigami.Icon {
                                 objectName: "networkMemberStateIcon"
-                                // 状态未知时干脆不画：宁可少一个图标，也不要一个"?"占位
+                                // Unknown state: draw nothing rather than a "?" placeholder
                                 visible: memberRow.stateKey.length > 0
                                 source: Kontainer.Presentation.stateIconName(memberRow.stateKey)
                                 color: Components.StatusPalette.color(Kontainer.Presentation.stateSemanticKey(memberRow.stateKey, "none"))
@@ -259,7 +261,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* ---------------- 标签与选项 ---------------- */
+                /* ---------------- Labels and options ---------------- */
                 Components.CollapsibleSection {
                     objectName: "networkLabelsSection"
                     Layout.fillWidth: true
@@ -297,7 +299,7 @@ Kirigami.Page {
         objectName: "removeNetworkDialog"
         headingText: i18n("Remove network")
         questionText: i18n("Remove the network “%1”?", page.controller.name)
-        // 后果说明是必填：连着的容器会失去这个网络（这正是用户需要知道的）
+        // The consequence text is required: connected containers lose this network
         consequenceText: page.connectedCount > 0
             ? i18ncp("@info network removal consequence", "One connected container loses this network.", "%1 connected containers lose this network.", page.connectedCount)
             : i18n("No container is connected to this network.")

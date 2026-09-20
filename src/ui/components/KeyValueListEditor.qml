@@ -1,21 +1,23 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    键值对编辑器（ARCH_V5_V8 §1.6）。
+    Key/value editor (ARCH_V5_V8 §1.6).
 
-    环境变量、容器/网络/卷的标签、Dockerfile 构建参数都用它，避免每处再写一套
-    "一行两个输入框 + 增删"。
+    Used for environment variables, container/network/volume labels and Dockerfile build
+    arguments, so "two inputs per row + add/remove" is not rewritten every time.
 
-    三件必须由它统一承担的事：
+    Three things it must own centrally:
 
-      - **键名校验只有一份实现**：调用 C++ 的 `Presentation.isValidEnvKey()`，
-        QML 里不写第二份正则
-      - **值可以当密码显示**（`secretValues`）：环境变量常含密钥，默认不回显
-      - **粘贴 `.env` 文本**：解析也走 C++（`Presentation.parseEnvText()`），
-        支持注释、空行、`export ` 前缀与引号
+      - **key validation has one implementation**: calls C++ `Presentation.isValidEnvKey()`,
+        QML holds no second regex
+      - **values can be masked** (`secretValues`): environment variables often hold
+        secrets, so they are not echoed by default
+      - **pasting `.env` text**: parsing also goes through C++
+        (`Presentation.parseEnvText()`), supporting comments, blank lines, the `export `
+        prefix and quoting
 
-    用法：
+    Usage:
 
         Components.KeyValueListEditor {
             id: envEditor
@@ -26,7 +28,7 @@
         }
 */
 
-// delegate 需要访问外层 id（调用 ListModel 的增删改）：固定用 Unbound 语义
+// Delegates need the outer id (to add/remove/modify the ListModel): keep the Unbound semantics
 pragma ComponentBehavior: Unbound
 
 import QtQuick
@@ -41,44 +43,45 @@ import "." as Local
 ColumnLayout {
     id: root
 
-    /*! 初始条目：`[{ key, value }]`（组件创建时读取一次）。 */
+    /*! Initial entries: `[{ key, value }]` (read once when the component is created). */
     property var initialEntries: []
-    /*! 键的占位文本（例如 `TZ`）。 */
+    /*! Key placeholder (for example `TZ`). */
     property string keyPlaceholderText: "KEY"
-    /*! 值的占位文本。 */
+    /*! Value placeholder. */
     property string valuePlaceholderText: "value"
-    /*! 值默认以密码样式显示（环境变量等可能是密钥）。 */
+    /*! Values are masked by default (environment variables may be secrets). */
     property bool secretValues: false
-    /*! 是否显示"粘贴 .env"按钮。 */
+    /*! Whether to show the "Paste .env" button. */
     property bool envPasteEnabled: false
 
-    /*! 条目发生变化。 */
+    /*! Entries changed. */
     signal changed
 
     /*!
-     * delegate 用的中转对象。
+     * Relay object for delegates.
      *
-     * `pragma ComponentBehavior: Unbound` 下，delegate 里引用**根对象的 id**（root）
-     * 会抛 `ReferenceError: root is not defined`——用户实测的报错就出在这里。
-     * 同一文件里**非根**对象的 id 是可用的，因此把 delegate 需要的能力集中放在这里，
-     * 转发到根对象上。这样不必改成 Bound（那个 pragma 是修崩溃时加的，不能随便去掉）。
+     * Under `pragma ComponentBehavior: Unbound`, referencing the **root object's id**
+     * (root) from a delegate throws `ReferenceError: root is not defined` — the error seen
+     * in user testing. Ids of **non-root** objects in the same file do work, so everything
+     * delegates need is collected here and forwarded to the root. This avoids switching to
+     * Bound (that pragma was added to fix a crash and must not be dropped lightly).
      */
     QtObject {
         id: editor
 
-        /* delegate 需要的只读配置：也必须走这里，delegate 里读 root.* 同样会抛错 */
+        /* Read-only config for delegates: also via here, reading root.* in a delegate throws too */
         readonly property string keyPlaceholder: root.keyPlaceholderText
         readonly property string valuePlaceholder: root.valuePlaceholderText
         readonly property bool secretValues: root.secretValues
         readonly property var model: rows
         readonly property var presentation: Kontainer.Presentation
 
-        /*! 删除一行（delegate 调用）。 */
+        /*! Remove a row (called by delegates). */
         function removeRow(row) {
             rows.remove(row);
             root.changed();
         }
-        /*! 键/值被编辑（delegate 调用）。 */
+        /*! Key/value edited (called by delegates). */
         function setEntry(row, key, value) {
             if (key !== undefined) {
                 rows.setProperty(row, "entryKey", key);
@@ -142,7 +145,7 @@ ColumnLayout {
                     onTextEdited: editor.setEntry(index, undefined, text)
                 }
 
-                // 只有"值可能是密钥"的场景才需要显隐切换
+                // A reveal toggle is only needed where the value may be a secret
                 QQC2.ToolButton {
                     objectName: "keyValueRevealButton"
                     visible: editor.secretValues
@@ -226,7 +229,7 @@ ColumnLayout {
         }
     }
 
-    /*! 当前条目（丢掉完全为空的行）。 */
+    /*! Current entries (fully empty rows are dropped). */
     function entries(): var {
         const result = [];
         for (let i = 0; i < rows.count; ++i) {
@@ -243,7 +246,7 @@ ColumnLayout {
         return result;
     }
 
-    /*! 是否有键名非法或重复（空行不算错误，提交时会被忽略）。 */
+    /*! Whether a key is invalid or duplicated (blank rows are no error, they are ignored on submit). */
     function hasErrors(): bool {
         const seen = [];
         for (let i = 0; i < rows.count; ++i) {
@@ -262,7 +265,7 @@ ColumnLayout {
         return false;
     }
 
-    /*! 用新的一组条目替换现有内容。 */
+    /*! Replace the current content with a new set of entries. */
     function setEntries(list): void {
         rows.clear();
         for (const entry of list) {
@@ -274,7 +277,7 @@ ColumnLayout {
         root.changed();
     }
 
-    /*! 追加一组条目（粘贴 .env 用），已存在的键会被覆盖。 */
+    /*! Append entries (used by .env paste); keys that already exist are overwritten. */
     function appendEntries(list): void {
         for (const entry of list) {
             let replaced = false;
@@ -295,7 +298,7 @@ ColumnLayout {
         root.changed();
     }
 
-    /*! 粘贴 `.env` 文本的输入框（多行，确认后合并）。 */
+    /*! Input for pasted `.env` text (multiline, merged on accept). */
     Kirigami.PromptDialog {
         id: envPasteDialog
 
@@ -313,8 +316,8 @@ ColumnLayout {
                 id: envPasteField
 
                 objectName: "envPasteField"
-                // 示例文本是数据而不是界面文案
-                placeholderText: "TZ=Asia/Shanghai\n# comment\nAPI_KEY=\"secret\"" // i18n-lint: allow 示例 .env 内容
+                // The example text is data, not UI copy
+                placeholderText: "TZ=Asia/Shanghai\n# comment\nAPI_KEY=\"secret\"" // i18n-lint: allow sample .env content
                 font.family: "monospace"
                 wrapMode: TextEdit.NoWrap
             }

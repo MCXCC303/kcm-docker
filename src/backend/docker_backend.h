@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -31,17 +31,19 @@ namespace Kontainer
 {
 
 /*!
- * 真实的 Docker backend（ARCH_V1 §6.3/§11/§15/§17，ARCH_V2 §29/§42，ARCH_V4 §2.2）。
+ * Real Docker backend (ARCH_V1 §6.3/§11/§15/§17, ARCH_V2 §29/§42, ARCH_V4 §2.2).
  *
- * 职责：HTTP 请求、Unix socket、HTTP 状态码、JSON 解码、API 版本处理、
- * 错误映射、请求去重。不含任何 UI 文本，也不知道用户当前在哪个页面（§43）。
+ * Owns HTTP requests, the Unix socket, HTTP status codes, JSON decoding, API version
+ * handling, error mapping and request deduplication. No UI text, and no knowledge of
+ * which page the user is on (§43).
  *
- * 读路径：GET /_ping、/version、/info、/containers/json、/images/json、/system/df、
- * /containers/{id}/json、/images/{id}/json、/containers/{id}/stats?stream=false。
+ * Read paths: GET /_ping, /version, /info, /containers/json, /images/json, /system/df,
+ * /containers/{id}/json, /images/{id}/json, /containers/{id}/stats?stream=false.
  *
- * 四期起新增写操作（ARCH_V4 §2.3/§2.4）：容器 start / stop / restart / remove，
- * 镜像 pull（流式，带进度与取消）/ remove。全部路径来自 `docker_api_paths.h`，
- * 且本类是唯一允许调用 DockerClient 写方法的文件（tst_source_conventions 断言）。
+ * Since phase 4 also writes (ARCH_V4 §2.3/§2.4): container start / stop / restart /
+ * remove, image pull (streaming, with progress and cancel) / remove. All paths come from
+ * `docker_api_paths.h`; this is the only file allowed to call DockerClient write methods
+ * (asserted by tst_source_conventions).
  */
 class DockerBackend : public DockerBackendInterface
 {
@@ -74,7 +76,7 @@ public:
     void requestContainerStats(const QString &id) override;
     void stopContainerStats(const QString &id) override;
 
-    /* --- 写操作（ARCH_V4 §2.2.4） --- */
+    /* --- Write operations (ARCH_V4 §2.2.4) --- */
     DockerEndpoint endpoint() const override;
     void startContainer(const QString &id) override;
     void stopContainer(const QString &id) override;
@@ -141,25 +143,25 @@ public:
 private:
     using ReadyCallback = std::function<void()>;
 
-    /*! `/auth` 的超时（引擎要联系仓库，与写操作同量级）。 */
+    /*! `/auth` timeout (the engine contacts the registry; same order as a mutation). */
     int authCheckTimeoutMs() const;
 
 
-    /* --- 容器日志（流式，ARCH_V5_V8 §3.1） --- */
+    /* --- Container logs (streaming, ARCH_V5_V8 §3.1) --- */
     struct LogStreamState {
         DockerReply *reply = nullptr;
         LogFrameReader reader;
-        /*! 用户是否已经要求停止（用于把结束原因归到"取消"）。 */
+        /*! Whether the user already asked to stop (so the end reason is reported as cancel). */
         bool cancelled = false;
     };
-    /*! 每个容器最多一路日志流（换容器或重连会先停掉旧的）。 */
+    /*! At most one log stream per container (switching or reconnecting stops the old one). */
     QHash<QString, LogStreamState> m_logStreams;
-    /*! 历史（follow=0）读取的超时；follow 流不设静默超时。 */
+    /*! Timeout for history reads (follow=0); follow streams get no idle timeout. */
     int logHistoryTimeoutMs() const;
-    /*! 还在等版本握手时就被要求停止的日志请求（避免开了流没人收）。 */
+    /*! Log requests cancelled while still awaiting the version handshake (never streamed). */
     QSet<QString> m_cancelledLogRequests;
 
-    /* --- 镜像拉取（流式，可并发，ARCH_V4 §2.4） --- */
+    /* --- Image pulls (streaming, concurrent, ARCH_V4 §2.4) --- */
 
     struct PullLayerState {
         qint64 current = 0;
@@ -167,7 +169,7 @@ private:
         bool complete = false;
     };
 
-    /*! 一路拉取的全部状态：每路都有自己的流解析器与进度聚合。 */
+    /*! All state of one pull: it has its own stream parser and progress aggregation. */
     struct ImagePullState {
         QString reference;
         QString targetKey;
@@ -178,7 +180,7 @@ private:
         bool failed = false;
     };
 
-    /*! 一路构建的状态：自己的流解析器 + 当前进度聚合。 */
+    /*! State of one build: its own stream parser plus the current progress. */
     struct ImageBuildState {
         QString id;
         QString contextArchive;
@@ -188,28 +190,28 @@ private:
         bool failed = false;
     };
 
-    /*! 需要 API 版本前缀的请求：若尚未协商，则先完成握手再执行。 */
+    /*! Requests needing an API version prefix: finish the handshake first when unnegotiated. */
     void withApiVersion(Section section, ReadyCallback callback);
 
     /*!
-     * 写操作的地基：等版本握手完成后执行；握手失败时把错误作为
-     * mutation 失败上报（而不是变成一个莫名其妙的 section 错误）。
+     * Base for writes: run after the version handshake. If the handshake failed, the error
+     * is reported as a mutation failure (not as an unrelated section error).
      */
     void runMutation(Mutation mutation, const QString &targetKey, ReadyCallback run);
-    /*! start / stop / restart / remove 共用的实现。 */
+    /*! Shared implementation of start / stop / restart / remove. */
     void runContainerMutation(Mutation mutation, const QString &id, const QString &apiPath, const QUrlQuery &query);
     /*!
-     * 用容器列表里的 `NetworkSettings.Networks` 汇总出每个网络的成员。
+     * Aggregate each network's members from `NetworkSettings.Networks` in the container list.
      *
-     * 为什么必须这么做：实测 `GET /networks` 的 `Containers` 字段是**空的**
-     * （只有 `GET /networks/{id}` 才填），因此"哪些容器连了这个网络"只能从容器侧汇总。
-     * 容器列表与网络列表任一先到都要重算一次（幂等，代价很小）。
+     * Measured: `GET /networks` returns an empty `Containers` field (only
+     * `GET /networks/{id}` fills it), so membership can only come from the container side.
+     * Recompute when either list arrives (idempotent, cheap).
      */
     void refreshNetworkMembership();
 
-    /*! 处理构建流的一行（聚合进度、记录失败原因）。 */
+    /*! Handle one line of a build stream (aggregate progress, record the failure reason). */
     void handleBuildLine(ImageBuildState &state, const QJsonObject &object);
-    /*! 结束一路构建：删临时 tar、清理状态、发信号。 */
+    /*! End one build: delete the temp tar, clean up state, emit signals. */
     void finishBuild(const QString &buildId, MutationOutcome outcome, const DockerError &error);
 
     void startPullRequest(const QString &reference, const QString &targetKey, const Kontainer::RegistryCredential &credential);
@@ -233,15 +235,16 @@ private:
 
     void finishHandshakeSuccess();
     void finishHandshakeFailure(const DockerError &error);
-    /*! 清空 /info 汇总计数，避免把上一次的旧计数当成当前值展示。 */
+    /*! Clear the /info aggregate counts so the previous read's values are not shown as current. */
     void resetEngineCounts();
     void flushReadyCallbacks(const DockerError &error);
     void failSection(Section section, const DockerError &error);
     void updateLoading();
 
     /*!
-     * 请求去重（ARCH_V2 §29）：key = 请求类型 + 资源。
-     * 返回 false 表示同一资源已有同类请求在途，调用方应合并（coalesce）本次请求。
+     * Request deduplication (ARCH_V2 §29): key = request type + resource.
+     * Returns false when a same-type request for that resource is already in flight; the
+     * caller should coalesce this one.
      */
     bool beginRequest(const QString &key);
     void endRequest(const QString &key);
@@ -260,25 +263,25 @@ private:
     bool m_imagesInFlight = false;
     bool m_networksInFlight = false;
     bool m_volumesInFlight = false;
-    /*! 上一次成功读取的数据卷列表（刷新失败时保留）。 */
+    /*! Last successfully read volume list (kept when a refresh fails). */
     QList<Volume> m_volumes;
-    /*! 上一次成功读取的网络列表（刷新失败时保留，界面不会突然空掉）。 */
+    /*! Last successfully read network list (kept on failure so the UI does not go blank). */
     QList<Network> m_networks;
     bool m_handshakeInFlight = false;
     bool m_loading = false;
 
-    /*! 在途请求 key 集合（inspect / stats / storage 的去重）。 */
+    /*! Set of in-flight request keys (deduplication for inspect / stats / storage). */
     QSet<QString> m_inFlightRequests;
-    /*! 仍然需要 stats 的容器（离开详情页后移除，§27）。 */
+    /*! Containers still wanting stats (removed when leaving the detail page, §27). */
     QSet<QString> m_statsWanted;
 
     QList<QPair<Section, ReadyCallback>> m_readyCallbacks;
 
-    /*! 在途拉取，key = targetKey（`image:<归一化引用>`）。 */
+    /*! In-flight pulls, key = targetKey (`image:<normalized reference>`). */
     QHash<QString, ImagePullState> m_pulls;
     QHash<QString, ImageBuildState> m_builds;
 
-    /*! 等待版本握手的写操作（握手完成或失败后统一清算）。 */
+    /*! Writes waiting for the version handshake (settled together once it ends). */
     struct PendingMutation {
         Mutation mutation;
         QString targetKey;

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -24,17 +24,18 @@ namespace Kontainer
 
 namespace
 {
-/*! `.dockerignore` 的一条规则（只实现规范里最常用的子集）。 */
+/*! One `.dockerignore` rule (only the most common subset of the spec is implemented). */
 struct IgnoreRule {
     QRegularExpression pattern;
     bool negated = false;
 };
 
 /*!
- * 把 `.dockerignore` 的一行编译成正则。
+ * Compile one `.dockerignore` line into a regex.
  *
- * 支持的写法：`#` 注释与空行、`!` 取反、`*` 匹配任意字符（不跨 `/`）、`?` 匹配单字符、
- * 末尾 `/` 只匹配目录、开头 `/` 锚定到上下文根。**不做**字符类与 `**`（登记为偏离）。
+ * Supported: `#` comments and blank lines, `!` negation, `*` (any character, not across `/`),
+ * `?` (single character), trailing `/` (directories only), leading `/` (anchored to the context
+ * root). Character classes and `**` are **not** implemented (logged as a deviation).
  */
 bool compileIgnoreRule(const QString &line, IgnoreRule *rule)
 {
@@ -68,7 +69,7 @@ bool compileIgnoreRule(const QString &line, IgnoreRule *rule)
         }
     }
 
-    // 目录规则（`logs/`）：目录本身与它下面的**整棵子树**都算命中
+    // Directory rule (`logs/`): the directory itself and its **whole subtree** match
     const QString pattern = directoryOnly ? prefix + body + QStringLiteral("(/.*)?$")
                                           : prefix + body + QLatin1Char('$');
     rule->pattern = QRegularExpression(pattern);
@@ -81,13 +82,13 @@ bool isIgnored(const QString &relativePath, bool isDirectory, const QList<Ignore
     for (const IgnoreRule &rule : rules) {
         Q_UNUSED(isDirectory);
         if (rule.pattern.match(relativePath).hasMatch()) {
-            ignored = !rule.negated; // 后面的规则覆盖前面的
+            ignored = !rule.negated; // later rules override earlier ones
         }
     }
     return ignored;
 }
 
-/*! 读 `.dockerignore`（不存在就是没有规则）。 */
+/*! Read `.dockerignore` (a missing file means no rules). */
 QList<IgnoreRule> readIgnoreRules(const QString &contextDirectory)
 {
     QList<IgnoreRule> rules;
@@ -104,7 +105,7 @@ QList<IgnoreRule> readIgnoreRules(const QString &contextDirectory)
     return rules;
 }
 
-/*! 目标路径是否落在上下文目录内（防符号链接穿越）。 */
+/*! Whether the target path stays inside the context directory (anti symlink traversal). */
 bool staysInside(const QString &canonicalRoot, const QString &candidate)
 {
     const QString canonical = QFileInfo(candidate).canonicalFilePath();
@@ -132,8 +133,8 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
 
     const bool inlineDockerfile = !options.inlineDockerfile.isEmpty();
     if (!inlineDockerfile && !QFileInfo::exists(QDir(root).filePath(options.dockerfile))) {
-        // 引擎在缺 Dockerfile 时回 500 "Cannot locate specified Dockerfile"，
-        // 本地先给更清楚的提示（§5.2 前置校验）
+        // The engine answers 500 "Cannot locate specified Dockerfile" when it is missing;
+        // check locally first for a clearer message (§5.2 pre-check)
         result.errorKey = QStringLiteral("dockerfileMissing");
         result.errorDetail = options.dockerfile;
         return result;
@@ -153,7 +154,7 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
     tempFile.close();
 
     const QList<IgnoreRule> rules = readIgnoreRules(root);
-    QStringList symlinkTargets; // 相对路径列表（与 tar 里的链接分开收集，最后统一写）
+    QStringList symlinkTargets; // relative paths (collected apart from tar links, written last)
     QStringList symlinkPaths;
     qint64 totalBytes = 0;
     int fileCount = 0;
@@ -161,15 +162,15 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
     QString failureDetail;
 
     {
-    // 只写文件条目（空目录不会进 tar，Docker 侧无所谓）：addLocalDirectory 是递归的，
-    // 用它会把整棵树重复写两遍，因此这里按条目自己加
+    // Only file entries are written (empty dirs never reach the tar, which is fine for Docker):
+    // addLocalDirectory is recursive and would write the tree twice, so entries are added here
     KTar tar(archivePath, QStringLiteral("application/x-tar"));
     if (!tar.open(QIODevice::WriteOnly)) {
         result.errorKey = QStringLiteral("archiveFailed");
         return result;
     }
 
-    /* 自己递归（而不是 QDirIterator）：目录被 .dockerignore 排除时要能**整棵子树**跳过 */
+    /* Recurse manually (not QDirIterator): an ignored directory must skip its **whole subtree** */
     std::function<void(const QString &)> walk = [&](const QString &relativeDirectory) {
         if (!failureKey.isEmpty()) {
             return;
@@ -192,7 +193,7 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
                 continue;
             }
             if (info.isSymLink()) {
-                // 符号链接：指向上下文之外的**跳过**（防目录穿越），指向里面的按链接写进 tar
+                // Symlinks escaping the context are **skipped**; inside ones are written as tar links
                 if (!staysInside(root, info.absoluteFilePath())) {
                     qCWarning(kontainerBackend) << "skipping symlink that escapes the build context:" << relative;
                     result.skipped.append(relative);
@@ -207,7 +208,7 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
                 continue;
             }
             if (relative == QLatin1String(".dockerignore")) {
-                continue; // 忽略规则本身不必进上下文
+                continue; // the ignore file itself need not enter the context
             }
 
             ++fileCount;
@@ -222,14 +223,14 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
                 failureDetail = QString::number(options.maxBytes);
                 return;
             }
-            // KF6 的 addLocalFile 只有两个参数：第二个就是 tar 里的完整路径
+            // KF6 addLocalFile takes only two arguments: the second is the full path inside the tar
             tar.addLocalFile(info.absoluteFilePath(), relative);
         }
     };
     walk(QString());
 
     if (failureKey.isEmpty() && inlineDockerfile) {
-        // 内联内容：先落到临时文件再进 tar（KTar 没有"直接写一段内容"的接口）
+        // Inline content: spill to a temp file before adding (KTar has no "write this content" API)
         QTemporaryFile inlineFile(QDir(base).filePath(QStringLiteral("kontainer-inline-XXXXXX")));
         inlineFile.setAutoRemove(true);
         if (!inlineFile.open()) {
@@ -251,7 +252,7 @@ BuildContextResult packBuildContext(const BuildContextOptions &options, const QS
     if (failureKey.isEmpty() && !tar.close()) {
         failureKey = QStringLiteral("archiveFailed");
     }
-    } // KTar 在这里析构：必须等它彻底放手之后再删临时文件，否则它会把文件又写出来
+    } // KTar destructs here: delete the temp file only after it fully lets go, or it writes it again
 
     if (!failureKey.isEmpty()) {
         removeArchive(archivePath);

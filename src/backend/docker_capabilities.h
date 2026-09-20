@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,30 +13,30 @@ namespace Kontainer
 {
 
 /*!
- * 写权限门（ARCH_V4 §2.2.3）。
+ * Write-permission gate (ARCH_V4 §2.2.3).
  *
- * 权限模型（ARCH_V3 §1.3 已定）：**按 socket 实际权限工作，不引入提权机制**。
- * 本类只做一次便宜的判定，不做任何 I/O 之外的事情：
- *  - 端点必须是本机 unix socket（远程 endpoint 一律只读，不变式）
- *  - socket 文件必须存在
- *  - socket 必须对当前进程可写（QFileInfo::isWritable() 在 Unix 上就是 access(2) 的结果）
+ * Model (ARCH_V3 §1.3): **work with the socket's real permissions, never escalate**. One cheap
+ * check, nothing but I/O:
+ *  - endpoint must be a local unix socket (remote endpoints are always read-only)
+ *  - socket file must exist
+ *  - socket must be writable by this process (QFileInfo::isWritable() is access(2) on Unix)
  *
- * 判定为不可写时 UI 不出现写入口；即便如此，真正的权威仍然是引擎：
- * 任何一次 mutation 返回 403 / EACCES 都会让会话降级为只读（OperationController）。
+ * Not writable means no write entry points in the UI. The engine stays authoritative: a mutation
+ * returning 403 / EACCES downgrades the session to read-only (OperationController).
  */
 enum class WriteAccess {
     Allowed,
-    /*! socket 不存在：引擎可能没跑。 */
+    /*! Socket missing: the engine is probably not running. */
     SocketMissing,
-    /*! socket 不可写：当前用户不在 socket 所属组，或权限被收紧。 */
+    /*! Socket not writable: user is not in the socket's group, or permissions were tightened. */
     SocketNotWritable,
-    /*! 非本机 unix socket（远程 endpoint）：按设计只读。 */
+    /*! Not a local unix socket (remote endpoint): read-only by design. */
     UnsupportedEndpoint,
 };
 
-/*! 稳定 key：allowed / denied / unsupported（QML 据此决定要不要渲染写入口）。 */
+/*! Stable key: allowed / denied / unsupported (QML uses it to render write entry points). */
 QString writeAccessKey(WriteAccess access);
-/*! 是否允许出现写入口。 */
+/*! Whether write entry points may be shown. */
 inline bool writeAccessAllowed(WriteAccess access)
 {
     return access == WriteAccess::Allowed;

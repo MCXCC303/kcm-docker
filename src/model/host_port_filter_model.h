@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,13 +11,14 @@ namespace Kontainer
 {
 
 /*!
- * 端口页的搜索 / 过滤 / 排序（ARCH_next_ports.md §4.A，里程碑 M3）。
+ * Search / filter / sort for the ports page (ARCH_next_ports.md §4.A, milestone M3).
  *
- * - 搜索：端口号、容器名、镜像、地址都能搜（用户想"8100 是谁占的"或"medai 用了哪些端口"）
- * - 过滤：全部 / 运行中占用（`inUse`）/ 声明未生效（`declaredNotPublished`）
- * - 排序：端口（默认，升序）/ 容器名
+ * - Search: port number, container name, image, address (users ask "who holds 8100" or "which ports
+ *   does medai use")
+ * - Filter: all / in use (`inUse`) / declared but not published (`declaredNotPublished`)
+ * - Sort: port (default, ascending) / container name
  *
- * 与其他过滤模型一样是代理模型：后台刷新不会重置用户的选择。
+ * A proxy model like the others: a background refresh never resets the user's choices.
  */
 class HostPortFilterModel : public QSortFilterProxyModel
 {

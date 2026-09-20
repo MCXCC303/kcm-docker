@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -36,7 +36,7 @@ int DetailListModel::totalCount() const
 
 bool DetailListModel::empty() const
 {
-    // 「有没有数据」与「当前显示几条」是两件事：折叠时 empty() 仍应为 false
+    // "Has data" and "how many are shown" are different: while collapsed empty() must stay false
     return m_entries.isEmpty();
 }
 
@@ -92,10 +92,10 @@ QHash<int, QByteArray> DetailListModel::roleNames() const
 
 void DetailListModel::setEntries(const QList<DetailEntry> &entries)
 {
-    // 数据没变就什么都不做：不发 modelReset、不发 countChanged。
-    // 详情页的列表由 5 秒（容器列表变化 → 关联容器）与 30 秒（inspect 复核）周期重建，
-    // 无条件重置会让 Repeater 每次都销毁重建 delegate——「布局正在算尺寸时条目被销毁」
-    // 正是真实会话里段错误的触发条件（ARCH_V3 附录 A.1d）。
+    // Unchanged data: do nothing, no modelReset and no countChanged.
+    // Detail lists are rebuilt every 5 s (container list change -> related containers) and every 30 s
+    // (inspect recheck); an unconditional reset makes Repeater destroy and rebuild delegates each time --
+    // "item destroyed while layout computes sizes" is what segfaulted real sessions (ARCH_V3 App. A.1d).
     if (m_entries == entries) {
         return;
     }

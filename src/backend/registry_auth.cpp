@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -22,7 +22,7 @@ constexpr auto kPassword = "password";
 constexpr auto kServerAddress = "serveraddress";
 constexpr auto kIdentityToken = "identitytoken";
 
-/*! 去掉所有空白：base64 里出现的换行/空格（配置文件里可能折行）不该导致解析失败。 */
+/*! Strip whitespace: newlines/spaces in base64 (config files may wrap) must not break decoding. */
 QByteArray withoutWhitespace(const QByteArray &value)
 {
     QByteArray out;
@@ -35,7 +35,7 @@ QByteArray withoutWhitespace(const QByteArray &value)
     return out;
 }
 
-/*! 按"看起来像哪种字母表"选择解码方式：`-`/`_` 是 URL-safe，`+`/`/` 是标准。 */
+/*! Pick the alphabet by what the input looks like: `-`/`_` means URL-safe, `+`/`/` standard. */
 QByteArray decodeBase64Loose(const QByteArray &value)
 {
     const QByteArray trimmed = withoutWhitespace(value);
@@ -50,7 +50,7 @@ QByteArray decodeBase64Loose(const QByteArray &value)
     if (!decoded.isEmpty()) {
         return decoded;
     }
-    // 另一种字母表再试一次：纯字母数字的输入两种都能解，但混入 `=` 之外的符号时只有一种可行
+    // Retry with the other alphabet: pure alphanumeric input works either way, other symbols do not
     return QByteArray::fromBase64(trimmed,
                                   (looksUrlSafe ? QByteArray::Base64Encoding : QByteArray::Base64UrlEncoding)
                                       | QByteArray::AbortOnBase64DecodingErrors);
@@ -64,11 +64,11 @@ QString RegistryAuth::normalizeServerAddress(const QString &value)
         return {};
     }
 
-    // 协议前缀：Docker 的配置里可能写 `https://host/v1/`，也可能只写 `host`
+    // Scheme prefix: Docker configs may write `https://host/v1/` or just `host`
     const QRegularExpression scheme(QStringLiteral("^[A-Za-z][A-Za-z0-9+.-]*://"));
     address.remove(scheme);
 
-    // 去掉路径、查询与末尾斜杠：凭据的索引只认 host[:port]
+    // Drop path, query and trailing slashes: the credential index only knows host[:port]
     const int slash = address.indexOf(QLatin1Char('/'));
     if (slash >= 0) {
         address = address.left(slash);
@@ -78,7 +78,7 @@ QString RegistryAuth::normalizeServerAddress(const QString &value)
     }
     address = address.toLower();
 
-    // Docker Hub 的几种写法归一到同一个键（Docker 自己也是这么做的）
+    // Collapse all Docker Hub spellings to one key (Docker itself does the same)
     if (address == QLatin1String("docker.io") || address == QLatin1String("index.docker.io")
         || address == QLatin1String("registry-1.docker.io") || address == QLatin1String("registry.docker.io")
         || address == QLatin1String("hub.docker.com")) {
@@ -102,7 +102,7 @@ QString RegistryAuth::serverAddressForImage(const QString &imageReference)
         return {};
     }
     if (parts->registry.isEmpty()) {
-        return QString::fromLatin1(hubHost); // 没写 registry 就是 Docker Hub
+        return QString::fromLatin1(hubHost); // no registry means Docker Hub
     }
     return normalizeServerAddress(parts->registry);
 }
@@ -123,7 +123,7 @@ QByteArray RegistryAuth::encode(const RegistryCredential &credential)
     object.insert(QLatin1String(kServerAddress), headerServerAddress(credential.serverAddress));
 
     const QByteArray json = QJsonDocument(object).toJson(QJsonDocument::Compact);
-    // URL-safe + 保留 padding：与 docker CLI 的 base64.URLEncoding 一致
+    // URL-safe + kept padding: matches the docker CLI's base64.URLEncoding
     return json.toBase64(QByteArray::Base64UrlEncoding | QByteArray::KeepTrailingEquals);
 }
 
@@ -170,7 +170,7 @@ RegistryCredential RegistryAuth::decode(const QByteArray &headerValue, QString *
 
 QString RegistryAuth::encodeConfigAuth(const QString &username, const QString &password)
 {
-    // 标准 base64（不是 base64url）：`~/.docker/config.json` 的 `auths` 用这种
+    // Standard base64 (not base64url): what `~/.docker/config.json`'s `auths` uses
     return QString::fromLatin1(QByteArray(username.toUtf8() + ':' + password.toUtf8()).toBase64());
 }
 
@@ -188,7 +188,7 @@ RegistryCredential RegistryAuth::decodeConfigAuth(const QString &serverAddress, 
         return fail("invalidBase64");
     }
 
-    // 约定：`用户名:密码`，密码里可以再出现冒号（只按第一个冒号切分）
+    // Convention: `user:password`; the password may contain colons (split on the first one only)
     const int separator = decoded.indexOf(':');
     if (separator <= 0) {
         return fail("invalidAuthField");

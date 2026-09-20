@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,7 +15,7 @@
 namespace Kontainer
 {
 
-/*! 容器状态语义（ARCH_V1 §2.1：created/restarting/running/removing/paused/exited/dead）。 */
+/*! Container state semantics (ARCH_V1 §2.1: created/restarting/running/removing/paused/exited/dead). */
 enum class ContainerState {
     Unknown,
     Created,
@@ -27,7 +27,7 @@ enum class ContainerState {
     Dead,
 };
 
-/*! 健康状态；Unknown 表示引擎/API 没有提供该信息（与 None「未配置健康检查」不同）。 */
+/*! Health state; Unknown means the engine/API gave nothing (unlike None, "no health check configured"). */
 enum class HealthState {
     Unknown,
     None,
@@ -36,11 +36,11 @@ enum class HealthState {
     Unhealthy,
 };
 
-/*! 端口映射（domain model，不直接暴露 Docker JSON 结构）。 */
+/*! Port mapping (domain model; does not expose the Docker JSON structure). */
 struct Port {
     QString ip;
     quint16 privatePort = 0;
-    quint16 publicPort = 0; /*!< 0 表示未发布到宿主 */
+    quint16 publicPort = 0; /*!< 0 means not published to the host */
     QString type;
 
     bool isPublished() const
@@ -55,10 +55,10 @@ struct Port {
 };
 
 /*!
- * 容器 domain object（ARCH_V1 §12.1）。
+ * Container domain object (ARCH_V1 §12.1).
  *
- * 保存原始可计算数据（QDateTime、枚举、结构化端口），不保存任何 UI 字符串，
- * 也不保留 Docker API 的 JSON 结构。
+ * Holds raw computable data (QDateTime, enums, structured ports); no UI strings and no Docker API
+ * JSON structure.
  */
 class Container
 {
@@ -67,16 +67,17 @@ public:
     QString name;
     QString image;
     QString imageId;
-    QString status; /*!< Docker 返回的 status 文本（数据，非界面文案） */
+    QString status; /*!< status text returned by Docker (data, not UI copy) */
     ContainerState state = ContainerState::Unknown;
     HealthState health = HealthState::Unknown;
     QDateTime created; /*!< UTC */
     QList<Port> ports;
     /*!
-     * 该容器连接的网络（来自 `GET /containers/json` 的 `NetworkSettings.Networks`）。
+     * Networks this container is attached to (from `NetworkSettings.Networks` of the list call).
      *
-     * **网络成员列表的唯一可靠来源**：实测 `GET /networks` 返回的 `Containers` 是空的
-     * （只有 `GET /networks/{id}` 才填），因此"哪些容器连了这个网络"必须从容器侧汇总。
+     * **The only reliable source of network membership**: `Containers` in the `GET /networks`
+     * response came back empty (only `GET /networks/{id}` fills it), so "which containers are on
+     * this network" has to be aggregated from the container side.
      */
     QList<ContainerNetwork> networks;
 
@@ -84,16 +85,17 @@ public:
     {
         return !id.isEmpty();
     }
-    /*! 12 位短 ID（Docker 习惯用法）。 */
+    /*! 12-character short ID (the customary Docker form). */
     QString shortId() const;
-    /*! 稳定的状态键，供 QML 做展示判断："running" / "exited" / ... */
+    /*! Stable state key for QML display decisions: "running" / "exited" / ... */
     QString stateKey() const;
-    /*! 稳定的健康键："healthy" / "unhealthy" / "starting" / "none" / "unknown" */
+    /*! Stable health key: "healthy" / "unhealthy" / "starting" / "none" / "unknown" */
     QString healthKey() const;
 
     /*!
-     * 值比较：后台刷新时如果数据完全没变，模型就不需要发任何信号，
-     * 从而避免每 5 秒重置一次列表（滚动位置与 delegate 都保持不动，ARCH_V2 §32/§34）。
+     * Value comparison: when a background refresh changed nothing, the model need not emit any
+     * signal, so the list is not reset every 5 seconds (scroll position and delegates stay put,
+     * ARCH_V2 §32/§34).
      */
     friend bool operator==(const Container &lhs, const Container &rhs)
     {

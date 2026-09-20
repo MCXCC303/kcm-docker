@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -51,7 +51,7 @@ bool MountPresetStore::empty() const
 
 QList<MountPreset> MountPresetStore::presets() const
 {
-    // 展示顺序 = m_order（保存下来的顺序），收藏只是让界面把它们排在最前面
+    // display order = m_order (the saved sequence); favorites are only sorted first for the UI
     QList<MountPreset> result;
     result.reserve(m_presets.size());
     for (const QString &id : m_order) {
@@ -62,7 +62,7 @@ QList<MountPreset> MountPresetStore::presets() const
             }
         }
     }
-    // 兜底：m_order 里没有的（理论上不该出现）按插入顺序补在后面，绝不丢数据
+    // fallback: ids absent from m_order (should not happen) are appended in insertion order, never dropped
     for (const MountPreset &preset : m_presets) {
         if (!m_order.contains(preset.id)) {
             result.append(preset);
@@ -71,10 +71,10 @@ QList<MountPreset> MountPresetStore::presets() const
 
     std::stable_sort(result.begin(), result.end(), [](const MountPreset &lhs, const MountPreset &rhs) {
         if (lhs.favorite != rhs.favorite) {
-            return lhs.favorite; // 收藏在前
+            return lhs.favorite; // favorites first
         }
         if (lhs.lastUsedAt != rhs.lastUsedAt) {
-            // 最近用过的在前；没用过的（无效时间）排在后面
+            // recently used first; never used (invalid time) goes last
             if (!lhs.lastUsedAt.isValid()) {
                 return false;
             }
@@ -83,7 +83,7 @@ QList<MountPreset> MountPresetStore::presets() const
             }
             return lhs.lastUsedAt > rhs.lastUsedAt;
         }
-        return false; // 保持 m_order 的相对顺序
+        return false; // keep the relative m_order sequence
     });
     return result;
 }
@@ -96,7 +96,7 @@ QVariantList MountPresetStore::summaries() const
     for (const MountPreset &preset : list) {
         result.append(QVariantMap {
             {QStringLiteral("id"), preset.id},
-            // 下拉显示用的一行文案（收藏加星标）；界面不再自己拼字符串，避免两处格式不一致
+            // one-line label for the combo box (★ marks favorites); built here so the UI cannot drift
             {QStringLiteral("label"),
              (preset.favorite ? QStringLiteral("★ ") : QString()) + preset.source + QStringLiteral(" → ") + preset.destination},
             {QStringLiteral("source"), preset.source},
@@ -128,7 +128,7 @@ QString MountPresetStore::add(const QString &source,
     request.destination = destination.trimmed();
     for (const MountPreset &preset : m_presets) {
         if (preset.matches(request)) {
-            return preset.id; // 已存在：返回它的 id，不重复添加
+            return preset.id; // already present: return its id instead of adding a duplicate
         }
     }
 
@@ -233,7 +233,7 @@ void MountPresetStore::noteUsed(const QList<ContainerMountRequest> &mounts)
     bool touched = false;
     for (const ContainerMountRequest &mount : mounts) {
         if (mount.type == QLatin1String("tmpfs")) {
-            continue; // tmpfs 没有可复用的宿主位置，不作为预设
+            continue; // tmpfs has no reusable host location, so it is never a preset
         }
         const auto it = std::find_if(m_presets.begin(), m_presets.end(), [&mount](const MountPreset &preset) {
             return preset.matches(mount);
@@ -269,7 +269,7 @@ QString MountPresetStore::validateSource(const QString &source, const QString &t
         return QStringLiteral("sourceRequired");
     }
     if (type == QLatin1String("volume")) {
-        // 卷名规则与 Docker 一致
+        // same volume-name rule as Docker
         static const QRegularExpression allowed(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]*$"));
         if (!allowed.match(trimmed).hasMatch()) {
             return QStringLiteral("volumeNameInvalid");
@@ -277,9 +277,9 @@ QString MountPresetStore::validateSource(const QString &source, const QString &t
         return {};
     }
     if (type == QLatin1String("tmpfs")) {
-        return {}; // tmpfs 没有来源
+        return {}; // tmpfs has no source
     }
-    // bind：必须是绝对路径（相对路径在 Docker 里会被当成命名卷，是最常见的误解之一）
+    // bind: must be absolute (Docker reads a relative path as a named volume — a common misconception)
     if (!trimmed.startsWith(QLatin1Char('/'))) {
         return QStringLiteral("sourceNotAbsolute");
     }
@@ -300,7 +300,7 @@ QString MountPresetStore::validateDestination(const QString &destination)
 
 QString MountPresetStore::nextId() const
 {
-    // 用递增编号而不是随机串：配置文件用肉眼看得懂，也便于用户自己编辑
+    // sequential numbers, not random strings: the config file stays readable and hand-editable
     int counter = m_presets.size() + 1;
     QString candidate = QStringLiteral("preset-%1").arg(counter);
     const auto taken = [this](const QString &id) {
@@ -317,7 +317,7 @@ QString MountPresetStore::nextId() const
 
 void MountPresetStore::trimRecents()
 {
-    // 只淘汰"最近使用"里最旧的，收藏与从未用过的预设不动
+    // evict only the oldest recently-used entry; favorites and never-used presets stay
     while (m_presets.size() > kMaxRecent) {
         int oldestRow = -1;
         QDateTime oldest;
@@ -332,7 +332,7 @@ void MountPresetStore::trimRecents()
             }
         }
         if (oldestRow < 0) {
-            break; // 剩下的都不可淘汰
+            break; // nothing left is evictable
         }
         m_order.removeAll(m_presets.at(oldestRow).id);
         m_presets.removeAt(oldestRow);
@@ -376,7 +376,7 @@ void MountPresetStore::save() const
     KConfig config(m_configPath, KConfig::SimpleConfig);
     KConfigGroup group = config.group(QString::fromLatin1(kGroup));
 
-    // 先删掉已经不在列表里的旧条目（用户删除预设后配置里不该留下垃圾）
+    // drop stale entries first (deleting a preset must not leave garbage in the config)
     QStringList ids;
     for (const MountPreset &preset : m_presets) {
         ids.append(preset.id);

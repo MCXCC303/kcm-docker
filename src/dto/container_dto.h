@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,19 +17,20 @@
 namespace Kontainer
 {
 
-/*! Docker Engine API 的端口映射条目（/containers/json → Ports[]）。 */
+/*! Docker Engine API port mapping entry (/containers/json → Ports[]). */
 struct DockerPortDTO {
     QString ip;
     quint16 privatePort = 0;
-    quint16 publicPort = 0; /*!< 0 表示未发布到宿主 */
+    quint16 publicPort = 0; /*!< 0 means not published to the host */
     QString type; /*!< tcp / udp / sctp */
 };
 
 /*!
- * `HostConfig.PortBindings` 里的一条**声明**绑定。
+ * One **declared** binding from `HostConfig.PortBindings`.
  *
- * 与 `DockerPortDTO`（来自 `NetworkSettings.Ports`，即"实际发布"）刻意分开：
- * 声明里 `HostPort` 可以是区间字符串（`"47300-47309"`），解析失败时整条丢弃。
+ * Deliberately separate from `DockerPortDTO` (from `NetworkSettings.Ports`, the actual
+ * publication): a declared `HostPort` may be a range string (`"47300-47309"`), and an entry that
+ * fails to parse is dropped entirely.
  */
 struct DockerDeclaredPortDTO {
     quint16 containerPort = 0;
@@ -40,10 +41,10 @@ struct DockerDeclaredPortDTO {
 };
 
 /*!
- * `GET /containers/json` 的单条记录（ARCH_V1 §40：DTO 是 API schema 的镜像）。
+ * One record of `GET /containers/json` (ARCH_V1 §40: a DTO mirrors the API schema).
  *
- * 只有 Id / State / Names 是必需的；其余字段缺失或类型不符时使用默认值，
- * 单条记录损坏不会让整个列表失败。
+ * Only Id / State / Names are required; missing or mistyped fields fall back to defaults, so one
+ * broken record cannot fail the whole list.
  */
 struct DockerContainerDTO {
     QString id;
@@ -52,26 +53,26 @@ struct DockerContainerDTO {
     QString imageId;
     QString state;
     QString status;
-    QString healthStatus; /*!< Docker 29+ 的 Health.Status；老引擎缺失时为空 */
+    QString healthStatus; /*!< Health.Status on Docker 29+; empty on older engines */
     qint64 createdUnix = 0;
     QList<DockerPortDTO> ports;
-    /*! `NetworkSettings.Networks`（网络成员列表的唯一可靠来源，见 domain/container.h 的说明）。 */
+    /*! `NetworkSettings.Networks` (only reliable source of network membership; see domain/container.h). */
     QList<ContainerNetworkDTO> networks;
 
-    /*! 解析单条记录；缺少必需字段时返回 nullopt 并写入 error。 */
+    /*! Parse one record; nullopt plus error when a required field is missing. */
     static std::optional<DockerContainerDTO> fromJson(const QJsonObject &object, QString *error = nullptr);
 
     /*!
-     * 解析 `/containers/json` 的完整响应。
-     * 非法 JSON 或不是数组 → 返回空列表并写入 error（调用方转 UnexpectedPayload）。
-     * 个别记录损坏 → 跳过该记录，skipped 计数递增，其余照常返回。
+     * Parse the full `/containers/json` response.
+     * Invalid JSON or not an array → empty list plus error (caller maps to UnexpectedPayload).
+     * One broken record → skipped, skipped counter bumped, the rest returned as usual.
      */
     static QList<DockerContainerDTO> listFromJson(const QByteArray &payload, QString *error = nullptr, int *skipped = nullptr);
 };
 
 /*!
- * DTO → domain object 的映射放在 DTO 层（ARCH_V2 §26）：
- * 方向始终是 dto → domain，domain 不反向依赖 API schema。
+ * DTO → domain mapping lives in the DTO layer (ARCH_V2 §26): the direction is always
+ * dto → domain, and domain never depends back on the API schema.
  */
 Container containerFromDto(const DockerContainerDTO &dto);
 QList<Container> containersFromDto(const QList<DockerContainerDTO> &dtos);

@@ -1,39 +1,39 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    数据可视化色板（ARCH_V3 §2.4 / ARCH_V3_pre §1.4）。
+    Data-visualization palette (ARCH_V3 §2.4 / ARCH_V3_pre §1.4).
 
-    §1.4 明确把两类颜色列为**语义色之外的例外**：
-      1. sparkline / 趋势图的序列色（CPU / 内存 / 网络 / 块 IO）需要彼此可区分；
-      2. 存储占用堆叠条属于中性数据展示。
-    因此这里使用固定的低饱和度色值，并按亮色 / 暗色主题各定义一版——
-    而不是借用 positiveTextColor / negativeTextColor 这类**状态语义** token。
+    §1.4 lists two exceptions to the semantic-colour-only rule: sparkline/trend series
+    (CPU / memory / network / block IO) must be mutually distinguishable, and the storage
+    stacked bar is neutral data display. So fixed low-saturation values are defined per
+    light/dark theme instead of reusing status tokens like positiveTextColor /
+    negativeTextColor. StatusPalette is never referenced here: status semantics and data
+    series stay independent, or "green" would mean both "running" and "network traffic".
 
-    本文件与 StatusPalette 互不引用：状态语义色与数据序列色必须保持独立，
-    否则「绿色」会同时表示「运行中」和「网络流量」，语义就退化了。
+    ## Contrast
 
-    ## 对比度
+    Every value was WCAG-checked against the target theme background (3:1 required for
+    non-text graphics; a stricter 4.5:1 was used here):
 
-    所有取色都对目标主题背景做过 WCAG 对比度校验（非文本图形元素要求 3:1，
-    此处按更严格的 4.5:1 取色）：
-
-    | 主题 | 背景基准 | 序列色最低对比度 |
+    | theme | reference background | lowest series contrast |
     | --- | --- | --- |
-    | 亮色 | `#eff0f1`（Breeze Light view 背景） | 5.5:1 |
-    | 暗色 | `#232629`（Breeze Dark view 背景，§1.8 指定） | 6.5:1 |
+    | light | `#eff0f1` (Breeze Light view background) | 5.5:1 |
+    | dark | `#232629` (Breeze Dark view background, §1.8) | 6.5:1 |
 
-    存储色阶（同色相四级明度）在两种主题下均 ≥ 4.5:1，相邻级差 1.19–1.28:1；
-    由于级差较小，堆叠条**必须**在段与段之间绘制背景色分隔线，
-    并提供「颜色 + 文字 + 数值」三重编码的图例，不能只靠颜色区分（§1.8）。
+    The storage ramp (one hue, four lightness steps) stays ≥ 4.5:1 on both themes with
+    adjacent steps only 1.19–1.28:1 apart, so the stacked bar **must** draw a
+    background-coloured divider between segments and provide a "colour + text + value"
+    triple-encoded legend — colour alone cannot separate them (§1.8).
 
-    ## 明暗判定
+    ## Light/dark detection
 
-    Kirigami 6.30 的 QML API **没有**暴露 `colorScheme` / `Theme.Light` / `Theme.Dark`
-    （实测：`Kirigami.Theme.colorScheme` 与 `Platform.Theme.colorScheme` 均为 undefined，
-    qmltypes 中也不存在该属性）。因此这里改用不依赖枚举的方式判断：
-    比较背景色与文字色的相对亮度——文字总是与背景形成对比，
-    谁更亮就说明当前是哪种配色方案。该判定对亮 / 暗 / 高对比主题都成立。
+    Kirigami 6.30 exposes **no** `colorScheme` / `Theme.Light` / `Theme.Dark` QML API
+    (measured: `Kirigami.Theme.colorScheme` and `Platform.Theme.colorScheme` are both
+    undefined, and the qmltypes has no such property). Hence an enum-free test: compare
+    the relative luminance of background vs text — text always contrasts with the
+    background, so the brighter one identifies the scheme. Holds for light, dark and
+    high-contrast themes.
 */
 
 pragma Singleton
@@ -45,18 +45,18 @@ import org.kde.kcm.docker as Kontainer
 
 QtObject {
     /*!
-        单通道 sRGB → 线性亮度分量（WCAG 2.x 定义）。
+        Single sRGB channel → linear luminance component (WCAG 2.x).
     */
     function linearize(channel: real): real {
         return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
     }
 
-    /*! 颜色的相对亮度（0 = 黑，1 = 白）。 */
+    /*! Relative luminance of a colour (0 = black, 1 = white). */
     function relativeLuminance(c: color): real {
         return 0.2126 * linearize(c.r) + 0.7152 * linearize(c.g) + 0.0722 * linearize(c.b);
     }
 
-    /*! 两色的 WCAG 对比度，供测试与校验使用。 */
+    /*! WCAG contrast ratio of two colours, for tests and validation. */
     function contrastRatio(a: color, b: color): real {
         const la = relativeLuminance(a);
         const lb = relativeLuminance(b);
@@ -65,54 +65,55 @@ QtObject {
         return (lighter + 0.05) / (darker + 0.05);
     }
 
-    /*! 当前是否为暗色配色方案。 */
+    /*! Whether the current colour scheme is dark. */
     readonly property bool darkScheme: relativeLuminance(Kirigami.Theme.backgroundColor) < relativeLuminance(Kirigami.Theme.textColor)
 
-    /*! 校验用的背景基准（Breeze Light / Dark 的 view 背景）。 */
+    /*! Reference backgrounds for validation (Breeze Light / Dark view background). */
     readonly property color lightReferenceBackground: "#eff0f1"
     readonly property color darkReferenceBackground: "#232629"
 
-    /* ---------------- 趋势图序列色 ---------------- */
+    /* ---------------- Trend chart series colours ---------------- */
 
     readonly property color cpuSeries: darkScheme ? "#6fb3ff" : "#0b5d9e"
     readonly property color memorySeries: darkScheme ? "#f0a35e" : "#8a5300"
     readonly property color networkSeries: darkScheme ? "#6fcf97" : "#186b3a"
     readonly property color blockSeries: darkScheme ? "#b79cf0" : "#6b3fa0"
 
-    /* ---------------- 存储占用堆叠条（同色相四级明度） ---------------- */
+    /* ---------------- Storage stacked bar (one hue, four lightness steps) ---------------- */
 
     readonly property color storageImages: darkScheme ? "#4098e0" : "#12456e"
     readonly property color storageContainers: darkScheme ? "#65ace6" : "#165589"
     readonly property color storageVolumes: darkScheme ? "#87beeb" : "#1a64a0"
     readonly property color storageBuildCache: darkScheme ? "#a9d0f1" : "#1d70b4"
 
-    /* ---------------- 端口映射拓扑（ARCH_V4 §2.1.2） ---------------- */
+    /* ---------------- Port mapping topology (ARCH_V4 §2.1.2) ---------------- */
 
     /*!
-        拓扑连线的中性色（种子为空时的兜底）。
-        这是**结构性图形**，不是数据序列也不是状态：因此既不用序列色也不用状态色，
-        而是单独取一组中性色，并对两种配色都保证与背景的对比度（§1.8 / AA）。
+        Neutral colour for topology links (fallback when the seed is empty).
+        This is a **structural graphic**, neither data series nor status: so it uses its
+        own neutral pair, contrasting with the background on both schemes (§1.8 / AA).
     */
     readonly property color topologyLink: darkScheme ? "#9aa4ad" : "#4a545e"
 
     /*!
-        拓扑连线的可选颜色（一条连线一种，见 `connectionColor()`）。
+        Selectable topology link colours (one per link, see `connectionColor()`).
 
-        选色要求：彼此可区分、与两种主题背景都保持 ≥ 3:1 对比度，
-        并且**不表达任何语义**——连线颜色只用来"让同一个容器的图看起来是一体的"，
-        端口与绑定的文字才是信息（§1.1：颜色不能是唯一区分手段）。
-        因此这里刻意避开 StatusPalette 的红/黄/绿语义区间，用低饱和的中间色相。
+        Requirements: mutually distinguishable, ≥ 3:1 against both theme backgrounds,
+        and **semantically meaningless** — the link colour only makes one container's
+        graph look like a unit, the port and binding text carries the information (§1.1:
+        colour must not be the only means of distinction). Deliberately avoids
+        StatusPalette's red/amber/green semantics, using low-saturation mid hues.
     */
     readonly property var topologyConnectionColors: darkScheme
         ? ["#d98b8b", "#d9b06a", "#8fc98f", "#7fc4c4", "#8fb3e0", "#b79cd9"]
         : ["#a4504f", "#8a6a1f", "#3f6b3f", "#2f6b6b", "#33557f", "#5c4a80"]
 
     /*!
-        由种子取连线颜色：同一个种子永远得到同一种颜色。
+        Picks a link colour from a seed: the same seed always gets the same colour.
 
-        种子一般是容器 id（由 `Presentation::connectionColorIndex` 做 FNV-1a 取模），
-        因此刷新、重开页面、切换主题都不会让同一个容器的连线变色——
-        主题切换时取的是对应主题的那一组色值。
+        The seed is usually a container id (FNV-1a modulo in
+        `Presentation::connectionColorIndex`), so refresh, page reopen and theme switch
+        never recolour a container's link — a theme switch selects that theme's palette.
     */
     function connectionColor(seed: string): color {
         if (!seed) {
@@ -122,14 +123,15 @@ QtObject {
         return palette[Kontainer.Presentation.connectionColorIndex(seed, palette.length)];
     }
 
-    /*! 拓扑节点（容器 / 宿主）的背景与边框。 */
+    /*! Topology node (container / host) background and border. */
     readonly property color topologyNodeBackground: darkScheme ? "#31363b" : "#e6e9ec"
     readonly property color topologyNodeBorder: darkScheme ? "#4b5157" : "#c2c7cc"
 
     /*!
-        段与段之间的分隔线颜色。
-        存储色阶的相邻级差只有约 1.2:1，靠颜色本身不足以稳定区分，
-        因此堆叠条必须绘制这条分隔线（§1.8：颜色不能是唯一区分手段）。
+        Divider colour between segments.
+        Adjacent storage ramp steps differ by only ~1.2:1, too little to distinguish
+        reliably by colour, so the stacked bar must draw this divider (§1.8: colour must
+        not be the only means of distinction).
     */
     readonly property color storageSeparator: Kirigami.Theme.backgroundColor
 }

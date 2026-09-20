@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -19,7 +19,7 @@ QString PortMappingEntry::hostChipText() const
         return {};
     }
     if (dualStack) {
-        // 合并后的"所有接口（IPv4+IPv6）"：地址由拓扑图的双环表达，文字只留端口
+        // merged "all interfaces (IPv4+IPv6)": the topology's double ring shows the address, keep the port
         return QString::number(hostPort);
     }
     return QStringLiteral("%1:%2").arg(hostIp.isEmpty() ? QStringLiteral("0.0.0.0") : hostIp).arg(hostPort);

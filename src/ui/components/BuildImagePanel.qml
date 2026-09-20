@@ -1,20 +1,23 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    构建列表与构建表单（ARCH_V5_V8 §5.3/§5.4）。
+    Build list and build form (ARCH_V5_V8 §5.3/§5.4).
 
-    与拉取列表同一个模式：构建是长任务、可以同时跑多个、失败原因不能丢。
-    因此进度不进模态框，而是：
+    Same pattern as the pull list: builds are long-running, several can run at once, and
+    the failure reason must not be lost. So progress does not go into a modal dialog:
 
-      - 进行中：进度条（按步骤数推算，未知时不确定态）+ 引擎状态原文 + 步骤命令 + 取消
-      - 已结束：成功（给「查看镜像详情」）/ 已取消 / **失败带着失败的步骤一直留着**
-      - 多个已完成记录可以一键清空
+      - running: progress bar (derived from step counts, indeterminate when unknown) +
+        the engine's own status text + step command + cancel
+      - finished: success (offers "show image") / cancelled / **failure stays with its
+        failing step**
+      - several finished records can be cleared in one click
 
-    表单做成**内联面板**而不是对话框：六期实测过弹层内容在离屏/未展示时序下不可靠，
-    这里的字段又多（上下文目录、Dockerfile、标签、构建参数、target），内联更稳也更好用。
+    The form is an **inline panel**, not a dialog: phase 6 measured popup content as
+    unreliable under offscreen/never-shown timings, and this form has many fields (context
+    directory, Dockerfile, tags, build arguments, target) — inline is steadier and handier.
 
-    用法：
+    Usage:
 
         Components.BuildImagePanel {
             Layout.fillWidth: true
@@ -35,15 +38,15 @@ ColumnLayout {
     id: root
 
     required property var operations
-    /*! 构建缓存当前占用的字节数（0 = 没有可回收的；由使用方从存储用量传入）。 */
+    /*! Bytes currently held by the build cache (0 = nothing reclaimable; passed in by the caller). */
     property real buildCacheBytes: 0
 
-    /*! 构建成功后点「查看镜像详情」。 */
+    /*! "Show image" clicked after a successful build. */
     signal imageRequested(string imageId)
 
     objectName: "buildImagePanel"
 
-    /* ---------------- 表单状态 ---------------- */
+    /* ---------------- Form state ---------------- */
     property bool formOpen: false
     property string contextDirectory: ""
     property string dockerfile: "Dockerfile"
@@ -54,7 +57,7 @@ ColumnLayout {
     property bool noCache: false
     property bool pullBase: false
 
-    /*! 表单校验的稳定 key（空 = 可以提交）。 */
+    /*! Stable key of the form validation (empty = submittable). */
     readonly property string formErrorKey: {
         if (root.contextDirectory.trim().length === 0) {
             return "contextRequired";
@@ -68,7 +71,7 @@ ColumnLayout {
         return "";
     }
 
-    /*! 校验 key → 文案。 */
+    /*! Validation key → text. */
     function errorText(key: string): string {
         switch (key) {
         case "contextRequired":
@@ -105,7 +108,7 @@ ColumnLayout {
 
     spacing: Kirigami.Units.smallSpacing
 
-    /* ---------------------------- 表单 ---------------------------- */
+    /* ---------------------------- Form ---------------------------- */
     Kirigami.AbstractCard {
         objectName: "buildImageForm"
         Layout.fillWidth: true
@@ -182,8 +185,8 @@ ColumnLayout {
 
                 QQC2.TextArea {
                     objectName: "buildInlineDockerfileField"
-                    // 这是 Dockerfile 语法示例（代码），不是界面文案
-                    placeholderText: "FROM alpine:3.19\nRUN echo hello" // i18n-lint: allow Dockerfile 语法示例
+                    // This is a Dockerfile syntax sample (code), not UI copy
+                    placeholderText: "FROM alpine:3.19\nRUN echo hello" // i18n-lint: allow Dockerfile syntax sample
                     Accessible.name: i18n("Dockerfile content")
                     font.family: "monospace"
                     wrapMode: TextEdit.NoWrap
@@ -267,10 +270,10 @@ ColumnLayout {
         }
     }
 
-    /*! 构建参数（由编辑器回写）。 */
+    /*! Build arguments (written back by the editor). */
     property var buildArgs: []
 
-    /*! 提交：交给控制器（校验与打包在那边，界面只负责收集字段）。 */
+    /*! Submit: handed to the controller (validation and packing live there; the UI only collects). */
     function submit(): void {
         if (root.formErrorKey.length > 0) {
             return;
@@ -296,7 +299,7 @@ ColumnLayout {
         }
     }
 
-    /*! 构建参数只需要值列表（键值对编辑器给的是 `{key, value}`）。 */
+    /*! Build arguments need only the value list (the editor returns `{key, value}` pairs). */
     function buildArgsKeys(): var {
         const result = [];
         for (const entry of root.buildArgs) {
@@ -308,7 +311,7 @@ ColumnLayout {
         return result;
     }
 
-    /* --------------------- 构建缓存清理（§5.5） --------------------- */
+    /* --------------------- Build cache cleanup (§5.5) --------------------- */
     RowLayout {
         objectName: "buildPruneRow"
         Layout.fillWidth: true
@@ -316,7 +319,7 @@ ColumnLayout {
 
         QQC2.Label {
             Layout.fillWidth: true
-            // 可回收空间取自 /system/df 的构建缓存段：**先看清楚再删**
+            // Reclaimable space comes from the build-cache section of /system/df: **look before deleting**
             text: root.buildCacheBytes > 0
                 ? i18n("Build cache: %1 can be reclaimed. Untagged intermediate images are removed.", Kontainer.Format.byteSize(root.buildCacheBytes))
                 : i18n("Build cache: nothing to reclaim right now.")
@@ -346,7 +349,7 @@ ColumnLayout {
         onConfirmed: root.operations.pruneBuildCache()
     }
 
-    /* ---------------------------- 列表 ---------------------------- */
+    /* ---------------------------- List ---------------------------- */
     Kirigami.Heading {
         Layout.fillWidth: true
         visible: root.operations.builds.count > 0
@@ -433,7 +436,7 @@ ColumnLayout {
                         onClicked: root.operations.cancelBuild(buildCard.buildId)
                     }
 
-                    // 成功后可以直接去看这个镜像（构建列表里最自然的下一步）
+                    // After success, go straight to the image (the most natural next step from this list)
                     QQC2.Button {
                         objectName: "buildOpenImageButton"
                         visible: buildCard.succeeded && buildCard.imageId.length > 0
@@ -448,7 +451,7 @@ ColumnLayout {
                     objectName: "buildProgressBar"
                     Layout.fillWidth: true
                     visible: buildCard.active
-                    // 步数未知时是不确定态：不能假装知道进度
+                    // An unknown step count means indeterminate: do not pretend to know the progress
                     indeterminate: !buildCard.progressKnown
                     from: 0
                     to: 1
@@ -460,7 +463,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                     text: {
                         if (buildCard.failed) {
-                            // 失败的步骤在 detailText 里（后端拼好的 Step N/M (CMD) failed: …）
+                            // The failing step is in detailText (backend-built "Step N/M (CMD) failed: …")
                             return buildCard.detailText.length > 0
                                 ? i18n("Build failed: %1", buildCard.detailText)
                                 : i18n("The build failed.");

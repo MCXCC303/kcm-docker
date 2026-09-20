@@ -1,16 +1,16 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    空状态占位（ARCH_V3 §2.1 / ARCH_V3_pre §1.3）：
+    Empty-state placeholder (ARCH_V3 §2.1 / ARCH_V3_pre §1.3):
 
-    「没有容器」「没有挂载」「日志功能尚未提供」这类场合统一使用
-    Kirigami.PlaceholderMessage，而不是留一片空白或只写一行小字。
+    "no containers", "no mounts", "logging not yet available" and similar cases all use
+    Kirigami.PlaceholderMessage, never blank space or one small line of text.
 
-    四态区分（无数据 / 无匹配搜索 / 无匹配过滤 / 加载失败）的**判定逻辑留在页面**
-    （ARCH_V2 §33），本组件只负责呈现。
+    The **decision** between the four states (no data / no search match / no filter match /
+    load failure) stays in the page (ARCH_V2 §33); this component only presents.
 
-    用法：
+    Usage:
 
         Components.EmptyPlaceholder {
             Layout.fillWidth: true
@@ -28,25 +28,25 @@ import org.kde.kirigami as Kirigami
 Kirigami.PlaceholderMessage {
     id: placeholder
 
-    /*! 主文案；为空时整个占位不显示。 */
+    /*! Main text; an empty message hides the whole placeholder. */
     required property string message
 
-    /*! 补充说明；为空则不显示。 */
+    /*! Additional explanation; hidden when empty. */
     property string explanationText: ""
 
-    /*! 图标名；为空则不显示图标（避免每个空状态都顶着一个大图标）。 */
+    /*! Icon name; empty hides the icon (not every empty state needs a big icon). */
     property string iconName: ""
 
-    /*! 引导动作文案；为空则不显示按钮。 */
+    /*! Guidance action text; empty hides the button. */
     property string actionText: ""
 
-    /*! 引导动作图标。 */
+    /*! Guidance action icon. */
     property string actionIconName: "view-refresh"
 
-    /*! 引导动作被触发。 */
+    /*! Guidance action triggered. */
     signal actionTriggered
 
-    // 文案为空即整体隐藏：调用方不需要（也不应该）自己维护 visible
+    // Empty text hides everything: callers need not (and should not) maintain visible themselves
     visible: placeholder.message.length > 0
 
     text: placeholder.message

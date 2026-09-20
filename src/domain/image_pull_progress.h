@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -12,11 +12,11 @@ namespace Kontainer
 {
 
 /*!
- * 镜像拉取进度（ARCH_V4 §2.2.4）。
+ * Image pull progress (ARCH_V4 §2.2.4).
  *
- * 这是 domain 对象：只保存数值与引擎原文，不含任何 UI 文案。
- * `statusText` / `errorText` 是引擎返回的字符串（"Downloading"、"manifest unknown" 等），
- * 与容器 status（"Up 2 hours"）同等对待——按数据显示，不翻译。
+ * A domain object: numbers and engine text only, no UI strings.
+ * `statusText` / `errorText` are engine strings ("Downloading", "manifest unknown", …), treated
+ * like container status ("Up 2 hours"): shown as data, never translated.
  */
 struct ImagePullProgress {
     enum class Phase {
@@ -28,32 +28,32 @@ struct ImagePullProgress {
         Failed,
     };
 
-    /*! 用户请求的引用（归一化后），用于结果文案。 */
+    /*! User-requested reference (normalized), used in result texts. */
     QString reference;
     Phase phase = Phase::Waiting;
-    /*! 当前正在处理的层（引擎给的前缀 id，可能为空）。 */
+    /*! Layer being processed (engine's short id, may be empty). */
     QString layerId;
-    /*! 引擎给的状态原文。 */
+    /*! Status text as given by the engine. */
     QString statusText;
-    /*! 已下载字节（所有层之和）。 */
+    /*! Bytes downloaded (sum over all layers). */
     qint64 currentBytes = 0;
-    /*! 已知总量（所有已报告 total 的层之和）；0 表示未知。 */
+    /*! Known total (sum of layers that reported a total); 0 = unknown. */
     qint64 totalBytes = 0;
     int completedLayers = 0;
     int totalLayers = 0;
-    /*! 流内 error 行（引擎原文）；非空表示这次拉取失败。 */
+    /*! Error line from the stream (engine text); non-empty means the pull failed. */
     QString errorText;
 
     bool isValid() const
     {
         return !reference.isEmpty();
     }
-    /*! 总量未知时进度条应为不确定态（ARCH_V4 §2.4）。 */
+    /*! With an unknown total the progress bar must be indeterminate (ARCH_V4 §2.4). */
     bool isIndeterminate() const
     {
         return totalBytes <= 0;
     }
-    /*! 0.0 ~ 1.0；未知时返回 -1。 */
+    /*! 0.0 ~ 1.0; -1 when unknown. */
     double fraction() const
     {
         if (totalBytes <= 0) {

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -10,7 +10,7 @@ namespace Kontainer
 
 namespace
 {
-/*! State filter 的语义分组（写在这里，不在 QML 里拼装）。 */
+/*! Semantic grouping for the state filter (kept here, not assembled in QML). */
 bool matchesStateFilter(ContainerState state, const QString &filter)
 {
     if (filter.isEmpty() || filter == QLatin1String("all")) {
@@ -43,7 +43,7 @@ ContainerFilterModel::ContainerFilterModel(QObject *parent)
     setFilterCaseSensitivity(Qt::CaseInsensitive);
     updateSorting();
 
-    // 行数变化时同步 count（供 UI 判断“过滤后为空”）
+    // Keep count in sync on row changes (lets the UI detect "empty after filtering")
     connect(this, &QAbstractItemModel::rowsInserted, this, &ContainerFilterModel::countChanged);
     connect(this, &QAbstractItemModel::rowsRemoved, this, &ContainerFilterModel::countChanged);
     connect(this, &QAbstractItemModel::modelReset, this, &ContainerFilterModel::countChanged);
@@ -91,8 +91,8 @@ void ContainerFilterModel::setSortKey(const QString &key)
 
 void ContainerFilterModel::updateSorting()
 {
-    // ARCH_V2 §10：默认 Name 升序；created 用降序（最新在前）更符合运维直觉。
-    // 注意：必须用 setSortRole() + sort(0, ...)，不能把 role 当列号传给 sort()。
+    // ARCH_V2 §10: default Name ascending; created descending (newest first) matches ops intuition.
+    // Note: use setSortRole() + sort(0, ...) -- a role cannot be passed to sort() as a column.
     if (m_sortKey == QLatin1String("state")) {
         setSortRole(ContainerModel::StateKeyRole);
         sort(0, Qt::AscendingOrder);
@@ -126,7 +126,7 @@ bool ContainerFilterModel::filterAcceptsRow(int sourceRow, const QModelIndex &so
         return true;
     }
 
-    // Search 覆盖 name / ID / image（§9.2），大小写不敏感
+    // Search covers name / ID / image (§9.2), case-insensitive
     const QString needle = m_searchText.trimmed();
     if (needle.isEmpty()) {
         return true;

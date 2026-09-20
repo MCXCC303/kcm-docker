@@ -1,17 +1,18 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    运行时配置页（ARCH_V5_V8 §2.2–§2.4）。
+    Runtime configuration page (ARCH_V5_V8 §2.2–§2.4).
 
-    这是本项目第一个"写系统配置"的界面，因此把三件事摆在同一屏上：
+    The project's first "writes system configuration" UI, so three things share one screen:
 
-      - **现状**：部署形态、配置文件路径与是否可写、其他键（只读）
-      - **可改的东西**：镜像加速器、不安全仓库、并发下载数、日志驱动
-      - **写不进去时怎么办**：需要提权时给出授权入口；helper 不可用时给出可直接复制的命令
+      - **Current state**: deployment form, config file path and writability, other keys (read-only)
+      - **What can change**: registry mirrors, insecure registries, concurrent downloads, log driver
+      - **When the write fails**: an unlock entry point when privilege is needed, or a copyable
+        command when no helper exists
 
-    页面本身不做校验、不拼 JSON：校验走 `Presentation` 的单一实现，
-    合并与写入走 `DaemonConfigController`（未知键由它逐键保留）。
+    The page validates nothing and builds no JSON: validation goes through the single `Presentation`
+    implementation, merging and writing through `DaemonConfigController`, which preserves unknown keys.
 */
 
 import QtQuick
@@ -27,24 +28,24 @@ import "components" as Components
 KCM.AbstractKCM {
     id: page
 
-    /*! `user`（不需要提权）或 `system`（受保护区）。由入口决定。 */
+    /*! `user` (no privilege needed) or `system` (protected area). Decided by the entry point. */
     property string scope: "system"
 
     readonly property var controller: page.scope === "user"
         ? kcm.controller.daemonConfigUser
         : kcm.controller.daemonConfigSystem
-    /*! 受保护区且当前用户写不了这个文件：需要解锁。 */
+    /*! Protected scope and the current user cannot write the file: unlocking needed. */
     readonly property bool protectedScope: page.controller.requiresPrivilege
-    /*! 是否有提权通路（helper/policy 已安装）。 */
+    /*! Whether an escalation path exists (helper/policy installed). */
     readonly property bool privilegeAvailable: page.controller.privilegeAvailable
-    /*! 字段是否可编辑：受保护区必须已解锁。 */
+    /*! Whether fields are editable: the protected scope must be unlocked first. */
     readonly property bool editable: !page.protectedScope || page.controller.unlocked
     readonly property var engine: kcm.controller.engine
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
-    /*! 可编辑行的标签列宽度（与只读行、KeyValueListEditor 对齐）。 */
+    /*! Label column width for editable rows (aligned with read-only rows and KeyValueListEditor). */
     readonly property real labelColumnWidth: Kirigami.Units.gridUnit * 10
 
-    /*! 授权/降级相关的界面状态。 */
+    /*! UI state for authorization / fallback. */
     property bool showManualCommands: false
 
     signal closeRequested
@@ -72,7 +73,7 @@ KCM.AbstractKCM {
         id: settingsRows
     }
 
-    /*! 只读信息块的内容（KeyValueList 消费的是带 label/value 角色的模型）。 */
+    /*! Content of the read-only info block (KeyValueList consumes a model with label/value roles). */
     function refreshRows(): void {
         deploymentRows.clear();
         deploymentRows.append({
@@ -116,10 +117,10 @@ KCM.AbstractKCM {
     function mirrorError(value: string): string {
         const key = Kontainer.Presentation.registryMirrorErrorKey(value);
         if (key === "emptyHost") {
-            // 示例地址走参数而不是写进 msgid：gettext 不建议把 URL 放进待译字符串
-            //（URL 不需要翻译，混在里面只会让译者去改动它）。
-            // 注意这里只能是 QML 的普通字符串字面量：QStringLiteral 是 C++ 宏，
-            // 在 QML 里会抛 ReferenceError（真实踩过，添加空行时立刻报错）
+            // The example address is a parameter, not part of the msgid: gettext discourages URLs in
+            // translatable strings (nothing to translate, and translators may mangle them).
+            // It must stay a plain QML string literal — QStringLiteral is a C++ macro and throws
+            // ReferenceError in QML (hit for real, right after adding an empty line)
             return i18n("Enter a registry mirror address, for example %1", "https://mirror.example.com");
         }
         if (key === "invalid") {
@@ -151,8 +152,9 @@ KCM.AbstractKCM {
             text: i18n("Reload from disk")
             icon.name: "view-refresh"
             onTriggered: {
-                // 有未保存的修改时先确认：这是唯一还会丢掉编辑的入口
-                // （自动刷新已经不再重新读盘了，见 DaemonConfigController::setEngineInfo）
+                // Confirm first when there are unsaved changes: this is the only entry point
+                // that still drops edits (auto-refresh no longer re-reads the disk;
+                // see DaemonConfigController::setEngineInfo)
                 if (page.controller.dirty) {
                     discardChangesDialog.open();
                     return;
@@ -182,7 +184,7 @@ KCM.AbstractKCM {
                 x: Math.max(0, (parent.width - width) / 2)
                 spacing: Kirigami.Units.largeSpacing
 
-                /* ---------------- 现状 ---------------- */
+                /* ---------------- Current state ---------------- */
                 Kirigami.Heading {
                     Layout.fillWidth: true
                     Layout.topMargin: Kirigami.Units.smallSpacing
@@ -192,8 +194,9 @@ KCM.AbstractKCM {
                         : i18n("System runtime configuration")
                 }
 
-                /* 受保护区的总警示：措辞按作用域分开——系统级是"改的是整台机器"，
-                   用户级只是"这个文件不归你写"（例如曾经用 sudo 建过） */
+                /* General protected-scope warning, worded per scope: system-level means "you are changing
+                   the whole machine"; user-level only "this file is not yours to write"
+                   (e.g. it was created with sudo) */
                 Kirigami.InlineMessage {
                     objectName: "protectedScopeBanner"
                     Layout.fillWidth: true
@@ -202,7 +205,7 @@ KCM.AbstractKCM {
                     text: i18n("Making changes take effect needs administrator rights.")
                 }
 
-                /* 这个文件不是正在运行的 daemon 读的那个：改了不会生效 */
+                /* This file is not the one the running daemon reads: changes will not take effect */
                 Kirigami.InlineMessage {
                     objectName: "inactiveScopeBanner"
                     Layout.fillWidth: true
@@ -210,14 +213,15 @@ KCM.AbstractKCM {
                     type: Kirigami.MessageType.Information
                     text: page.scope === "user"
                         /*
-                         * 用户反馈：这一页最多同时出现三条"需要管理员权限"的长说明，
-                         * 内容重复且占版面。统一压成一句，细节留给锁按钮的提示。
+                         * User feedback: this page could show three long "needs administrator rights"
+                         * notices at once — repetitive and space-hungry. Collapsed into one sentence;
+                         * the lock button tooltip keeps the detail.
                          */
                         ? i18n("Making changes take effect needs administrator rights.")
                         : i18n("Making changes take effect needs administrator rights.")
                 }
 
-                /* 解锁状态 */
+                /* Unlock state */
                 Kirigami.InlineMessage {
                     objectName: "lockedMessage"
                     Layout.fillWidth: true
@@ -239,7 +243,7 @@ KCM.AbstractKCM {
                     model: deploymentRows
                 }
 
-                // 数据目录落在用户家目录、但 daemon 是系统服务：容易被误认为 rootless
+                // Data root in the user's home but a system-service daemon: easily mistaken for rootless
                 Kirigami.InlineMessage {
                     objectName: "dataRootHint"
                     Layout.fillWidth: true
@@ -275,7 +279,7 @@ KCM.AbstractKCM {
                     showCloseButton: true
                 }
 
-                /* ---------------- 可改的设置 ---------------- */
+                /* ---------------- Editable settings ---------------- */
                 Kirigami.Separator {
                     Layout.fillWidth: true
                 }
@@ -293,7 +297,7 @@ KCM.AbstractKCM {
                     Layout.fillWidth: true
                     initialEntries: page.controller.registryMirrors
                     editable: page.editable
-                    placeholderText: "https://mirror.example.com" // i18n-lint: allow 示例地址（数据，不翻译）
+                    placeholderText: "https://mirror.example.com" // i18n-lint: allow example address (data, not translated)
                     addText: i18n("Add mirror")
                     validator: function (value) {
                         return page.mirrorError(value);
@@ -309,7 +313,7 @@ KCM.AbstractKCM {
                     visible: false
                     initialEntries: page.controller.insecureRegistries
                     editable: page.editable
-                    placeholderText: "registry.local:5000" // i18n-lint: allow 示例地址（数据，不翻译）
+                    placeholderText: "registry.local:5000" // i18n-lint: allow example address (data, not translated)
                     addText: i18n("Add registry")
                     validator: function (value) {
                         return page.registryError(value);
@@ -327,8 +331,8 @@ KCM.AbstractKCM {
                     text: i18n("Other settings")
                 }
 
-                /* 可编辑的两项：用两列网格而不是 Kirigami.FormLayout——
-                   后者会把整个表单居中，而这一页其余内容都是左对齐的 */
+                /* The two editable fields use a two-column grid, not Kirigami.FormLayout, which would
+                   center the whole form while everything else on this page is left-aligned */
                 GridLayout {
                     Layout.fillWidth: true
                     columns: 2
@@ -344,11 +348,11 @@ KCM.AbstractKCM {
                         id: concurrentDownloadsSpin
 
                         objectName: "concurrentDownloadsSpin"
-                        // 0 = 使用 daemon 默认（保存时把这个键删掉，而不是写一个 0）
+                        // 0 = use the daemon default (on save the key is removed, not written as 0)
                         from: 0
                         to: 1024
-                        // enabled 管整个控件；只设 editable 的话文本框虽只读，
-                        // 但上下箭头仍然能改值（未解锁时不该能改）
+                        // `enabled` governs the whole control: with only `editable` set the text field is
+                        // read-only but the up/down arrows still change the value (not allowed while locked)
                         enabled: page.editable
                         editable: page.editable
                         value: page.controller.maxConcurrentDownloads
@@ -359,7 +363,8 @@ KCM.AbstractKCM {
                             const parsed = parseInt(text, 10);
                             return isNaN(parsed) ? 0 : parsed;
                         }
-                        // onValueModified 只在用户改的时候发；程序化赋值（读盘/保存后刷新）不会触发
+                        // onValueModified fires on user edits only; programmatic assignment
+                        // (disk read / post-save refresh) does not
                         onValueModified: page.controller.setMaxConcurrentDownloads(value)
                         Accessible.name: i18n("Concurrent downloads")
                     }
@@ -375,7 +380,8 @@ KCM.AbstractKCM {
                         objectName: "logDriverCombo"
                         Layout.preferredWidth: Kirigami.Units.gridUnit * 12
                         enabled: page.editable
-                        // 名单来自 helper 的白名单（首项空串 = 用默认），界面不另抄一份
+                        // The list comes from the helper's whitelist, first entry empty = default;
+                        // the UI keeps no copy of its own
                         model: page.controller.selectableLogDrivers()
                         textRole: ""
                         displayText: currentIndex === 0 ? i18n("default") : currentText
@@ -383,7 +389,7 @@ KCM.AbstractKCM {
                             const index = page.controller.selectableLogDrivers().indexOf(page.controller.logDriver);
                             return index >= 0 ? index : 0;
                         }
-                        // onActivated 只在用户选择时发（currentIndex 的程序化变化不会触发）
+                        // onActivated fires only on user selection (programmatic currentIndex changes do not)
                         onActivated: page.controller.setLogDriver(currentIndex === 0 ? "" : currentText)
                         Accessible.name: i18n("Log driver")
                     }
@@ -405,7 +411,7 @@ KCM.AbstractKCM {
                     wrapMode: Text.WordWrap
                 }
 
-                /* ---------------- 写不进去时的出路 ---------------- */
+                /* ---------------- When writing is not possible ---------------- */
                 Kirigami.InlineMessage {
                     objectName: "helperUnavailableMessage"
                     Layout.fillWidth: true
@@ -448,7 +454,7 @@ KCM.AbstractKCM {
             }
         }
 
-        /* ---------------- 底部动作 ---------------- */
+        /* ---------------- Bottom actions ---------------- */
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -543,7 +549,7 @@ KCM.AbstractKCM {
         }
     }
 
-    /*! 重新读盘会丢掉未保存的修改：问一次再丢。 */
+    /*! Reloading from disk discards unsaved edits: ask once before dropping them. */
     Components.ConfirmDialog {
         id: discardChangesDialog
 

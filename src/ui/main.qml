@@ -1,11 +1,11 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Kontainer KCM 根对象（ARCH_V2 §5/§43）：只负责页面导航与 KCM 级动作。
+    Kontainer KCM root object (ARCH_V2 §5/§43): owns page navigation and KCM-level actions only.
 
-    导航使用页内 StackView（不依赖宿主对 KCM push/pop 的支持），
-    Backend / Model 完全不知道页面结构（§43）。
+    Navigation uses an in-page StackView (no reliance on host KCM push/pop support);
+    backend and models know nothing about page structure (§43).
 */
 
 import QtQuick
@@ -21,11 +21,11 @@ KCM.AbstractKCM {
 
     actions: [
         /*!
-            手动刷新。
+            Manual refresh.
 
-            注意：这里**不**绑定 `enabled: !controller.busy`。自动刷新每 5 秒会让
-            busy 抖动一次，按钮跟着在「可点 / 不可点」之间切换，看起来就是在闪；
-            而重复触发刷新本身是无害的——backend 会把在途的同类请求合并（ARCH_V2 §29）。
+            Deliberately not bound to `enabled: !controller.busy`: the 5-second auto-refresh toggles
+            busy every tick, so the button would flicker between clickable and greyed out. Repeated
+            refreshes are harmless anyway — the backend coalesces in-flight duplicate requests (ARCH_V2 §29).
         */
         Kirigami.Action {
             text: i18n("Refresh")
@@ -40,11 +40,11 @@ KCM.AbstractKCM {
             onTriggered: stack.pop()
         },
         /*!
-            自动刷新开关（ARCH_V3 §2.7）。
+            Auto-refresh toggle (ARCH_V3 §2.7).
 
-            关掉之后后台不再有任何定时刷新：界面只在用户按「刷新」时更新。
-            这既是给用户的选择（配置面板不需要一直跳动），
-            也是排查「定时刷新触发的界面重建」类问题的诊断开关。
+            When off, nothing polls in the background: the UI updates only when the user presses
+            Refresh. That is both a user preference (a config panel need not keep churning) and a
+            diagnostic switch for "UI rebuilt by the timer" bugs.
         */
         Kirigami.Action {
             text: i18n("Auto-refresh")
@@ -63,7 +63,7 @@ KCM.AbstractKCM {
 
         anchors.fill: parent
         initialItem: mainPageComponent
-        // 页面切换时不做花哨动画，保持 KCM 内的稳定感
+        // No fancy page transitions: steadiness inside a KCM matters more
         pushEnter: Transition {}
         pushExit: Transition {}
         popEnter: Transition {}
@@ -73,14 +73,14 @@ KCM.AbstractKCM {
             id: mainPageComponent
 
             MainPage {
-                // 调试用：KCM_DOCKER_START_TAB=<索引>（由控制器读环境变量，QML 读不到环境）
+                // Debug: KCM_DOCKER_START_TAB=<index>; the controller reads the env var because QML cannot
                 startTab: kcm.controller.startTabFromEnvironment
                 onContainerActivated: function (containerId) {
                     stack.push(containerDetailComponent, {
                         "containerId": containerId
                     });
                 }
-                // 端口页的"跳转"与容器列表落到同一个详情页
+                // The ports page "jump" lands on the same detail page as the container list
                 onPortContainerActivated: function (containerId) {
                     stack.push(containerDetailComponent, {
                         "containerId": containerId
@@ -142,7 +142,7 @@ KCM.AbstractKCM {
 
             CreateContainer {
                 onCloseRequested: stack.pop()
-                // 创建成功：直接进新容器的详情（§4.6）
+                // Created successfully: go straight to the new container's detail page (§4.6)
                 onContainerCreated: function (containerId) {
                     stack.pop();
                     stack.push(containerDetailComponent, {

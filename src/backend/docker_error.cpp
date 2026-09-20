@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -61,7 +61,7 @@ DockerError DockerError::fromHttpStatus(int status, const QString &apiMessage)
     } else if (status == 404) {
         error.m_kind = Kind::NotFound;
     } else if (status == 409) {
-        // 与当前状态冲突：容器正在运行不能删除、镜像被容器引用、名称冲突（ARCH_V4 §2.2.2）
+        // State conflict: container running, image in use, or name taken (ARCH_V4 §2.2.2)
         error.m_kind = Kind::Conflict;
     } else if (status >= 500) {
         error.m_kind = Kind::EngineError;

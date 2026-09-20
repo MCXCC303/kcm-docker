@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -22,26 +22,26 @@ namespace Kontainer
 
 namespace
 {
-/*! `lastError` 里既可能是技术原因，也可能是这个 key（界面据此走降级路径）。 */
+/*! `lastError` may hold a technical reason or this key (the UI takes the fallback path on it). */
 constexpr auto kPrivilegeRequired = "privilegeRequired";
-/*! 没有提权通路（helper / policy 未安装）：界面据此直接给出可复制的命令。 */
+/*! No privilege path (helper / policy not installed): the UI then hands out a copyable command. */
 constexpr auto kHelperUnavailable = "helperUnavailable";
-/*! 未解锁（受保护作用域）：保存被拒绝。 */
+/*! Not unlocked (protected scope): the save is rejected. */
 constexpr auto kLocked = "locked";
 /*!
- * 解锁后的有效期（秒）。
+ * Unlock lifetime in seconds.
  *
- * 这个值必须与 polkit 的 keep 窗口一致：`auth_admin_keep` 默认记住 5 分钟，
- * 界面上的倒计时只是把这段时间显示出来；到期后我们主动上锁，让"还要不要继续"
- * 这件事重新变成用户的显式动作（而不是等到保存时才失败）。
+ * Must match the polkit keep window: `auth_admin_keep` remembers for 5 minutes by default and the UI
+ * countdown only displays that window; on expiry we lock deliberately, so "continue or not" becomes an
+ * explicit user action again instead of a failure at save time.
  */
 constexpr int kUnlockKeepSeconds = 300;
 
 /*!
- * 两份部署信息是否等价（用于"只在真的变了才通知界面"）。
+ * Whether two deployment snapshots are equivalent (so the UI is notified only on a real change).
  *
- * 刻意逐字段比较而不是给 DaemonDeployment 加 operator==：那个结构体是给界面用的，
- * 加比较运算符会让"哪些字段影响界面"这件事变得不明显。
+ * Field-by-field on purpose instead of adding operator== to DaemonDeployment: that struct serves the UI,
+ * and a comparison operator would hide which fields affect it.
  */
 bool sameDeployment(const DaemonDeployment &a, const DaemonDeployment &b)
 {
@@ -78,7 +78,7 @@ void DaemonConfigController::setScope(const QString &scope)
         return;
     }
     m_scope = normalized;
-    lock(); // 换作用域必须重新授权：授权是给"那个文件"的
+    lock(); // Switching scope requires re-authorization: the grant is for that one file
     refreshFromDisk();
 }
 
@@ -126,7 +126,7 @@ void DaemonConfigController::lock()
         return;
     }
     m_unlocked = false;
-    // 上锁后迟到的授权结果不再接受：用户已经明确表示不要授权了
+    // Late authorization results are not accepted after locking: the user no longer wants the grant
     m_awaitingAuthorize = false;
     Q_EMIT authorizationChanged();
 }
@@ -140,7 +140,7 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedClient *client)
     connect(client, &PrivilegedClient::finished, this, [this](PrivilegedClient::Operation operation, bool success, const QString &errorKey) {
         if (operation == PrivilegedClient::Operation::ServiceControl) {
             if (!m_serviceInFlight) {
-                return; // 别的页面发起的服务操作
+                return; // Service operation started by another page
             }
             m_serviceInFlight = false;
             m_serviceErrorKey = success ? QString() : (errorKey.isEmpty() ? QStringLiteral("serviceControlFailed") : errorKey);
@@ -150,12 +150,12 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedClient *client)
         }
         if (operation == PrivilegedClient::Operation::Authorize) {
             if (!m_awaitingAuthorize) {
-                // 别的页面发起的授权：与我无关（共享客户端会广播结果）
+                // Authorization from another page: not mine (the shared client broadcasts results)
                 return;
             }
             m_awaitingAuthorize = false;
             if (!success) {
-                // 取消授权是正常结果：保持锁定，不当作错误横幅（避免噪音）
+                // Cancelling is a normal outcome: stay locked and show no error banner (avoid noise)
                 if (errorKey != QLatin1String("cancelled")) {
                     setLastError(errorKey);
                 }
@@ -170,7 +170,7 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedClient *client)
         }
         if (operation == PrivilegedClient::Operation::WriteConfig) {
             if (!m_awaitingWrite) {
-                return; // 别的页面发起的写入
+                return; // Write started by another page
             }
             m_awaitingWrite = false;
             if (!success) {
@@ -183,7 +183,7 @@ void DaemonConfigController::setPrivilegedClient(PrivilegedClient *client)
             return;
         }
         if (!m_awaitingRestart) {
-            return; // 别的页面发起的重启
+            return; // Restart started by another page
         }
         m_awaitingRestart = false;
         Q_EMIT restarted(success, errorKey);
@@ -206,7 +206,7 @@ int DaemonConfigController::runningContainers() const
 
 bool DaemonConfigController::controlService(const QString &unit, const QString &verbKey)
 {
-    // 白名单校验：非法请求在这里就被拒绝，**不会**发起任何提权动作
+    // Whitelist check: invalid requests are rejected right here and start **no** privileged action
     const QString argumentError = serviceControlArgumentError(unit, verbKey);
     if (!argumentError.isEmpty()) {
         m_serviceErrorKey = argumentError;
@@ -245,10 +245,10 @@ void DaemonConfigController::setEngineInfo(const EngineInfo &info)
 {
     m_engine = info;
 
-    // 这里**不能**重新读盘：`setEngineInfo()` 会被状态刷新（自动刷新、容器列表更新）
-    // 反复调用，重新读盘会把 `m_edits` 与 dirty 一并清零——用户正在编辑镜像列表或
-    // 并发下载数时，界面会突然恢复成磁盘上的旧值（真实反馈的 bug）。
-    // 需要重新读盘时走显式的 reload()／保存后／切换作用域。
+    // Re-reading from disk is **not** allowed here: `setEngineInfo()` is called repeatedly by status
+    // refreshes (auto refresh, container list updates), and re-reading would clear `m_edits` and dirty --
+    // while editing mirrors or concurrent downloads the UI would snap back to the old disk values
+    // (reported bug). Re-reading happens via explicit reload(), after save, or on a scope switch.
     const bool mirrorsChanged = m_activeMirrors != info.registryMirrors;
     m_activeMirrors = info.registryMirrors;
 
@@ -279,7 +279,7 @@ bool DaemonConfigController::configWritable() const
 
 bool DaemonConfigController::requiresPrivilege() const
 {
-    // 只看当前作用域的文件能不能写（形态判断在 DaemonDeployment 里，单一实现）
+    // Only whether the current scope's file is writable (form detection lives in DaemonDeployment)
     return m_deployment.requiresPrivilege();
 }
 
@@ -305,7 +305,7 @@ QStringList DaemonConfigController::insecureRegistries() const
 
 int DaemonConfigController::maxConcurrentDownloads() const
 {
-    // 0 表示"用 daemon 默认"（界面上显示为「默认」）：包括"删掉这个键"的编辑意图
+    // 0 means "use the daemon default" (shown as "Default"): it also covers removing the key
     if (m_edits.concurrentDownloadsEdit == ConfigEdit::Set) {
         return m_edits.maxConcurrentDownloads;
     }
@@ -348,8 +348,8 @@ QStringList DaemonConfigController::activeRegistryMirrors() const
 
 bool DaemonConfigController::restartPending() const
 {
-    // 待重启 = "配置文件里的加速器" 与 "/info 报告的加速器" 不一致。
-    // Docker 对镜像源做归一化（末尾斜杠、顺序），所以这里按集合比较而不是逐个字符串比较。
+    // Restart pending = the configured mirrors differ from the mirrors `/info` reports.
+    // Docker normalizes mirrors (trailing slash, order), so compare sets rather than string by string.
     QStringList configured = registryMirrors();
     QStringList active = m_activeMirrors;
     configured.sort();
@@ -394,8 +394,9 @@ bool DaemonConfigController::refreshDeployment()
 
     m_deployment = DaemonDeploymentDetector::detect(m_engine);
 
-    // 作用域决定看哪个文件：用户级 ~/.config/docker/daemon.json、系统级 /etc/docker/daemon.json。
-    // 这与"哪个 daemon 在读它"是两件事——后者由 activeScope 告诉界面（改了没生效的坑）。
+    // The scope picks which file is read: user ~/.config/docker/daemon.json, system /etc/docker/daemon.json.
+    // That is a different question from "which daemon reads it" -- activeScope tells the UI the latter
+    // (otherwise edits silently do not take effect).
     const QString scopedPath = m_scope == QLatin1String("user") ? m_deployment.userConfigPath : m_deployment.systemConfigPath;
     m_deployment.configPath = scopedPath;
     const QFileInfo scopedInfo(scopedPath);
@@ -407,8 +408,9 @@ bool DaemonConfigController::refreshDeployment()
     const bool rootlessDaemon = m_deployment.form == DaemonForm::Rootless;
     m_activeScope = (m_scope == QLatin1String("user")) == rootlessDaemon;
 
-    // 周期刷新（引擎/容器列表每次更新）都会走到这里，因此只在**真的变了**的时候通知界面：
-    // 一是避免无谓的绑定重算与列表重建（刷新抖动），二是别把用户正在编辑的内容搅乱
+    // Periodic refreshes (every engine/container list update) reach here, so notify the UI only on a
+    // **real** change: it avoids pointless binding recomputation and list rebuilds (refresh jitter) and
+    // does not disturb what the user is editing
     return previousActiveScope != m_activeScope || !sameDeployment(previous, m_deployment);
 }
 
@@ -419,7 +421,7 @@ void DaemonConfigController::refreshFromDisk()
     m_document = DaemonConfigDocument::fromFile(m_deployment.configPath);
     m_backups = DaemonConfigWriter::listBackups(m_deployment.configPath);
     m_unlockSecondsRemaining = m_unlocked ? m_unlockSecondsRemaining : 0;
-    // 重新读盘后，编辑状态归零（磁盘值是新的基准）
+    // After re-reading, edit state resets (the disk values are the new baseline)
     m_edits = DaemonConfigEdits();
     setDirty(false);
     Q_EMIT changed();
@@ -443,7 +445,7 @@ void DaemonConfigController::setInsecureRegistries(const QStringList &registries
 
 void DaemonConfigController::setMaxConcurrentDownloads(int value)
 {
-    // 0 = 回到默认（删除该键），> 0 = 写入
+    // 0 = back to the default (remove the key), > 0 = write it
     m_edits.concurrentDownloadsEdit = value > 0 ? ConfigEdit::Set : ConfigEdit::Remove;
     m_edits.maxConcurrentDownloads = std::max(0, value);
     setDirty(true);
@@ -452,7 +454,7 @@ void DaemonConfigController::setMaxConcurrentDownloads(int value)
 
 void DaemonConfigController::setLogDriver(const QString &driver)
 {
-    // 空字符串 = 回到默认（删除该键）
+    // Empty string = back to the default (remove the key)
     m_edits.logDriverEdit = driver.isEmpty() ? ConfigEdit::Remove : ConfigEdit::Set;
     m_edits.logDriver = driver;
     setDirty(true);
@@ -490,20 +492,20 @@ bool DaemonConfigController::save()
     }
 
     if (requiresPrivilege()) {
-        // 受保护作用域：必须已解锁（界面在未解锁时也会禁用保存按钮，这里是兜底）
+        // Protected scope: must be unlocked (the UI also disables Save while locked; this is the backstop)
         if (!m_unlocked) {
             setLastError(QString::fromLatin1(kLocked));
             return false;
         }
-        // 交给受限 helper。没有提权通路时明确告知（界面走降级命令），
-        // 绝不让用户以为"点了保存就是保存了"
+        // Hand it to the restricted helper. With no privilege path, say so plainly (the UI falls back to
+        // the copyable command); never let the user believe "clicked Save = saved"
         if (!m_privilegedClient) {
             setLastError(QString::fromLatin1(kHelperUnavailable));
             return false;
         }
         m_awaitingWrite = true;
         m_privilegedClient->writeConfig(buildEdits());
-        return false; // 结果经 finished() 异步回来（成功后发 saved()）
+        return false; // The result returns asynchronously via finished() (saved() on success)
     }
 
     QString backupPath;
@@ -541,7 +543,7 @@ bool DaemonConfigController::restoreBackup(const QString &backupPath)
         return false;
     }
     if (requiresPrivilege()) {
-        // 恢复也属于写系统文件：同样只能走 helper（这里不提供"绕过"的路径）
+        // Restoring also writes a system file: it must go through the helper too (no bypass here)
         setLastError(m_privilegedClient ? QString::fromLatin1(kPrivilegeRequired) : QString::fromLatin1(kHelperUnavailable));
         return false;
     }
@@ -563,7 +565,7 @@ bool DaemonConfigController::restoreBackup(const QString &backupPath)
 QStringList DaemonConfigController::selectableLogDrivers() const
 {
     QStringList drivers;
-    drivers.append(QString()); // 「默认」：删除 log-driver 键
+    drivers.append(QString()); // "Default": remove the log-driver key
     drivers.append(PrivilegedConfigRequest::allowedLogDrivers());
     return drivers;
 }
@@ -572,10 +574,10 @@ QString DaemonConfigController::privilegedCommand() const
 {
     const QByteArray merged = m_document.merged(buildEdits());
     const QString path = m_deployment.configPath.isEmpty() ? QStringLiteral("/etc/docker/daemon.json") : m_deployment.configPath;
-    // 用 tee + here-doc：用户复制到终端即可，内容与界面里预览的一致。
-    // 注意：这里不生成 `sudo sh -c` 之类的"任意命令"形态，只是一个受限的写入动作。
-    // 重启那一步要看 daemon 形态：rootless daemon 是用户自己的服务，`systemctl --user`
-    // 即可，不需要（也不应该）用 sudo 去动系统服务。
+    // tee + here-doc: the user copies it into a terminal and the content matches the UI preview.
+    // Note: this generates no "arbitrary command" form such as `sudo sh -c`, only a restricted write.
+    // The restart step depends on the daemon form: a rootless daemon is the user's own service, so
+    // `systemctl --user` suffices -- sudo against a system service is neither needed nor right.
     const QString restart = m_deployment.form == DaemonForm::Rootless
         ? QStringLiteral("systemctl --user restart docker")
         : QStringLiteral("sudo systemctl restart docker");

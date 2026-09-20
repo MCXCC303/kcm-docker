@@ -20,7 +20,7 @@ QString defaultAppConfigPath(const QString &configDir)
     const QString current = directory + QStringLiteral("/kcm_dockerrc");
     const QString legacy = directory + QStringLiteral("/kontainerrc");
 
-    // 迁移只做一次：新文件还不存在、旧文件在 → 复制一份过去（旧文件保留）
+    // Migrate once: new file absent and old file present -> copy it over (old file kept)
     if (!QFile::exists(current) && QFile::exists(legacy)) {
         QDir().mkpath(directory);
         QFile::copy(legacy, current);

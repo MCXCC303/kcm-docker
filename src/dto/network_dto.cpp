@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -21,7 +21,7 @@ using namespace JsonHelpers;
 
 namespace
 {
-/*! 对象形式（`Labels` / `Options`）→ 按键排序的键值对列表（顺序稳定，界面不跳）。 */
+/*! Object form (`Labels` / `Options`) → key-sorted pair list (stable order, no UI jumping). */
 QList<QPair<QString, QString>> pairsFromObject(const QJsonValue &value)
 {
     QList<QPair<QString, QString>> pairs;
@@ -31,7 +31,7 @@ QList<QPair<QString, QString>> pairsFromObject(const QJsonValue &value)
     const QJsonObject object = value.toObject();
     pairs.reserve(object.size());
     for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
-        // 值理论上都是字符串，但驱动选项里出现过数字/布尔：统一转成文本
+        // Values should be strings, but driver options do contain numbers/booleans: stringify
         const QJsonValue entry = it.value();
         QString text;
         if (entry.isString()) {
@@ -49,7 +49,7 @@ QList<QPair<QString, QString>> pairsFromObject(const QJsonValue &value)
     return pairs;
 }
 
-/*! `172.18.0.2/16` → `172.18.0.2`（界面上不显示子网前缀，子网单独一行说明）。 */
+/*! `172.18.0.2/16` → `172.18.0.2` (the UI hides the prefix; the subnet gets its own row). */
 QString addressWithoutPrefix(const QString &value)
 {
     const int slash = value.indexOf(QLatin1Char('/'));
@@ -101,7 +101,7 @@ std::optional<DockerNetworkDTO> DockerNetworkDTO::fromJson(const QJsonObject &ob
         member.macAddress = stringValue(entry, QStringLiteral("MacAddress"));
         dto.members.append(member);
     }
-    // 成员按名字排序：daemon 给的是哈希表，顺序不稳定
+    // Sort members by name: the daemon hands out a hash map with unstable order
     std::sort(dto.members.begin(), dto.members.end(), [](const NetworkMember &lhs, const NetworkMember &rhs) {
         if (lhs.name != rhs.name) {
             return lhs.name < rhs.name;

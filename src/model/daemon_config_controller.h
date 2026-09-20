@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,27 +20,27 @@ namespace Kontainer
 class PrivilegedClient;
 
 /*!
- * 运行时配置页的控制器（ARCH_V5_V8 §2.2/§2.3/§2.4）。
+ * Controller for the runtime configuration page (ARCH_V5_V8 §2.2/§2.3/§2.4).
  *
- * 职责：
- *  - 探测部署形态与配置文件状态（只读）
- *  - 读取 `daemon.json`（允许未知键）并把白名单字段暴露给界面
- *  - 与 `/info` 的实际值对照，标出「已生效 / 待重启」
- *  - 保存（用户可写路径直接原子写入；系统级路径走 5C 的提权 helper）
- *  - 生成"自己动手"的降级命令（helper 不可用时不让功能变成死胡同）
+ * Duties:
+ *  - probe the deployment form and config file state (read-only)
+ *  - read `daemon.json` (unknown keys allowed) and expose whitelisted fields to the UI
+ *  - compare against the real `/info` values and mark "in effect / restart pending"
+ *  - save (atomic write on user-writable paths; system paths go through the 5C privileged helper)
+ *  - generate "do it yourself" fallback commands (a missing helper must not dead-end the feature)
  *
- * 不负责：QML 文案（界面负责）、提权细节（helper 负责）。
+ * Not responsible for: QML copy (the UI owns it), privilege details (the helper owns them).
  */
 class DaemonConfigController : public QObject
 {
     Q_OBJECT
 
-    /* --- 作用域（ARCH_V5_V8 §2.2 修正：按"哪个 daemon 读这个文件"分离） --- */
-    /*! `user`（~/.config/docker/daemon.json）或 `system`（/etc/docker/daemon.json）。 */
+    /* --- Scope (ARCH_V5_V8 §2.2 fix: split by "which daemon reads this file") --- */
+    /*! `user` (~/.config/docker/daemon.json) or `system` (/etc/docker/daemon.json). */
     /*!
-     * 服务控制（B1）：非法请求会被拒绝并给出稳定 key；进行中时界面禁用按钮。
-     * 这些属性必须声明成 Q_PROPERTY——否则 QML 里读到的永远是 undefined
-     * （踩过一次：属性值正确、QML 却报 "Unable to assign [undefined] to bool"）。
+     * Service control (B1): invalid requests are rejected with a stable key; the UI disables buttons while
+     * one is in flight. These must be declared as Q_PROPERTY -- otherwise QML reads undefined forever
+     * (hit once: the value was right yet QML logged "Unable to assign [undefined] to bool").
      */
     Q_PROPERTY(QString serviceErrorKey READ serviceErrorKey NOTIFY changed)
     Q_PROPERTY(QString serviceUnit READ serviceUnit NOTIFY changed)
@@ -48,66 +48,66 @@ class DaemonConfigController : public QObject
     Q_PROPERTY(bool serviceInFlight READ serviceInFlight NOTIFY changed)
 
     Q_PROPERTY(QString scope READ scope NOTIFY changed)
-    /*! 这个作用域是否就是正在运行的 daemon 读取的那一个。 */
+    /*! Whether this scope is the one the running daemon reads. */
     Q_PROPERTY(bool activeScope READ activeScope NOTIFY changed)
 
-    /* --- 解锁状态（受保护作用域） --- */
-    /*! 是否已通过 polkit 授权（受保护作用域才有意义）。 */
+    /* --- Unlock state (protected scope) --- */
+    /*! Whether polkit authorization succeeded (meaningful for protected scopes only). */
     Q_PROPERTY(bool unlocked READ unlocked NOTIFY authorizationChanged)
-    /*! 授权还剩多少秒；0 表示未解锁。 */
+    /*! Seconds of authorization left; 0 means locked. */
     Q_PROPERTY(int unlockSecondsRemaining READ unlockSecondsRemaining NOTIFY authorizationChanged)
-    /*! 当前环境是否具备提权通路（helper/policy 已安装）。 */
+    /*! Whether a privilege path exists here (helper/policy installed). */
     Q_PROPERTY(bool privilegeAvailable READ privilegeAvailable NOTIFY changed)
 
-    /* --- 部署与文件状态 --- */
+    /* --- Deployment and file state --- */
     Q_PROPERTY(QString formKey READ formKey NOTIFY changed)
     Q_PROPERTY(QString configPath READ configPath NOTIFY changed)
     Q_PROPERTY(bool configExists READ configExists NOTIFY changed)
     Q_PROPERTY(bool configWritable READ configWritable NOTIFY changed)
     Q_PROPERTY(bool requiresPrivilege READ requiresPrivilege NOTIFY changed)
     Q_PROPERTY(bool dataRootInHomeDir READ dataRootInHomeDir NOTIFY changed)
-    /*! 解析失败时的技术原因；为空表示文件可用（或不存在）。 */
+    /*! Technical reason for a parse failure; empty means the file is usable (or absent). */
     Q_PROPERTY(QString parseError READ parseError NOTIFY changed)
 
-    /* --- 我们管理的设置 --- */
+    /* --- Settings we manage --- */
     Q_PROPERTY(QStringList registryMirrors READ registryMirrors NOTIFY changed)
     Q_PROPERTY(QStringList insecureRegistries READ insecureRegistries NOTIFY changed)
     Q_PROPERTY(int maxConcurrentDownloads READ maxConcurrentDownloads NOTIFY changed)
     Q_PROPERTY(QString logDriver READ logDriver NOTIFY changed)
-    /*! `data-root` / `storage-driver`（只读展示）。 */
+    /*! `data-root` / `storage-driver` (read-only display). */
     Q_PROPERTY(QString dataRoot READ dataRoot NOTIFY changed)
     Q_PROPERTY(QString configuredStorageDriver READ configuredStorageDriver NOTIFY changed)
-    /*! 我们不管的键（界面显示"其他键：N 个（只读）"）。 */
+    /*! Keys we do not manage (the UI shows "Other keys: N (read-only)"). */
     Q_PROPERTY(QStringList unmanagedKeys READ unmanagedKeys NOTIFY changed)
 
-    /* --- 生效状态 --- */
-    /*! `/info` 报告的镜像加速器（实际生效值）。 */
+    /* --- In-effect state --- */
+    /*! Registry mirrors reported by `/info` (the values actually in effect). */
     Q_PROPERTY(QStringList activeRegistryMirrors READ activeRegistryMirrors NOTIFY changed)
-    /*! 已保存但尚未生效（需要重启 daemon）。 */
+    /*! Saved but not yet in effect (a daemon restart is needed). */
     Q_PROPERTY(bool restartPending READ restartPending NOTIFY changed)
-    /*! `LiveRestoreEnabled`：为假时重启会停掉运行中的容器。 */
+    /*! `LiveRestoreEnabled`: when false, a restart stops running containers. */
     Q_PROPERTY(bool liveRestoreEnabled READ liveRestoreEnabled NOTIFY changed)
-    /*! 当前配置文件的备份列表（新的在前）。 */
+    /*! Backup list for the current config file (newest first). */
     Q_PROPERTY(QStringList backups READ backups NOTIFY changed)
 
-    /* --- 保存结果 --- */
+    /* --- Save results --- */
     Q_PROPERTY(QString lastError READ lastError NOTIFY resultChanged)
     Q_PROPERTY(QString lastBackupPath READ lastBackupPath NOTIFY resultChanged)
     Q_PROPERTY(bool dirty READ dirty NOTIFY dirtyChanged)
 
 public:
-    /*! 默认作用域：跟着正在运行的 daemon 走（rootless → user，系统级 → system）。 */
+    /*! Default scope follows the running daemon (rootless -> user, system-wide -> system). */
     explicit DaemonConfigController(QObject *parent = nullptr);
 
-    /*! 引擎信息变化（`/info` 回来）时更新"生效状态"的对照基准。 */
+    /*! Update the "in effect" baseline when engine info arrives (`/info`). */
     void setEngineInfo(const EngineInfo &info);
 
     /*!
-     * 注入提权客户端（组合根负责；为空表示当前环境没有提权通路）。
-     * 为空时需要提权的保存会直接给出降级命令，而不是静默失败。
+     * Inject the privileged client (the composition root does this; null means no privilege path here).
+     * When null, a save needing privileges hands out the fallback command instead of failing silently.
      */
     void setPrivilegedClient(PrivilegedClient *client);
-    /*! 运行中的容器数（重启影响提示用）。由 StatusController 提供。 */
+    /*! Running container count (for restart impact hints), provided by StatusController. */
     void setRunningContainerCount(int count);
 
     QString formKey() const;
@@ -134,13 +134,13 @@ public:
     QString lastError() const;
     QString lastBackupPath() const;
     bool dirty() const;
-    /*! 运行中的容器数（重启确认文案用）。 */
+    /*! Running container count (used in the restart confirmation wording). */
     int runningContainers() const;
 
-    /*! 重新探测 + 重新读文件（页面进入、保存/重启之后调用）。 */
+    /*! Re-probe and re-read the file (on page entry and after save/restart). */
     Q_INVOKABLE void reload();
 
-    /*! 切换作用域（界面按作用域分成两页/两个入口）。 */
+    /*! Switch scope (the UI splits the scopes into two pages/entries). */
     Q_INVOKABLE void setScope(const QString &scope);
     QString serviceErrorKey() const
     {
@@ -162,76 +162,77 @@ public:
     QString scope() const;
     bool activeScope() const;
 
-    /*! 「解锁」：打一次写配置动作的授权（keep 按动作记忆，随后保存与重启不再询问）。 */
+    /*! "Unlock": authorize the write-config action once (keep remembers per action, so the following
+     * save and restart do not prompt again). */
     Q_INVOKABLE void requestUnlock();
-    /*! 手动上锁（用户主动收起权限）。 */
+    /*! Lock manually (the user gives the privileges up). */
     Q_INVOKABLE void lock();
     bool unlocked() const;
     int unlockSecondsRemaining() const;
     bool privilegeAvailable() const;
 
-    /* --- 编辑（界面把当前值塞回来；未调用的字段表示不修改） --- */
+    /* --- Edits (the UI pushes current values back; untouched fields mean "do not change") --- */
     Q_INVOKABLE void setRegistryMirrors(const QStringList &mirrors);
     Q_INVOKABLE void setInsecureRegistries(const QStringList &registries);
     Q_INVOKABLE void setMaxConcurrentDownloads(int value);
     Q_INVOKABLE void setLogDriver(const QString &driver);
 
-    /*! 把当前编辑合并进原文档并返回预览（用于确认对话框里展示将写入的内容）。 */
+    /*! Merge the current edits into the document and return a preview (shown in the confirm dialog). */
     Q_INVOKABLE QString pendingContentPreview() const;
 
     /*!
-     * 保存。
+     * Save.
      *
-     * 用户可写路径 → 直接原子写入并返回 true；
-     * 需要提权 → 返回 false 并把 `lastError` 设为 `privilegeRequired`（5C 接上 helper 后由 helper 完成）。
+     * User-writable path -> atomic write and true;
+     * privilege needed -> false and `lastError` = `privilegeRequired` (5C hands it to the helper).
      */
     Q_INVOKABLE bool save();
 
-    /*! 恢复某个备份（传入备份文件路径；空字符串表示最近一个）。 */
+    /*! Restore a backup (pass the backup file path; an empty string means the most recent one). */
     Q_INVOKABLE bool restoreBackup(const QString &backupPath = QString());
 
-    /*! helper 不可用时的"自己动手"命令（可直接复制到终端执行）。 */
+    /*! "Do it yourself" command for when the helper is unavailable (paste it straight into a terminal). */
     /*!
-     * 可选日志驱动（含首项空串 = 使用 daemon 默认）。
+     * Selectable log drivers (first entry is an empty string = use the daemon default).
      *
-     * 名单来自 helper 的白名单（`PrivilegedConfigRequest::allowedLogDrivers`），
-     * 界面不再自己抄一份：抄一份的下场是界面能选、helper 拒绝。
+     * The list comes from the helper whitelist (`PrivilegedConfigRequest::allowedLogDrivers`); the UI must
+     * not keep a copy of its own -- the outcome is a UI that offers what the helper rejects.
      */
     Q_INVOKABLE QStringList selectableLogDrivers() const;
 
     Q_INVOKABLE QString privilegedCommand() const;
 
-    /*! 重启 Docker（系统级走 helper，rootless 走会话 systemd）。 */
+    /*! Restart Docker (system-wide goes through the helper, rootless through the session systemd). */
     /*!
-     * 控制一个 Docker 相关服务（B1）：unit 必须在白名单里，verbKey 是五个固定动词之一。
-     * 非法请求在这里就被拒绝（稳定 key，不发任何提权动作）。
+     * Control a Docker-related service (B1): the unit must be whitelisted and verbKey one of five fixed
+     * verbs. Invalid requests are rejected right here (stable key, no privileged action is sent).
      */
     Q_INVOKABLE bool controlService(const QString &unit, const QString &verbKey);
     Q_INVOKABLE void restartDocker();
-    /*! 运行中的容器数：重启确认文案要用它（"将停止 N 个运行中的容器"）。 */
+    /*! Running container count: the restart confirmation needs it ("will stop N running containers"). */
     Q_PROPERTY(int runningContainers READ runningContainers NOTIFY changed)
 
 Q_SIGNALS:
     void changed();
-    /*! 解锁状态或剩余时间变化。 */
+    /*! Unlock state or remaining time changed. */
     void authorizationChanged();
     void resultChanged();
     void dirtyChanged();
-    /*! 保存成功（页面据此提示"待重启生效"或"已写入"）。 */
+    /*! Save succeeded (the page then shows "restart pending" or "written"). */
     void saved();
-    /*! 服务控制结束（成功或失败）：界面据此刷新状态与提示。 */
+    /*! Service control finished, successfully or not; the UI refreshes state and hints. */
     void serviceControlled(const QString &unit, const QString &verb, bool success, const QString &errorKey);
-    /*! 重启结果（页面据此提示；成功时 daemon 会短暂不可用）。 */
+    /*! Restart result (the page hints accordingly; on success the daemon is briefly unavailable). */
     void restarted(bool success, const QString &errorKey);
 
 private:
-    /*! 重新读盘（显式动作）：磁盘值成为新基准，待保存的编辑会被丢弃。 */
+    /*! Re-read from disk (explicit action): disk values become the baseline and pending edits are dropped. */
     void refreshFromDisk();
     /*!
-     * 只重算"探测出来的事实"（路径、可写性、生效作用域、数据目录提示），
-     * **不碰**文档与待保存编辑；返回是否有变化。
+     * Recompute only the probed facts (paths, writability, active scope, data-root hint), **never** the
+     * document or pending edits; returns whether anything changed.
      *
-     * 自动刷新会反复调用它，所以它必须便宜且无副作用。
+     * Automatic refresh calls it repeatedly, so it must stay cheap and side-effect free.
      */
     bool refreshDeployment();
     DaemonConfigEdits buildEdits() const;
@@ -242,7 +243,7 @@ private:
     DaemonDeployment m_deployment;
     DaemonConfigDocument m_document;
 
-    /*! 编辑状态：只有被 set* 调用过的字段才会写回。 */
+    /*! Edit state: only fields touched by a set* call are written back. */
     DaemonConfigEdits m_edits;
 
     QStringList m_activeMirrors;
@@ -252,24 +253,24 @@ private:
     bool m_dirty = false;
     PrivilegedClient *m_privilegedClient = nullptr;
     /*
-     * KAuth 客户端是**共享**的（DockerKcm 只建一个，两个作用域各有一个 controller），
-     * 而它的 finished() 是广播：谁发的请求它不区分。因此每个 controller 必须自己记住
-     * "我发起过什么"，否则在系统级页面解锁会把用户级页面也标成已解锁
-     * （真实反馈：解锁→锁定后进用户设置，仍显示已解锁）。
+     * The KAuth client is **shared** (DockerKcm creates one; each scope has its own controller) and its
+     * finished() is a broadcast that does not identify the requester. Each controller must therefore
+     * remember what it sent, or unlocking on the system page marks the user page unlocked too (reported:
+     * unlock -> lock -> open user settings, still shown as unlocked).
      */
     bool m_awaitingAuthorize = false;
     bool m_awaitingWrite = false;
     bool m_awaitingRestart = false;
-    /*! 服务控制（B1）：最近一次请求与结果。 */
+    /*! Service control (B1): the most recent request and its result. */
     QString m_serviceUnit;
     QString m_serviceVerb;
     QString m_serviceErrorKey;
     bool m_serviceInFlight = false;
     int m_runningContainers = 0;
-    /*! 当前作用域（user / system）与"是否就是运行中的 daemon 读的那个文件"。 */
+    /*! Current scope (user / system) and whether it is the file the running daemon reads. */
     QString m_scope = QStringLiteral("system");
     bool m_activeScope = true;
-    /*! 解锁状态：到期后自动上锁（polkit 的 keep 窗口约 5 分钟）。 */
+    /*! Unlock state: locks itself on expiry (the polkit keep window is about 5 minutes). */
     bool m_unlocked = false;
     int m_unlockSecondsRemaining = 0;
     QTimer *m_unlockTimer = nullptr;

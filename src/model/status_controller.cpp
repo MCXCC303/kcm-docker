@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -23,7 +23,8 @@ using Section = DockerBackendInterface::Section;
 
 namespace
 {
-/*! 高频数据集：它们的失败才影响 stale 判定（storage/detail/stats 是独立生命周期）。 */
+/*! Fast datasets: only their failures feed the stale decision (storage/detail/stats
+    have independent lifetimes). */
 bool isFast(Section section)
 {
     return section == Section::Engine || section == Section::Containers || section == Section::Images;
@@ -57,32 +58,32 @@ StatusController::StatusController(DockerBackendInterface *backend,
     , m_containerDetail(new ContainerDetailController(backend, hostPaths, this))
     , m_imageDetail(new ImageDetailController(backend, this))
     , m_operations(new OperationController(backend, this))
-    // 挂载预设是"这个工具的数据"（~/.config/kcm_dockerrc），不是系统设置（§1.5.3）
-    // 挂载预设：注入时用注入的（测试/渲染用临时文件，绝不写用户真实配置）
+    // Mount presets are this tool's own data (~/.config/kcm_dockerrc), not system settings (§1.5.3)
+    // Mount presets: use the injected store (tests/rendering use a temp file, never the real config)
     , m_mountPresets(mountPresetStore ? mountPresetStore : new MountPresetStore({}, this))
     , m_commandHistory(new CommandHistoryStore({}, this))
     , m_createContainer(new CreateContainerController(m_operations, m_mountPresets, backend, m_containerDetail, m_commandHistory, this))
-    // 目录选择：注入时用注入的（测试与离屏渲染不弹真实对话框）
+    // Directory picker: use the injected one (tests and offscreen rendering must not show dialogs)
     , m_directoryPicker(directoryPicker ? directoryPicker : new SystemDirectoryPicker(this))
     , m_busyWatchdog(new QTimer(this))
     , m_services(serviceStatus ? serviceStatus : new SystemdServiceStatus(this))
     , m_hostPaths(hostPaths)
     , m_daemonConfigUser(new DaemonConfigController(this))
     , m_daemonConfigSystem(new DaemonConfigController(this))
-    // 凭据的唯一持久化位置是 KWallet（ARCH_V5_V8 §2.6）：后端、存储、控制器各一处实例
+    // KWallet is the only credential store (ARCH_V5_V8 §2.6): one instance for backend, store, controller
     , m_credentialBackend(credentialBackend ? credentialBackend : new KWalletBackend(this))
     , m_credentialStore(new CredentialStore(m_credentialBackend, this))
     , m_registryAuth(new RegistryAuthController(backend, m_credentialStore, this))
 {
     Q_ASSERT(m_backend);
-    // 注意：backend 的生命周期由调用方负责，这里绝不接管所有权。
+    // The caller owns the backend's lifetime; ownership is never taken here.
 
-    // 在途看门狗：单次触发，busy 期间由 onLoadingChanged 启动/停止
+    // In-flight watchdog: single shot, started/stopped by onLoadingChanged while busy
     m_busyWatchdog->setSingleShot(true);
     m_busyWatchdog->setInterval(int(std::chrono::duration_cast<std::chrono::milliseconds>(RefreshPolicy::kInFlightWatchdog).count()));
     connect(m_busyWatchdog, &QTimer::timeout, this, &StatusController::onBusyWatchdogTimeout);
 
-    // 服务动作成功后重新查询状态（界面因此立刻看到"已停止/已启动"）
+    // Re-query service state after a successful action (so the UI shows "stopped"/"started" at once)
     for (DaemonConfigController *config : {m_daemonConfigUser, m_daemonConfigSystem}) {
         connect(config, &DaemonConfigController::serviceControlled, this, [this](const QString &, const QString &, bool success, const QString &) {
             if (success) {
@@ -91,18 +92,18 @@ StatusController::StatusController(DockerBackendInterface *backend,
         });
     }
 
-    // 服务状态：查询回来后连接 key 可能变化（"已连接"要能因为服务停了而变成"服务未运行"）
+    // Service state: the connection key may change after a query ("connected" can become "service down")
     connect(m_services, &ServiceStatusBackend::servicesChanged, this, [this] {
         Q_EMIT serviceStatesChanged();
         updateStates();
     });
 
-    // 代理模型：搜索/过滤/排序状态由代理自己持有，因此后台刷新不会重置用户条件（§32）
+    // Proxy models own search/filter/sort, so background refreshes never reset user criteria (§32)
     m_containerFilter->setSourceModel(m_containerModel);
     m_imageFilter->setSourceModel(m_imageModel);
     m_networkFilter->setSourceModel(m_networkModel);
     m_hostPortFilter->setSourceModel(m_hostPortModel);
-    // 筛选/搜索/排序变化都要让缓存的区间地图数据失效（否则地图还是旧的）
+    // Any filter/search/sort change must invalidate the cached range map, or the map stays stale
     connect(m_hostPortFilter, &HostPortFilterModel::searchTextChanged, this, &StatusController::invalidatePortRanges);
     connect(m_hostPortFilter, &HostPortFilterModel::stateFilterChanged, this, &StatusController::invalidatePortRanges);
     connect(m_hostPortFilter, &HostPortFilterModel::sortKeyChanged, this, &StatusController::invalidatePortRanges);
@@ -110,17 +111,17 @@ StatusController::StatusController(DockerBackendInterface *backend,
     m_volumeFilter->setSourceModel(m_volumeModel);
 
     connect(m_backend, &DockerBackendInterface::engineUpdated, this, &StatusController::onEngineUpdated);
-    // 配置页需要 /info 里的 SecurityOptions / RegistryConfig.Mirrors / LiveRestoreEnabled，
-    // 因此引擎信息一到就同步给配置控制器
+    // The config page needs SecurityOptions / RegistryConfig.Mirrors / LiveRestoreEnabled from
+    // /info, so engine info is forwarded to the config controllers as soon as it arrives
     m_daemonConfigUser->setScope(QStringLiteral("user"));
     m_daemonConfigSystem->setScope(QStringLiteral("system"));
     m_daemonConfigUser->setEngineInfo(m_backend->engineInfo());
     m_daemonConfigSystem->setEngineInfo(m_backend->engineInfo());
     connect(m_backend, &DockerBackendInterface::containersUpdated, this, &StatusController::onContainersUpdated);
     /*
-     * inspect 回来了：记下这个容器**声明**的宿主绑定，重建端口表。
-     * 只有端口页真的请求过（在 m_declaredRequested 里）才理会——容器详情页的
-     * inspect 也会走到这里，没必要为它多算一遍。
+     * inspect arrived: record this container's **declared** host bindings and rebuild the port
+     * table. Only when the ports page asked for it (present in m_declaredRequested) — container
+     * detail inspects land here too and need no extra work.
      */
     connect(m_backend, &DockerBackendInterface::containerDetailUpdated, this, [this] {
         const ContainerDetail detail = m_backend->containerDetail();
@@ -136,14 +137,14 @@ StatusController::StatusController(DockerBackendInterface *backend,
     connect(m_backend, &DockerBackendInterface::storageUpdated, this, &StatusController::onStorageUpdated);
     connect(m_backend, &DockerBackendInterface::loadingChanged, this, &StatusController::onLoadingChanged);
     connect(m_backend, &DockerBackendInterface::sectionFailed, this, &StatusController::onSectionFailed);
-    // 拉取私有仓库时用钱包里的凭据（没有就是匿名拉取）
+    // Pulls from private registries use wallet credentials (anonymous when none are stored)
     m_operations->setCredentialStore(m_credentialStore);
 
     connect(m_scheduler, &RefreshScheduler::stateChanged, this, &StatusController::refreshStateChanged);
     connect(m_scheduler, &RefreshScheduler::autoRefreshEnabledChanged, this, &StatusController::autoRefreshEnabledChanged);
 
-    // 写后即读（ARCH_V4 §2.2.4）：操作成功后让打开着的详情页静默重读，
-    // 否则状态徽标与资源分区要等到下一次 30 秒复核才会跟上
+    // Read after write (ARCH_V4 §2.2.4): a successful operation silently reloads the open detail
+    // page, otherwise state badges and resource sections lag until the next 30 s re-check
     if (m_hostPaths) {
         connect(m_hostPaths, &HostPathService::openFinished, this, [this](HostPathError error, const QString &detail) {
             switch (error) {
@@ -215,9 +216,9 @@ bool StatusController::stale() const
 void StatusController::loadLowFrequencyListsOnce()
 {
     /*
-     * 网络与数据卷不进 5 秒轮询（低频数据），但它们的**数量**显示在标签页上——
-     * 用户实测："没进标签页之前一直显示 0，进去才变成 4"。
-     * 因此页面初始化时读一次，之后仍按原来的按需刷新（切页 / 变更后）。
+     * Networks and volumes skip the 5 s polling (low-frequency data), but their **counts** appear
+     * in tab titles — users saw 0 until the tab was opened, then 4. So they are read once at page
+     * init, and afterwards still refresh on demand (tab switch / changes).
      */
     if (m_lowFrequencyLoaded) {
         return;
@@ -229,7 +230,7 @@ void StatusController::loadLowFrequencyListsOnce()
 
 void StatusController::rebuildPorts()
 {
-    // 端口表、计数与区间地图都从这一份数据来：只在这里重建，避免三处各写一遍
+    // Port table, counts and range map all come from this one data set: rebuilt only here
     const int declaredBefore = declaredNotPublishedCount();
     const int reservedBefore = reservedPortCount();
     const int inUseBefore = inUsePortCount();
@@ -254,7 +255,7 @@ int StatusController::declaredNotPublishedCount() const
 
 int StatusController::inUsePortCount() const
 {
-    // 区间（47300-47309）按**端口数**算，不是按声明条数
+    // A range (47300-47309) counts as **ports**, not as declared entries
     int count = 0;
     for (const HostPortEntry &entry : m_hostPortModel->entries()) {
         if (entry.stateKey != QLatin1String("inUse")) {
@@ -300,16 +301,16 @@ QVariantList StatusController::portRanges() const
     timer.start();
 
     /*
-     * 地图画的是**过滤后**的端口：搜索框与状态过滤对地图同样生效
-     * （用户实测反馈：地图里筛不了，等于两个视图各有一套数据）。
-     * 数据从代理模型取，因此过滤条件只有一份实现。
+     * The map draws **filtered** ports: search box and state filter apply to it as well (users
+     * reported the map could not be filtered, leaving two views with separate data). Entries come
+     * from the proxy model, so the filter logic exists in one place.
      */
     QList<HostPortEntry> entries;
     entries.reserve(m_hostPortFilter->rowCount());
     for (int row = 0; row < m_hostPortFilter->rowCount(); ++row) {
         const QModelIndex index = m_hostPortFilter->index(row, 0);
         HostPortEntry entry;
-        // 用 role 里的结构化字段重建（不要从字符串反解：区间曾经因此丢掉终点）
+        // Rebuild from structured role fields, never by parsing strings (ranges once lost their end)
         entry.hostPort = quint16(index.data(HostPortModel::HostPortRole).toUInt());
         entry.hostPortEnd = quint16(index.data(HostPortModel::RangeEndRole).toUInt());
         entry.hostIp = index.data(HostPortModel::HostIpRole).toString();
@@ -323,9 +324,9 @@ QVariantList StatusController::portRanges() const
 
     QVariantList ranges;
     /*
-     * 方块的颜色按"筛选优先"解析：选了某个筛选时，只有该状态的方块显示成那样；
-     * "全部端口"时按优先级（运行中 > 被占用 > 未启动 > 未占用），
-     * 因此 20003 这种"未占用 + 运行中"的端口显示成运行中（用户要求）。
+     * Tile colours resolve filter-first: with a filter selected, only that state is painted; under
+     * "all ports" the priority is running > occupied > not started > free, so a port like 20003
+     * that is both free and running shows as running (user request).
      */
     const QStringList preferred = m_hostPortFilter->stateFilter() == QLatin1String("all")
         ? QStringList()
@@ -338,7 +339,7 @@ QVariantList StatusController::portRanges() const
                                       {QStringLiteral("text"), QString::number(port)},
                                       {QStringLiteral("stateKey"), entry.stateKey},
                                       {QStringLiteral("occupied"), !entry.stateKey.isEmpty()},
-                                      // 运行中的端口对应唯一一个容器：地图里点一下就能跳过去
+                                      // An in-use port maps to one container, so a map click can jump to it
                                       {QStringLiteral("containerId"), entry.stateKey == QLatin1String("inUse") ? entry.containerId : QString()},
                                       {QStringLiteral("containerName"), entry.stateKey == QLatin1String("inUse") ? entry.containerName : QString()}});
         }
@@ -364,11 +365,12 @@ void StatusController::refreshPorts()
 {
     m_backend->refreshContainers();
     /*
-     * 声明来自 inspect：**所有**容器都要取——
-     *   - 运行中：分辨"声明了却没真正发布"（`declaredNotPublished`）；
-     *   - 未运行：标明"这个端口现在是空的，但那个容器一起来就会要回去"（`reserved`）。
-     * 用户实测反馈要求两种都显示（早前"不做 reserved"的决定已被推翻，见 ARCH_next_ports.md）。
-     * 进页面时每个容器只拉一次（`m_declaredRequested` 记着），不为一个视图反复 inspect。
+     * Declarations come from inspect, and **every** container is inspected:
+     *   - running: to tell "declared but not actually published" (`declaredNotPublished`);
+     *   - stopped: to mark "the port is free now, but that container takes it back when it starts"
+     *     (`reserved`).
+     * Users asked for both (the earlier "no reserved" decision was reversed, see ARCH_next_ports.md).
+     * Each container is inspected once per page visit (`m_declaredRequested`), not per view.
      */
     for (const Container &container : m_backend->containers()) {
         if (container.id.isEmpty() || m_declaredRequested.contains(container.id)) {
@@ -393,8 +395,8 @@ void StatusController::refresh()
 {
     loadLowFrequencyListsOnce();
     qCDebug(kontainerModel) << "refresh requested";
-    // 用户主动刷新后，"上一次操作成功"这类提示已经过时（A7）：
-    // 失败类信息保留，因为它往往是用户唯一能看到的"为什么"（dismissResultIfObsolete 里判断）
+    // After a manual refresh "last operation succeeded" hints are outdated (A7); failures stay,
+    // since they are often the only "why" the user can see (decided in dismissResultIfObsolete)
     m_operations->dismissResultIfObsolete();
     m_services->query();
     m_refreshRequested = true;
@@ -408,7 +410,7 @@ void StatusController::retryStorage()
 }
 
 /* ------------------------------------------------------------------------- */
-/* 状态 key（QML 契约）                                                        */
+/* State keys (QML contract)                                                 */
 /* ------------------------------------------------------------------------- */
 
 QString StatusController::stateKeyFor(State state)
@@ -478,19 +480,21 @@ QString StatusController::engineStateKey() const
 QString StatusController::connectionKey() const
 {
     /*
-     * 连接状态的细化（用户实测 B1）：
+     * Refined connection state (report B1):
      *
-     * `docker.service` 停掉时 `docker.socket` 还在（socket 激活的语义），只看 socket 会显示
-     * "已连接"——但守护进程已经停了，用户点任何操作都不会成功。因此把服务状态一并纳入：
-     * 服务未全部运行时，连接状态明确带上"服务未运行"，界面据此给不同的提示与颜色。
-     * `containerd.service` 不参与"已连接"的判定（它不提供 Docker API），只用于提示部分能力可用。
+     * With docker.service stopped, `docker.socket` is still there (socket activation), so looking at
+     * the socket alone reports "connected" while the daemon is down and every action fails. Service
+     * state is therefore included: when not all services run, the connection key says "services
+     * down" so the UI can use a different hint and colour. `containerd.service` does not take part
+     * in the "connected" decision (it serves no Docker API), it only flags missing capabilities.
      */
     const bool dockerSocket = m_services->isActive(QStringLiteral("docker.socket"));
     const bool dockerService = m_services->isActive(QStringLiteral("docker.service"));
     const bool servicesDown = !dockerSocket || !dockerService;
     /*
-     * "已连接"要求**最近一次刷新是成功的**：只看缓存的引擎数据会误导——
-     * 守护进程停掉之后我们仍留着上一次读到的数据，用户看到"已连接"却点什么都失败。
+     * "Connected" requires the **last refresh to have succeeded**: cached engine data alone
+     * misleads — after the daemon stops the old data remains and the UI says "connected" while
+     * every action fails.
      */
     const bool engineDataUsable = m_engineState == EngineState::Ready || m_engineState == EngineState::Refreshing
         || m_engineState == EngineState::Partial;
@@ -503,7 +507,7 @@ QString StatusController::connectionKey() const
 
 QString StatusController::engineStateSemanticKey() const
 {
-    // Partial = 已连接但 /info 概要读不到：降级（警告），不是失败。
+    // Partial = connected but the /info summary is unreadable: degraded (warning), not a failure.
     switch (m_engineState) {
     case EngineState::Ready:
     case EngineState::Refreshing:
@@ -560,7 +564,7 @@ QString StatusController::volumesStateKey() const
 }
 
 /* ------------------------------------------------------------------------- */
-/* backend 信号                                                                */
+/* backend signals                                                           */
 /* ------------------------------------------------------------------------- */
 
 void StatusController::onEngineUpdated()
@@ -587,7 +591,7 @@ void StatusController::onContainersUpdated()
     m_daemonConfigUser->setRunningContainerCount(runningContainerCount());
     m_daemonConfigSystem->setRunningContainerCount(runningContainerCount());
     m_containerModel->setContainers(m_backend->containers());
-    // 端口视图跟着容器列表走："实际发布"来自它，"声明"来自已拉到的 inspect
+    // The port view follows the container list: publications come from it, declarations from inspect
     rebuildPorts();
     m_containersOk = true;
     m_containersFailed = false;
@@ -649,7 +653,7 @@ void StatusController::onLoadingChanged()
     if (busy != m_busy) {
         m_busy = busy;
         if (busy) {
-            // 在途请求开始：起看门狗（超时后放弃在途请求，界面回到"可以重试"）
+            // In-flight request started: arm the watchdog (on timeout it is abandoned, UI can retry)
             m_busyWatchdog->start();
         } else {
             m_busyWatchdog->stop();
@@ -680,8 +684,8 @@ void StatusController::onBusyWatchdogTimeout()
         m_busyWatchdog->stop();
         return;
     }
-    // 兜底：请求卡在"永远不回来"的状态（daemon 半死不活、socket 接了不回数据）。
-    // 放弃在途请求并如实报告超时——否则界面会永久停在"正在加载 / backend busy"（B3/B4）。
+    // Fallback for requests stuck "never returning" (half-dead daemon, socket accepted but silent).
+    // Abandon them and report the timeout, or the UI stays on "loading / backend busy" (B3/B4).
     m_timeoutReason = i18n("Docker stopped responding; the pending request was given up. Retry when the service is available again.");
     m_backend->abandonInFlightRequests(
         DockerError(DockerError::Kind::Timeout, QStringLiteral("no response within the watchdog window")));
@@ -708,23 +712,23 @@ void StatusController::onSectionFailed(Section section, const DockerError &error
     case Section::Storage:
         m_storageOk = false;
         m_storageFailed = true;
-        m_storage->clear(); // 失败时不让旧数据继续冒充最新（§15）
+        m_storage->clear(); // Do not let old data pass as fresh on failure (§15)
         break;
     case Section::Networks:
-        // 网络是低频数据：读失败时**保留**上一次的列表（后端也保留），
-        // 只把状态标成失败并在页面上提示，避免界面突然空掉
+        // Networks are low-frequency: on failure **keep** the previous list (the backend does too),
+        // only mark the state as failed and show a hint, so the UI does not suddenly go empty
         m_networksOk = false;
         m_networksFailed = true;
         break;
     case Section::Volumes:
-        // 数据卷同理：保留列表，只标失败
+        // Same for volumes: keep the list, only mark the failure
         m_volumesOk = false;
         m_volumesFailed = true;
         break;
     case Section::ContainerDetail:
     case Section::ImageDetail:
     case Section::Stats:
-        // 详情/采样失败由各自的 controller 处理，不影响概览与列表（§30/§31）
+        // Detail/stats failures belong to their own controllers and spare overview and lists (§30/§31)
         break;
     }
 
@@ -788,23 +792,24 @@ void StatusController::setSectionError(Section section, const QString &text)
 }
 
 /* ------------------------------------------------------------------------- */
-/* 状态机（§14/§30）                                                           */
+/* State machine (§14/§30)                                                   */
 /* ------------------------------------------------------------------------- */
 
 StatusController::EngineState StatusController::computeEngineState() const
 {
     if (m_engine->available()) {
         if (!m_engineError.isEmpty()) {
-            return EngineState::Partial; // 已连接，但汇总信息（/info）不可用
+            return EngineState::Partial; // connected, but the /info summary is unavailable
         }
         return m_busy ? EngineState::Refreshing : EngineState::Ready;
     }
     /*
-     * 还没连上时的三种情况要分清（用户实测 B3：服务没起来时界面永远停在"正在加载"）：
-     *  - 还没请求过刷新 → Loading
-     *  - 请求过、仍在途     → Loading
-     *  - 请求过、已经失败过 → Unavailable（带错误原因，并且可以"重试"）
-     * 原来的判定只看"请求过没有"，于是 daemon 不可用时永远显示正在加载。
+     * Three not-yet-connected cases must be told apart (report B3: with the daemon down the UI
+     * stayed on "loading" forever):
+     *  - no refresh requested yet → Loading
+     *  - requested, still in flight → Loading
+     *  - requested and already failed → Unavailable (with a reason and a retry action)
+     * The old check only asked "requested or not", so an unreachable daemon loaded forever.
      */
     if (!m_refreshRequested) {
         return EngineState::Loading;
@@ -863,7 +868,7 @@ void StatusController::updateStates()
         Q_EMIT storageStateChanged();
     }
 
-    // 网络列表不参与整页状态（§30）：它没有数据时只是"网络页空着"
+    // The network list does not drive the page state (§30): no data means an empty networks page
     const ListState networksState = computeListState(m_networksOk, m_networksFailed, m_networkModel->count());
     if (networksState != m_networksState) {
         m_networksState = networksState;
@@ -884,7 +889,7 @@ void StatusController::updateStates()
     } else if (anyOk) {
         next = State::Ready;
     } else if (anyFailed) {
-        // 只有高频数据集全部失败才让整页进入 Error（§30：storage/detail 失败不影响整页）
+        // Only when all fast datasets fail does the page enter Error (§30: storage/detail do not count)
         next = State::Error;
     }
 
@@ -919,7 +924,7 @@ bool StatusController::openHostPath(const QString &path)
         return false;
     }
     setHostPathError(QString());
-    // 路径本身不进日志（ARCH_V2 §40）；结果经 openFinished 回来
+    // The path itself is never logged (ARCH_V2 §40); the result arrives via openFinished
     return m_hostPaths->openDirectory(path);
 }
 

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -21,32 +21,33 @@ class ContainerDetailController;
 class OperationController;
 
 /*!
- * 创建容器向导的状态与校验（ARCH_V5_V8 §4.3/§4.4）。
+ * State and validation for the create-container wizard (ARCH_V5_V8 §4.3/§4.4).
  *
- * 为什么把表单状态放在 C++ 而不是 QML：七期的校验矩阵里有一半要**对照后端数据**
- * （重名、端口冲突、镜像是否在本地），另一半是纯格式规则；两者放在一起才可能被
- * 单元测试完整覆盖。QML 只做两件事：把输入写进来、把 `summary()` 画出来。
+ * Why form state lives in C++ and not QML: half of the phase-seven validation matrix must **check
+ * backend data** (duplicate names, port conflicts, whether the image is local) and the other half is
+ * pure format rules; only together can unit tests cover them fully. QML does two things only: write
+ * input in, draw `summary()` out.
  *
- * 步骤用**稳定 key**（`image` / `basics` / `ports` / `environment` / `mounts` /
- * `resources` / `summary`）而不是下标：界面上的步骤按钮、校验与测试都按 key 说话，
- * 以后插入或调整步骤顺序不会静默错位（六期在标签页索引上踩过这个坑）。
+ * Steps use **stable keys** (`image` / `basics` / `ports` / `environment` / `mounts` / `resources` /
+ * `summary`) instead of indices: step buttons, validation and tests all speak keys, so inserting or
+ * reordering steps later cannot silently misalign (phase six hit this on tab indices).
  */
 class CreateContainerController : public QObject
 {
     Q_OBJECT
 
-    /* ---------------- 步骤 ---------------- */
+    /* ---------------- Steps ---------------- */
     Q_PROPERTY(QString stepKey READ stepKey NOTIFY stepChanged)
     Q_PROPERTY(int stepIndex READ stepIndex NOTIFY stepChanged)
     Q_PROPERTY(int stepCount READ stepCount CONSTANT)
-    /*! 当前步骤能不能继续（不能时 `stepErrorKey()` 给出原因）。 */
+    /*! Whether the current step can advance (`stepErrorKey()` gives the reason when it cannot). */
     Q_PROPERTY(bool canAdvance READ canAdvance NOTIFY changed)
-    /*! 当前步骤的问题 key（空 = 没问题）。 */
+    /*! Problem key of the current step (empty = no problem). */
     Q_PROPERTY(QString stepErrorKey READ stepErrorKey NOTIFY changed)
-    /*! 是否停在最后一步（确认总览）。 */
+    /*! Whether we are on the last step (the review). */
     Q_PROPERTY(bool onSummary READ onSummary NOTIFY stepChanged)
 
-    /* ---------------- 表单字段 ---------------- */
+    /* ---------------- Form fields ---------------- */
     Q_PROPERTY(QString name READ name WRITE setName NOTIFY changed)
     Q_PROPERTY(QString image READ image WRITE setImage NOTIFY changed)
     Q_PROPERTY(QString commandText READ commandText WRITE setCommandText NOTIFY changed)
@@ -61,42 +62,44 @@ class CreateContainerController : public QObject
     Q_PROPERTY(qint64 memoryLimitBytes READ memoryLimitBytes WRITE setMemoryLimitBytes NOTIFY changed)
     Q_PROPERTY(double cpus READ cpus WRITE setCpus NOTIFY changed)
     Q_PROPERTY(bool privileged READ privileged WRITE setPrivileged NOTIFY changed)
-    /*! 交互式标准输入（`-i`）：**默认开**，否则 alpine 这类镜像的命令会立刻读到 EOF 退出。 */
+    /*! Interactive stdin (`-i`): **on by default**, or commands in images like alpine read EOF and exit. */
     Q_PROPERTY(bool openStdin READ openStdin WRITE setOpenStdin NOTIFY changed)
-    /*! 分配伪终端（`-t`）：默认开（与 `-i` 一起才是常见的手动调试组合）。 */
+    /*! Allocate a pseudo-TTY (`-t`): on by default (with `-i` it is the usual manual debug combo). */
     Q_PROPERTY(bool tty READ tty WRITE setTty NOTIFY changed)
     Q_PROPERTY(bool stdinOnce READ stdinOnce WRITE setStdinOnce NOTIFY changed)
     Q_PROPERTY(bool startAfterCreate READ startAfterCreate WRITE setStartAfterCreate NOTIFY changed)
-    /*! 镜像不在本地时是否允许继续（界面上的「先拉取」）。 */
+    /*! Whether to continue when the image is not local (the UI's "pull first"). */
     Q_PROPERTY(bool pullIfMissing READ pullIfMissing WRITE setPullIfMissing NOTIFY changed)
 
-    /*! 端口 / 环境变量 / 标签 / 挂载：QML 的行编辑器写进来的纯数据。 */
+    /*! Ports / env vars / labels / mounts: plain data written in by the QML row editors. */
     Q_PROPERTY(QVariantList portRows READ portRows WRITE setPortRows NOTIFY changed)
     /*!
-     * 每一行端口的状态（与 `portRows` 同序）：`{errorKey, holder, suggestion}`。
+     * Status of every port row, same order as `portRows`: `{errorKey, holder, suggestion}`.
      *
-     * 做成**属性**而不是 `Q_INVOKABLE`：QML 里函数调用不建立依赖，容器列表一变提示就不会更新
-     * （本项目反复踩过；端口编辑器要在用户填端口时立刻给出"被谁占用 / 建议端口"）。
-     * 空闲时 `errorKey` 为空——界面据此**什么都不显示**（用户要求：减少冗余小字）。
+     * A **property**, not `Q_INVOKABLE`: in QML a function call builds no dependency, so hints would not
+     * update when the container list changes (hit repeatedly here; the port editor must immediately show
+     * "held by whom / suggested port"). When free, `errorKey` is empty and the UI shows **nothing**
+     * (user-requested: fewer redundant small labels).
      */
     Q_PROPERTY(QVariantList portRowStatuses READ portRowStatuses NOTIFY changed)
     Q_PROPERTY(QVariantList environmentRows READ environmentRows WRITE setEnvironmentRows NOTIFY changed)
     Q_PROPERTY(QVariantList labelRows READ labelRows WRITE setLabelRows NOTIFY changed)
     Q_PROPERTY(QVariantList mountRows READ mountRows WRITE setMountRows NOTIFY changed)
 
-    /*! 命令历史（本地记录 + 已有容器的命令）。 */
+    /*! Command history (local records + existing containers' commands). */
     Q_PROPERTY(Kontainer::CommandHistoryStore *commandHistory READ commandHistory CONSTANT)
     Q_PROPERTY(QVariantList presets READ presets NOTIFY presetsChanged)
     /*!
-     * 选择列表：本地镜像与可用网络。
+     * Choice lists: local images and available networks.
      *
-     * 做成**属性**而不是 Q_INVOKABLE：函数调用既不会建立依赖，又会随着每次表单改动
-     * 让 Repeater 重建全部条目（实测会崩）。它们只在后端数据变化时才通知。
+     * **Properties**, not Q_INVOKABLE: a function call builds no dependency and would also make Repeater
+     * rebuild all of its items on every form change (observed to crash). They notify only when backend
+     * data changes.
      */
     Q_PROPERTY(QVariantList availableImages READ availableImages NOTIFY choiceListsChanged)
     Q_PROPERTY(QVariantList availableNetworks READ availableNetworks NOTIFY choiceListsChanged)
 
-    /*! 确认总览：`[{label, value}]`，最后一步只读展示。 */
+    /*! Review summary: `[{label, value}]`, shown read-only on the last step. */
     Q_PROPERTY(QVariantList summary READ summary NOTIFY changed)
 
 public:
@@ -107,9 +110,9 @@ public:
                               CommandHistoryStore *commandHistory = nullptr,
                               QObject *parent = nullptr);
 
-    /*! 步骤 key 顺序（界面与测试共用；不要在 QML 里另抄一份）。 */
+    /*! Step key order (shared by UI and tests; do not copy it into QML). */
     static QStringList stepKeys();
-    /*! 同上，但以属性形式暴露给 QML（静态方法在 QML 里拿不到）。 */
+    /*! As above, exposed to QML as a property (static methods are unreachable from QML). */
     Q_PROPERTY(QStringList stepKeys READ stepKeys CONSTANT)
 
     QString stepKey() const;
@@ -141,7 +144,7 @@ public:
 
     QVariantList portRows() const;
     QVariantList portRowStatuses() const;
-    /*! 单行的状态（`portRowStatuses()` 与 `validatePorts()` 共用同一份判断）。 */
+    /*! Status of one row (`portRowStatuses()` and `validatePorts()` share the same judgment). */
     QVariantMap portRowStatus(int row) const;
     QVariantList environmentRows() const;
     QVariantList labelRows() const;
@@ -177,39 +180,41 @@ public:
     void setLabelRows(const QVariantList &rows);
     void setMountRows(const QVariantList &rows);
 
-    /*! 从空白开始（可选预填镜像，供镜像卡片/详情进入时使用）。 */
+    /*! Start blank (optionally pre-filled with an image, for entry from an image card/detail). */
     Q_INVOKABLE void reset(const QString &presetImage = {});
     /*!
-     * 把"已有容器的命令"并入命令历史候选（不写盘）：当前打开的那个容器详情里的命令。
+     * Merge existing containers' commands into the history candidates (not persisted): the commands of
+     * the container detail currently open.
      *
-     * 容器列表本身没有命令（要 inspect 才有），因此这里只取**已经加载过**的那一份——
-     * 为了一次下拉去逐个 inspect 所有容器不值得（登记为偏离，见 ARCH）。
+     * The container list carries no command (that needs inspect), so only the **already loaded** one is
+     * taken -- inspecting every container for a single dropdown is not worth it (recorded as a deviation
+     * in ARCH).
      */
     Q_INVOKABLE int mergeCommandsFromExistingContainers();
-    /*! 克隆：用现有容器的**配置**预填（不复制运行时状态，§4.5）。 */
+    /*! Clone: pre-fill from an existing container's **config** (no runtime state copied, §4.5). */
     Q_INVOKABLE bool prefillFromContainer(const QString &containerId);
-    /*! 名称冲突时给一个可用的候选名（`web` → `web-copy`）。 */
+    /*! Suggest a usable name on a conflict (`web` -> `web-copy`). */
     Q_INVOKABLE QString suggestedName() const;
 
-    /*! 指定步骤的校验结果（诊断与测试用；不影响当前步骤）。 */
+    /*! Validation result of a given step (for diagnostics and tests; the current step is untouched). */
     Q_INVOKABLE QString stepErrorKeyForStep(const QString &key) const;
 
-    /*! 上一步 / 下一步（下一步会先校验当前步骤）。 */
+    /*! Previous / next step (next validates the current step first). */
     Q_INVOKABLE bool nextStep();
     Q_INVOKABLE void previousStep();
-    /*! 跳到某一步（步骤按钮用；只允许跳到已通过校验的那一步或它之前）。 */
+    /*! Jump to a step (for the step buttons; only up to the last validated step). */
     Q_INVOKABLE bool goToStep(const QString &key);
 
     QVariantList availableImages() const;
     QVariantList availableNetworks() const;
 
     /*!
-     * 端口行的增删改（八期后的修正：行编辑放在 C++）。
+     * Add / edit / remove port rows (phase-eight fix: row editing lives in C++).
      *
-     * 为什么不让 QML 直接改列表：`Repeater` 的 delegate 在
-     * `pragma ComponentBehavior: Unbound` 下**拿不到根对象的 id**，delegate 里
-     * 写 `page.xxx` 会抛 `ReferenceError`，用户实测表现为"删不掉端口/加不了挂载"。
-     * 把行的增删改收进控制器后，delegate 只需要一个非根 id 就能调用，规则也更好测。
+     * Why QML does not edit the list directly: with `pragma ComponentBehavior: Unbound` a `Repeater`
+     * delegate **cannot see the root object's id**, so `page.xxx` inside it throws `ReferenceError`,
+     * which users saw as "cannot delete a port / add a mount". With row editing in the controller a
+     * delegate needs only a non-root id, and the rules are easier to test.
      */
     Q_INVOKABLE void addPortRow(int containerPort = 80, int hostPort = 0, const QString &hostIp = {}, const QString &protocol = QStringLiteral("tcp"));
     Q_INVOKABLE void setPortRow(int row, const QString &field, const QVariant &value);
@@ -223,32 +228,32 @@ public:
     Q_INVOKABLE void setMountRow(int row, const QString &field, const QVariant &value);
     Q_INVOKABLE void removeMountRow(int row);
 
-    /*! 从预设添加一条挂载（已存在则忽略）。 */
+    /*! Add a mount from a preset (ignored if already present). */
     Q_INVOKABLE bool addMountFromPreset(const QString &presetId);
-    /*! 追加一条空挂载行（bind）。 */
+    /*! Append an empty mount row (bind). */
     Q_INVOKABLE void addEmptyMount();
     Q_INVOKABLE void removeMountAt(int row);
 
-    /*! 提交（最后一步）：构造请求交给 `OperationController::createContainer`。 */
+    /*! Submit (last step): build the request and hand it to `OperationController::createContainer`. */
     Q_INVOKABLE bool submit();
 
 Q_SIGNALS:
     void changed();
     void stepChanged();
     void presetsChanged();
-    /*! 镜像或网络列表变了（选择列表要重铺）。 */
+    /*! Image or network list changed (the choice lists must be repopulated). */
     void choiceListsChanged();
-    /*! 提交成功（界面据此跳到新容器详情页）。 */
+    /*! Submit succeeded (the UI jumps to the new container's detail page). */
     void submitted(const QString &containerId);
 
 private:
-    /*! 当前步骤的校验（返回稳定 key；空 = 通过）。 */
+    /*! Validation of the current step (stable key; empty = passed). */
     QString validateCurrentStep() const;
-    /*! 每一行端口/挂载的字段级校验（`stepErrorKey` 用的同一批规则）。 */
+    /*! Field-level validation of every port/mount row (the same rules `stepErrorKey` uses). */
     QString validatePorts() const;
     QString validateMounts() const;
     QVariantMap requestMap() const;
-    /*! 默认网络：列表里的第一个（列表是异步到的，因此这里每次现算）。 */
+    /*! Default network: the first in the list (it arrives asynchronously, so it is computed live). */
     QString defaultNetwork() const;
     QStringList splitLines(const QString &text) const;
     void touch();
@@ -256,7 +261,7 @@ private:
     OperationController *m_operations = nullptr;
     MountPresetStore *m_presets = nullptr;
     DockerBackendInterface *m_backend = nullptr;
-    /*! 容器详情控制器（可能为空）：克隆时用它拿命令/入口点/环境/标签等完整配置。 */
+    /*! Container detail controller (may be null): cloning reads command/entrypoint/env/labels from it. */
     ContainerDetailController *m_containerDetail = nullptr;
     CommandHistoryStore *m_commandHistory = nullptr;
 
@@ -276,7 +281,7 @@ private:
     qint64 m_memoryLimitBytes = 0;
     double m_cpus = 0.0;
     bool m_privileged = false;
-    /* 交互能力：默认开（见请求结构里的说明） */
+    /* Interactive capability: on by default (see the request struct's comments) */
     bool m_openStdin = true;
     bool m_tty = true;
     bool m_stdinOnce = false;
@@ -288,7 +293,7 @@ private:
     QVariantList m_labelRows;
     QVariantList m_mountRows;
 
-    /*! 提交后引擎返回的 id（`containerCreated` 信号里拿到）。 */
+    /*! Id returned by the engine after submit (from the `containerCreated` signal). */
     QString m_createdContainerId;
 };
 

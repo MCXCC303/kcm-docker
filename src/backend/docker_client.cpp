@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -53,7 +53,8 @@ DockerReply::DockerReply(DockerEndpoint endpoint, Request request, QObject *pare
     connect(m_socket, &QLocalSocket::connected, this, &DockerReply::onConnected);
     connect(m_socket, &QLocalSocket::readyRead, this, &DockerReply::onReadyRead);
     connect(m_socket, &QLocalSocket::disconnected, this, &DockerReply::onDisconnected);
-    // 分块上传请求体：写出去一块就接着写下一块（靠这个信号做背压，不自己转圈写）
+    // Chunked body upload: one chunk written, queue the next (this signal provides
+    // backpressure; no busy loop)
     connect(m_socket, &QLocalSocket::bytesWritten, this, &DockerReply::onBytesWritten);
     connect(m_socket, &QLocalSocket::errorOccurred, this, [this](auto socketError) {
         onSocketError(int(socketError), m_socket->errorString());
@@ -67,7 +68,7 @@ bool DockerReply::isHeaderSafe(const QByteArray &name, const QByteArray &value)
         return false;
     }
     const auto isTokenChar = [](char ch) {
-        // RFC 7230 的 token 字符集：字母数字与 !#$%&'*+-.^_`|~
+        // RFC 7230 token charset: alphanumerics plus !#$%&'*+-.^_`|~
         return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
             || QByteArray("!#$%&'*+-.^_`|~").contains(ch);
     };
@@ -77,7 +78,7 @@ bool DockerReply::isHeaderSafe(const QByteArray &name, const QByteArray &value)
         }
     }
     for (const char ch : value) {
-        // 禁止 CR/LF（请求头注入）与其余控制字符
+        // Reject CR/LF (header injection) and all other control characters
         if (ch == '\r' || ch == '\n' || (static_cast<unsigned char>(ch) < 0x20 && ch != '\t')) {
             return false;
         }
@@ -103,7 +104,8 @@ void DockerReply::start()
                               QStringLiteral("socket %1 does not exist").arg(m_endpoint.socketPath())));
         return;
     }
-    // 两段超时：先等「首个响应」，收到响应头之后才按流式静默超时算
+    // Two-stage timeout: wait for the first response, and only after the headers
+    // switch to the streaming idle timeout
     const int firstResponseTimeout = m_request.headersTimeoutMs > 0 ? m_request.headersTimeoutMs : m_request.timeoutMs;
     if (firstResponseTimeout > 0) {
         m_timer->start(firstResponseTimeout);
@@ -127,8 +129,9 @@ void DockerReply::onConnected()
     if (!m_request.bodyFile.isEmpty()) {
         DockerError error;
         if (!openBodyFile(&error)) {
-            // 必须**延后**发失败：调用方是在拿到 reply 之后才 connect(finished) 的，
-            // 同步发信号会让它永远收不到（构建上下文读不到时会表现为"卡住"）
+            // Must fail **later**: the caller connects finished() only after it got
+            // the reply, so a synchronous emit would never reach it (symptom: the
+            // build hangs when the context cannot be read)
             failLater(error);
             return;
         }
@@ -157,7 +160,7 @@ void DockerReply::onConnected()
         if (uploadsFile || !m_request.body.isEmpty()) {
             request += "Content-Type: " + m_request.bodyContentType + "\r\n";
         }
-        // 没有请求体时也显式声明长度（比留空更稳妥）
+        // Declare the length even without a body (safer than omitting it)
         const qint64 length = uploadsFile ? QFileInfo(m_request.bodyFile).size() : m_request.body.size();
         request += "Content-Length: " + QByteArray::number(length) + "\r\n";
     }
@@ -165,7 +168,8 @@ void DockerReply::onConnected()
 
     m_socket->write(request);
     if (uploadsFile) {
-        // 上传阶段用较宽的静默超时：写大上下文时"多久没有进展"才是异常
+        // Wider idle timeout while uploading: with a large context, "no progress" is
+        // the anomaly
         if (m_request.uploadTimeoutMs > 0) {
             m_timer->start(m_request.uploadTimeoutMs);
         }
@@ -182,7 +186,7 @@ void DockerReply::writeNextBodyChunk()
         return;
     }
     if (!m_bodyFile) {
-        return; // 没打开成功（错误已经发出）
+        return; // open failed (the error has already been emitted)
     }
     const qint64 chunk = qMin(kBodyChunkBytes, m_bodyRemaining);
     const QByteArray data = m_bodyFile->read(chunk);
@@ -195,7 +199,7 @@ void DockerReply::writeNextBodyChunk()
     m_socket->write(data);
     m_socket->flush();
     if (m_bodyRemaining <= 0) {
-        // 上传完成：切回响应阶段（流式空闲超时或首个响应超时）
+        // Upload done: switch back to the response phase (streaming idle or first-response timeout)
         m_bodyFile->close();
         const int responseTimeout = m_request.timeoutMs > 0 ? m_request.timeoutMs : m_request.headersTimeoutMs;
         if (responseTimeout > 0) {
@@ -238,8 +242,8 @@ void DockerReply::onReadyRead()
 
     notifyStreamStarted();
 
-    // 流式响应：超时语义是「多久没有新数据」，每次收到数据就重新计时。
-    // timeoutMs == 0 表示不设静默超时（日志 follow 流可以合法地长时间静默）
+    // Streaming response: the timeout means "no new data", restarted on every read.
+    // timeoutMs == 0 disables it (a follow log stream may legitimately stay silent)
     if (m_request.streaming && m_request.timeoutMs > 0) {
         m_timer->start(m_request.timeoutMs);
     }
@@ -257,7 +261,7 @@ void DockerReply::onDisconnected()
     if (isFinished()) {
         return;
     }
-    // Connection: close 的正常结束路径
+    // Normal end path for Connection: close
     m_parser->finishInput();
     notifyStreamStarted();
     if (m_parser->body().size() != m_seenBodyBytes) {
@@ -276,7 +280,8 @@ void DockerReply::notifyStreamStarted()
         return;
     }
     m_streamStarted = true;
-    // 响应头到了：切换到流式静默超时（拉取可以合法地跑很久；日志 follow 则不设超时）
+    // Headers arrived: switch to the streaming idle timeout (a pull may run long;
+    // log follow has none)
     if (m_request.streaming && m_request.timeoutMs > 0) {
         m_timer->start(m_request.timeoutMs);
     }
@@ -298,8 +303,9 @@ void DockerReply::processBuffer()
 
     const int status = m_parser->statusCode();
     const QByteArray body = m_parser->body();
-    // 304 只可能来自 start（已运行）/ stop（已停止）：那是「已处于目标状态」，
-    // 属于成功语义，由 backend 落成 MutationOutcome::Unchanged（ARCH_V4 §2.2.1）。
+    // 304 can only come from start (already running) / stop (already stopped): that
+    // means "already in the target state", so success; the backend maps it to
+    // MutationOutcome::Unchanged (ARCH_V4 §2.2.1).
     if ((status >= 200 && status < 300) || status == 304) {
         succeed(status, body);
     } else {
@@ -315,7 +321,7 @@ DockerError DockerReply::errorFromResponse(int httpStatus, const QByteArray &bod
         apiMessage = document.object().value(QStringLiteral("message")).toString();
     }
 
-    // Docker 在客户端请求的 API 版本不受支持时返回 400 + 明确说明
+    // Docker answers 400 with a clear message when the requested API version is unsupported
     if (httpStatus == 400
         && (apiMessage.contains(QLatin1String("client version"), Qt::CaseInsensitive)
             || apiMessage.contains(QLatin1String("too new"), Qt::CaseInsensitive)
@@ -344,7 +350,7 @@ void DockerReply::onTimeout()
         return;
     }
     if (m_request.streaming) {
-        // 还没收到响应头 → 请求根本没开始（例如引擎联系不上镜像仓库）
+        // No headers yet -> the request never started (e.g. the engine cannot reach the registry)
         if (!m_streamStarted) {
             fail(DockerError(DockerError::Kind::Timeout,
                              QStringLiteral("no response headers within %1 ms").arg(m_request.headersTimeoutMs)));
@@ -387,8 +393,9 @@ void DockerReply::cancel()
     if (isFinished()) {
         return;
     }
-    // 先落状态再 abort：abort() 会同步触发 disconnected/errorOccurred，
-    // 那些回调看到「已经结束」才会正确退出（否则会先 succeed() 再发第二次 finished()）
+    // Set the state before abort(): abort() synchronously fires disconnected/
+    // errorOccurred, and those callbacks must see "already finished" to bail out
+    // (otherwise they would succeed() and emit finished() a second time)
     m_state = State::Cancelled;
     m_timer->stop();
     m_socket->abort();
@@ -454,7 +461,7 @@ DockerReply *DockerClient::del(const QString &apiPath, const QUrlQuery &query, i
 DockerReply *DockerClient::getStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs)
 {
     DockerReply *reply = request(DockerReply::Method::Get, apiPath, query, idleTimeoutMs, true);
-    // 首个响应仍用普通超时：连不上时快速失败，而不是干等
+    // First response still uses the normal timeout: fail fast when unreachable
     reply->setHeadersTimeoutMs(m_timeoutMs);
     return reply;
 }
@@ -462,7 +469,8 @@ DockerReply *DockerClient::getStream(const QString &apiPath, const QUrlQuery &qu
 DockerReply *DockerClient::postStream(const QString &apiPath, const QUrlQuery &query, int idleTimeoutMs, const QMap<QByteArray, QByteArray> &headers)
 {
     DockerReply *reply = request(DockerReply::Method::Post, apiPath, query, idleTimeoutMs > 0 ? idleTimeoutMs : m_timeoutMs, true, headers);
-    // 首个响应用普通请求超时：仓库不可达时快速失败，而不是干等一分钟
+    // First response uses the normal request timeout: fail fast when the registry is
+    // unreachable instead of waiting a whole minute
     reply->setHeadersTimeoutMs(m_timeoutMs);
     return reply;
 }
@@ -483,19 +491,19 @@ DockerReply *DockerClient::request(DockerReply::Method method,
         path = QLatin1Char('/') + m_apiVersion.pathPrefix() + apiPath;
     }
 
-    // 只记录方法与路径：不记录 header、payload、query 或响应体（ARCH_V1 §27）。
-    // query 里可能含镜像引用等用户数据，因此不进日志。
+    // Log method and path only: never headers, payload, query or response body
+    // (ARCH_V1 §27). The query may carry user data such as image references.
     qCDebug(kontainerApi) << methodName(method) << path;
 
     DockerReply::Request request;
     request.method = method;
     request.path = path;
     request.query = query;
-    // timeoutMs <= 0 = 不设静默超时（日志 follow 流）；其余取最小值保护
+    // timeoutMs <= 0 = no idle timeout (log follow); otherwise clamp to the minimum
     request.timeoutMs = timeoutMs <= 0 ? 0 : std::max(minimumTimeoutMs, timeoutMs);
     request.streaming = streaming;
     request.headers = headers;
-    // 请求体必须在 start() 之前放进 Request：start() 会立刻把请求写进 socket
+    // The body must be in Request before start(): start() writes to the socket at once
     request.body = body;
     request.bodyFile = bodyFile;
     request.bodyContentType = bodyContentType;

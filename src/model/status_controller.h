@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -44,16 +44,18 @@ namespace Kontainer
 {
 
 /*!
- * KCM 与 backend 之间的 presentation controller（ARCH_V1 §6.2/§14，ARCH_V2 §13–§16/§30/§43）。
+ * Presentation controller between the KCM and the backend (ARCH_V1 §6.2/§14, ARCH_V2 §13–§16/§30/§43).
  *
- * 职责：
- *  - 把 backend 的域数据搬进 QML 可绑定的模型（容器 / 镜像 / Engine / Storage / Detail）
- *  - 维护明确的 UI 状态机：整页 State + 每个分区显式状态（字符串 key），QML 只比较单一状态值
- *  - 分区错误隔离：Storage / Detail / Metrics 失败不会让整页进入 Error（§30）
- *  - Last Updated / Stale / 部分失败提示（§15/§16）
- *  - 刷新调度委托给 RefreshScheduler（§14）；controller 自己不再维护页面级 QTimer
+ * Responsibilities:
+ *  - Move backend domain data into QML-bindable models (containers / images / engine / storage / detail)
+ *  - Maintain an explicit UI state machine: whole-page State plus per-section state keys, so QML
+ *    compares a single value
+ *  - Isolate section failures: storage / detail / metrics failures never put the page into Error (§30)
+ *  - Last Updated / Stale / partial-failure reporting (§15/§16)
+ *  - Delegate refresh scheduling to RefreshScheduler (§14); no page-level QTimer lives here
  *
- * 不负责：Docker URL 拼接、JSON 解析、HTTP 状态码判断、socket 访问、页面导航（§43）。
+ * Not responsible for: Docker URL building, JSON parsing, HTTP status codes, socket access,
+ * page navigation (§43).
  */
 class StatusController : public QObject
 {
@@ -64,7 +66,8 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::StatusController::ListState containersState READ containersState NOTIFY containersStateChanged)
     Q_PROPERTY(Kontainer::StatusController::ListState imagesState READ imagesState NOTIFY imagesStateChanged)
     Q_PROPERTY(Kontainer::StatusController::ListState storageState READ storageState NOTIFY storageStateChanged)
-    /*! QML 只使用字符串状态 key：同一个类里多个 Q_ENUM 有同名成员时，Type.Loading 会解析到错误枚举。 */
+    /*! QML uses string state keys only: with several Q_ENUMs sharing member names inside one
+     * class, Type.Loading resolves to the wrong enum. */
     Q_PROPERTY(QString stateKey READ stateKey NOTIFY stateChanged)
     Q_PROPERTY(QString engineStateKey READ engineStateKey NOTIFY engineStateChanged)
     Q_PROPERTY(QString containersStateKey READ containersStateKey NOTIFY containersStateChanged)
@@ -73,17 +76,17 @@ class StatusController : public QObject
     Q_PROPERTY(QString networksStateKey READ networksStateKey NOTIFY networksStateChanged)
     Q_PROPERTY(QString volumesStateKey READ volumesStateKey NOTIFY volumesStateChanged)
     /*!
-     * Engine 连接状态的语义与图标（ARCH_V3 §2.1：语义判断属于 model 层，
-     * QML 只把语义 key 翻译成主题颜色，不再自己 switch 状态字符串）。
+     * Semantics and icon of the engine connection state (ARCH_V3 §2.1: semantics belong to the
+     * model layer, so QML maps a key to a theme colour instead of switching on strings).
      */
     Q_PROPERTY(QString engineStateSemanticKey READ engineStateSemanticKey NOTIFY engineStateChanged)
     Q_PROPERTY(QString engineStateIconName READ engineStateIconName NOTIFY engineStateChanged)
 
     /*!
-     * 调试用起始标签页（`KCM_DOCKER_START_TAB=<索引>`）。
+     * Debug start tab (`KCM_DOCKER_START_TAB=<index>`).
      *
-     * QML 读不到环境变量，因此由这里读一次给界面：只是为了让"打开就看到某一页"
-     * （截图复核 / 排查）成为可能，默认 0 = 容器页，行为不变。
+     * QML cannot read environment variables, so it is read once here: it only makes "open straight
+     * to a page" (screenshot review / debugging) possible. Default 0 = containers, unchanged.
      */
     Q_PROPERTY(int startTabFromEnvironment READ startTabFromEnvironment CONSTANT)
 
@@ -93,17 +96,17 @@ class StatusController : public QObject
     Q_PROPERTY(QString imagesError READ imagesError NOTIFY imagesErrorChanged)
     Q_PROPERTY(QString storageError READ storageError NOTIFY storageErrorChanged)
     Q_PROPERTY(QString networksError READ networksError NOTIFY networksErrorChanged)
-    /*! 数据卷列表（六期 §3.5）：同样是低频数据，进页面时刷新。 */
+    /*! Volume list (phase 6 §3.5): low-frequency data, refreshed when entering the page. */
     Q_PROPERTY(ListState volumesState READ volumesState NOTIFY volumesStateChanged)
     Q_PROPERTY(QString volumesError READ volumesError NOTIFY volumesErrorChanged)
 
-    /*! 一期 endpoint 不可在运行时改变（没有配置写入口），因此是 CONSTANT。 */
+    /*! The endpoint cannot change at runtime (no config write path), hence CONSTANT. */
     Q_PROPERTY(QString endpoint READ endpoint CONSTANT)
     /*!
-     * 构建标记（版本 + git 短哈希 + 构建时间）。
+     * Build stamp (version + short git hash + build time).
      *
-     * 排查真实会话问题时，「用户装的到底是哪一次构建」必须能一眼确认——
-     * 曾经因为安装与重新链接只差 0.3 秒而无法判断崩溃对应哪份代码。
+     * When debugging real sessions, "which build is the user running" must be answerable at a
+     * glance — once install and relink were 0.3 s apart and a crash could not be matched to code.
      */
     Q_PROPERTY(QString buildStamp READ buildStamp CONSTANT)
 
@@ -111,57 +114,61 @@ class StatusController : public QObject
     Q_PROPERTY(int autoRefreshInterval READ autoRefreshInterval CONSTANT)
     Q_PROPERTY(int storageRefreshInterval READ storageRefreshInterval CONSTANT)
 
-    /*! 网络列表与过滤代理（六期 §3.2）。 */
+    /*! Network list and its filter proxy (phase 6 §3.2). */
     Q_PROPERTY(Kontainer::NetworkModel *networkModel READ networkModel CONSTANT)
-    /*! 宿主端口视图（ARCH_next_ports.md §4.A）：容器列表的实际发布 + 运行中容器的声明。 */
+    /*! Host port view (ARCH_next_ports.md §4.A): actual publications from the container list,
+     * plus declarations of running containers. */
     Q_PROPERTY(Kontainer::HostPortModel *portModel READ portModel CONSTANT)
-    /*! 端口页用的搜索/过滤/排序代理模型。 */
+    /*! Search/filter/sort proxy for the ports page. */
     Q_PROPERTY(Kontainer::HostPortFilterModel *hostPortList READ hostPortList CONSTANT)
-    /*! "声明了但没发布"的行数（运行中的容器；端口页据此决定要不要在顶部说明一次）。 */
+    /*! Rows "declared but not published" (running containers; the ports page shows a note). */
     Q_PROPERTY(int declaredNotPublishedCount READ declaredNotPublishedCount NOTIFY declaredNotPublishedCountChanged)
-    /*! "声明过、但容器没在运行"的行数（端口现在是空的，容器一起来就要回去）。 */
+    /*! Rows "declared, container not running" (the port is free now but returns on start). */
     Q_PROPERTY(int reservedPortCount READ reservedPortCount NOTIFY declaredNotPublishedCountChanged)
     /*!
-     * **运行中**容器真正占用的宿主端口数（标签页标题用它，不随筛选变化）。
+     * Host ports actually held by **running** containers (used by the tab title, untouched by filters).
      *
-     * 用户实测反馈：原来用列表行数，把"已声明"的也数进去了；标签上该显示的是"现在真被占着几个"。
+     * Users reported the old row count also counted "declared" ports; the tab must show how many
+     * are really occupied right now.
      */
     Q_PROPERTY(int inUsePortCount READ inUsePortCount NOTIFY declaredNotPublishedCountChanged)
     /*!
-     * 区间地图的数据（ARCH_next_ports.md §4.B）：每段
-     * `{first, last, title, tileCount, hiddenCount, usedCount, tiles: [{port, stateKey}]}`。
+     * Range map data (ARCH_next_ports.md §4.B), one entry per range:
+     * `{first, last, title, tileCount, hiddenCount, usedCount, tiles: [{port, stateKey}]}`.
      *
-     * 做成**属性**而不是 `Q_INVOKABLE`：QML 里函数调用不建立依赖，端口表一变地图就不会更新。
+     * A **property** rather than a `Q_INVOKABLE`: function calls create no QML dependency, so the
+     * map would not update when the port table changes.
      */
     Q_PROPERTY(QVariantList portRanges READ portRanges NOTIFY portRangesChanged)
-    /*! 下一个空闲宿主端口（地图视图里显示并支持一键复制；0 = 找不到）。 */
+    /*! Next free host port (shown in the map view for easy copying; 0 = none found). */
     Q_PROPERTY(int nextFreeHostPort READ nextFreeHostPort NOTIFY portRangesChanged)
     Q_PROPERTY(Kontainer::NetworkFilterModel *networkList READ networkList CONSTANT)
-    /*! 数据卷列表与过滤代理。 */
+    /*! Volume list and its filter proxy. */
     Q_PROPERTY(Kontainer::VolumeModel *volumeModel READ volumeModel CONSTANT)
     Q_PROPERTY(Kontainer::VolumeFilterModel *volumeList READ volumeList CONSTANT)
-    /*! 数据卷详情（选中一个卷后读它的标签与驱动选项）。 */
+    /*! Volume detail (labels and driver options of the selected volume). */
     Q_PROPERTY(Kontainer::VolumeDetailController *volumeDetail READ volumeDetail CONSTANT)
-    /*! 创建容器向导的状态与校验（七期 §4.4）。 */
+    /*! Create-container wizard state and validation (phase 7 §4.4). */
     Q_PROPERTY(Kontainer::CreateContainerController *createContainer READ createContainer CONSTANT)
-    /*! 挂载预设（七期 §4.1）：界面上可增删改与"从容器保存"。 */
+    /*! Mount presets (phase 7 §4.1): add/edit/remove in the UI and save from a container. */
     Q_PROPERTY(Kontainer::MountPresetStore *mountPresets READ mountPresets CONSTANT)
-    /*! 目录选择（挂载预设的宿主路径用；测试与渲染注入替身）。 */
+    /*! Directory picker (for mount preset host paths; tests and rendering inject a stub). */
     Q_PROPERTY(Kontainer::DirectoryPicker *directoryPicker READ directoryPicker CONSTANT)
-    /*! 三个 systemd unit 的状态（B1）：连接状态与"服务未运行"提示都取自这里。 */
+    /*! State of the three systemd units (B1): connection state and "service not running" hints. */
     Q_PROPERTY(Kontainer::ServiceStatusBackend *services READ services CONSTANT)
     /*!
-     * 连接状态的**细化** key（B1）：
-     * `connected` / `connectedServicesDown` / `disconnected` / `disconnectedServicesDown`。
+     * Refined connection key (B1):
+     * `connected` / `connectedServicesDown` / `disconnected` / `disconnectedServicesDown`.
      *
-     * 为什么不能只看 socket：docker.service 停掉时 `docker.socket` 仍在（socket 激活），
-     * 于是旧实现照样显示"已连接"——用户角度这是误导（实测反馈 B1）。
+     * Why the socket alone is not enough: with docker.service stopped, `docker.socket` is still
+     * there (socket activation), so the old code kept showing "connected" — misleading to users
+     * (report B1).
      */
     Q_PROPERTY(QString connectionKey READ connectionKey NOTIFY serviceStatesChanged)
-    /*! 网络详情（六期 §3.2）：选中一个网络后读它的成员/标签/选项。 */
+    /*! Network detail (phase 6 §3.2): members/labels/options of the selected network. */
     Q_PROPERTY(Kontainer::NetworkDetailController *networkDetail READ networkDetail CONSTANT)
 
-    /* 刷新状态（§15/§16） */
+    /* Refresh state (§15/§16) */
     Q_PROPERTY(QDateTime lastUpdated READ lastUpdated NOTIFY refreshStateChanged)
     Q_PROPERTY(bool updateFailed READ updateFailed NOTIFY refreshStateChanged)
     Q_PROPERTY(bool stale READ stale NOTIFY refreshStateChanged)
@@ -170,24 +177,24 @@ class StatusController : public QObject
     Q_PROPERTY(Kontainer::StorageStatus *storage READ storage CONSTANT)
     Q_PROPERTY(Kontainer::ContainerModel *containers READ containers CONSTANT)
     Q_PROPERTY(Kontainer::ImageModel *images READ images CONSTANT)
-    /*! 经过搜索/过滤/排序的列表，供 ListView 使用（§9/§32）。 */
+    /*! Search/filter/sorted list used by the ListView (§9/§32). */
     Q_PROPERTY(Kontainer::ContainerFilterModel *containerList READ containerList CONSTANT)
     Q_PROPERTY(Kontainer::ImageFilterModel *imageList READ imageList CONSTANT)
     Q_PROPERTY(Kontainer::ContainerDetailController *containerDetail READ containerDetail CONSTANT)
     Q_PROPERTY(Kontainer::ImageDetailController *imageDetail READ imageDetail CONSTANT)
-    /*! 写操作编排与结果通道（ARCH_V4 §2.2.4）。 */
+    /*! Write-operation orchestration and result channel (ARCH_V4 §2.2.4). */
     Q_PROPERTY(Kontainer::OperationController *operations READ operations CONSTANT)
-    /*! 用户级运行时配置（rootless：~/.config/docker/daemon.json），不需要提权。 */
+    /*! User-level runtime config (rootless: ~/.config/docker/daemon.json), no privileges needed. */
     Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfigUser READ daemonConfigUser CONSTANT)
-    /*! 系统级运行时配置（/etc/docker/daemon.json），受保护区。 */
+    /*! System-level runtime config (/etc/docker/daemon.json), protected area. */
     Q_PROPERTY(Kontainer::DaemonConfigController *daemonConfigSystem READ daemonConfigSystem CONSTANT)
-    /*! 仓库认证（KWallet 凭据 + /auth 校验 + CLI 导入，ARCH_V5_V8 §2.6/§2.7）。 */
+    /*! Registry auth (KWallet credentials + /auth check + CLI import, ARCH_V5_V8 §2.6/§2.7). */
     Q_PROPERTY(Kontainer::RegistryAuthController *registryAuth READ registryAuth CONSTANT)
-    /*! 最近一次「打开宿主路径」的失败说明；为空表示没有失败。 */
+    /*! Last "open host path" failure; empty means none. */
     Q_PROPERTY(QString hostPathError READ hostPathError NOTIFY hostPathErrorChanged)
 
 public:
-    /*! 整页状态：Idle / Loading / Ready / Error（§14）。 */
+    /*! Whole-page state: Idle / Loading / Ready / Error (§14). */
     enum class State {
         Idle,
         Loading,
@@ -196,38 +203,36 @@ public:
     };
     Q_ENUM(State)
 
-    /*! Engine 卡片状态（§14：由 model 提供明确状态，QML 不自行拼装）。 */
+    /*! Engine card state (§14: the model provides explicit states; QML never assembles them). */
     enum class EngineState {
-        Loading, /*!< 首次加载中，还没有任何结果 */
-        Ready, /*!< 已连接且 /info 成功，计数可信 */
-        Partial, /*!< 已连接但汇总信息（/info）失败：版本可用、计数不可用 */
-        Refreshing, /*!< 已连接，正在刷新 */
-        Unavailable, /*!< 未连接 */
+        Loading, /*!< first load, no result yet */
+        Ready, /*!< connected and /info succeeded, counts are trustworthy */
+        Partial, /*!< connected but /info summary failed: version available, counts not */
+        Refreshing, /*!< connected, refreshing */
+        Unavailable, /*!< not connected */
     };
     Q_ENUM(EngineState)
 
-    /*! 列表 / 分区数据集状态。 */
+    /*! List / section dataset state. */
     enum class ListState {
-        Idle, /*!< 尚未请求 */
-        Loading, /*!< 首次加载中 */
-        Ready, /*!< 有数据 */
-        Empty, /*!< 请求成功，但没有条目（不是错误） */
-        Error, /*!< 请求失败 */
+        Idle, /*!< not requested yet */
+        Loading, /*!< first load in progress */
+        Ready, /*!< has data */
+        Empty, /*!< request succeeded but returned no entries (not an error) */
+        Error, /*!< request failed */
     };
     Q_ENUM(ListState)
 
+    /*! The caller owns the backend's lifetime: this object only holds a pointer. */
     /*!
-     * backend 的生命周期由调用方负责：本对象只持有指针，不接管所有权。
+     * `hostPaths` is injected by the composition root (KioHostPathService in production, a fake in
+     * tests); when null, container mount rows offer no "open host directory" action.
      */
     /*!
-     * `hostPaths` 由组合根注入（生产是 KioHostPathService，测试是 Fake）；为空时
-     * 容器详情的挂载行不提供「打开宿主目录」动作。
-     */
-    /*!
-     * `credentialBackend` 为空时使用 KWallet（生产路径）。
+     * A null `credentialBackend` means KWallet (the production path).
      *
-     * 注入点是给测试与离屏渲染用的：KWallet 会弹解锁框、写入用户真实钱包，
-     * 自动化流程里既不确定也不该发生。
+     * The injection point serves tests and offscreen rendering: KWallet pops an unlock dialog and
+     * writes to the user's real wallet, which is nondeterministic and must not happen in automation.
      */
     explicit StatusController(DockerBackendInterface *backend,
                               HostPathService *hostPaths = nullptr,
@@ -274,13 +279,13 @@ public:
     QString networksStateKey() const;
     QString volumesStateKey() const;
     /*!
-     * Engine 状态的语义 key（positive / neutral / negative / disabled）。
+     * Semantic key of the engine state (positive / neutral / negative / disabled).
      *
-     * 注意 Partial 是「已连接，但 /info 概要读不到」——属于降级而非失败，
-     * 因此是 neutral（警告）而不是 negative（错误）。
+     * Partial means "connected, but /info is unreadable" — a degradation rather than a failure, so
+     * it is neutral (warning), not negative (error).
      */
     QString engineStateSemanticKey() const;
-    /*! Engine 状态的图标名（icon theme name）。 */
+    /*! Icon name of the engine state (icon theme name). */
     QString engineStateIconName() const;
 
     bool busy() const
@@ -312,7 +317,7 @@ public:
         return m_volumesError;
     }
     QString endpoint() const;
-    /*! 形如 "0.3.0+1e3b56e (2026-09-17 08:50 UTC)"。 */
+    /*! e.g. "0.3.0+1e3b56e (2026-09-17 08:50 UTC)". */
     QString buildStamp() const;
 
     bool autoRefreshEnabled() const;
@@ -365,7 +370,7 @@ public:
     int reservedPortCount() const;
     int inUsePortCount() const;
     QVariantList portRanges() const;
-    /*! 让缓存的区间地图数据失效（数据或筛选变化时调用，下一次读取时重算）。 */
+    /*! Invalidate the cached range map (call on data/filter change; recomputed on next read). */
     void invalidatePortRanges();
     int nextFreeHostPort() const;
     NetworkFilterModel *networkList() const
@@ -408,9 +413,9 @@ public:
     {
         return m_commandHistory;
     }
-    /*! 细化的连接状态（见 connectionKey 的说明）。 */
+    /*! Refined connection state (see connectionKey). */
     QString connectionKey() const;
-    /*! 服务状态变化（连接 key 随之可能变化）。 */
+    /*! Service states changed (the connection key may follow). */
     Q_SIGNAL void serviceStatesChanged();
     ContainerDetailController *containerDetail() const
     {
@@ -450,69 +455,70 @@ public:
         return m_backend;
     }
 
-    /* --- 表单与预设共用的查询（ARCH_V5_V8 §1.6：不在 QML 里重复实现规则） --- */
+    /* --- Queries shared by forms and presets (ARCH_V5_V8 §1.6: no rule duplication in QML) --- */
 
-    /*! 宿主路径状态 key：directory / missing / notADirectory / notApplicable。 */
+    /*! Host path state key: directory / missing / notADirectory / notApplicable. */
     Q_INVOKABLE QString hostPathStateKey(const QString &path) const;
-    /*! 用系统文件管理器打开宿主目录；返回是否已受理（失败原因走 hostPathError）。 */
+    /*! Open a host directory in the file manager (returns accepted; failures via hostPathError). */
     Q_INVOKABLE bool openHostPath(const QString &path);
 
     /*!
-     * 当前所有已发布的宿主端口绑定，形如 `0.0.0.0:8080`。
-     * 创建表单用它做端口冲突的前置检测（判定逻辑在 Presentation.hostPortConflicts）。
+     * All currently published host port bindings, e.g. `0.0.0.0:8080`.
+     * The create form pre-checks port conflicts with them (logic in Presentation.hostPortConflicts).
      */
     Q_INVOKABLE QStringList portBindingsInUse() const;
-    /*! 运行中的容器数（重启 daemon 的影响提示）。 */
+    /*! Number of running containers (impact hint for daemon restarts). */
     Q_INVOKABLE int runningContainerCount() const;
 
 public Q_SLOTS:
-    /*! 手动刷新（§16 必须项）；请求去重由 backend 负责（§29）。 */
+    /*! Manual refresh (required by §16); the backend deduplicates requests (§29). */
     void refresh();
     /*!
-     * 只重试 storage 数据集（§30/§55 的部分失败恢复路径）。
-     * QML 不允许直接访问 backend（§4/§43），因此提供这个显式入口。
+     * Retry only the storage dataset (partial-failure recovery path, §30/§55).
+     * QML may not touch the backend directly (§4/§43), hence this explicit entry point.
      */
     void retryStorage();
-    /*! 网络列表是低频数据：只在进入网络页面时刷新（六期 §3.2）。 */
-    /*! 刷新网络列表（创建容器等场景会主动调用）。 */
+    /*! The network list is low-frequency: refreshed when entering the networks page (phase 6 §3.2). */
+    /*! Refresh the network list (called proactively, e.g. after creating a container). */
     /*!
-     * 看门狗间隔（毫秒）。给测试用：默认取 `RefreshPolicy::kInFlightWatchdog`。
-     * 必须是可调的，否则用例只能等 20 秒。
+     * Watchdog interval in milliseconds. For tests: defaults to `RefreshPolicy::kInFlightWatchdog`
+     * and must stay tunable, otherwise cases would have to wait 20 seconds.
      */
     Q_INVOKABLE void setInFlightWatchdogMs(int milliseconds);
     /*!
-     * 触发一次**自动**刷新（与定时器走的路径相同）。
+     * Trigger one **automatic** refresh (the same path the timer takes).
      *
-     * 给用例用：手动刷新会重置失败计数（B2），因此"连续失败 → stale"这类断言
-     * 必须走自动路径才能被测到。
+     * For tests: a manual refresh resets the failure counter (B2), so assertions such as
+     * "consecutive failures → stale" are only reachable through the automatic path.
      */
     Q_INVOKABLE void requestAutomaticRefreshForTesting();
     Q_INVOKABLE int inFlightWatchdogMs() const;
 
     /*!
-     * 首次进入页面时把低频列表（网络、数据卷）读一次。
+     * Read the low-frequency lists (networks, volumes) once when the page is first entered.
      *
-     * 它们的数量显示在标签页标题上，不能等用户点进去才对（实测反馈：没进标签页前
-     * 一直显示 0，进去才变成 4）。幂等：只读一次，之后仍由切页与变更驱动。
+     * Their counts appear in tab titles, so they cannot wait for a click (report: the count stayed
+     * 0 until the tab was opened, then became 4). Idempotent: read once, afterwards still driven by
+     * tab switches and changes.
      */
     void loadLowFrequencyListsOnce();
 
     Q_INVOKABLE void refreshNetworks();
     /*!
-     * 打开端口页时调用：刷新容器列表，并为**运行中**的容器各拉一次 inspect
-     * （只为拿到它们"声明"了哪些宿主端口，见 `ARCH_next_ports.md` 决定 3）。
+     * Called when the ports page opens: refresh containers and inspect each **running** container
+     * (only to learn which host ports they declare, see decision 3 in `ARCH_next_ports.md`).
      */
     Q_INVOKABLE void refreshPorts();
-    /*! 端口表 / 计数 / 区间地图的唯一重建处。 */
+    /*! The single place that rebuilds the port table, the counts and the range map. */
     void rebuildPorts();
-    /*! 数据卷列表同样是低频数据（六期 §3.5）；`includeUsage=false` 时不扫占用。 */
+    /*! Volume list is low-frequency too (phase 6 §3.5); `includeUsage=false` skips usage scanning. */
     void refreshVolumes(bool includeUsage = true);
 
 Q_SIGNALS:
     void stateChanged();
-    /*! "声明了但没发布"的行数变化（端口页顶部的说明条据此显隐）。 */
+    /*! The "declared but not published" count changed (the ports-page banner follows it). */
     void declaredNotPublishedCountChanged();
-    /*! 端口表 / 区间地图的数据变化。 */
+    /*! Port table / range map data changed. */
     void portRangesChanged();
     void engineStateChanged();
     void containersStateChanged();
@@ -528,12 +534,12 @@ Q_SIGNALS:
     void imagesErrorChanged();
     void storageErrorChanged();
     void autoRefreshEnabledChanged();
-    /*! 「打开宿主路径」失败提示变化。 */
+    /*! The "open host path" failure hint changed. */
     void hostPathErrorChanged();
     void refreshStateChanged();
 
 private:
-    /*! 宿主路径动作的失败提示（表单与挂载分区共用）。 */
+    /*! Failure hint for host path actions (shared by forms and the mounts section). */
     void setHostPathError(const QString &text);
     void onEngineUpdated();
     void onContainersUpdated();
@@ -542,7 +548,7 @@ private:
     void onVolumesUpdated();
     void onStorageUpdated();
     void onLoadingChanged();
-    /*! 看门狗到点：放弃在途请求并报告超时（B3/B4 的兜底）。 */
+    /*! Watchdog fired: abandon in-flight requests and report a timeout (fallback for B3/B4). */
     void onBusyWatchdogTimeout();
     void onSectionFailed(DockerBackendInterface::Section section, const DockerError &error);
     void updateStates();
@@ -569,23 +575,23 @@ private:
     bool m_volumesFailed = false;
     NetworkModel *m_networkModel = nullptr;
     /*!
-     * 各容器**声明**的宿主绑定（inspect 的 `HostConfig.PortBindings`）。
+     * Host bindings **declared** by each container (inspect's `HostConfig.PortBindings`).
      *
-     * 只对**运行中**的容器取（用户拍板：不做"已停止容器声明过什么"），
-     * 并且只在打开端口页时拉一次——不为一个视图把每个容器都 inspect 一遍。
+     * Taken only for **running** containers and only once when the ports page opens — a single view
+     * is not worth inspecting every container.
      */
     /*
-     * 区间地图的缓存。
+     * Range map cache.
      *
-     * `portRanges()` 是 QML 绑定的数据源；一次重算要遍历整个过滤后的模型、聚类、
-     * 再为每个方块查状态。缓存住并只在数据/筛选真的变化时重算，切换筛选时就不会重复算
-     * （用户实测：地图里切筛选会卡 1-2 秒）。
+     * `portRanges()` is the data source QML binds to; one recompute walks the whole filtered model,
+     * clusters, then looks up every tile's state. Caching it and recomputing only when data or
+     * filters really change avoids that work when switching filters (users saw 1-2 s freezes).
      */
     mutable QVariantList m_portRanges;
     mutable bool m_portRangesDirty = true;
 
     QHash<QString, QList<DeclaredPortBinding>> m_declaredPorts;
-    /*! 已经为本轮拉过声明的容器（避免每次刷新都重发 inspect）。 */
+    /*! Containers already inspected this round (avoids re-inspecting on every refresh). */
     QStringList m_declaredRequested;
     NetworkFilterModel *m_networkFilter = nullptr;
     NetworkDetailController *m_networkDetail = nullptr;
@@ -600,26 +606,28 @@ private:
     ContainerDetailController *m_containerDetail = nullptr;
     ImageDetailController *m_imageDetail = nullptr;
     OperationController *m_operations = nullptr;
-    /* 注意：这两个依赖 m_operations，**必须**声明在它后面——
-       成员初始化顺序按声明顺序走，放在前面会让向导拿到还没构造的 OperationController。 */
+    /* These two depend on m_operations and **must** be declared after it: members initialize in
+       declaration order, so declaring them earlier hands the wizard an unconstructed
+       OperationController. */
     MountPresetStore *m_mountPresets = nullptr;
-    /*! 命令历史（同样是"这个工具的数据"→ ~/.config/kcm_dockerrc）；向导依赖它，必须排在前面。 */
+    /*! Command history (tool data → ~/.config/kcm_dockerrc); the wizard needs it, so it comes first. */
     CommandHistoryStore *m_commandHistory = nullptr;
     CreateContainerController *m_createContainer = nullptr;
-    /*! 目录选择：默认用系统原生对话框；测试/渲染注入替身。 */
+    /*! Directory picker: native dialog by default; tests/rendering inject a stub. */
     DirectoryPicker *m_directoryPicker = nullptr;
     /*!
-     * 在途看门狗：busy 持续过久时放弃在途请求（用户实测 B3/B4：永久"正在加载/backend busy"）。
+     * In-flight watchdog: abandon requests when busy lasts too long (reports B3/B4: a permanent
+     * "loading / backend busy" state).
      */
     QTimer *m_busyWatchdog = nullptr;
-    /*! 低频列表（网络/数据卷）是否已读过一次。 */
+    /*! Whether the low-frequency lists (networks/volumes) were already read once. */
     bool m_lowFrequencyLoaded = false;
-    /*! 服务状态来源（默认 systemd D-Bus 只读查询；测试注入替身）。 */
+    /*! Service state source (read-only systemd D-Bus by default; tests inject a stub). */
     ServiceStatusBackend *m_services = nullptr;
     HostPathService *m_hostPaths = nullptr;
     DaemonConfigController *m_daemonConfigUser = nullptr;
     DaemonConfigController *m_daemonConfigSystem = nullptr;
-    /*! 凭据后端（KWallet）：只在 core 里构造一次，存储与控制器共用。 */
+    /*! Credential backend (KWallet): constructed once in the core, shared by store and controller. */
     CredentialBackend *m_credentialBackend = nullptr;
     CredentialStore *m_credentialStore = nullptr;
     RegistryAuthController *m_registryAuth = nullptr;
@@ -631,7 +639,7 @@ private:
     ListState m_imagesState = ListState::Idle;
     ListState m_storageState = ListState::Idle;
     bool m_busy = false;
-    /*! 看门狗放弃在途请求时给出的原因（展示用；下一次成功刷新时清掉）。 */
+    /*! Reason the watchdog reports when abandoning a request (displayed; cleared on next success). */
     QString m_timeoutReason;
 
 

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -110,7 +110,7 @@ void PortMappingGroupModel::setEntries(const QList<PortMappingEntry> &entries)
     QList<PortMappingGroup> grouped;
     for (const PortMappingEntry &entry : entries) {
         if (!entry.isPublished()) {
-            continue; // 未发布的端口没有宿主端点，不进拓扑（由页面单独成组说明）
+            continue; // unpublished ports have no host endpoint, so they stay out of the topology (page groups them)
         }
         const QString protocol = entry.protocol.isEmpty() ? QStringLiteral("tcp") : entry.protocol;
         auto it = std::find_if(grouped.begin(), grouped.end(), [&entry, &protocol](const PortMappingGroup &group) {
@@ -127,8 +127,8 @@ void PortMappingGroupModel::setEntries(const QList<PortMappingEntry> &entries)
         it->bindings.append(entry);
     }
 
-    // 排序：组按容器端口/协议，组内按宿主端口/宿主地址。
-    // 顺序确定，刷新时行不会跳（与其它模型的约定一致）
+    // sort: groups by container port/protocol, bindings inside a group by host port/host address.
+    // deterministic order, so rows never jump on refresh (as with the other models)
     for (PortMappingGroup &group : grouped) {
         std::sort(group.bindings.begin(), group.bindings.end(), [](const PortMappingEntry &lhs, const PortMappingEntry &rhs) {
             if (lhs.hostPort != rhs.hostPort) {
@@ -145,7 +145,7 @@ void PortMappingGroupModel::setEntries(const QList<PortMappingEntry> &entries)
     });
 
     if (grouped == m_groups) {
-        return; // 内容未变：不动模型（避免刷新时重建 delegate）
+        return; // unchanged: leave the model alone (avoids rebuilding delegates on refresh)
     }
 
     beginResetModel();

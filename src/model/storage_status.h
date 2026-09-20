@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,10 +13,11 @@ namespace Kontainer
 {
 
 /*!
- * Docker disk usage 的 presentation model（ARCH_V2 §23）。
+ * Presentation model for Docker disk usage (ARCH_V2 §23).
  *
- * 只承载 Engine 级存储统计；字节数保持原始值，单位换算由 QML 的 Format 完成（§17.2）。
- * 负值表示该类别不可用（API 未提供），QML 显示 “—” 而不是 0。
+ * Engine-level storage stats only; byte counts stay raw and unit conversion is QML's Format job
+ * (§17.2). A negative value means that category is unavailable (not in the API) and QML shows
+ * "—", not 0.
  */
 class StorageStatus : public QObject
 {

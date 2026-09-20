@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -27,14 +27,14 @@ constexpr auto kIdentityToken = "identitytoken";
 constexpr auto kCredsStore = "credsStore";
 constexpr auto kCredHelpers = "credHelpers";
 
-/*! Docker CLI 的令牌缓存后缀：`<server>/access-token`、`<server>/refresh-token`。 */
+/*! Docker CLI token cache suffixes: `<server>/access-token`, `<server>/refresh-token`. */
 const QStringList &tokenCacheSuffixes()
 {
     static const QStringList suffixes = {QStringLiteral("/access-token"), QStringLiteral("/refresh-token")};
     return suffixes;
 }
 
-/*! 这个键是不是 Docker 自己的令牌缓存（不是仓库凭据）。 */
+/*! Whether this key is Docker's own token cache rather than a registry credential. */
 bool isTokenCacheKey(const QString &key)
 {
     for (const QString &suffix : tokenCacheSuffixes()) {
@@ -48,9 +48,9 @@ bool isTokenCacheKey(const QString &key)
 
 QString DockerCliAuthImporter::defaultConfigPath()
 {
-    // DOCKER_CONFIG 指向的是**目录**（CLI 的约定），不是文件
-    // 用 qEnvironmentVariable 而不是 QProcessEnvironment：项目有一条"绝不 shell out"的
-    // 源码约定（禁止 QProcess 家族），不为了让审计保持简单而开口子
+    // DOCKER_CONFIG points at a **directory** (CLI convention), not a file.
+    // qEnvironmentVariable, not QProcessEnvironment: the project bans the QProcess family to keep
+    // audits simple, and this is no reason to open an exception.
     const QString configured = qEnvironmentVariable("DOCKER_CONFIG");
     if (!configured.isEmpty()) {
         QDir dir(configured);
@@ -75,7 +75,7 @@ DockerCliAuthScan DockerCliAuthImporter::scan(const QString &path)
 
     QFile file(result.path);
     if (!file.open(QIODevice::ReadOnly)) {
-        // 只记路径与错误，不记内容（文件里有等价明文的凭据）
+        // Log only path and error, never content (the file holds plaintext-equivalent credentials)
         qCWarning(kontainerModel) << "cannot read docker cli config:" << result.path << file.errorString();
         result.errorKey = QStringLiteral("unreadable");
         return result;
@@ -90,7 +90,7 @@ DockerCliAuthScan DockerCliAuthImporter::scan(const QString &path)
 
     const QJsonObject root = document.object();
 
-    // 凭据助手管理的条目：我们知道它们存在，但不调用助手（见头文件说明）
+    // Helper-managed entries: known to exist, but helpers are never invoked (see the header)
     const QString credsStore = root.value(QLatin1String(kCredsStore)).toString();
     const QJsonObject credHelpers = root.value(QLatin1String(kCredHelpers)).toObject();
     if (!credsStore.isEmpty()) {
@@ -106,7 +106,7 @@ DockerCliAuthScan DockerCliAuthImporter::scan(const QString &path)
     for (auto it = auths.constBegin(); it != auths.constEnd(); ++it) {
         const QString sourceKey = it.key();
 
-        // Docker 的令牌缓存：与真正的凭据共用一个前缀，先挑出来忽略掉
+        // Docker token cache: shares the prefix with real credentials, so filter it out first
         if (isTokenCacheKey(sourceKey)) {
             result.tokenCacheKeys.append(sourceKey);
             continue;
@@ -114,7 +114,7 @@ DockerCliAuthScan DockerCliAuthImporter::scan(const QString &path)
 
         const QJsonObject entry = it.value().toObject();
 
-        // 令牌形式（CI 常见）：auths 里直接给 identitytoken
+        // Token form (common in CI): auths carries identitytoken directly
         const QString identityToken = entry.value(QLatin1String(kIdentityToken)).toString();
         if (!identityToken.isEmpty()) {
             ImportableCredential importable;
@@ -131,7 +131,7 @@ DockerCliAuthScan DockerCliAuthImporter::scan(const QString &path)
 
         const QByteArray auth = entry.value(QLatin1String(kAuth)).toString().toLatin1();
         if (auth.isEmpty()) {
-            // 可能是由 credsStore/credHelpers 管的条目：已经在上面登记过，这里只记"跳过"
+            // Possibly managed by credsStore/credHelpers: already recorded above, so just skip here
             if (result.helperManagedKeys.isEmpty()) {
                 result.skippedKeys.append(sourceKey);
             }
@@ -152,10 +152,11 @@ DockerCliAuthScan DockerCliAuthImporter::scan(const QString &path)
         parsed.append(importable);
     }
 
-    // 去重：多个键指向同一个仓库时（`docker.io` 与 `https://index.docker.io/v1/`），
-    // 保留"请求头里该用的那个写法"（Hub 是 https://index.docker.io/v1/，其余是 host[:port]），
-    // 其余如实记入 skippedKeys。不这么做的话结果会随 JSON 键的排序漂移——
-    // 本机实测里 `docker.io` 恰好排在前面，会把真正的凭据挤掉。
+    // Deduplicate: when several keys name one registry (`docker.io` and
+    // `https://index.docker.io/v1/`), keep the spelling used in request headers (Hub is
+    // https://index.docker.io/v1/, others are host[:port]) and record the rest in skippedKeys.
+    // Otherwise the winner drifts with JSON key order — locally `docker.io` sorted first and
+    // squeezed out the real credential.
     for (const ImportableCredential &candidate : parsed) {
         const QString canonicalKey = RegistryAuth::headerServerAddress(candidate.credential.serverAddress);
         auto existing = std::find_if(result.credentials.begin(), result.credentials.end(),
@@ -182,7 +183,8 @@ DockerCliAuthImporter::ImportOutcome DockerCliAuthImporter::importInto(Credentia
     ImportOutcome outcome;
     for (const ImportableCredential &importable : scan.credentials) {
         if (store.hasCredential(importable.credential.serverAddress)) {
-            // 已有条目一律不覆盖：静默覆盖会让用户丢掉刚设好的密码
+            // Never overwrite an existing entry: a silent overwrite loses the password the user
+            // just set
             ++outcome.alreadyPresent;
             continue;
         }

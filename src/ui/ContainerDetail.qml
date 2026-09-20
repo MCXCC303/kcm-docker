@@ -1,23 +1,23 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Container Detail（ARCH_V2 §7 / ARCH_V3 §2.2）：
+    Container Detail (ARCH_V2 §7 / ARCH_V3 §2.2):
 
-    把运行信息按用户理解方式重新组织，不是 docker inspect JSON 的漂亮化输出。
+    Runtime information reorganized the way users think, not a prettified docker inspect JSON dump.
 
-    分区（§2.2）：概览 / 资源 / 网络 / 挂载 / 日志（占位）。
-    - 概览：一级信息（Name/State/Health/Status/Image/ID/时间）+ Runtime + Configuration
-            + Environment/Labels（默认折叠，§40）
-    - 资源：CPU / 内存 / 网络 / 块 IO + 短期趋势
-    - 网络：网络接口 + 端口
-    - 挂载：Bind / Volume
-    - 日志：四期实现，这里明确说明而不是留空白页
+    Sections (§2.2): overview / resources / network / mounts / logs.
+    - Overview: top-level facts (Name/State/Health/Status/Image/ID/times) + Runtime + Configuration
+            + Environment/Labels (collapsed by default, §40)
+    - Resources: CPU / memory / network / block IO + short-term trends
+    - Network: interfaces + ports
+    - Mounts: bind / volume
+    - Logs: implemented in phase 4; says so explicitly instead of leaving a blank page
 
-    页面本身不滚动：每个分区各自滚动（§2.2 约束 4），
-    因此基类用 KCM.AbstractKCM 而不是 SimpleKCM。
+    The page itself does not scroll: each section scrolls on its own (§2.2 constraint 4), hence
+    KCM.AbstractKCM rather than SimpleKCM.
 
-    ARCH_V3 §2.1：本文件不做状态语义判断，语义 key 与图标名都来自 C++。
+    ARCH_V3 §2.1: no state-semantics decisions here; semantic keys and icon names come from C++.
 */
 
 import QtQuick
@@ -36,26 +36,27 @@ KCM.AbstractKCM {
     property string containerId: ""
 
     readonly property var controller: kcm.controller.containerDetail
-    /*! 写操作控制器（ARCH_V4 §2.3）。 */
+    /*! Write-operation controller (ARCH_V4 §2.3). */
     readonly property var operations: kcm.controller.operations
     readonly property bool ready: controller.loadStateKey === "ready"
-    /*! 健康问题优先于状态（Unhealthy 的 Running 必须看起来有问题，§11.3） */
+    /*! Health outranks state: an Unhealthy Running container must look wrong (§11.3) */
     readonly property string stateSemanticKey: Kontainer.Presentation.stateSemanticKey(controller.stateKey, controller.healthKey)
     readonly property bool healthVisible: controller.healthKey !== "unknown" && controller.healthKey !== "none"
-    /*! 正文最大宽度：约 42 gridUnit，宽窗口下避免一行过长（§1.2）。 */
+    /*! Content max width: ~42 gridUnit, keeping lines short in wide windows (§1.2). */
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
 
     /*!
-        写操作可见性（ARCH_V4 §2.3）：
-        - 权限门不允许写时，整条 footer 不出现（不是禁用后静默）
-        - 可逆操作（启动 / 停止 / 重启）直接执行；删除必须二次确认
-        - 运行中的容器不给删除按钮，并说明原因：让引擎返回 409 再解释是下策
+        Write-action visibility (ARCH_V4 §2.3):
+        - Without write permission the whole footer disappears (not silently disabled)
+        - Reversible actions (start / stop / restart) run directly; delete needs confirmation
+        - Running containers get no delete button, with the reason stated: letting the engine
+          answer 409 and explaining afterwards is worse
     */
-    /*! 宿主节点标题：daemon 报告的 Name 就是宿主机名（没有时退化为本机回环名）。 */
+    /*! Host node title: the daemon's Name is the host name, falling back to the local host name. */
     readonly property string engineHostName: kcm.controller.engine.engineName.length > 0 ? kcm.controller.engine.engineName : i18n("Host")
 
     readonly property bool targetBusy: {
-        // 同上：函数调用本身不建立依赖，必须先读 stateRevision
+        // As above: function calls create no dependency, so read stateRevision first
         page.operations.stateRevision;
         return page.operations.isContainerBusy(page.containerId);
     }
@@ -63,7 +64,7 @@ KCM.AbstractKCM {
         && (controller.stateKey === "exited" || controller.stateKey === "created" || controller.stateKey === "dead")
     readonly property bool canStop: page.ready && !page.targetBusy && page.operations.writeAllowed
         && (controller.stateKey === "running" || controller.stateKey === "paused" || controller.stateKey === "restarting")
-    /*! 暂停只对**运行中**有意义；已暂停的容器给"继续"（用户实测反馈 ①）。 */
+    /*! Pause only makes sense for **running** containers; paused ones get Resume (user report ①). */
     readonly property bool canPause: page.ready && !page.targetBusy && page.operations.writeAllowed
         && controller.stateKey === "running"
     readonly property bool canUnpause: page.ready && !page.targetBusy && page.operations.writeAllowed
@@ -73,7 +74,7 @@ KCM.AbstractKCM {
     readonly property bool canRemove: page.ready && !page.targetBusy && page.operations.writeAllowed
         && controller.stateKey !== "running" && controller.stateKey !== "paused" && controller.stateKey !== "restarting"
 
-    /*! 网络条目里地址行的字段名：IPv4 / IPv6 / 网关。 */
+    /*! Field label for address rows in a network entry: IPv4 / IPv6 / gateway. */
     function networkValueLabel(entryKey: string): string {
         if (entryKey === "network-ipv6") {
             return i18n("IPv6:");
@@ -84,47 +85,48 @@ KCM.AbstractKCM {
         return i18n("IPv4:");
     }
 
-    /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
-        注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
+    /*! Request a return to the list page (main.qml connects it to StackView.pop).
+        Not named backRequested: Kirigami.Page already declares a signal by that name. */
     signal closeRequested
-    /*! 克隆这个容器的配置（七期 §4.5）：只复制配置，不复制运行时状态。 */
+    /*! Clone this container's configuration (phase 7 §4.5): config only, no runtime state. */
     signal cloneRequested(string containerId)
-    /*! 打开这个容器所用镜像的详情。 */
+    /*! Open the detail page of the image this container uses. */
     signal imageRequested(string imageId)
 
-    /*! 「保存为预设」的结果提示（挂载行里的小反馈）。 */
+    /*! "Save as preset" result message (inline feedback in the mount row). */
     property string mountPresetMessage: ""
     property bool mountPresetMessageVisible: false
 
-    /*! 正在等待"断开"确认的网络名（确认对话框要用）。 */
+    /*! Network name awaiting disconnect confirmation (used by the dialog). */
     property string pendingNetworkName: ""
-    /*! 连接网络的内联面板是否展开（以及当前选中的网络 Id / 别名）。 */
+    /*! Whether the connect-network inline panel is open (plus the selected network id / aliases). */
     property bool connectPanelOpen: false
     property string connectNetworkId: ""
     property string connectAliases: ""
 
-    /*! 这个网络能不能连（已经连上的当然不能再连一次）。 */
+    /*! Whether a network can still be connected (an attached one obviously cannot). */
     /*
-     * 可连接的网络（属性，不是函数）。
+     * Connectable networks (a property, not a function).
      *
-     * 实测反馈：断开某个网络后，面板里它仍显示"已连接"、按钮还是灰的——因为原来是
-     * 函数调用，绑定不跟踪数据变化（本项目第五次踩这个坑）。改成 `readonly property`
-     * 的绑定块后，`connectedNetworkNames`（属性）或网络模型一变就会重新求值。
+     * User report: after disconnecting, the network still showed as "already connected" with a
+     * greyed button, because this was a function call and bindings do not track data changes (the
+     * fifth time this trap bit the project). As a `readonly property` binding block it re-evaluates
+     * whenever `connectedNetworkNames` or the network model changes.
      */
     readonly property var connectedNetworkNameList: page.controller.connectedNetworkNames
 
     /*!
-     * 还能连的网络（整表 + 数量都是属性，界面直接用）。
+     * Networks that can still be connected (list and count are properties the UI reads directly).
      *
-     * 这里**故意**在读 `model.summaries()` 之外显式读一次 `model.count`：
-     * C++ 的 Q_INVOKABLE 调用不产生依赖，只有读到带 NOTIFY 的属性，
-     * 这个绑定才会在网络列表变化时重新求值（踩过多次的同一个坑）。
+     * `model.count` is read explicitly alongside `model.summaries()` on purpose: a C++
+     * Q_INVOKABLE call creates no dependency, and only a NOTIFYable property makes this binding
+     * re-evaluate when the network list changes (the same trap, hit many times).
      */
     readonly property var connectableNetworks: {
         const model = kcm.controller.networkModel;
         const connected = page.connectedNetworkNameList;
         const result = [];
-        const rowCount = model ? model.count : 0; // ← 建立依赖，别删
+        const rowCount = model ? model.count : 0; // ← establishes the dependency, do not remove
         if (!model || rowCount === 0) {
             return result;
         }
@@ -141,7 +143,7 @@ KCM.AbstractKCM {
         return page.connectedNetworkNameList.indexOf(networkName) < 0;
     }
 
-    /*! 提交内联面板上的连接（失败原因由控制器给出用户文案）。 */
+    /*! Submit the inline panel's connection (the controller supplies user-facing failure text). */
     function submitConnectNetwork(): void {
         if (page.connectNetworkId.length === 0) {
             return;
@@ -154,36 +156,36 @@ KCM.AbstractKCM {
     }
 
     /*!
-     * 网络摘要（`{id, name, driver}`）：连接对话框的数据源。
+     * Network summaries (`{id, name, driver}`): the data source for the connect dialog.
      *
-     * 每次求值都会读一次 `networkModel.count`，因此模型刷新后对话框能跟上
-     * （QML 不追踪函数调用，必须显式读一个属性建立依赖）。
+     * Each evaluation reads `networkModel.count`, so the dialog follows model refreshes
+     * (QML does not track function calls; an explicit property read creates the dependency).
      */
-    /*! 还能连的网络数（0 = 没有可连的，面板据此给出说明）。 */
+    /*! Number of connectable networks (0 = none, which the panel explains). */
 
 
     Component.onCompleted: {
-        // 必须无条件 start()：容器 id 相同时（A → 返回 → 再进 A）也要重新 inspect、
-        // 重新开始低频复核与 stats 采样（§27/§46）。
+        // start() must be unconditional: even with the same container id (A → back → A again) the
+        // page must re-inspect and restart low-frequency checks and stats sampling (§27/§46).
         if (page.containerId.length > 0) {
             controller.containerId = page.containerId;
             controller.start();
         }
     }
 
-    // 离开页面：停止 stats 采样并释放指标历史（§27）
+    // Leaving the page: stop stats sampling and release metric history (§27)
     Components.ConfirmDialog {
         id: disconnectNetworkDialog
 
         objectName: "disconnectNetworkDialog"
         headingText: i18n("Disconnect from network")
         questionText: i18n("Disconnect this container from “%1”?", page.pendingNetworkName)
-        // 断开正在使用的网络会中断通信：这句话是必须写清的后果
+        // Disconnecting a network in use interrupts traffic, so this consequence must be spelled out
         consequenceText: i18n("The container loses this network's addresses and aliases; connections through it may be interrupted.")
         acceptText: i18n("Disconnect")
         destructive: true
         onConfirmed: {
-            // 网络名 → Id 的转换只有一处实现（NetworkModel::idForName）
+            // Name → id conversion has exactly one implementation (NetworkModel::idForName)
             const networkId = kcm.controller.networkModel.idForName(page.pendingNetworkName);
             page.operations.disconnectContainerFromNetwork(networkId.length > 0 ? networkId : page.pendingNetworkName,
                                                            page.containerId);
@@ -193,10 +195,11 @@ KCM.AbstractKCM {
     Component.onDestruction: controller.stop()
 
     /*!
-        写操作 footer（ARCH_V3 §2.2 约束 5 预留的位置，ARCH_V4 §2.3 填充）。
+        Write-action footer (reserved by ARCH_V3 §2.2 constraint 5, filled in ARCH_V4 §2.3).
 
-        可逆操作与破坏性操作在同一行，但删除按钮在最右侧并单独确认；
-        忙碌时按钮禁用并显示进度指示，避免重复点击产生第二个请求。
+        Reversible and destructive actions share one row, but delete sits at the far right with its
+        own confirmation; while busy the buttons are disabled with a progress indicator so a double
+        click cannot fire a second request.
     */
     footer: QQC2.ToolBar {
         id: actionBar
@@ -256,7 +259,7 @@ KCM.AbstractKCM {
                 implicitHeight: Kirigami.Units.iconSizes.smallMedium
             }
 
-            // 运行中不给删除：说明原因比让引擎报 409 更直接
+            // No delete while running: saying why beats letting the engine answer 409
             QQC2.Label {
                 objectName: "removeBlockedHint"
                 visible: page.ready && !page.canRemove && !page.targetBusy && page.operations.writeAllowed
@@ -284,14 +287,14 @@ KCM.AbstractKCM {
     contentItem: ColumnLayout {
         spacing: Kirigami.Units.smallSpacing
 
-        /* 本页触发的操作结果（启动 / 停止 / 重启 / 删除）在这里呈现 */
+        /* Operation results from this page (start / stop / restart / delete) are shown here */
         Components.OperationMessage {
             Layout.fillWidth: true
             operations: page.operations
         }
 
         /* ------------------------------------------------------------------ */
-        /* 页头：返回 + 名称 + 复制名称                                          */
+        /* Header: back + name + copy name                                        */
         /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
@@ -316,7 +319,7 @@ KCM.AbstractKCM {
         }
 
         /* ------------------------------------------------------------------ */
-        /* Loading / Error（§31：详细失败不影响列表页）                          */
+        /* Loading / error (§31: a detail failure never breaks the list page)     */
         /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
@@ -354,7 +357,7 @@ KCM.AbstractKCM {
         }
 
         /* ------------------------------------------------------------------ */
-        /* 分区切换（§1.3：为日志与后续操作留出位置）                            */
+        /* Section switcher (§1.3: room for logs and later actions)               */
         /* ------------------------------------------------------------------ */
         QQC2.TabBar {
             id: sectionBar
@@ -363,15 +366,16 @@ KCM.AbstractKCM {
             Layout.fillWidth: true
             visible: page.ready
 
-            // 日志是长连接：进分区才连、离开即断（§3.1.4）。索引 4 = 日志
+            // Logs are a long-lived stream: connected when the section is entered, dropped on
+            // leaving (§3.1.4). Index 4 = logs
             onCurrentIndexChanged: {
                 if (currentIndex === 4) {
                     page.controller.startLogs();
                 } else {
                     page.controller.stopLogs();
                 }
-                // 网络分区要用到网络列表（连接对话框、名字 → Id）：进分区时按需刷新一次，
-                // 否则从没打开过"网络"标签页的用户会看到"没有可连的网络"（实测踩过）
+                // The network section needs the network list (connect panel, name → id): refresh it on
+                // entry, or users who never opened the Networks tab see "no connectable networks"
                 if (currentIndex === 2) {
                     kcm.controller.refreshNetworks();
                 }
@@ -406,10 +410,11 @@ KCM.AbstractKCM {
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: page.ready
-            // 切换分区不触碰 controller 生命周期：不重新 inspect、不重启动 stats 采样（§2.2 约束 2/3）
+            // Switching sections never touches the controller lifecycle: no re-inspect, no restart of
+            // stats sampling (§2.2 constraints 2/3)
             currentIndex: sectionBar.currentIndex
 
-            /* ============================ 概览 ============================ */
+            /* ============================ Overview ============================ */
             QQC2.ScrollView {
                 id: overviewScroll
 
@@ -421,12 +426,13 @@ KCM.AbstractKCM {
                     x: Math.max(0, (overviewScroll.availableWidth - width) / 2)
                     spacing: Kirigami.Units.largeSpacing
 
-                    /* ---------------- 一级信息 ---------------- */
+                    /* ---------------- Top-level facts ---------------- */
                     Kirigami.FormLayout {
                         /*
-                         * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
-                         * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
-                         * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                         * Shrink to content and align left: Kirigami's FormLayout right-aligns the
+                         * `[label][field]` group, so at full width the block drifts to the right
+                         * (user report: too far right). Fields needing width (long commands) set their
+                         * own Layout.preferredWidth instead of relying on the row.
                          */
                         Layout.fillWidth: false
                         Layout.alignment: Qt.AlignLeft
@@ -458,8 +464,9 @@ KCM.AbstractKCM {
                             Kirigami.FormData.label: i18n("Image:")
                             Layout.fillWidth: true
                             /*
-                             * 「镜像」可以点进镜像详情（与网络成员/关联容器同一种交互：
-                             * 箭头 + 整行可点）。镜像 ID 为空（引擎没给）时不可点。
+                             * The image row opens image detail — the same interaction as network
+                             * members and related containers (arrow + clickable row). Not clickable
+                             * when the image ID is empty (the engine did not supply one).
                              */
                             enabled: page.controller.imageId.length > 0
                             onClicked: page.imageRequested(page.controller.imageId)
@@ -519,9 +526,10 @@ KCM.AbstractKCM {
 
                     Kirigami.FormLayout {
                         /*
-                         * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
-                         * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
-                         * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                         * Shrink to content and align left: Kirigami's FormLayout right-aligns the
+                         * `[label][field]` group, so at full width the block drifts to the right
+                         * (user report: too far right). Fields needing width (long commands) set their
+                         * own Layout.preferredWidth instead of relying on the row.
                          */
                         Layout.fillWidth: false
                         Layout.alignment: Qt.AlignLeft
@@ -568,21 +576,24 @@ KCM.AbstractKCM {
 
                     Kirigami.FormLayout {
                         /*
-                         * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
-                         * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
-                         * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                         * Shrink to content and align left: Kirigami's FormLayout right-aligns the
+                         * `[label][field]` group, so at full width the block drifts to the right
+                         * (user report: too far right). Fields needing width (long commands) set their
+                         * own Layout.preferredWidth instead of relying on the row.
                          */
                         Layout.fillWidth: false
                         Layout.alignment: Qt.AlignLeft
 
                         /*
-                         * 入口点与命令：可以一键复制（实测反馈 A2）。
+                         * Entrypoint and command: one-click copyable (user report A2).
                          *
-                         * 宽度策略：表单是"按内容收缩"的，所以这两行必须自带宽度——
-                         *   - 不设宽度：字段会被内容的隐式宽度撑到面板之外（溢出）；
-                         *   - `implicitWidth: 0`：字段塌到几十像素（渲染实测），省略号立刻吃掉一切。
-                         * 给一个固定宽度（26 gridUnit ≈ 470px）后：短命令一行、长命令在字段内换行，
-                         * 整页不会被撑高，也不会溢出；完整值仍可通过复制按钮/悬停提示拿到。
+                         * Width policy — the form shrinks to content, so these rows must set their own:
+                         *   - no width: the implicit content width pushes the field out of the panel;
+                         *   - `implicitWidth: 0`: the field collapses to a few dozen pixels (measured in
+                         *     a render) and the ellipsis swallows everything.
+                         * A fixed 26 gridUnit (≈470px) keeps short commands on one line, wraps long ones
+                         * inside the field, and neither overflows nor inflates the page; the full value
+                         * stays reachable through the copy button and tooltip.
                          */
                         Item {
                             Kirigami.FormData.label: i18n("Entrypoint:")
@@ -636,7 +647,7 @@ KCM.AbstractKCM {
                         }
                     }
 
-                    /* ---------------- Environment / Labels（默认折叠） ---------------- */
+                    /* ---------------- Environment / labels (collapsed by default) ---------------- */
                     Components.CollapsibleSection {
                         Layout.fillWidth: true
                         contentObjectName: "environmentValues"
@@ -659,7 +670,7 @@ KCM.AbstractKCM {
                 }
             }
 
-            /* ============================ 资源 ============================ */
+            /* ============================ Resources ============================ */
             QQC2.ScrollView {
                 id: resourcesScroll
 
@@ -673,7 +684,7 @@ KCM.AbstractKCM {
                 }
             }
 
-            /* ============================ 网络 ============================ */
+            /* ============================ Network ============================ */
             QQC2.ScrollView {
                 id: networkScroll
 
@@ -690,7 +701,7 @@ KCM.AbstractKCM {
                         message: page.controller.networks.empty ? i18n("No network information.") : ""
                     }
 
-                    // 连接/断开网络（ARCH_V5_V8 §3.4）：只读模式不出现入口
+                    // Connect/disconnect network (ARCH_V5_V8 §3.4): no entry point in read-only mode
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
@@ -712,10 +723,11 @@ KCM.AbstractKCM {
                         }
                     }
 
-                    /* 连接网络：**内联面板**而不是弹窗。
-                       弹层（Kirigami.Dialog）的内容在窗口之外还有一份实例，模型驱动的
-                       子项在离屏与尚未显示时可能一条都建不出来（实测过：对话框打开着，
-                       里面是空的）；连接本来是"就地选一个网络"的动作，内联更直接。 */
+                    /* Connect network: an **inline panel**, not a popup.
+                       A Kirigami.Dialog keeps a second instance of its content outside the window, and
+                       model-driven children may not be created at all while offscreen or not yet shown
+                       (measured: the dialog was open and empty). Connecting is a pick-one-here action,
+                       so inline is more direct. */
                     ColumnLayout {
                         objectName: "connectNetworkPanel"
                         Layout.fillWidth: true
@@ -746,7 +758,8 @@ KCM.AbstractKCM {
                         }
 
                         Repeater {
-                            // 直接用模型（属性）：模型变化时列表跟着更新，不再是函数快照
+                            // Use the model (a property) directly: the list follows model changes,
+                            // not a function snapshot
                             model: kcm.controller.networkModel
 
                             delegate: QQC2.RadioButton {
@@ -759,7 +772,8 @@ KCM.AbstractKCM {
 
                                 objectName: "connectNetworkOption"
                                 Layout.fillWidth: true
-                                // 已经连上的网络：标注出来但不可再选（避免"再连一次"这种无意义操作）
+                                // Attached networks are labelled but not selectable again
+                                // (no pointless re-connect)
                                 enabled: page.isConnectable(networkOption.name)
                                 text: networkOption.name + " · " + networkOption.driver
                                     + (networkOption.enabled ? "" : " — " + i18n("already connected"))
@@ -798,10 +812,10 @@ KCM.AbstractKCM {
                         }
                     }
 
-                    /*  网络条目**不用 FormLayout**：每个条目一个 GridLayout 落在
-                        Repeater 里，正是 core dump 中「外层布局 → 条目 box → 内层
-                        GridLayout sizeHint → 查 FormData 附加属性」的形状。
-                        改用与「挂载」一致的普通行布局，去掉这层嵌套。 */
+                    /*  Network entries **avoid FormLayout**: one GridLayout per entry inside a
+                        Repeater matched the core-dump shape "outer layout → item box → inner
+                        GridLayout sizeHint → FormData attached-property lookup". Plain row layouts,
+                        as used by the mounts section, remove that nesting. */
                     Repeater {
                         model: page.controller.networks
 
@@ -815,8 +829,9 @@ KCM.AbstractKCM {
                             Layout.fillWidth: true
                             spacing: 0
 
-                            /* 网络名只在主条目显示：IPv6 / 网关条目里 label 就是
-                               "IPv6"/"Gateway" 这类标题，重复展示会变成 "IPv6: IPv6" */
+                            /* The network name appears on the main entry only: in IPv6/gateway entries
+                               `label` is already a heading like "IPv6", so repeating it would give
+                               "IPv6: IPv6" */
                             RowLayout {
                                 Layout.fillWidth: true
                                 visible: entryKey === "network"
@@ -834,7 +849,7 @@ KCM.AbstractKCM {
                                     Layout.fillWidth: true
                                     elide: Text.ElideMiddle
                                 }
-                                // 断开这个网络：可能中断通信，因此走确认对话框
+                                // Disconnect may interrupt traffic, so it goes through a confirmation dialog
                                 QQC2.Button {
                                     objectName: "disconnectNetworkButton"
                                     visible: page.operations.writeAllowed
@@ -899,19 +914,20 @@ KCM.AbstractKCM {
                         message: page.controller.publishedPorts.empty && page.controller.unpublishedPorts.empty ? i18n("No published ports.") : ""
                     }
 
-                    /* 拓扑：左列容器端口、右列宿主绑定，连线为装饰（§2.1.2） */
+                    /* Topology: container ports left, host bindings right, lines decorative (§2.1.2) */
                     Components.PortTopology {
                         Layout.fillWidth: true
-                        // 用**分组**模型：同一个容器端口的多条绑定会合并成一条分支线
+                        // Use the **grouped** model: several bindings of one container port
+                        // merge into one branch line
                         visible: !page.controller.portGroups.empty
                         model: page.controller.portGroups
                         containerLabel: page.controller.name.length > 0 ? page.controller.name : i18n("Container")
                         hostLabel: page.engineHostName
-                        // 同一个容器永远同色：种子就是容器 id（ARCH_V4 §2.1.2）
+                        // One container always keeps one color: the seed is the container id (ARCH_V4 §2.1.2)
                         colorSeed: page.controller.containerId
                     }
 
-                    /* 只 EXPOSE、没有映射到宿主的端口：没有宿主端点，因此不画线 */
+                    /* EXPOSEd-only ports with no host mapping: no host endpoint, so no line is drawn */
                     QQC2.Label {
                         Layout.fillWidth: true
                         Layout.topMargin: Kirigami.Units.smallSpacing
@@ -942,7 +958,7 @@ KCM.AbstractKCM {
                 }
             }
 
-            /* ============================ 挂载 ============================ */
+            /* ============================ Mounts ============================ */
             QQC2.ScrollView {
                 id: mountsScroll
 
@@ -960,7 +976,7 @@ KCM.AbstractKCM {
                         message: page.controller.mounts.empty ? i18n("No mounts.") : ""
                     }
 
-                    // 「保存为预设」的结果：就地给一行反馈，不用跑去别处看
+                    // "Save as preset" result: inline feedback, no need to look elsewhere
                     Kirigami.InlineMessage {
                         objectName: "mountPresetMessage"
                         Layout.fillWidth: true
@@ -975,7 +991,7 @@ KCM.AbstractKCM {
                         }
                     }
 
-                    /* 打开宿主目录失败时的提示（路径不存在 / 没有文件管理器） */
+                    /* Hint when opening the host folder fails (path missing / no file manager) */
                     Kirigami.InlineMessage {
                         objectName: "mountActionMessage"
                         Layout.fillWidth: true
@@ -1009,7 +1025,7 @@ KCM.AbstractKCM {
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing / 2
 
-                            /* 第一行：类型 + 读写模式 + 宿主路径缺失警告 */
+                            /* First row: type + read/write mode + missing-host-path warning */
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -1025,7 +1041,7 @@ KCM.AbstractKCM {
                                     muted: mountRow.mode === "ro"
                                 }
 
-                                // 命名卷显示卷名，否则用户只看到一个宿主路径
+                                // Named volumes show their name; otherwise only an opaque host path shows
                                 Components.FieldChip {
                                     objectName: "mountVolumeChip"
                                     visible: mountRow.volumeName.length > 0
@@ -1045,8 +1061,9 @@ KCM.AbstractKCM {
                                 }
                             }
 
-                            /* 第二行：宿主路径 → 容器路径
-                               （容器路径**靠右**收尾，两条路径都从中间省略：太长也不挤掉对方） */
+                            /* Second row: host path → container path
+                               (the container path ends flush right; both elide in the middle so a long
+                               one cannot squeeze the other out) */
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -1054,12 +1071,13 @@ KCM.AbstractKCM {
 
                                 QQC2.Label {
                                     objectName: "mountSourceLabel"
-                                    // 挂载源路径属潜在敏感信息（§40）：只在详情页展示，不写日志
+                                    // Mount sources are potentially sensitive (§40): detail page only,
+                                    // never logged
                                     text: mountRow.source
                                     font.family: "monospace"
                                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                                    // 宿主路径通常更长：占满剩余宽度，从中间省略
-                                    // （保留开头与尾段，比单纯截尾更有辨识度）
+                                    // Host paths are usually longer: take the remaining width and elide in
+                                    // the middle (head and tail identify it better than a plain tail cut)
                                     elide: Text.ElideMiddle
                                     horizontalAlignment: Text.AlignLeft
                                     Layout.fillWidth: true
@@ -1079,16 +1097,18 @@ KCM.AbstractKCM {
                                     font.family: "monospace"
                                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                                     elide: Text.ElideMiddle
-                                    // 靠右对齐：容器路径是固定长度、需要一眼扫完的一列，
-                                    // 让它贴着右边缘（而不是跟着宿主路径的长度左右漂移）
+                                    // Right-aligned: container paths form a fixed-length column meant to be
+                                    // scanned at a glance, so it hugs the right edge instead of drifting
+                                    // with the host path's length
                                     horizontalAlignment: Text.AlignRight
                                     Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-                                    // 很长的容器路径最多占四成宽度，剩下的留给宿主路径
+                                    // A very long container path takes at most 40% of the width;
+                                    // the rest stays with the host path
                                     Layout.maximumWidth: Math.max(Kirigami.Units.gridUnit * 6, mountRow.width * 0.4)
                                 }
                             }
 
-                            /* 第三行：动作（tmpfs 与缺失路径不提供打开动作） */
+                            /* Third row: actions (tmpfs and missing paths offer no open action) */
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -1112,7 +1132,8 @@ KCM.AbstractKCM {
                                     fieldLabel: i18n("container path")
                                 }
 
-                                // 把这条挂载存成预设（七期 §4.2）：下次创建容器时可以一键添加
+                                // Save this mount as a preset (phase 7 §4.2) for one-click reuse
+                                // when creating a container
                                 QQC2.Button {
                                     objectName: "mountSavePresetButton"
                                     visible: mountRow.source.length > 0
@@ -1134,7 +1155,7 @@ KCM.AbstractKCM {
                 }
             }
 
-            /* ============================ 日志（§3.1） ============================ */
+            /* ============================ Logs (§3.1) ============================ */
             ColumnLayout {
                 Layout.margins: Kirigami.Units.largeSpacing
 
@@ -1147,7 +1168,7 @@ KCM.AbstractKCM {
         }
     }
 
-    /* 删除确认：句式与后果说明固定（ARCH_V4 §2.2.5） */
+    /* Delete confirmation: wording and consequence text are fixed (ARCH_V4 §2.2.5) */
     Components.ConfirmDialog {
         id: removeDialog
 
@@ -1160,7 +1181,7 @@ KCM.AbstractKCM {
         onConfirmed: page.operations.removeContainer(page.containerId)
     }
 
-    /* 删除成功后本页的目标已经不存在：返回列表（列表已由控制器刷新） */
+    /* After a successful delete this page's target is gone: return to the list (already refreshed) */
     Connections {
         target: page.operations
         function onContainerRemoved(id) {

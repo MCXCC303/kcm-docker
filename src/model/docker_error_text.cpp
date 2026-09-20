@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,9 +14,9 @@ namespace
 {
 
 /*!
- * 409 的三类语义（ARCH_V4 §2.2.2）只能靠引擎 message 区分：
- * HTTP 状态码本身不携带这个信息，而文案必须让用户知道下一步做什么。
- * 这里匹配的是 Docker 稳定多年的英文措辞，匹配不到就退化为通用文案。
+ * The three 409 meanings (ARCH_V4 §2.2.2) can only be told apart by the engine message: the HTTP
+ * status itself carries no such detail, and the text must tell the user what to do next.
+ * Matches Docker's long-stable English wording; on no match it falls back to generic text.
  */
 QString conflictText(const DockerError &error)
 {
@@ -117,7 +117,7 @@ QString dockerErrorCategoryKey(ErrorCategory category)
 
 QString dockerErrorActionKey(const DockerError &error)
 {
-    // 目标已经消失时唯一的有效动作是把列表刷成真实状态
+    // When the object is gone, refreshing to the real list state is the only useful action
     if (error.kind() == DockerError::Kind::NotFound) {
         return QStringLiteral("refresh");
     }

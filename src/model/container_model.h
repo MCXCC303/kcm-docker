@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,10 +14,10 @@ namespace Kontainer
 {
 
 /*!
- * 容器列表的 presentation model（ARCH_V1 §13）。
+ * Presentation model for the container list (ARCH_V1 §13).
  *
- * role 名称固定，不为了 QML 的临时需求随意变更。
- * 只做“域数据 → QML 可消费数据”的转换，不做任何 Docker 访问。
+ * Role names are fixed; do not change them for ad-hoc QML needs.
+ * Only converts domain data into QML-consumable data, never accesses Docker.
  */
 class ContainerModel : public KeyedListModel<ContainerModel, Container>
 {

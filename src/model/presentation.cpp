@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -22,7 +22,7 @@ Presentation::Presentation(QObject *parent)
 
 QString Presentation::stateSemanticKey(const QString &stateKey, const QString &healthKey) const
 {
-    // 健康状态优先于状态：Running + Unhealthy 必须看起来是“有问题”（§11.3/§12）
+    // health outranks state: Running + Unhealthy must look "wrong" (§11.3/§12)
     if (healthKey == QLatin1String("unhealthy")) {
         return QStringLiteral("negative");
     }
@@ -67,7 +67,7 @@ QString Presentation::stateIconName(const QString &stateKey) const
 
 QString Presentation::stateText(const QString &stateKey) const
 {
-    // stateKey 就是 Docker 的状态字符串（running/exited/…），与解析 DTO 时用的是同一套映射
+    // stateKey is Docker's own state string (running/exited/…), the same mapping used when parsing DTOs
     return containerStateText(containerStateFromString(stateKey));
 }
 
@@ -91,7 +91,7 @@ void Presentation::copyToClipboard(const QString &text) const
     if (text.isEmpty()) {
         return;
     }
-    // 没有 GUI 应用实例时（例如无 GUI 单元测试）直接跳过
+    // skip when there is no GUI application instance (e.g. headless unit tests)
     if (!QGuiApplication::instance()) {
         return;
     }
@@ -111,9 +111,10 @@ int Presentation::connectionColorIndex(const QString &seed, int paletteSize) con
     if (seed.isEmpty() || paletteSize <= 0) {
         return 0;
     }
-    // FNV-1a 32 位 + lowbias32 收尾混合。
-    // 收尾不能省：FNV 的低位对"只差末尾几个字符"的种子雪崩不足，直接取模会把
-    // 大量种子挤到同一批色位上（实测 200 个相似种子只用到 6 个色位中的 3 个）。
+    // FNV-1a 32-bit plus a lowbias32 finalizer.
+    // The finalizer is required: FNV's low bits avalanche poorly for seeds differing only in their
+    // last characters, so a direct modulo crowded many seeds onto few palette slots (measured: 200
+    // similar seeds used only 3 of the 6 slots).
     quint32 hash = 2166136261u;
     for (const QChar ch : seed) {
         hash ^= quint32(ch.unicode());
@@ -141,20 +142,20 @@ QVariantList Presentation::parseEnvText(const QString &text) const
         }
         const int equals = line.indexOf(QLatin1Char('='));
         if (equals <= 0) {
-            continue; // 不是 KEY=VALUE 的行直接跳过（粘贴内容常常是人手整理的）
+            continue; // skip lines that are not KEY=VALUE (pasted content is often hand-edited)
         }
         const QString key = line.left(equals).trimmed();
         QString value = line.mid(equals + 1).trimmed();
         if (!isValidEnvKey(key)) {
             continue;
         }
-        // 引号包裹：整段取值，不做转义展开（够用且行为可预期）
+        // quoted: take the whole span, no escape expansion (sufficient here, and predictable)
         if (value.size() >= 2) {
             const QChar first = value.front();
             if ((first == QLatin1Char('"') || first == QLatin1Char('\'')) && value.back() == first) {
                 value = value.mid(1, value.size() - 2);
             } else {
-                // 未加引号：去掉行内注释（` #` 之后的内容）
+                // unquoted: strip the trailing comment (everything after ` #`)
                 const int comment = value.indexOf(QLatin1String(" #"));
                 if (comment >= 0) {
                     value = value.left(comment).trimmed();
@@ -183,7 +184,7 @@ bool Presentation::isWildcardHostIp(const QString &hostIp) const
 bool Presentation::hostPortConflicts(const QString &hostIp, int hostPort, const QStringList &usedBindings) const
 {
     if (!isValidPort(hostPort)) {
-        return false; // 非法端口由范围校验负责，不算冲突
+        return false; // an invalid port is the range check's job, not a conflict
     }
     const bool wildcard = isWildcardHostIp(hostIp);
     for (const QString &binding : usedBindings) {
@@ -210,7 +211,7 @@ QString Presentation::registryMirrorErrorKey(const QString &value) const
     if (trimmed.isEmpty()) {
         return QStringLiteral("emptyHost");
     }
-    // 镜像加速器是 daemon 主动去连的地址：必须是 http(s) URL，且带主机名、不带路径查询
+    // a mirror is an address the daemon connects to: an http(s) URL with a host and no path/query
     static const QRegularExpression pattern(QStringLiteral("^https?://[A-Za-z0-9._\\-]+(:[0-9]{1,5})?/?$"));
     if (!pattern.match(trimmed).hasMatch()) {
         return QStringLiteral("invalid");
@@ -224,7 +225,7 @@ QString Presentation::insecureRegistryErrorKey(const QString &value) const
     if (trimmed.isEmpty()) {
         return QStringLiteral("emptyHost");
     }
-    // insecure-registries 是"仓库地址":只允许 host[:port]，写 scheme 或路径都不对
+    // insecure-registries holds registry addresses: only host[:port], a scheme or path is wrong
     static const QRegularExpression pattern(QStringLiteral("^[A-Za-z0-9._\\-]+(:[0-9]{1,5})?$"));
     if (!pattern.match(trimmed).hasMatch()) {
         return QStringLiteral("invalid");

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,7 +17,7 @@ namespace Kontainer
 
 namespace
 {
-/*! 钱包状态 → 界面 key。 */
+/*! Wallet state → UI key. */
 QString walletStateKeyFor(CredentialStore::State state)
 {
     switch (state) {
@@ -100,7 +100,7 @@ QStringList RegistryAuthController::importableAddresses() const
 {
     QStringList addresses;
     for (const ImportableCredential &importable : m_scan.credentials) {
-        // 钱包里已经有这个仓库的凭据就不必再导入（导入也不会覆盖它）
+        // skip registries already in the wallet (importing would not overwrite them either)
         if (!m_store->hasCredential(importable.credential.serverAddress)) {
             addresses.append(importable.credential.serverAddress);
         }
@@ -151,8 +151,8 @@ void RegistryAuthController::refresh()
     m_store->open();
     m_credentials->reload();
     scanCliConfig();
-    // 静默识别：CLI 配置文件里有、钱包里还没有的条目自动收进来（不覆盖已有条目）。
-    // 界面不再有"导入/同步"按钮——这是用户要求的行为（ARCH_V5_V8 §5.19）。
+    // silent pickup: entries in the CLI config but not in the wallet (existing ones are never
+    // overwritten). The UI has no import/sync button any more — as users requested (ARCH_V5_V8 §5.19).
     importFromCliSilently();
     Q_EMIT changed();
 }
@@ -160,7 +160,7 @@ void RegistryAuthController::refresh()
 void RegistryAuthController::importFromCliSilently()
 {
     if (m_store->state() != CredentialStore::State::Ready) {
-        return; // 钱包没准备好就先不碰（下次 refresh 再试）
+        return; // wallet not ready: leave it alone and retry on the next refresh
     }
     const DockerCliAuthImporter::ImportOutcome outcome = DockerCliAuthImporter::importInto(*m_store, m_scan);
     m_importedCount = outcome.imported;
@@ -232,7 +232,7 @@ void RegistryAuthController::login(const QString &serverAddress, const QString &
         return;
     }
     if (m_store->state() != CredentialStore::State::Ready) {
-        // 钱包不可用时不验证、不保存：验证通过了也存不下，说了反而误导
+        // wallet unavailable: validate nothing and save nothing — a passed check could not be stored anyway
         setResultKeys(QString(), QStringLiteral("unavailable"));
         return;
     }
@@ -275,12 +275,12 @@ void RegistryAuthController::handleAuthCheckFinished(const QString &serverAddres
     setBusy(false);
 
     if (!wasTesting && !wasLogin) {
-        return; // 不是我们发起的校验（例如别处复用后端）
+        return; // not a check we started (the backend may be reused elsewhere)
     }
 
     const QString key = keyForAuthResult(result);
     if (result != DockerBackendInterface::AuthCheckResult::Succeeded) {
-        // 校验失败：什么都不保存。密码只留在这次请求里，用完即弃
+        // check failed: save nothing; the password lived only inside this request and is discarded
         setResultKeys(QString(), key, detail);
         return;
     }
@@ -292,15 +292,15 @@ void RegistryAuthController::handleAuthCheckFinished(const QString &serverAddres
 
     QString errorKey;
     if (!m_store->store(m_pendingLogin.credential, &errorKey)) {
-        // 校验成功但写不进去（钱包只读/被拒）：如实报告，不能假装登录成功
+        // check passed but the write failed (wallet read-only or refused): report it, never fake success
         setResultKeys(QString(), errorKey.isEmpty() ? QStringLiteral("writeFailed") : errorKey, detail);
         return;
     }
-    // 模型与 credentialsChanged() 由 CredentialStore::changed() 驱动（见构造函数），
-    // 这里不再重复发一次：重复的信号会让界面提示条闪两下
+    // the model and credentialsChanged() are driven by CredentialStore::changed() (see the
+    // constructor), so do not emit here as well: a duplicate signal makes the notice bar blink twice
     QString cliError;
     if (!writeBackToCli(m_pendingLogin.credential, &cliError)) {
-        // 钱包里已经存好了；只是没能同步给 docker CLI——如实说明，别让用户以为 CLI 也能用了
+        // stored in the wallet, only the docker CLI sync failed — say so, or the user assumes the CLI works
         setResultKeys(QStringLiteral("loginSucceeded"), QStringLiteral("cliWriteFailed"), detail);
         setCliConfigPathForMessages();
         return;
@@ -315,7 +315,7 @@ void RegistryAuthController::removeCredential(const QString &serverAddress)
         setResultKeys(QString(), errorKey);
         return;
     }
-    // 同步删除 CLI 配置里的条目：只删我们这边会让 CLI 继续拿着一份已经作废的凭据
+    // remove the CLI config entry as well: deleting only ours leaves the CLI holding a dead credential
     QString cliError;
     if (!DockerCliAuthWriter::remove(DockerCliAuthWriter::defaultConfigPath(), serverAddress, &cliError)) {
         setResultKeys(QStringLiteral("removed"), QStringLiteral("cliWriteFailed"));
@@ -327,7 +327,7 @@ void RegistryAuthController::removeCredential(const QString &serverAddress)
 
 void RegistryAuthController::setCliConfigPathForMessages()
 {
-    // 提示文案里要说明"哪个文件没同步成功"，因此把路径填进 detail（路径不是敏感信息）
+    // the notice must name the file that failed to sync, so put the path in detail (paths are not secret)
     m_lastErrorDetail = DockerCliAuthWriter::defaultConfigPath();
     Q_EMIT resultChanged();
 }
@@ -343,10 +343,12 @@ void RegistryAuthController::scanCliConfig()
 bool RegistryAuthController::writeBackToCli(const RegistryCredential &credential, QString *errorKey)
 {
     /*
-     * 把凭据同步进 Docker CLI 的配置文件（用户要求：静默维护，界面不再有"同步"动作）。
+     * Sync the credential into the Docker CLI config file (users asked for silent maintenance; the
+     * UI has no "sync" action any more).
      *
-     * 失败**不**影响 KWallet 里的结果（那边已经写成功了），但必须如实告诉用户——
-     * 否则他会在 docker CLI 里遇到"为什么这个仓库还要再登录一次"。
+     * A failure does **not** change the KWallet result (that write succeeded), but it must be
+     * reported — otherwise the user hits "why does this registry ask me to log in again?" in the
+     * docker CLI.
      */
     const QString path = DockerCliAuthWriter::defaultConfigPath();
     if (DockerCliAuthWriter::upsert(path, credential.serverAddress, credential, errorKey)) {

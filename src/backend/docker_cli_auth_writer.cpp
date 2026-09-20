@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -24,13 +24,13 @@ namespace
 constexpr auto kAuths = "auths";
 constexpr auto kAuth = "auth";
 
-/*! 读现有配置；`ok` 为假表示"文件存在但读不动/解析不了"，调用方必须放弃写入。 */
+/*! Read the existing config; `ok` false = file exists but is unreadable/unparsable: do not write. */
 QJsonObject readExisting(const QString &path, bool *ok, QString *errorKey)
 {
     *ok = true;
     QFile file(path);
     if (!file.exists()) {
-        return {}; // 还没有这个文件：从空配置开始
+        return {}; // no such file yet: start from an empty config
     }
     if (!file.open(QIODevice::ReadOnly)) {
         *ok = false;
@@ -47,7 +47,8 @@ QJsonObject readExisting(const QString &path, bool *ok, QString *errorKey)
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        // 关键安全点：用户的配置文件我们不理解时**一个字都不写**，否则会把他的登录状态弄丢
+        // Key safety point: if the user's config is unintelligible, write **nothing** — otherwise
+        // the login state stored in it is lost
         *ok = false;
         if (errorKey) {
             *errorKey = QStringLiteral("invalidJson");
@@ -58,7 +59,7 @@ QJsonObject readExisting(const QString &path, bool *ok, QString *errorKey)
     return document.object();
 }
 
-/*! 原子写入（QSaveFile）+ 0600：文件里等价于明文凭据，权限必须收紧。 */
+/*! Atomic write (QSaveFile) with 0600: the file holds plaintext-equivalent credentials. */
 bool writeConfig(const QString &path, const QJsonObject &root, QString *errorKey)
 {
     const QDir dir = QFileInfo(path).absoluteDir();
@@ -68,7 +69,7 @@ bool writeConfig(const QString &path, const QJsonObject &root, QString *errorKey
         }
         return false;
     }
-    // 目录 0700（已存在时不动它，避免改掉用户自己的权限设置）
+    // Directory 0700 (leave it alone if it already exists, so user permissions are not changed)
     QFile::setPermissions(dir.absolutePath(), QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 
     QSaveFile file(path);
@@ -92,11 +93,11 @@ bool writeConfig(const QString &path, const QJsonObject &root, QString *errorKey
 }
 
 /*!
- * 两个地址是否指向同一个仓库。
+ * Whether two addresses point at the same registry.
  *
- * 必须用 `normalizeServerAddress()`（它处理的是**仓库地址**）；
- * `serverAddressForImage()` 是给"镜像引用"用的，它会把不认识的东西都归到 Docker Hub——
- * 拿它比较会把新仓库的凭据写进 Hub 那一条里（实测踩到过）。
+ * Must use `normalizeServerAddress()` (it handles **registry addresses**);
+ * `serverAddressForImage()` is for image references and lumps anything unrecognized into Docker
+ * Hub — comparing with it writes a new registry's credentials into the Hub entry (hit in testing).
  */
 bool sameRegistry(const QString &lhs, const QString &rhs)
 {
@@ -118,7 +119,7 @@ QString DockerCliAuthWriter::configKeyFor(const QString &path, const QString &se
     if (ok) {
         const QJsonObject auths = existing.value(QString::fromLatin1(kAuths)).toObject();
         for (auto it = auths.constBegin(); it != auths.constEnd(); ++it) {
-            // 沿用文件里已有的写法，避免同一个仓库出现两个键
+            // Reuse the spelling already in the file so one registry does not get two keys
             if (sameRegistry(it.key(), serverAddress)) {
                 return it.key();
             }
@@ -148,10 +149,11 @@ bool DockerCliAuthWriter::upsert(const QString &path,
 
     QJsonObject auths = root.value(QString::fromLatin1(kAuths)).toObject();
     const QString key = configKeyFor(configPath, serverAddress);
-    QJsonObject entry = auths.value(key).toObject(); // 保留 identitytoken 等已有字段
+    QJsonObject entry = auths.value(key).toObject(); // keep existing fields such as identitytoken
     /*
-     * 秘密取 password；令牌登录时取 identityToken（CLI 的 `docker login` 也是把令牌
-     * 当作密码写进 `auth`）。两者都空说明凭据不完整，前面已经拦掉了。
+     * Secret comes from password; for token logins from identityToken (the CLI's `docker login`
+     * also writes the token as the `auth` password). Both empty means an incomplete credential,
+     * already rejected above.
      */
     const QString secret = !credential.password.isEmpty() ? credential.password : credential.identityToken;
     entry.insert(QString::fromLatin1(kAuth), RegistryAuth::encodeConfigAuth(credential.username, secret));
@@ -179,7 +181,7 @@ bool DockerCliAuthWriter::remove(const QString &path, const QString &serverAddre
         }
     }
     if (toRemove.isEmpty()) {
-        return true; // 本来就没有：不算失败
+        return true; // nothing there: not a failure
     }
     for (const QString &key : toRemove) {
         auths.remove(key);

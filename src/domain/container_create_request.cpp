@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,7 +17,7 @@ namespace Kontainer
 
 namespace
 {
-/*! `80/tcp` / `80` → `80/tcp`（Docker 的 ExposedPorts 用这种键）。 */
+/*! `80/tcp` / `80` → `80/tcp` (the key form Docker uses for ExposedPorts). */
 QString portKey(quint16 port, const QString &protocol)
 {
     const QString proto = protocol.isEmpty() ? QStringLiteral("tcp") : protocol;
@@ -70,7 +70,7 @@ QByteArray ContainerCreateRequest::toJson() const
         root.insert(QStringLiteral("Hostname"), hostname);
     }
 
-    // ExposedPorts：显式 EXPOSE 的端口 + 端口映射里的容器端口（Docker 会把后者也当成暴露）
+    // ExposedPorts: explicitly EXPOSEd ports plus mapped container ports (Docker exposes those too)
     QStringList exposed = exposedPorts;
     for (const ContainerPortRequest &port : ports) {
         const QString key = portKey(port.containerPort, port.protocol);
@@ -89,8 +89,8 @@ QByteArray ContainerCreateRequest::toJson() const
     /* ---------------- HostConfig ---------------- */
     QJsonObject hostConfig;
 
-    // 挂载：bind 与命名卷都走 Binds（`source:destination[:ro]`），语义与 docker CLI 一致。
-    // tmpfs 不能进 Binds（它不是路径映射），走 Tmpfs 映射。
+    // Mounts: bind and named volumes both go through Binds (`source:destination[:ro]`), same
+    // semantics as the docker CLI. tmpfs cannot go into Binds (it is no path mapping) and uses Tmpfs.
     QStringList binds;
     QJsonObject tmpfs;
     for (const ContainerMountRequest &mount : mounts) {
@@ -102,7 +102,7 @@ QByteArray ContainerCreateRequest::toJson() const
             continue;
         }
         if (mount.source.isEmpty()) {
-            continue; // 没有来源的 bind/volume 会被引擎拒绝，这里直接不发
+            continue; // the engine rejects a bind/volume without a source, so never send it
         }
         QString bind = mount.source + QLatin1Char(':') + mount.destination;
         if (mount.readOnly) {
@@ -121,7 +121,7 @@ QByteArray ContainerCreateRequest::toJson() const
         hostConfig.insert(QStringLiteral("Tmpfs"), tmpfs);
     }
 
-    // 端口映射：PortBindings 是 "容器端口/协议" → [{HostIp, HostPort}]
+    // Port mappings: PortBindings maps "containerPort/protocol" → [{HostIp, HostPort}]
     if (!ports.isEmpty()) {
         QJsonObject bindings;
         for (const ContainerPortRequest &port : ports) {
@@ -130,12 +130,13 @@ QByteArray ContainerCreateRequest::toJson() const
             }
             QJsonObject entry;
             entry.insert(QStringLiteral("HostIp"), port.hostIp);
-            // 0 表示随机分配：Docker 用空字符串表达"随机"
+            // 0 means random assignment: Docker expresses "random" as an empty string
             entry.insert(QStringLiteral("HostPort"), port.hostPort == 0 ? QString() : QString::number(port.hostPort));
             /*
-             * 同一个容器端口可以对应**多个宿主端口**（实测反馈：指定 1000/2000/3000 → 容器 80，
-             * 结果只有 1000 生效）。PortBindings 是"容器端口 → 绑定数组"，必须**追加**，
-             * 直接 insert 只会留下最后一行。
+             * One container port may map to **several host ports** (reported in testing: mapping
+             * 1000/2000/3000 to container 80 left only 1000 active). PortBindings is
+             * "container port → array of bindings", so entries must be **appended**; a plain insert
+             * would keep only the last one.
              */
             const QString key = portKey(port.containerPort, port.protocol);
             QJsonArray array = bindings.value(key).toArray();
@@ -159,13 +160,13 @@ QByteArray ContainerCreateRequest::toJson() const
         hostConfig.insert(QStringLiteral("Memory"), double(memoryLimitBytes));
     }
     if (cpus > 0.0) {
-        // Docker 用"十亿分之一核"的整数表达 CPU：1.5 核 = 1_500_000_000
+        // Docker expresses CPU in billionths of a core: 1.5 cores = 1_500_000_000
         hostConfig.insert(QStringLiteral("NanoCpus"), double(qint64(cpus * 1'000'000'000.0)));
     }
     if (privileged) {
         hostConfig.insert(QStringLiteral("Privileged"), true);
     }
-    // 交互能力在**顶层**（不属于 HostConfig）
+    // Interactivity lives at the **top level** (it is not part of HostConfig)
     if (openStdin) {
         root.insert(QStringLiteral("OpenStdin"), true);
     }
@@ -204,7 +205,7 @@ QByteArray ContainerCreateRequest::toJson() const
 QString ContainerCreateRequest::queryString() const
 {
     QUrlQuery query;
-    // name 是 query 参数（不是请求体）：这一点与"看起来像字段"的直觉相反，写在这里并有用例守着
+    // name is a query parameter, not part of the body — counter-intuitive, so a test guards it
     query.addQueryItem(QStringLiteral("name"), name);
     return query.toString(QUrl::FullyEncoded);
 }
@@ -215,7 +216,7 @@ QString validateContainerName(const QString &name)
     if (trimmed.isEmpty()) {
         return QStringLiteral("nameRequired");
     }
-    // Docker 的容器名规则（与网络/卷一致）
+    // Docker's container name rules (same as for networks/volumes)
     static const QRegularExpression allowed(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]*$"));
     if (!allowed.match(trimmed).hasMatch()) {
         return QStringLiteral("nameInvalid");
@@ -250,7 +251,7 @@ QString validateEnvironmentKey(const QString &key)
 
 QString validateHostPort(quint16 port)
 {
-    // 0 是"随机分配"，不是错误
+    // 0 means "random assignment", not an error
     Q_UNUSED(port);
     return {};
 }
@@ -260,7 +261,7 @@ QString validateMemoryLimit(qint64 bytes)
     if (bytes < 0) {
         return QStringLiteral("memoryNegative");
     }
-    // Docker 的最小内存限制是 6 MiB（低于它引擎会拒绝，提前挡住能省一次往返）
+    // Docker's minimum memory limit is 6 MiB (below it the engine refuses; catching it saves a trip)
     if (bytes > 0 && bytes < 6 * 1024 * 1024) {
         return QStringLiteral("memoryTooSmall");
     }

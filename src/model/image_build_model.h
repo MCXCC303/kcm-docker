@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,32 +14,32 @@ namespace Kontainer
 {
 
 /*!
- * 构建列表里的一条（ARCH_V5_V8 §5.3）。
+ * One entry in the build list (ARCH_V5_V8 §5.3).
  *
- * 与拉取同一个模式：构建也是"长时间、可并发、可取消、失败原因不能丢"的任务，
- * 因此不复用「一次操作一个结果」的通知通道。
+ * Same pattern as pull: builds are long-running, concurrent, cancellable, and must not lose the
+ * failure reason, so they never reuse the one-result-per-operation notification channel.
  */
 struct ImageBuildEntry {
     QString id;
-    /*! 上下文目录（再次构建时用）。 */
+    /*! Context directory (reused when building again). */
     QString contextDirectory;
-    /*! 标签（展示用；可能多个）。 */
+    /*! Tags (display only; may be several). */
     QStringList tags;
-    /*! building / succeeded / failed / cancelled。 */
+    /*! building / succeeded / failed / cancelled. */
     QString statusKey = QStringLiteral("building");
-    /*! 引擎状态原文（`Step 3/7 : RUN make`），按数据显示、不翻译。 */
+    /*! Raw engine status (`Step 3/7 : RUN make`), shown as data and never translated. */
     QString statusText;
-    /*! 由 `statusText` 解析出来的步骤信息。 */
+    /*! Step info parsed out of `statusText`. */
     int stepIndex = 0;
     int totalSteps = 0;
     QString stepCommand;
-    /*! 失败原因（含失败步骤的描述，引擎原文拼装）。 */
+    /*! Failure reason (includes the failing step, assembled from raw engine output). */
     QString detailText;
     QString errorKindKey;
-    /*! 0.0 ~ 1.0（按步骤数推算）；未知时 -1。 */
+    /*! 0.0 ~ 1.0 (derived from step counts); -1 when unknown. */
     double progress = -1.0;
     bool progressKnown = false;
-    /*! 成功后的镜像 id。 */
+    /*! Image id once the build succeeded. */
     QString imageId;
     bool active = true;
 
@@ -54,9 +54,10 @@ struct ImageBuildEntry {
 };
 
 /*!
- * 构建列表模型。
+ * Build list model.
  *
- * 与拉取列表一样：内容没变就不发信号（进度每来一行都会更新，但重复行不该打扰视图）。
+ * Like the pull list: emit nothing when the content is unchanged (progress updates on every line,
+ * but duplicate lines must not disturb the view).
  */
 class ImageBuildModel : public QAbstractListModel
 {
@@ -101,7 +102,7 @@ public:
     {
         return m_entries;
     }
-    /*! 按构建 id 找行号；不存在返回 -1（Q_INVOKABLE：QML 只能调用暴露出来的函数）。 */
+    /*! Row for a build id, -1 if absent (Q_INVOKABLE: QML can only call exposed functions). */
     Q_INVOKABLE int rowForBuildId(const QString &buildId) const;
 
 Q_SIGNALS:

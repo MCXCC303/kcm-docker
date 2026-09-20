@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,12 +15,12 @@ namespace Kontainer
 {
 
 /*!
- * `GET /version` 的 DTO。
+ * DTO for `GET /version`.
  *
- * ApiVersion / MinAPIVersion 是版本协商的唯一来源（Docker 29 的 /info 已不再返回
- * 这两个字段）。内核版本在 /version 中位于 Components[Name=Engine].Details 下。
+ * ApiVersion / MinAPIVersion are the only source for version negotiation (Docker 29's /info no
+ * longer returns them). The kernel version lives under Components[Name=Engine].Details.
  */
-/*! `/version` 的 `Components[]` 一项（Engine / containerd / runc / docker-init …）。 */
+/*! One `Components[]` entry of `/version` (Engine / containerd / runc / docker-init …). */
 struct DockerComponentDTO {
     QString name;
     QString version;
@@ -34,14 +34,14 @@ struct DockerVersionDTO {
     QString arch;
     QString kernelVersion;
     QString gitCommit;
-    /*! 引擎自报的组件表：dockerd 之外还有 containerd / runc / docker-init 等。 */
+    /*! Component table the engine reports: beyond dockerd, containerd / runc / docker-init etc. */
     QList<DockerComponentDTO> components;
 
     static std::optional<DockerVersionDTO> fromJson(const QJsonObject &object, QString *error = nullptr);
     static std::optional<DockerVersionDTO> fromPayload(const QByteArray &payload, QString *error = nullptr);
 };
 
-/*! `GET /info` 的 DTO：Engine 总体信息与容器/镜像计数。 */
+/*! DTO for `GET /info`: overall engine information plus container/image counts. */
 struct DockerInfoDTO {
     QString engineName;
     QString operatingSystem;
@@ -58,17 +58,17 @@ struct DockerInfoDTO {
     int images = 0;
     int cpus = 0;
     qint64 memoryTotalBytes = 0;
-    /*! `/info` 的 SecurityOptions（判断是否 rootless：含 `name=rootless`）。 */
+    /*! `/info` SecurityOptions (rootless check: contains `name=rootless`). */
     QStringList securityOptions;
-    /*! `/info` 的 DockerRootDir。 */
+    /*! `/info` DockerRootDir. */
     QString dockerRootDir;
-    /*! `/info` 的 LoggingDriver（六期日志功能据此判断能否读取）。 */
+    /*! `/info` LoggingDriver (the phase-6 log feature uses it to decide readability). */
     QString loggingDriver;
-    /*! `/info` 的 RegistryConfig.Mirrors（配置编辑的「已生效」对照）。 */
+    /*! `/info` RegistryConfig.Mirrors (the "in effect" reference for config editing). */
     QStringList registryMirrors;
-    /*! `/info` 的 Warnings（引擎自己报的配置问题）。 */
+    /*! `/info` Warnings (configuration problems the engine itself reports). */
     QStringList warnings;
-    /*! `/info` 的 LiveRestoreEnabled（重启 daemon 是否影响运行中容器）。 */
+    /*! `/info` LiveRestoreEnabled (whether a daemon restart disturbs running containers). */
     bool liveRestoreEnabled = false;
 
     static std::optional<DockerInfoDTO> fromJson(const QJsonObject &object, QString *error = nullptr);

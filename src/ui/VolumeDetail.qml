@@ -1,12 +1,13 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    数据卷详情（ARCH_V5_V8 §3.5）。
+    Volume details (ARCH_V5_V8 §3.5).
 
-    挂载点在这里比列表里更有用：可以复制、也可以在系统文件管理器中打开
-    （复用四期的宿主路径服务——这是唯一的非 Docker 外部动作）。
-    删除走确认对话框，且**不提供 force**：被容器使用时让引擎拒绝并说明原因。
+    The mount point is more useful here than in the list: it can be copied and opened in the
+    system file manager (reusing phase 4's host path service — the only non-Docker external action).
+    Removal goes through a confirmation dialog and has **no force option**: when the volume is in
+    use, let the engine refuse and explain why.
 */
 
 import QtQuick
@@ -37,7 +38,7 @@ Kirigami.Page {
             objectName: "removeVolumeAction"
             text: i18n("Remove volume…")
             icon.name: "edit-delete"
-            // 只读模式不出现；有操作在途时不可用
+            // Hidden in read-only mode; disabled while an operation is in flight
             visible: page.controller.valid && page.operations.writeAllowed
             enabled: !page.operations.isTargetBusy("volume:" + page.volumeName)
             onTriggered: removeVolumeDialog.open()
@@ -110,7 +111,7 @@ Kirigami.Page {
                     }
                 }
 
-                /* 挂载点：可复制，也可以在文件管理器中打开 */
+                /* Mount point: can be copied, and opened in the file manager */
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -131,7 +132,7 @@ Kirigami.Page {
                             text: i18n("Open host folder")
                             icon.name: "folder-open"
                             enabled: page.controller.mountpointUsable
-                            // 打开宿主目录是四期的宿主路径服务（唯一的非 Docker 外部动作）
+                            // Phase 4's host path service — the only non-Docker external action
                             onClicked: kcm.controller.openHostPath(page.controller.mountpoint)
                         }
 
@@ -149,9 +150,10 @@ Kirigami.Page {
 
                 Kirigami.FormLayout {
                     /*
-                     * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
-                     * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
-                     * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                     * Shrink to content and align left: Kirigami's FormLayout right-aligns the
+                     * `[label][field]` group, so at full width the block drifts into the right half
+                     * (observed in testing). Fields that need width (long commands) set
+                     * Layout.preferredWidth themselves.
                      */
                     Layout.fillWidth: false
                     Layout.alignment: Qt.AlignLeft
@@ -218,7 +220,7 @@ Kirigami.Page {
         objectName: "removeVolumeDialog"
         headingText: i18n("Remove volume")
         questionText: i18n("Remove the volume “%1”?", page.controller.name)
-        // 后果说明是必填：卷里的数据会一起消失
+        // The consequence text is required: the volume's data disappears with it
         consequenceText: page.controller.usageKnown && page.controller.inUse
             ? i18n("The volume and the data inside it are deleted. Containers that use it must be removed or disconnected first.")
             : i18n("The volume and the data inside it are deleted. This cannot be undone.")

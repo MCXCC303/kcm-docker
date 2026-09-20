@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,26 +14,26 @@ namespace Kontainer
 {
 
 /*!
- * 我们管理的三个 systemd unit（ARCH_V5_V8 §B1）。
+ * The three systemd units we manage (ARCH_V5_V8 §B1).
  *
- * **固定白名单**：界面只显示这三个，提权动作也只接受这三个（不接受任意 unit 名）。
- * `docker.socket` 提供 socket 激活，`docker.service` 是守护进程本体，
- * `containerd.service` 提供一部分底层能力（容器/镜像的部分查看）。
+ * A **fixed whitelist**: the UI shows only these and privileged actions accept only these (never
+ * arbitrary unit names). `docker.socket` provides socket activation, `docker.service` is the daemon
+ * itself, `containerd.service` backs part of the low-level capabilities (some container/image views).
  */
 QStringList managedServiceUnits();
 
-/*! 一个 unit 的状态快照。 */
+/*! Snapshot of one unit's state. */
 struct ServiceState {
-    /*! unit 名（`docker.service`）。 */
+    /*! Unit name (`docker.service`). */
     QString unit;
-    /*! systemd 的 `ActiveState`：active / inactive / failed / activating / deactivating。 */
+    /*! systemd's `ActiveState`: active / inactive / failed / activating / deactivating. */
     QString activeState;
-    /*! `UnitFileState`：enabled / disabled / static / masked。 */
+    /*! `UnitFileState`: enabled / disabled / static / masked. */
     QString unitFileState;
-    /*! `SubState`：running / dead / failed / listening …（按数据显示，不做翻译）。 */
+    /*! `SubState`: running / dead / failed / listening … (shown raw, never translated). */
     QString subState;
 
-    /*! 稳定 key（界面文案由 QML 决定）：`running` / `stopped` / `failed` / `starting` / `unknown`。 */
+    /*! Stable key (QML owns the wording): `running` / `stopped` / `failed` / `starting` / `unknown`. */
     QString stateKey() const;
     bool isActive() const
     {
@@ -43,7 +43,7 @@ struct ServiceState {
     {
         return unitFileState == QLatin1String("enabled");
     }
-    /*! 是否真的查到了（systemd 不在或 unit 不存在时为空）。 */
+    /*! Whether it was actually queried (empty when systemd or the unit is absent). */
     bool known() const
     {
         return !activeState.isEmpty();
@@ -57,30 +57,30 @@ struct ServiceState {
 };
 
 /*!
- * 服务状态来源。
+ * Service status source.
  *
- * 做成接口是为了：① 测试注入替身（不能假设测试机上有 systemd 或这三个 unit）；
- * ② 未来换成 systemd 之外的实现（例如容器里跑的时候）。
+ * An interface so that: (1) tests can inject a stand-in (test machines may lack systemd or these
+ * units), and (2) a non-systemd implementation can replace it later (e.g. in a container).
  */
 class ServiceStatusBackend : public QObject
 {
     Q_OBJECT
 
-    /*! 三个 unit 的状态（顺序同 `managedServiceUnits()`）。 */
+    /*! States of the three units (same order as `managedServiceUnits()`). */
     Q_PROPERTY(QVariantList services READ servicesVariant NOTIFY servicesChanged)
 
 public:
     explicit ServiceStatusBackend(QObject *parent = nullptr);
     ~ServiceStatusBackend() override;
 
-    /*! 查询一次（异步）：结果经 `servicesChanged` 通知。 */
+    /*! Query once (async): the result is announced via `servicesChanged`. */
     virtual void query() = 0;
     virtual QList<ServiceState> services() const = 0;
     QVariantList servicesVariant() const;
 
-    /*! 按 unit 名取状态 key（查不到给 `unknown`）。 */
+    /*! State key by unit name (`unknown` when not found). */
     Q_INVOKABLE QString stateKeyFor(const QString &unit) const;
-    /*! 该 unit 是否处于 active。 */
+    /*! Whether the unit is active. */
     Q_INVOKABLE bool isActive(const QString &unit) const;
 
 Q_SIGNALS:
@@ -88,9 +88,10 @@ Q_SIGNALS:
 };
 
 /*!
- * systemd 实现：通过 systemd 的 D-Bus 接口**只读**查询属性。
+ * systemd implementation: **read-only** property queries over systemd's D-Bus interface.
  *
- * 只读：这里不做任何 start/stop/enable/disable——那些动作走受限提权 helper（固定 unit + 固定动词）。
+ * Read-only on purpose: no start/stop/enable/disable here — those go through the restricted
+ * privileged helper (fixed units + fixed verbs).
  */
 class SystemdServiceStatus : public ServiceStatusBackend
 {

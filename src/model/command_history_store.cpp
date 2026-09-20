@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -61,7 +61,7 @@ void CommandHistoryStore::record(const QString &command)
     if (trimmed.isEmpty()) {
         return;
     }
-    // 重复的提到最前（"最近用过"比"第一次用过"更有用）
+    // Duplicates move to the front ("recently used" beats "first used")
     const int existing = m_local.indexOf(trimmed);
     if (existing == 0) {
         return;
@@ -121,7 +121,7 @@ void CommandHistoryStore::load()
     if (raw.isEmpty()) {
         return;
     }
-    // JSON 数组：命令是多行文本，用 QStringList 存会被换行拆散
+    // JSON array: commands are multi-line, a QStringList would split them on newlines
     const QJsonArray array = QJsonDocument::fromJson(raw.toUtf8()).array();
     for (const QJsonValue &value : array) {
         const QString command = value.toString();

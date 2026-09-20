@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -102,9 +102,9 @@ const QList<Volume> &VolumeModel::volumes() const
 void VolumeModel::setVolumes(const QList<Volume> &volumes)
 {
     /*
-     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
-     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
-     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     * Incremental sync, not a full reset: `beginResetModel()` ran unconditionally and a
+     * reset always scrolls a ListView to the top, which users saw as the list jumping back
+     * after start/stop or returning from detail; now only row/order changes move the view.
      */
     const bool touched = syncRows(
         m_volumes,
@@ -125,7 +125,7 @@ void VolumeModel::clear()
     if (m_volumes.isEmpty()) {
         return;
     }
-    // 走增量路径（逐行删除）：清空时也不整表重置，视图位置因此不会被拉回顶部
+    // Take the incremental path (row-by-row removal): clearing skips the full reset that scrolls to top
     const bool touched = syncRows(m_volumes,
                                   QList<Volume>(),
                                   [](const Volume &entry) {
@@ -163,7 +163,7 @@ QStringList VolumeModel::unusedNames() const
 {
     QStringList result;
     for (const Volume &volume : m_volumes) {
-        // 只有**确定**没被使用才算"可清理"：引用数未知时不能猜（prune 会真的删数据）
+        // Only **definitely** unused volumes are prunable: never guess on unknown refs (prune deletes data)
         if (volume.usageKnown() && !volume.isInUse()) {
             result.append(volume.name);
         }

@@ -1,16 +1,20 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    容器日志控制台（ARCH_V5_V8 §3.1.3）。
+    Container log console (ARCH_V5_V8 §3.1.3).
 
-    刻意用**单块只读等宽 TextArea**，不是"每行一个 delegate 的 ListView"：
+    Deliberately a **single read-only monospace TextArea**, not a "ListView with one
+    delegate per line":
 
-      - 日志是高频追加场景，逐行 delegate 会不断创建/销毁条目并触发布局重排 ——
-        这正是三期段错误（ARCH_V3 附录 A.1d/A.1g）的诱因形状；
-      - 控制台语义本来就是"一整块文本 + 滚动"，选择复制的行为也最标准。
+      - logs append at high frequency, and per-line delegates keep creating/destroying
+        items and triggering relayout — the shape that induced the phase-3 segfault
+        (ARCH_V3 appendix A.1d/A.1g);
+      - console semantics are "one block of text + scrolling", and select-to-copy then
+        behaves most conventionally.
 
-    代价是必须有双上限（由 `ContainerLogController` 守住，这里只显示"已省略 N 行"）。
+    The price is double caps (enforced by `ContainerLogController`; this file only shows
+    "N lines omitted").
 */
 
 import QtQuick
@@ -23,22 +27,22 @@ import "." as Local
 import ".." as Components
 
 ColumnLayout {
-    // 注意不要把 id 取成 `console`：那会遮蔽 JS 的全局 console（QML 直接报错）
+    // Do not name the id `console`: it shadows the JS global console (QML errors out immediately)
     id: logConsole
 
-    /*! `ContainerLogController`（容器详情的 logs 控制器）。 */
+    /*! `ContainerLogController` (the logs controller of the container detail page). */
     required property var logs
 
     objectName: "logConsole"
     spacing: Kirigami.Units.smallSpacing
 
-    /*! 是否跟随末尾（用户往上翻或手动暂停时应当停止跟随）。 */
+    /*! Whether to follow the tail (scrolling up or pausing manually should stop it). */
     property bool followTail: true
 
     readonly property bool empty: logConsole.logs.lineCount === 0
     readonly property bool paused: logConsole.logs.paused
 
-    /*! 状态 key → 文案（C++ 只给 key）。 */
+    /*! State key → text (C++ supplies only the key). */
     function stateText(): string {
         switch (logConsole.logs.stateKey) {
         case "connecting":
@@ -56,7 +60,7 @@ ColumnLayout {
         }
     }
 
-    /*! 失败原因 key → 文案（含"日志驱动不支持读取"这种必须给替代做法的情形）。 */
+    /*! Failure key → text (e.g. "driver cannot be read", which must offer an alternative). */
     function failureText(): string {
         switch (logConsole.logs.errorKey) {
         case "containerGone":
@@ -83,7 +87,7 @@ ColumnLayout {
     Connections {
         target: logConsole.logs
 
-        // 有新内容就跟着滚（暂停时不追加、也就不滚动）
+        // Scroll along with new content (pausing appends nothing, so nothing scrolls)
         function onAppended() {
             if (logConsole.followTail) {
                 Qt.callLater(logConsole.scrollToEnd);
@@ -91,7 +95,7 @@ ColumnLayout {
         }
     }
 
-    /* ---------------- 动作条 ---------------- */
+    /* ---------------- Action bar ---------------- */
     RowLayout {
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
@@ -161,7 +165,7 @@ ColumnLayout {
         }
     }
 
-    /* ---------------- 失败提示（含替代做法） ---------------- */
+    /* ---------------- Failure message (with an alternative) ---------------- */
     Kirigami.InlineMessage {
         objectName: "logErrorMessage"
         Layout.fillWidth: true
@@ -172,7 +176,7 @@ ColumnLayout {
             : logConsole.failureText()
     }
 
-    /* ---------------- 控制台本体 ---------------- */
+    /* ---------------- The console itself ---------------- */
     Kirigami.Separator {
         Layout.fillWidth: true
     }
@@ -183,22 +187,22 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
         clip: true
-        // 不换行：控制台语义（一行长文本靠横向滚动看），也避免换行使行数失控。
-        // 注意**不要**把 contentWidth 绑到 availableWidth：Vertical/HorizontalScrollBar 的可见性
-        // 又反过来影响 availableWidth，会形成绑定环（tst_kcm_widget_churn 抓到了这个）
+        // No wrapping: console semantics (long lines scroll sideways) and wrapping grows the line count.
+        // Do **not** bind contentWidth to availableWidth: the Vertical/HorizontalScrollBar
+        // visibility in turn affects availableWidth, forming a loop (caught by tst_kcm_widget_churn)
 
         QQC2.TextArea {
             id: logArea
 
             objectName: "logTextArea"
-            // 文本由控制器按上限裁剪，这里只负责显示
+            // The controller trims the text to the caps; this only displays it
             text: logConsole.logs.text
             readOnly: true
             selectByMouse: true
             wrapMode: TextEdit.NoWrap
             font.family: "monospace"
             font.pointSize: Kirigami.Theme.smallFont.pointSize
-            // 只读文本不该抢焦点，但必须可以被选中复制
+            // Read-only text should not steal focus but must stay selectable for copying
             activeFocusOnPress: false
 
             Accessible.name: i18n("Container log output")
@@ -218,7 +222,7 @@ ColumnLayout {
             : i18n("This container has not written anything to stdout or stderr yet.")
     }
 
-    // 上面那个占位在"还没连接"时也要说明状态；这里补一条不可见时的提示
+    // The placeholder above must also state "not connected yet"; this adds a hint while it is hidden
     QQC2.Label {
         objectName: "logIdleHint"
         Layout.fillWidth: true

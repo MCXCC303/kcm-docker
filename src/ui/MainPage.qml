@@ -1,14 +1,14 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Kontainer 首页（ARCH_V2 §5 / ARCH_V3 §2）：Engine 状态 + Overview + Storage + 容器/镜像列表。
+    Kontainer home page (ARCH_V2 §5 / ARCH_V3 §2): engine status + overview + storage + container/image lists.
 
-    由 main.qml 放进 StackView 作为根页面；卡片激活时发出信号，由 main.qml 负责导航。
+    main.qml pushes it into a StackView as the root page; cards emit signals and main.qml navigates.
 
-    ARCH_V3 §2.1：本文件不做任何状态语义判断——
-    状态语义（positive/neutral/negative）与图标名全部来自 C++（StatusController / Presentation），
-    这里只负责排版与文案。
+    ARCH_V3 §2.1: this file makes no state-semantics decisions — semantic keys
+    (positive/neutral/negative) and icon names all come from C++ (StatusController / Presentation);
+    only layout and wording live here.
 */
 
 import QtQuick
@@ -38,30 +38,30 @@ Kirigami.Page {
     readonly property var networkList: controller.networkList
     readonly property var volumeList: controller.volumeList
 
-    /*! 卡片被激活：由 main.qml 接到导航上（ARCH_V2 §43：导航属于 KCM 层） */
+    /*! Card activated: main.qml wires it to navigation (ARCH_V2 §43: navigation is a KCM-layer concern) */
     signal containerActivated(string containerId)
-    /*! 端口页请求打开某个容器的详情（容器是那一页的"跳转"目标）。 */
+    /*! The ports page asks to open a container detail page (containers are its "jump" targets). */
     signal portContainerActivated(string containerId)
-    /*! 请求打开「运行时配置」页（daemon.json）；scope = user | system。 */
+    /*! Open the runtime configuration page (daemon.json); scope = user | system. */
     signal configureRuntimeRequested(string scope)
-    /*! 打开仓库认证页（ARCH_V5_V8 §2.7）：镜像标签页工具栏与失败引导都用它。 */
+    /*! Open the registry auth page (ARCH_V5_V8 §2.7): used by the Images toolbar and failure hints. */
     signal registryAuthRequested(string serverAddress)
     signal imageActivated(string imageId)
-    /*! 打开网络详情（六期 §3.2）；由 main.qml 负责导航。 */
+    /*! Open network detail (phase 6 §3.2); main.qml handles navigation. */
     signal networkActivated(string networkId)
-    /*! 构建镜像的内联表单是否展开（八期 §5.4）。 */
+    /*! Whether the inline build-image form is open (phase 8 §5.4). */
     property bool buildPanelOpen: false
 
-    /*! 打开数据卷详情（六期 §3.5）。 */
+    /*! Open volume detail (phase 6 §3.5). */
     signal volumeActivated(string volumeName)
-    /*! 打开创建容器向导（七期 §4.4）；presetImage 为空表示从零开始。 */
+    /*! Open the create-container wizard (phase 7 §4.4); an empty presetImage starts from scratch. */
     signal createContainerRequested(string presetImage)
 
-    /*! 数据卷页的内联面板（创建 / 清理）。 */
+    /*! Inline panels on the volumes tab (create / prune). */
     property bool volumeCreatePanelOpen: false
     property bool volumePrunePanelOpen: false
 
-    /*! 可回收空间文案：只统计**已知**大小，并且明说还有几个卷的大小未知。 */
+    /*! Reclaimable-space text: counts **known** sizes only and says how many volumes have unknown size. */
     function pruneReclaimableText(): string {
         const model = root.controller.volumeModel;
         const known = model.knownUnusedSize();
@@ -76,7 +76,7 @@ Kirigami.Page {
         return text;
     }
 
-    /*! Overview 统计块（纯展示层聚合；semanticKey 为空表示该项没有状态语义） */
+    /*! Overview tiles (view-layer aggregation only; an empty semanticKey means no state semantics) */
     readonly property var tiles: [
         {
             label: i18n("Containers"),
@@ -112,13 +112,13 @@ Kirigami.Page {
 
     readonly property bool countsReady: controller.engine.countsAvailable
 
-    /*! 写操作控制器（ARCH_V4 §2.2.4）：卡片按钮与结果提示都从这里读。 */
+    /*! Write-operation controller (ARCH_V4 §2.2.4): card buttons and result messages read from it. */
     readonly property var operations: root.controller.operations
 
     /*
-     * 连接状态文案（B1）：不能只看引擎数据——docker.service 停掉时 socket 仍在，
-     * 旧实现照样显示"已连接"，用户点任何操作却都会失败。
-     * 因此这里读 controller.connectionKey（服务状态 + 最近一次刷新结果都纳入判定）。
+     * Connection text (B1): engine data alone is not enough — with docker.service stopped the socket
+     * still exists, so the old implementation showed "Connected" while every action failed. Hence
+     * controller.connectionKey, which also weighs service state and the last refresh result.
      */
     function connectionText(key: string): string {
         switch (key) {
@@ -133,7 +133,7 @@ Kirigami.Page {
         }
     }
 
-    /*! 连接状态是否应当用警示色（服务未运行、或未连接）。 */
+    /*! Whether the connection state deserves a warning color (service down, or not connected). */
     function connectionNeedsAttention(key: string): bool {
         return key !== "connected";
     }
@@ -152,20 +152,20 @@ Kirigami.Page {
     }
 
     /* ------------------------------------------------------------------ */
-    /* 端口页（下一期 M3）的辅助                                            */
+    /* Helpers for the ports page (M3)                                    */
     /* ------------------------------------------------------------------ */
     /*!
-     * 调试用起始标签页（默认 0 = 容器）。
+     * Debug start tab (0 = containers).
      *
-     * 由宿主注入（`kcmshell6` 侧读 `KCM_DOCKER_START_TAB`）：只是为了"打开就能看到某一页"
-     * 以便截图复核 / 排查，默认行为完全不变。
+     * Injected by the host (the `kcmshell6` side reads `KCM_DOCKER_START_TAB`) purely so a given page
+     * opens for screenshot review or debugging; default behavior is unchanged.
      */
     property int startTab: 0
 
-    /*! 端口页的视图模式：`list`（默认）或 `map`（区间地图）。 */
+    /*! Ports page view mode: `list` (default) or `map` (range map). */
     property string portViewMode: "list"
 
-    /*! "声明了但没发布"的行数（由控制器算好；QML 不碰模型枚举）。 */
+    /*! "Declared but not published" row count (computed in the controller; QML never scans the model). */
     readonly property int portsDeclaredCount: root.controller.declaredNotPublishedCount
 
     function openContainerFromPorts(containerId, containerName): void {
@@ -176,7 +176,7 @@ Kirigami.Page {
     }
 
     /* ------------------------------------------------------------------ */
-    /* 空状态（§33：四种情况必须区分；判定逻辑在页面，呈现交给组件）           */
+    /* Empty states (§33: four cases must stay distinct; logic here, rendering in the component) */
     /* ------------------------------------------------------------------ */
 
     readonly property var containersEmptyState: {
@@ -214,7 +214,8 @@ Kirigami.Page {
         if (root.controller.images.count === 0) {
             return {
                 message: i18n("No images found."),
-                // 权限允许时给出真正能解决问题的动作（ARCH_V3_pre §1.3：空状态可以带一个操作按钮）
+                // Offer a genuinely useful action when writes are allowed
+                // (ARCH_V3_pre §1.3: empty states may carry an action button)
                 actionText: root.operations.writeAllowed ? i18n("Pull an image") : ""
             };
         }
@@ -231,13 +232,14 @@ Kirigami.Page {
     }
 
     /*!
-        清空当前标签页的搜索与过滤条件。
+        Clear the current tab's search and filter.
 
-        注意：用户一旦在输入框里打过字，TextField.text 的声明式绑定就会被内部赋值打断
-        （这是 QQC2 的行为，不是本页的 bug），因此这里必须同时显式清空输入框与下拉框。
+        Once the user has typed, the declarative TextField.text binding is broken by internal
+        assignment (QQC2 behavior, not a bug here), so the field and the combo box must both be
+        cleared explicitly.
     */
     /*!
-        空状态里的引导动作：镜像列表为空时是「拉取一个镜像」，其余情况是清空条件。
+        Empty-state guidance action: pull an image when the image list is empty, otherwise clear filters.
     */
     function handleEmptyAction() {
         if (tabBar.currentIndex === 1 && root.controller.images.count === 0 && root.operations.writeAllowed) {
@@ -264,7 +266,7 @@ Kirigami.Page {
         spacing: Kirigami.Units.smallSpacing
 
         /* ------------------------------------------------------------------ */
-        /* 页头：连接状态 + Last Updated + 失败/stale（§15/§16/§34）             */
+        /* Header: connection state + Last Updated + failure/stale (§15/§16/§34) */
         /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
@@ -302,7 +304,7 @@ Kirigami.Page {
                 font: Kirigami.Theme.smallFont
             }
             QQC2.Label {
-                // 关闭自动刷新后不给提示的话，用户会以为界面卡住了
+                // Without this hint, switching auto-refresh off makes users think the UI froze
                 visible: !root.controller.autoRefreshEnabled
                 text: i18n("Auto-refresh is off")
                 color: Components.StatusPalette.color("neutral")
@@ -314,7 +316,7 @@ Kirigami.Page {
             }
 
             QQC2.BusyIndicator {
-                // 后台刷新只显示轻量指示，不清空已有内容（§34）
+                // Background refreshes show only a light indicator and keep existing content (§34)
                 running: root.controller.busy
                 visible: running
                 implicitHeight: Kirigami.Units.iconSizes.small
@@ -330,10 +332,10 @@ Kirigami.Page {
         }
 
         /* ------------------------------------------------------------------ */
-        /* 整页错误（只有高频数据集全部失败才会到这里，§30）                     */
+        /* Whole-page error (reached only when every high-frequency dataset failed, §30) */
         /* ------------------------------------------------------------------ */
         /* ------------------------------------------------------------------ */
-        /* 写权限门（ARCH_V4 §2.2.3）：不可写时写入口整体消失，这里说明原因     */
+        /* Write-permission gate (ARCH_V4 §2.2.3): read-only hides all write entries; this says why */
         /* ------------------------------------------------------------------ */
         Kirigami.InlineMessage {
             objectName: "writeAccessBanner"
@@ -343,7 +345,7 @@ Kirigami.Page {
             text: root.operations.writeAccessText
         }
 
-        /* 操作结果（成功 / 失败 / 取消）的唯一呈现位置之一 */
+        /* One of the places operation results (success / failure / cancel) are shown */
         Components.OperationMessage {
             Layout.fillWidth: true
             operations: root.operations
@@ -364,10 +366,10 @@ Kirigami.Page {
         }
 
         /* ------------------------------------------------------------------ */
-        /* Overview（统计块 + Storage）                                        */
+        /* Overview (tiles + storage) */
         /*                                                                     */
-        /* 概览区在窗口较矮时不能把列表挤没：给它一个上限高度并允许内部滚动，   */
-        /* 列表始终保留最小高度（§19 响应窄窗口 / 小尺寸 KCM 窗口）。           */
+        /* In a short window the overview must not squeeze the lists away: cap its height and let it  */
+        /* scroll internally, so the lists keep a minimum height (§19: narrow / small KCM windows).   */
         /* ------------------------------------------------------------------ */
         QQC2.ScrollView {
             id: overviewScroll
@@ -385,8 +387,8 @@ Kirigami.Page {
                 width: overviewScroll.availableWidth
                 spacing: Kirigami.Units.smallSpacing
 
-                /* 统计卡按窗口宽度重排（§1.2）：宽 5 列 / 中 3 列 / 窄 2 列。
-                   断点用 gridUnit 表达，不写裸像素。 */
+                /* Tiles reflow with window width (§1.2): 5 columns wide / 3 medium / 2 narrow.
+                   Breakpoints are expressed in gridUnit, never raw pixels. */
                 GridLayout {
                     id: tileGrid
 
@@ -406,11 +408,11 @@ Kirigami.Page {
                         return 2;
                     }
 
-                    /*  model 必须是**稳定的数值**：root.tiles 是每次数据变化都会重新求值的
-                        JS 数组，直接当 model 会让 Repeater 在每次刷新时销毁并重建全部
-                        统计块。这类「布局正在算尺寸时条目被销毁」的情况会让 Qt 的布局
-                        引擎在 polish 阶段访问已析构的条目（实测在 kcmshell6 的
-                        QQuickWidget 宿主下会段错误），因此这里按索引取值。 */
+                    /*  model must be a **stable number**: root.tiles is a JS array re-evaluated on every
+                        data change, and using it directly makes Repeater destroy and rebuild all tiles
+                        on each refresh. That "items destroyed while the layout is computing sizes"
+                        pattern makes Qt's layout engine touch a destructed item during polish
+                        (segfaults under the kcmshell6 QQuickWidget host), hence indexing here. */
                     Repeater {
                         model: root.tiles.length
 
@@ -433,7 +435,7 @@ Kirigami.Page {
                 StorageView {
                     Layout.fillWidth: true
                     controller: root.controller
-                    // 看到「数据卷」占用后想看看是哪些：跳到数据卷页（索引 3）
+                    // Volume usage invites a follow-up: which ones? Jump to the volumes tab (index 3)
                     onSegmentActivated: function (entryKey) {
                         if (entryKey === "volumes") {
                             tabBar.currentIndex = 3;
@@ -444,22 +446,22 @@ Kirigami.Page {
         }
 
         /* ------------------------------------------------------------------ */
-        /* 标签页                                                             */
+        /* Tabs                                                               */
         /* ------------------------------------------------------------------ */
         QQC2.TabBar {
             id: tabBar
             objectName: "tabBar"
             Layout.fillWidth: true
 
-            // 网络与数据卷都是低频数据：只在切到对应页面时刷新，不加入 5 秒轮询。
-            // 索引：0 容器 / 1 镜像 / 2 网络 / 3 数据卷 / 4 端口 / 5 挂载预设 / 6 引擎
+            // Networks and volumes are low-frequency: refreshed on tab entry only, never on the 5 s poll.
+            // Indexes: 0 containers / 1 images / 2 networks / 3 volumes / 4 ports / 5 presets / 6 engine
             onCurrentIndexChanged: {
                 if (tabBar.currentIndex === 2) {
                     root.controller.refreshNetworks();
                 } else if (tabBar.currentIndex === 3) {
                     root.controller.refreshVolumes();
                 } else if (tabBar.currentIndex === 4) {
-                    // 端口页：刷新容器列表 + 为运行中的容器各拉一次 inspect（要它们的"声明"）
+                    // Ports page: refresh containers and inspect each running one (for its "declared" ports)
                     root.controller.refreshPorts();
                 }
             }
@@ -477,7 +479,8 @@ Kirigami.Page {
                 text: i18ncp("@title:tab volume list", "Volumes (%1)", "Volumes (%1)", root.controller.volumeModel.count)
             }
             QQC2.TabButton {
-                // 用户要求：这里显示**运行中**的端口数（不是所有声明），且不随筛选变化
+                // User requirement: show the **running** port count (not all declared ones),
+                // unaffected by the filter
                 text: i18ncp("@title:tab host port list", "Ports (%1)", "Ports (%1)", root.controller.inUsePortCount)
             }
             QQC2.TabButton {
@@ -493,11 +496,11 @@ Kirigami.Page {
         }
 
         /* ------------------------------------------------------------------ */
-        /* 工具栏：搜索 / 过滤 / 排序（§9/§10）                                 */
+        /* Toolbar: search / filter / sort (§9/§10)                           */
         /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
-            // 容器/镜像共用的搜索过滤行：网络页与引擎页各有自己的工具栏（索引见 tabBar）
+            // Shared search/filter row for containers and images: other tabs have their own (see tabBar)
             visible: tabBar.currentIndex === 0 || tabBar.currentIndex === 1
             spacing: Kirigami.Units.smallSpacing
 
@@ -506,7 +509,7 @@ Kirigami.Page {
 
                 Layout.fillWidth: true
                 placeholderText: tabBar.currentIndex === 0 ? i18n("Search containers (name, image, ID)…") : i18n("Search images (repository, tag, ID)…")
-                // 条件保存在 proxy 里：后台刷新不会重置（§32）
+                // Conditions live in the proxy, so background refreshes do not reset them (§32)
                 text: tabBar.currentIndex === 0 ? root.containerList.searchText : root.imageList.searchText
                 onTextEdited: {
                     if (tabBar.currentIndex === 0) {
@@ -621,7 +624,7 @@ Kirigami.Page {
                 onModelChanged: currentIndex = indexOfValue(tabBar.currentIndex === 0 ? root.containerList.sortKey : root.imageList.sortKey)
             }
 
-            // 构建镜像（八期 §5.4）：只读模式不出现入口
+            // Build image (phase 8 §5.4): no entry point in read-only mode
             QQC2.Button {
                 objectName: "buildImageEntryButton"
                 visible: tabBar.currentIndex === 1 && root.operations.writeAllowed
@@ -630,21 +633,21 @@ Kirigami.Page {
                 onClicked: root.buildPanelOpen = !root.buildPanelOpen
             }
 
-            // 创建容器（七期 §4.4）：只读模式不出现入口
+            // Create container (phase 7 §4.4): no entry point in read-only mode
             QQC2.Button {
                 objectName: "createContainerEntryButton"
                 visible: tabBar.currentIndex === 0 && root.operations.writeAllowed
                 text: i18n("Create container…")
                 icon.name: "list-add"
                 onClicked: {
-                    // 创建容器要用网络列表：低频数据是"进页才刷新"的，
-                    // 因此这里主动刷一次，否则用户不点"网络"标签页就选不到网络（实测反馈 ②）
+                    // Creating a container needs the network list, which refreshes only on tab entry,
+                    // so fetch it here — otherwise no network is selectable until that tab is opened
                     root.controller.refreshNetworks();
                     root.createContainerRequested("");
                 }
             }
 
-            // 仓库登录（ARCH_V5_V8 §2.7）：私有仓库拉取前先登录
+            // Registry login (ARCH_V5_V8 §2.7): log in before pulling from a private registry
             QQC2.Button {
                 objectName: "registryAuthEntryButton"
                 visible: tabBar.currentIndex === 1
@@ -653,8 +656,8 @@ Kirigami.Page {
                 onClicked: root.registryAuthRequested("")
             }
 
-            // 拉取镜像（ARCH_V4 §2.4）：唯一会新增镜像的入口。
-            // 权限门不允许写时按钮整体不出现，而不是禁用后静默。
+            // Pull image (ARCH_V4 §2.4): the only entry point that adds images.
+            // Without write permission the button disappears entirely instead of greying out silently.
             QQC2.Button {
                 objectName: "pullImageEntryButton"
                 visible: tabBar.currentIndex === 1 && root.operations.writeAllowed
@@ -670,7 +673,7 @@ Kirigami.Page {
         }
 
         /* ------------------------------------------------------------------ */
-        /* 内容区                                                             */
+        /* Content area                                                       */
         /* ------------------------------------------------------------------ */
         StackLayout {
             Layout.fillWidth: true
@@ -678,7 +681,7 @@ Kirigami.Page {
             Layout.minimumHeight: Kirigami.Units.gridUnit * 8
             currentIndex: tabBar.currentIndex
 
-            /* ---------------------------- 容器 ---------------------------- */
+            /* ---------------------------- Containers ---------------------------- */
             ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing
 
@@ -707,23 +710,25 @@ Kirigami.Page {
                     Layout.fillHeight: true
                     visible: root.containersEmptyState.message.length === 0
                     clip: true
-                    // 后台刷新时保留旧数据与滚动位置（§32/§34）
+                    // Keep old data and the scroll position during background refreshes (§32/§34)
                     property real savedContentY: 0
                     model: root.containerList
                     spacing: Kirigami.Units.smallSpacing / 2
-                    // 键盘导航（§38）
+                    // Keyboard navigation (§38)
                     keyNavigationEnabled: true
                     activeFocusOnTab: true
 
                     QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
 
                     /*
-                     * 兜底：模型**真的**重置时把滚动位置恢复回去。
+                     * Fallback: restore the scroll position when the model is **really** reset.
                      *
-                     * 注意这不是主要手段：模型已经不因"值变化"重置了（见 model/keyed_list_model.h，
-                     * 那正是"刷新被拉回顶部"的根因），而且重置后立刻恢复 contentY 会被夹到新的
-                     * 内容高度上——新 delegate 还没布局完时它就是 0，所以兜底救不回来。
-                     * 这里保留它只是为了万一有别的来源触发重置时不至于毫无保护。
+                     * Not the main mechanism — the model no longer resets on value changes (see
+                     * model/keyed_list_model.h, which was the root cause of "refresh jumps back to the
+                     * top"), and restoring contentY right after a reset clamps to the new content
+                     * height, which is 0 until the new delegates are laid out, so the fallback cannot
+                     * rescue it either. It stays only so that a reset from some other source is not
+                     * completely unprotected.
                      */
                     Connections {
                         target: containerView.model
@@ -743,7 +748,7 @@ Kirigami.Page {
                 }
             }
 
-            /* ---------------------------- 镜像 ---------------------------- */
+            /* ---------------------------- Images ---------------------------- */
             ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing
 
@@ -754,7 +759,8 @@ Kirigami.Page {
                     text: i18n("Unable to retrieve the image list: %1", root.controller.imagesError)
                 }
 
-                /* 拉取进度（可并发、后台继续、失败保留原因，ARCH_V4 §2.4） */
+                /* Pull progress: concurrent, continues in the background, failures keep their reason
+                   (ARCH_V4 §2.4) */
                 Components.BuildImagePanel {
                     id: buildPanel
 
@@ -771,7 +777,8 @@ Kirigami.Page {
                 Components.PullProgressList {
                     Layout.fillWidth: true
                     operations: root.operations
-                    // 401/403 的失败：直接把人带到对应仓库的登录框，而不是让他自己找入口
+                    // 401/403 failures go straight to that registry's login dialog
+                    // instead of leaving the user to find the entry point
                     onLoginRequested: function (reference) {
                         root.registryAuthRequested(root.controller.registryAuth.serverAddressForImage(reference));
                     }
@@ -820,7 +827,7 @@ Kirigami.Page {
                 }
             }
 
-            /* ---------------------------- 网络 ---------------------------- */
+            /* ---------------------------- Networks ---------------------------- */
             ColumnLayout {
                 id: networksTab
 
@@ -836,7 +843,7 @@ Kirigami.Page {
                     text: i18n("Unable to retrieve the network list: %1", root.controller.networksError)
                 }
 
-                /* 搜索 / 过滤 / 排序：与容器、镜像列表同一套交互 */
+                /* Search / filter / sort: the same interaction as the container and image lists */
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
@@ -849,7 +856,7 @@ Kirigami.Page {
                         onTextChanged: root.networkList.searchText = text
                     }
 
-                    // 创建网络（六期 §3.3）：只读模式不出现入口，而不是禁用后静默
+                    // Create network (phase 6 §3.3): hidden in read-only mode rather than silently disabled
                     QQC2.Button {
                         objectName: "createNetworkEntryButton"
                         visible: root.operations.writeAllowed
@@ -936,7 +943,7 @@ Kirigami.Page {
                 }
             }
 
-            /* ---------------------------- 数据卷 --------------------------- */
+            /* ---------------------------- Volumes --------------------------- */
             ColumnLayout {
                 id: volumesTab
 
@@ -995,7 +1002,7 @@ Kirigami.Page {
                         Component.onCompleted: currentIndex = indexOfValue(root.volumeList.sortKey)
                     }
 
-                    // 创建卷（只读模式不出现）
+                    // Create volume (hidden in read-only mode)
                     QQC2.Button {
                         objectName: "createVolumeEntryButton"
                         visible: root.operations.writeAllowed
@@ -1004,21 +1011,23 @@ Kirigami.Page {
                         onClicked: root.volumeCreatePanelOpen = !root.volumeCreatePanelOpen
                     }
 
-                    // 清理未使用（先列出将被删除的卷，再确认）
+                    // Prune unused (list the volumes to be deleted first, then confirm)
                     QQC2.Button {
                         objectName: "pruneVolumesEntryButton"
                         visible: root.operations.writeAllowed
                         text: i18n("Clean up unused…")
                         icon.name: "edit-clear"
-                        // 先读一次 count 建立依赖：QML 不追踪函数调用，否则模型填充后
-                        // 这个 enabled 会停留在初始值（按钮一直是灰的）
+                        // Read count once to establish the dependency: QML does not track function calls,
+                        // so otherwise `enabled` would stay at its initial value after the model fills
+                        // (button greyed out forever)
                         enabled: root.controller.volumeModel.count >= 0
                             && root.controller.volumeModel.unusedNames().length > 0
                         onClicked: root.volumePrunePanelOpen = !root.volumePrunePanelOpen
                     }
                 }
 
-                /* 创建卷：内联面板（理由同"连接网络"：弹层内容在离屏时序下不可靠） */
+                /* Create volume: inline panel (as with "create network",
+                   popup content is unreliable in offscreen runs) */
                 ColumnLayout {
                     objectName: "volumeCreatePanel"
                     Layout.fillWidth: true
@@ -1069,7 +1078,8 @@ Kirigami.Page {
                     }
                 }
 
-                /* 清理未使用：**先列出将被删除的卷**与可回收空间，再让用户确认 */
+                /* Prune unused: **list the volumes that will be deleted** and the reclaimable space,
+                   then ask for confirmation */
                 ColumnLayout {
                     objectName: "volumePrunePanel"
                     Layout.fillWidth: true
@@ -1136,7 +1146,7 @@ Kirigami.Page {
                     message: root.volumeList.count === 0 && root.controller.volumeModel.count > 0
                         ? i18n("No volume matches the current search or filter.")
                         : root.controller.volumeModel.count === 0 ? i18n("No volumes found.") : ""
-                    // 空状态只给"没有数据"这一句；"数据卷是干什么的"属于文档，不占界面
+                    // The empty state says only "no data"; what volumes are for belongs in documentation
                     explanationText: root.volumeList.count === 0 && root.controller.volumeModel.count > 0
                         ? i18n("Clear the search field or switch the filter back to “All volumes”.")
                         : ""
@@ -1171,8 +1181,8 @@ Kirigami.Page {
                 }
             }
 
-            /* ---------------------------- 端口（下一期 M3） ---------------------------- */
-            /* 用户要求：端口是第一视觉焦点，容器只是其中一列 */
+            /* ---------------------------- Ports (M3) ---------------------------- */
+            /* User requirement: ports are the primary visual focus; a container is just one column */
             ColumnLayout {
                 id: portsTab
 
@@ -1183,7 +1193,7 @@ Kirigami.Page {
                 Kirigami.InlineMessage {
                     objectName: "portsDeclaredHint"
                     Layout.fillWidth: true
-                    // 只在真的有"声明了但没发布"的行时说明一次（减少冗余小字）
+                    // Only explained when such rows really exist (keeps redundant small print down)
                     visible: root.portsDeclaredCount > 0
                     type: Kirigami.MessageType.Warning
                     text: i18ncp("@info", "%1 port is declared by a running container but was not actually published.",
@@ -1211,7 +1221,7 @@ Kirigami.Page {
                             {text: i18n("All ports"), value: "all"},
                             {text: i18n("In use"), value: "inUse"},
                             {text: i18n("Not bound"), value: "declaredNotPublished"},
-                            // 这一项同时包含"未启动"和"被占用"（用户要求改这个名字）
+                            // Covers both "not started" and "taken" (name requested by the user)
                             {text: i18n("Not started / taken"), value: "reserved"}
                         ]
                         onActivated: root.controller.hostPortList.stateFilter = currentValue
@@ -1232,7 +1242,7 @@ Kirigami.Page {
 
                     QQC2.ComboBox {
                         objectName: "portSortCombo"
-                        // 地图是按端口位置铺开的，没有"排序"这回事：只对列表视图显示
+                        // The map lays out by port position, so sorting does not apply: list view only
                         visible: root.portViewMode === "list"
                         textRole: "text"
                         valueRole: "value"
@@ -1277,8 +1287,8 @@ Kirigami.Page {
                 }
             }
 
-            /* ------------------------ 挂载预设（七期 §4.2） ------------------------ */
-            /* 用户实测反馈：在创建向导里管理预设不方便，因此独立成标签页 */
+            /* ------------------------ Mount presets (phase 7 §4.2) ------------------------ */
+            /* User report: managing presets inside the wizard was awkward, so they became their own tab */
             ColumnLayout {
                 id: presetsTab
 
@@ -1354,8 +1364,8 @@ Kirigami.Page {
     Components.PullImageDialog {
         id: pullDialog
         operations: root.operations
-        // 该仓库已有凭据（或引用还没填）：不提示"需要登录"；
-        // 没有凭据时才给出「去登录…」引导
+        // Credentials already exist for this registry (or the reference is still empty): do not
+        // suggest "login needed"; offer "Go to login…" only when there are none
         credentialKnown: pullDialog.referenceInput.serverAddress === ""
             || root.controller.registryAuth.hasCredentialForImage(pullDialog.referenceInput.text)
         onPullRequested: function (reference) {

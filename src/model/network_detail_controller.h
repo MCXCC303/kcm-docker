@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,20 +16,21 @@ namespace Kontainer
 {
 
 /*!
- * 网络详情页的控制器（ARCH_V5_V8 §3.2）。
+ * Controller for the network detail page (ARCH_V5_V8 §3.2).
  *
- * 数据直接来自后端已经拿到的网络列表（`/networks` 返回的就是完整对象，§3.2 实测），
- * 因此详情页**不再单独发请求**：选中的网络变了就重新取一份快照。
+ * Data comes straight from the network list the backend already has (`/networks` returns full
+ * objects, §3.2 measured), so the detail page **sends no request of its own**: it only takes a
+ * fresh snapshot when the selection changes.
  *
- * 与容器/镜像详情一样，只读信息拆成三个 `DetailListModel`：
- * 成员容器、标签、驱动选项——QML 只负责排版。
+ * As with container/image detail, read-only information is split into three `DetailListModel`s —
+ * member containers, labels, driver options — and QML only lays them out.
  */
 class NetworkDetailController : public QObject
 {
     Q_OBJECT
 
     Q_PROPERTY(QString networkId READ networkId NOTIFY changed)
-    /*! 选中的网络是否还在（列表里被删掉/刷新掉了就是 false，界面据此收起详情）。 */
+    /*! Whether the selected network still exists (false once a refresh drops it); the UI hides the detail. */
     Q_PROPERTY(bool valid READ valid NOTIFY changed)
 
     Q_PROPERTY(QString name READ name NOTIFY changed)
@@ -45,11 +46,11 @@ class NetworkDetailController : public QObject
     Q_PROPERTY(bool ingress READ ingress NOTIFY changed)
     Q_PROPERTY(int memberCount READ memberCount NOTIFY changed)
 
-    /*! 成员容器（label = 名称，value = IPv4，detail = MAC）。 */
+    /*! Member containers (label = name, value = IPv4, detail = MAC). */
     Q_PROPERTY(Kontainer::DetailListModel *members READ members CONSTANT)
-    /*! 标签（label = key，value = value）。 */
+    /*! Labels (label = key, value = value). */
     Q_PROPERTY(Kontainer::DetailListModel *labels READ labels CONSTANT)
-    /*! 驱动选项（label = key，value = value）。 */
+    /*! Driver options (label = key, value = value). */
     Q_PROPERTY(Kontainer::DetailListModel *options READ options CONSTANT)
 
 public:
@@ -75,15 +76,15 @@ public:
     DetailListModel *options() const;
 
     /*!
-     * 选中一个网络（空 id = 什么都不选）。
+     * Select a network (empty id selects nothing).
      *
-     * 必须是 `Q_INVOKABLE`：QML 侧从 `onCompleted` 调用它（普通成员函数在 QML 里
-     * 不是函数，会抛 `TypeError: ... is not a function`——这一点由 tst_qml_load 守着）。
+     * Must be `Q_INVOKABLE`: QML calls it from `onCompleted`, and a plain member function is not a
+     * function there — it throws `TypeError: ... is not a function`, which tst_qml_load guards.
      */
     Q_INVOKABLE void setNetworkId(const QString &id);
 
 Q_SIGNALS:
-    /*! 选中的网络或它的内容发生变化（网络列表刷新后也会发）。 */
+    /*! The selected network or its content changed (also emitted after a network list refresh). */
     void changed();
 
 private:

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -32,7 +32,7 @@ void JsonLineReader::consumeLine(const QByteArray &line, QList<QJsonObject> &out
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(candidate, &parseError);
     if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        // 单行看不懂不影响整条流：只计数（不记内容，流里可能含镜像名等用户数据）
+        // One bad line must not break the stream: count it, never log content (it may hold user data)
         ++m_malformedLines;
         return;
     }
@@ -57,7 +57,7 @@ QList<QJsonObject> JsonLineReader::takeCompleteLines()
 
         const int newline = m_buffer.indexOf('\n');
         if (newline < 0) {
-            // 没有换行：要么是半行，要么是一行超长数据（防御性丢弃）
+            // No newline: either a partial line or one oversized line (dropped defensively)
             if (m_buffer.size() > kMaxLineBytes) {
                 m_buffer.clear();
                 m_droppingOversizedLine = true;

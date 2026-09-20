@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,12 +13,12 @@ namespace Kontainer
 {
 
 /*!
- * 错误分级的呈现分类（ARCH_V4 §2.2.2）。
+ * Presentation categories for error severity (ARCH_V4 §2.2.2).
  *
- * 三类的 UI 处理不同，不允许混成同一个红色报错条：
- *  - UserActionable：用户自己能解决（权限、状态冲突、目标已消失）→ 警告 + 引导动作
- *  - Environment：环境问题（引擎没跑、连不上、超时、5xx、版本不匹配）→ 错误
- *  - Unexpected：响应非法或结构不符 → 错误 + 建议附带诊断信息
+ * The three classes need different UI treatment and must not collapse into one red error bar:
+ *  - UserActionable: the user can fix it (permissions, state conflict, object gone) -> warning + action
+ *  - Environment: engine not running, unreachable, timed out, 5xx, version mismatch -> error
+ *  - Unexpected: invalid or malformed response -> error plus a hint to attach diagnostics
  */
 enum class ErrorCategory {
     None,
@@ -27,12 +27,12 @@ enum class ErrorCategory {
     Unexpected,
 };
 
-/*! DockerError → 用户可见文案（ARCH_V1 §6.3：backend 不负责 UI 文本）。 */
+/*! DockerError -> user-visible text (ARCH_V1 §6.3: the backend does not own UI strings). */
 QString dockerErrorText(const DockerError &error);
 
-/*! 分级：QML 用它决定 InlineMessage 的类型，不自己判断 Kind。 */
+/*! Category: QML uses it to pick the InlineMessage type instead of inspecting Kind itself. */
 ErrorCategory dockerErrorCategory(const DockerError &error);
-/*! 分级的稳定 key：none / userActionable / environment / unexpected。 */
+/*! Stable category key: none / userActionable / environment / unexpected. */
 QString dockerErrorCategoryKey(ErrorCategory category);
 inline QString dockerErrorCategoryKey(const DockerError &error)
 {
@@ -40,8 +40,8 @@ inline QString dockerErrorCategoryKey(const DockerError &error)
 }
 
 /*!
- * 可选的引导动作 key（QML 映射到具体按钮）：
- * 空字符串表示没有可执行动作；`refresh` 表示「刷新」。
+ * Optional action key (QML maps it to a concrete button):
+ * an empty string means no action; `refresh` means refresh.
  */
 QString dockerErrorActionKey(const DockerError &error);
 

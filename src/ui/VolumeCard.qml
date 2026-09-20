@@ -1,11 +1,11 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    数据卷卡片（ARCH_V5_V8 §3.5）：整张卡片可点击进入卷详情。
+    Volume card (ARCH_V5_V8 §3.5): the whole card is clickable and opens the volume details.
 
-    占用与引用数可能是**未知**（引擎没扫）：未知显示「—」而不是 0——
-    "0 字节"和"不知道"在"能不能安全清理"这件事上是完全不同的答案。
+    Size and reference count may be **unknown** (the engine has not scanned): unknown shows "—",
+    not 0 — "0 bytes" and "no idea" are completely different answers for safe cleanup.
 */
 
 import QtQuick
@@ -44,7 +44,7 @@ QQC2.ItemDelegate {
 
         Kirigami.Icon {
             source: "drive-harddisk"
-            // 使用情况未知时不着色（未知不是错误，也不是"空闲"）
+            // No color when usage is unknown (unknown is neither an error nor "idle")
             color: card.usageKnown && !card.refCount ? Components.StatusPalette.color("neutral") : Kirigami.Theme.textColor
             implicitWidth: Kirigami.Units.iconSizes.smallMedium
             implicitHeight: Kirigami.Units.iconSizes.smallMedium
@@ -110,7 +110,7 @@ QQC2.ItemDelegate {
 
                 QQC2.Label {
                     objectName: "volumeSizeLabel"
-                    // 未知显示 —（不是 0）
+                    // Unknown shows — (not 0)
                     text: card.sizeKnown ? Kontainer.Format.byteSize(card.sizeBytes) : i18n("—")
                     opacity: 0.8
                 }

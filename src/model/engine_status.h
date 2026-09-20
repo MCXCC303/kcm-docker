@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,8 +17,8 @@ namespace Kontainer
 {
 
 /*!
- * Engine 状态的 presentation model：把 EngineInfo 转为 QML 可绑定的属性。
- * 只做数据承载，不含任何 Docker 访问逻辑。
+ * Presentation model for engine status: exposes EngineInfo as QML-bindable properties.
+ * Data only; contains no Docker access logic.
  */
 class EngineStatus : public QObject
 {
@@ -33,29 +33,29 @@ class EngineStatus : public QObject
     Q_PROPERTY(QString architecture READ architecture NOTIFY changed)
     Q_PROPERTY(QString kernelVersion READ kernelVersion NOTIFY changed)
     Q_PROPERTY(QString engineName READ engineName NOTIFY changed)
-    /*! 是否 rootless 部署（`/info` 的 SecurityOptions 含 `name=rootless`）。 */
+    /*! Whether this is a rootless deployment (`/info` SecurityOptions contains `name=rootless`). */
     Q_PROPERTY(bool rootless READ rootless NOTIFY changed)
-    /*! `/info` 的 DockerRootDir。 */
+    /*! `/info`'s DockerRootDir. */
     Q_PROPERTY(QString dockerRootDir READ dockerRootDir NOTIFY changed)
-    /*! `/info` 的 LoggingDriver（六期日志功能据此判断能否读取）。 */
+    /*! `/info`'s LoggingDriver (phase-six logs use it to decide whether reading is possible). */
     Q_PROPERTY(QString loggingDriver READ loggingDriver NOTIFY changed)
-    /*! `/info` 报告的镜像加速器（配置编辑的「已生效」对照）。 */
+    /*! Registry mirrors reported by `/info` (the "currently in effect" baseline for config edits). */
     Q_PROPERTY(QStringList activeRegistryMirrors READ activeRegistryMirrors NOTIFY changed)
-    /*! LiveRestore 是否开启（决定重启 daemon 会不会停掉运行中的容器）。 */
+    /*! Whether LiveRestore is on (decides if a daemon restart kills running containers). */
     Q_PROPERTY(bool liveRestoreEnabled READ liveRestoreEnabled NOTIFY changed)
     Q_PROPERTY(QString operatingSystem READ operatingSystem NOTIFY changed)
     Q_PROPERTY(QString cgroupVersion READ cgroupVersion NOTIFY changed)
-    /*! `/info` 的 CgroupDriver（`systemd` / `cgroupfs`）。 */
+    /*! `/info`'s CgroupDriver (`systemd` / `cgroupfs`). */
     Q_PROPERTY(QString cgroupDriver READ cgroupDriver NOTIFY changed)
-    /*! `/info` 的 NCPU。 */
+    /*! `/info`'s NCPU. */
     Q_PROPERTY(int cpuCount READ cpuCount NOTIFY changed)
     /*!
-     * `/version` 的组件表：`[{name, version}]`（dockerd / containerd / runc / docker-init …）。
+     * `/version` component table: `[{name, version}]` (dockerd / containerd / runc / docker-init …).
      *
-     * 是**属性**而不是函数：QML 里函数调用不建立依赖（本项目反复踩过）。
+     * A **property**, not a function: in QML function calls build no dependency (hit repeatedly here).
      */
     Q_PROPERTY(QVariantList components READ components NOTIFY changed)
-    /*! `/info` 的 Warnings：引擎自己报的配置问题（例如 swap 限制、bridge 未启用）。 */
+    /*! `/info` Warnings: configuration problems the engine reports (e.g. swap limit, bridge disabled). */
     Q_PROPERTY(QStringList warnings READ warnings NOTIFY changed)
     Q_PROPERTY(QString storageDriver READ storageDriver NOTIFY changed)
     Q_PROPERTY(int containerTotal READ containerTotal NOTIFY changed)
@@ -68,7 +68,7 @@ public:
     explicit EngineStatus(QObject *parent = nullptr);
 
     void setInfo(const EngineInfo &info);
-    /*! 清空（Docker 不可用时调用），保证 UI 不展示过期数据。 */
+    /*! Clear (called when Docker is unavailable) so the UI never shows stale data. */
     void clear();
 
     const EngineInfo &info() const
@@ -188,7 +188,7 @@ public:
     }
 
 Q_SIGNALS:
-    /*! 任一属性变化；QML 绑定会自动重新求值。 */
+    /*! Any property changed; QML bindings re-evaluate automatically. */
     void changed();
 
 private:

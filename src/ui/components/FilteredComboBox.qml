@@ -1,19 +1,21 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    可搜索的下拉选择（ARCH_V5_V8 §F3）。
+    Searchable dropdown (ARCH_V5_V8 §F3).
 
-    用户实测："镜像选择、挂载预设选择建议做成下拉菜单选择（考虑到部分用户镜像版本众多）"。
-    纯 `QQC2.ComboBox` 没有内置搜索，而自定义弹层在离屏测试里不可靠（本项目已经踩过两次），
-    因此这里做成**搜索框 + 下拉**的组合：
+    User feedback: "image and mount-preset selection should be dropdowns (some users have
+    many image versions)". Plain `QQC2.ComboBox` has no built-in search, and custom popups
+    proved unreliable in offscreen tests (hit twice in this project), so this combines a
+    **search field + dropdown**:
 
-        - 搜索框在上：输入即过滤（不区分大小写，匹配 `textRole` 字段）
-        - 下拉在下：只列出过滤后的条目；选中后 `selected(entry)` 把**整条数据**交回调用方
-        - entries 必须是**属性**（不是函数调用）：函数调用不建立依赖，列表不会跟着更新
-          （这个坑在日志、网络、数据卷、预设上各踩过一次）
+        - search field on top: filters as you type (case-insensitive, matches `textRole`)
+        - dropdown below: lists only the filtered entries; on selection `selected(entry)` hands
+          the **whole entry** back to the caller
+        - entries must be a **property** (not a function call): a function call creates no
+          dependency and the list never updates (hit once each in logs, networks, volumes, presets)
 
-    用法：
+    Usage:
 
         Components.FilteredComboBox {
             entries: page.controller.availableImages
@@ -31,22 +33,22 @@ import org.kde.kirigami as Kirigami
 ColumnLayout {
     id: root
 
-    /*! 完整条目列表（`[{...}]`，必须是属性）。 */
+    /*! Full entry list (`[{...}]`, must be a property). */
     required property var entries
-    /*! 用来显示的字段名，也用于搜索匹配。 */
+    /*! Field name used for display and search matching. */
     property string textRole: "text"
-    /*! 搜索框的占位文案。 */
+    /*! Search field placeholder. */
     property string searchPlaceholder: i18n("Search…")
-    /*! 下拉框没选中时的占位文案。 */
+    /*! Placeholder while the dropdown has no selection. */
     property string placeholder: i18n("Choose…")
 
-    /*! 选中一条（交回整条数据，调用方自己取需要的字段）。 */
+    /*! One entry selected (the whole entry is returned; the caller picks its fields). */
     signal selected(var entry)
 
     objectName: "filteredComboBox"
     spacing: Kirigami.Units.smallSpacing / 2
 
-    /*! 过滤后的条目（搜索为空时是全部）。 */
+    /*! Filtered entries (all of them while the search is empty). */
     readonly property var filteredEntries: {
         const needle = searchField.text.trim().toLowerCase();
         if (needle.length === 0) {
@@ -69,7 +71,7 @@ ColumnLayout {
         Layout.fillWidth: true
         placeholderText: root.searchPlaceholder
         Accessible.name: root.searchPlaceholder
-        // 清空搜索：让用户能一键回到完整列表
+        // Clear search: one click back to the full list
         rightPadding: Kirigami.Units.gridUnit * 2
         onTextChanged: combo.currentIndex = -1
 
@@ -104,7 +106,7 @@ ColumnLayout {
     QQC2.Label {
         objectName: "filteredComboBoxEmpty"
         Layout.fillWidth: true
-        // 只在**搜索没匹配上**时提示；列表本来就是空的（例如还没有命令历史）不必多说一句
+        // Hint only when the **search** matches nothing; an inherently empty list needs no note
         visible: root.filteredEntries.length === 0 && searchField.text.trim().length > 0
         text: i18n("Nothing matches the search.")
         font: Kirigami.Theme.smallFont

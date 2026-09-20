@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,19 +20,19 @@ namespace Kontainer
 {
 
 /*!
- * KWallet 后端（ARCH_V5_V8 §2.6）：凭据的唯一持久化位置。
+ * KWallet backend (ARCH_V5_V8 §2.6): the only persistent credential store.
  *
- * 为什么是"钱包 + 专用文件夹"而不是 `~/.docker/config.json`：
- * 后者是明文 base64（等价于明文密码），而且 Docker CLI 会重写它；
- * 钱包条目则受会话解锁保护，且不会因为用户跑一次 `docker login` 就被覆盖。
+ * Why a wallet folder and not `~/.docker/config.json`: the latter is plain base64
+ * (a plaintext password) and is rewritten by the Docker CLI; wallet entries are
+ * protected by the session unlock and survive a `docker login`.
  *
- * 条目布局：钱包 `kdewallet` 的 `Kontainer` 文件夹，键 = 规范化后的仓库地址，
- * 值 = `CredentialStore::encodeEntry()` 的 JSON。**读的时候也只看这个文件夹**，
- * 不去翻别的应用的条目。
+ * Layout: folder `Kontainer` in wallet `kdewallet`; key = normalized registry host,
+ * value = JSON from `CredentialStore::encodeEntry()`. Reads only ever look in that
+ * folder, never at other applications' entries.
  *
- * 生命周期：`open()` 是异步的（钱包可能要求用户解锁）。未打开时 `isAvailable()`
- * 为 false，`CredentialStore` 会停在 `Unavailable` 并让界面说明原因——
- * 钱包不可用是正常路径，不是崩溃路径。
+ * `open()` is asynchronous (the wallet may prompt to unlock); while unopened,
+ * `isAvailable()` is false, `CredentialStore` stays `Unavailable` and the UI explains
+ * why -- an unavailable wallet is a normal path, not a crash path.
  */
 class KWalletBackend : public QObject, public CredentialBackend
 {
@@ -52,18 +52,18 @@ public:
 
     QString unavailableReason() const override;
 
-    /*! 钱包名（默认用网络钱包，与 KDE 其他应用一致）。 */
+    /*! Wallet name (the network wallet, like other KDE apps). */
     static QString walletName();
-    /*! 专用文件夹名。 */
+    /*! Dedicated folder name. */
     static QString folderName();
 
 private:
     bool useFolder() const;
 
     std::unique_ptr<KWallet::Wallet> m_wallet;
-    /*! 打开失败/不可用的原因 key（界面据此给文案）。 */
+    /*! Reason key for open failure/unavailability (the UI picks its text). */
     QString m_unavailableReason;
-    /*! 正在等待 walletOpened() 的回调（钱包是异步的）。 */
+    /*! Callback waiting for walletOpened() (the wallet is asynchronous). */
     std::function<void(bool)> m_pendingOpen;
 };
 

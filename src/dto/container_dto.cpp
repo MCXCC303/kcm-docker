@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -38,13 +38,13 @@ std::optional<DockerContainerDTO> DockerContainerDTO::fromJson(const QJsonObject
         return std::nullopt;
     }
 
-    // Names 允许缺失（§41 宽容解析）：此时用短 ID 兜底，宁可显示得少一点，
-    // 也不能因为一个可选字段丢失就整条记录不显示
+    // Names may be absent (§41 lenient parsing): fall back to the short ID rather than dropping
+    // the whole record because one optional field is gone
     const QStringList names = stringListValue(object, QStringLiteral("Names"));
     if (names.isEmpty()) {
         dto.name = dto.id.left(12);
     } else {
-        // Docker 返回的容器名带有前导 '/'，在此处去掉，domain model 保持干净
+        // Docker returns container names with a leading '/'; strip it to keep the domain model clean
         dto.name = names.first();
         if (dto.name.startsWith(QLatin1Char('/'))) {
             dto.name.remove(0, 1);
@@ -61,8 +61,8 @@ std::optional<DockerContainerDTO> DockerContainerDTO::fromJson(const QJsonObject
         dto.healthStatus = stringValue(health.toObject(), QStringLiteral("Status"));
     }
 
-    // 网络成员：容器列表里就有 `NetworkSettings.Networks`，与 inspect 的载荷形状一致，
-    // 因此复用同一个解析器（不要写第二份）
+    // Network membership: the list payload already carries `NetworkSettings.Networks` in the same
+    // shape as inspect, so reuse the same parser instead of writing a second one
     dto.networks = parseNetworks(object.value(QStringLiteral("NetworkSettings")).toObject());
 
     const QJsonValue ports = object.value(QStringLiteral("Ports"));
@@ -71,12 +71,12 @@ std::optional<DockerContainerDTO> DockerContainerDTO::fromJson(const QJsonObject
         dto.ports.reserve(array.size());
         for (const QJsonValue &entry : array) {
             if (!entry.isObject()) {
-                continue; // 未知/损坏的端口条目直接忽略
+                continue; // ignore unknown/broken port entries
             }
             const QJsonObject portObject = entry.toObject();
             DockerPortDTO port;
             port.ip = stringValue(portObject, QStringLiteral("IP"));
-            // 端口号必须落在 quint16 范围内：超范围的值直接丢弃，避免回绕成错误端口
+            // Port numbers must fit quint16: out-of-range values are dropped, never wrapped
             const auto clampPort = [](qint64 value) -> quint16 {
                 return (value > 0 && value <= 65535) ? static_cast<quint16>(value) : 0;
             };

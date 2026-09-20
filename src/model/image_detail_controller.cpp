@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -168,15 +168,15 @@ void ImageDetailController::rebuildLists()
 
 void ImageDetailController::rebuildUsedBy()
 {
-    // 只读关联：从容器列表里筛出使用该镜像的容器（§52）
+    // read-only association: pick the containers using this image out of the container list (§52)
     QList<DetailEntry> used;
     const QList<Container> containers = m_backend->containers();
     for (const Container &container : containers) {
         if (container.imageId != m_detail.id) {
             continue;
         }
-        // 第 5 个字段是状态 key（图标用），第 6 个是跳转目标（容器 id）——
-        // 镜像的"关联容器"列表要能点击打开容器详情（实测反馈）
+        // field 5 is the state key (for the icon), field 6 the navigation target (container id):
+        // the image's "used by" list must open the container detail on click (observed in practice)
         used.append({container.name,
                      containerStateText(container.state),
                      container.shortId(),

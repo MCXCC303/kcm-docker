@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,19 +16,19 @@ namespace Kontainer
 {
 
 /*!
- * 数据卷详情页的控制器（ARCH_V5_V8 §3.5）。
+ * Controller for the volume detail page (ARCH_V5_V8 §3.5).
  *
- * 数据直接来自后端已经拿到的卷列表（`/volumes` 返回的就是完整对象），
- * 因此详情页**不再单独发请求**：选中的卷变了或列表刷新了就重新取一份快照。
+ * Data comes from the volume list the backend already holds (full objects), so the
+ * detail page sends **no extra request**: it re-snapshots on selection or list change.
  *
- * 只读信息拆成两个 `DetailListModel`：标签与驱动选项。
+ * Read-only info is split into two `DetailListModel`s: labels and driver options.
  */
 class VolumeDetailController : public QObject
 {
     Q_OBJECT
 
     Q_PROPERTY(QString volumeName READ volumeName NOTIFY changed)
-    /*! 选中的卷是否还在（被删掉/刷新掉就是 false，界面据此收起详情）。 */
+    /*! Whether the selected volume still exists (false after delete/refresh; UI hides the detail). */
     Q_PROPERTY(bool valid READ valid NOTIFY changed)
 
     Q_PROPERTY(QString name READ name NOTIFY changed)
@@ -36,14 +36,14 @@ class VolumeDetailController : public QObject
     Q_PROPERTY(QString mountpoint READ mountpoint NOTIFY changed)
     Q_PROPERTY(QDateTime created READ created NOTIFY changed)
     Q_PROPERTY(QString scope READ scope NOTIFY changed)
-    /*! 占用字节；-1 = 未知（界面显示"—"）。 */
+    /*! Bytes used; -1 = unknown (UI shows "--"). */
     Q_PROPERTY(qint64 sizeBytes READ sizeBytes NOTIFY changed)
     Q_PROPERTY(bool sizeKnown READ sizeKnown NOTIFY changed)
     Q_PROPERTY(int refCount READ refCount NOTIFY changed)
     Q_PROPERTY(bool usageKnown READ usageKnown NOTIFY changed)
     Q_PROPERTY(bool inUse READ inUse NOTIFY changed)
     Q_PROPERTY(QString status READ status NOTIFY changed)
-    /*! 挂载点是否可用于"在文件管理器中打开"（空的挂载点没有可打开的位置）。 */
+    /*! Whether the mountpoint can be opened in the file manager (an empty one cannot). */
     Q_PROPERTY(bool mountpointUsable READ mountpointUsable NOTIFY changed)
 
     Q_PROPERTY(Kontainer::DetailListModel *labels READ labels CONSTANT)
@@ -70,7 +70,7 @@ public:
     DetailListModel *labels() const;
     DetailListModel *options() const;
 
-    /*! 选中一个数据卷（空名字 = 什么都不选）。 */
+    /*! Select a volume (an empty name clears the selection). */
     Q_INVOKABLE void selectVolume(const QString &name);
 
 Q_SIGNALS:

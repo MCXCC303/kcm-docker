@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,8 +13,8 @@
 #include <QString>
 #include <QStringList>
 
-// moc 需要完整类型才能为指针属性生成元类型代码；这里只给 moc 看，
-// 使用方（.cpp）自己 include，避免头文件把模型实现拖进来
+// moc needs the complete type to generate metatype code for the pointer property; this include is
+// for moc only — users (.cpp) include it themselves so the model implementation is not dragged in
 Q_MOC_INCLUDE("model/registry_credential_model.h")
 
 namespace Kontainer
@@ -23,43 +23,47 @@ namespace Kontainer
 class RegistryCredentialModel;
 
 /*!
- * 仓库认证的界面控制器（ARCH_V5_V8 §2.6/§2.7）。
+ * UI controller for registry authentication (ARCH_V5_V8 §2.6/§2.7).
  *
- * 规则集中在这里，QML 只负责显示与收集输入：
+ * The rules live here; QML only displays and collects input:
  *
- *  - **先校验后保存**：登录必须经过 `POST /auth` 成功才写入钱包（写进去的都是"验过的"）；
- *    校验失败不落盘，也不会把密码留在任何地方；
- *  - **钱包不可用只降级、不回退**：不写明文、不假装成功，界面据 `walletUnavailableReason` 说明原因；
- *  - **CLI 导入只读且不覆盖**：扫描与导入都交给 `DockerCliAuthImporter`，这里只做状态与汇报；
- *  - **密码/令牌不出控制器**：`login()` 收进去、`POST /auth` 用完就丢，模型与信号里都没有它。
+ *  - **validate before saving**: a login reaches the wallet only after `POST /auth` succeeds
+ *    (everything stored has been verified); a failed check stores nothing and keeps the password
+ *    nowhere;
+ *  - **an unavailable wallet only degrades, never falls back**: no plain-text write, no pretending
+ *    success; the UI explains the cause from `walletUnavailableReason`;
+ *  - **CLI import is read-only and never overwrites**: scanning and importing belong to
+ *    `DockerCliAuthImporter`, this class only tracks state and reports;
+ *  - **the password/token never leaves this controller**: `login()` takes it, `POST /auth` consumes
+ *    it, and it appears in no model or signal.
  *
- * 用户可见文案不在 C++ 里：这里只给稳定的 key（`invalidCredentials` / `registryUnreachable`…），
- * 由 QML 侧映射（ARCH_V3 §2.6）。
+ * User-visible text is not in C++: this returns stable keys only (`invalidCredentials` /
+ * `registryUnreachable`…) which QML maps (ARCH_V3 §2.6).
  */
 class RegistryAuthController : public QObject
 {
     Q_OBJECT
 
     Q_PROPERTY(Kontainer::RegistryCredentialModel *credentials READ credentials CONSTANT)
-    /*! 钱包状态：`closed` / `opening` / `ready` / `unavailable`。 */
+    /*! Wallet state: `closed` / `opening` / `ready` / `unavailable`. */
     Q_PROPERTY(QString walletStateKey READ walletStateKey NOTIFY changed)
-    /*! 不可用原因 key：`walletDisabled` / `walletOpenFailed` / `walletFolderFailed`。 */
+    /*! Unavailable-reason key: `walletDisabled` / `walletOpenFailed` / `walletFolderFailed`. */
     Q_PROPERTY(QString walletUnavailableReason READ walletUnavailableReason NOTIFY changed)
     Q_PROPERTY(bool busy READ busy NOTIFY changed)
-    /*! 最近一次动作的结果 key（成功为空则看 lastErrorKey）。 */
+    /*! Result key of the last action (empty on success — look at lastErrorKey then). */
     Q_PROPERTY(QString lastResultKey READ lastResultKey NOTIFY resultChanged)
     Q_PROPERTY(QString lastErrorKey READ lastErrorKey NOTIFY resultChanged)
-    /*! 引擎原文，仅用于"技术细节"（可能含仓库返回的文本），不做用户文案。 */
+    /*! Raw engine text for "technical details" only (may contain registry text); never user wording. */
     Q_PROPERTY(QString lastErrorDetail READ lastErrorDetail NOTIFY resultChanged)
 
-    /* ---------------- docker CLI 导入（只读扫描 + 逐条导入） ---------------- */
+    /* ---------------- docker CLI import (read-only scan + per-entry import) ---------------- */
     Q_PROPERTY(bool cliConfigPresent READ cliConfigPresent NOTIFY importScanChanged)
     Q_PROPERTY(QString cliConfigPath READ cliConfigPath NOTIFY importScanChanged)
-    /*! CLI 里存在、钱包里还没有的仓库（可勾选导入）。 */
+    /*! Registries present in the CLI but not yet in the wallet (selectable for import). */
     Q_PROPERTY(QStringList importableAddresses READ importableAddresses NOTIFY importScanChanged)
-    /*! 由 credsStore/credHelpers 管理的条目：我们**不执行**外部凭据程序，只如实说明。 */
+    /*! Entries managed by credsStore/credHelpers: we **never run** external credential programs. */
     Q_PROPERTY(QStringList helperManagedKeys READ helperManagedKeys NOTIFY importScanChanged)
-    /*! 读到但用不上的条目（缺 auth、内容坏掉、与别的条目指向同一仓库）。 */
+    /*! Entries read but unusable (missing auth, corrupt, or pointing at the same registry as another). */
     Q_PROPERTY(QStringList skippedImportKeys READ skippedImportKeys NOTIFY importScanChanged)
     Q_PROPERTY(int lastImportedCount READ lastImportedCount NOTIFY resultChanged)
     Q_PROPERTY(int lastAlreadyPresentCount READ lastAlreadyPresentCount NOTIFY resultChanged)
@@ -85,54 +89,55 @@ public:
     int lastAlreadyPresentCount() const;
     int lastImportFailedCount() const;
 
-    /*! 打开钱包、刷新列表、只读扫描 CLI 配置（页面进入时调用，幂等）。 */
+    /*! Open the wallet, refresh the list, scan the CLI config read-only (on page entry, idempotent). */
     Q_INVOKABLE void refresh();
     /*!
-     * 登录：先 `POST /auth` 校验，成功才写入钱包。
+     * Log in: validate with `POST /auth` first and write to the wallet only on success.
      *
-     * `token` 非空时按令牌登录（不再发送用户名密码）。
+     * A non-empty `token` logs in by token (no username or password is sent).
      */
     Q_INVOKABLE void login(const QString &serverAddress, const QString &username, const QString &password, const QString &token = {});
-    /*! 用已保存的凭据测试连接（不修改任何东西）。 */
+    /*! Test the connection with stored credentials (changes nothing). */
     Q_INVOKABLE void testCredential(const QString &serverAddress);
-    /*! 移除凭据（界面负责二次确认）。 */
+    /*! Remove a credential (the UI asks for confirmation). */
     Q_INVOKABLE void removeCredential(const QString &serverAddress);
-    /*! 重新只读扫描 CLI 配置（内部使用；界面不再有"同步"动作）。 */
+    /*! Rescan the CLI config read-only (internal; the UI no longer has a "sync" action). */
     void scanCliConfig();
-    /*! 清掉最近一次结果（关闭提示条时用）。 */
+    /*! Clear the last result (used when the notice bar is dismissed). */
     Q_INVOKABLE void clearResult();
     /*!
-     * 该镜像所在的仓库是否已有凭据（拉取前提示用）。
+     * Whether credentials exist for the registry of this image (for the pre-pull hint).
      *
-     * 仓库解析走 `RegistryAuth::serverAddressForImage`：界面不该自己拆引用。
+     * Registry resolution goes through `RegistryAuth::serverAddressForImage`: the UI must not parse
+     * references itself.
      */
     Q_INVOKABLE bool hasCredentialForImage(const QString &imageReference) const;
-    /*! 该镜像对应的仓库地址（界面上预填登录对话框）。 */
+    /*! Registry address for the image (pre-filled into the login dialog). */
     Q_INVOKABLE QString serverAddressForImage(const QString &imageReference) const;
 
 Q_SIGNALS:
     void changed();
     void resultChanged();
     void importScanChanged();
-    /*! 凭据集合变化（含导入完成），界面据此提示。 */
+    /*! Credential set changed (imports included); the UI notifies from it. */
     void credentialsChanged();
 
 private:
     /*!
-     * 静默识别 CLI 配置里的条目并收进钱包（不覆盖已有条目）。
+     * Silently pick up CLI config entries into the wallet (existing entries are never overwritten).
      *
-     * 页面每次 `refresh()` 都会跑一次：用户在 CLI 里 `docker login` 过的仓库，
-     * 打开这个页面就已经在列表里了——不需要任何"导入"按钮。
+     * Runs on every `refresh()`: a registry the user logged into with `docker login` is already in
+     * the list when this page opens, so no "import" button is needed.
      */
     void importFromCliSilently();
-    /*! 把 CLI 配置路径填进 `lastErrorDetail`（同步失败时界面要说明是哪个文件）。 */
+    /*! Put the CLI config path into `lastErrorDetail` (a failed sync must name the file). */
     void setCliConfigPathForMessages();
-    /*! 把一条凭据写回 CLI 配置文件；失败时填 `errorKey` 并返回 false。 */
+    /*! Write one credential back to the CLI config; on failure fills `errorKey` and returns false. */
     static bool writeBackToCli(const RegistryCredential &credential, QString *errorKey);
 
     void setResultKeys(const QString &resultKey, const QString &errorKey, const QString &detail = {});
     void setBusy(bool busy);
-    /*! 把 `DockerBackendInterface::AuthCheckResult` 翻成界面 key。 */
+    /*! Translate `DockerBackendInterface::AuthCheckResult` into a UI key. */
     static QString keyForAuthResult(DockerBackendInterface::AuthCheckResult result);
     void handleAuthCheckFinished(const QString &serverAddress, DockerBackendInterface::AuthCheckResult result, const QString &detail);
 
@@ -140,13 +145,13 @@ private:
     CredentialStore *m_store = nullptr;
     RegistryCredentialModel *m_credentials = nullptr;
 
-    /*! 待校验的登录请求（校验通过后才写入钱包）。 */
+    /*! Login request awaiting validation (written to the wallet only after it passes). */
     struct PendingLogin {
         RegistryCredential credential;
         bool active = false;
     };
     PendingLogin m_pendingLogin;
-    /*! 正在进行的是"测试连接"而不是"登录"。 */
+    /*! A "test connection" is running rather than a "login". */
     bool m_testingCredential = false;
 
     DockerCliAuthScan m_scan;

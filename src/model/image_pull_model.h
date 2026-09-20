@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,34 +13,35 @@ namespace Kontainer
 {
 
 /*!
- * 一条镜像拉取（ARCH_V4 §2.4）。
+ * One image pull (ARCH_V4 §2.4).
  *
- * 拉取是**长时间运行、可并发、可以在后台继续**的操作，因此它不适合塞进
- * 「一次操作一个结果」的通知通道：这里为每一路拉取保留一条记录，
- * 界面据此显示进度、取消某一项、以及**保留失败原因**（拉取失败不能被静默丢掉）。
+ * A pull is long-running, concurrent and keeps going in the background, so it does not fit the
+ * one-result-per-operation channel: each pull keeps its own entry, which lets the UI show progress,
+ * cancel a single pull, and retain the failure reason (a failed pull must never be dropped silently).
  */
 struct ImagePullEntry {
-    /*! 归一化后的引用（`alpine:latest`）。 */
+    /*! Normalized reference (`alpine:latest`). */
     QString reference;
-    /*! pulling / succeeded / failed / cancelled。 */
+    /*! pulling / succeeded / failed / cancelled. */
     QString statusKey;
-    /*! 引擎当前状态原文（"Downloading"、"Pull complete"…），按数据显示、不翻译。 */
+    /*! Raw engine status ("Downloading", "Pull complete", …), shown as data, never translated. */
     QString statusText;
-    /*! 失败原因（引擎原文）；成功与进行中为空。 */
+    /*! Failure reason (raw engine text); empty while running and on success. */
     QString detailText;
     /*!
-     * 失败种类 key（`permissionDenied` / `timeout` / …）；成功与进行中为空。
+     * Failure kind key (`permissionDenied` / `timeout` / …); empty while running and on success.
      *
-     * 界面靠它区分"凭据不对（401/403）"与其他失败：前者给「去登录…」引导，
-     * 后者给重试——靠 detail 文本匹配是不可靠的（引擎文案会变）。
+     * The UI uses it to tell bad credentials (401/403) from other failures: the former offers a
+     * "log in…" action, the latter a retry. Matching on detail text is unreliable because engine
+     * wording changes.
      */
     QString errorKindKey;
-    /*! 0.0 ~ 1.0；未知时为 -1。 */
+    /*! 0.0 ~ 1.0; -1 when unknown. */
     double progress = -1.0;
     bool progressKnown = false;
     int completedLayers = 0;
     int totalLayers = 0;
-    /*! 是否仍在进行中。 */
+    /*! Still running. */
     bool active = false;
 
     bool isFinished() const
@@ -58,10 +59,11 @@ struct ImagePullEntry {
 };
 
 /*!
- * 拉取列表模型（ARCH_V4 §2.4）。
+ * Pull list model (ARCH_V4 §2.4).
  *
- * 顺序由控制器决定：进行中的在前，已结束的按结束时间倒序在后。
- * 与其它列表模型一样：内容未变不发信号（进度每来一行就会更新，但进度不变时不打扰视图）。
+ * Order is decided by the controller: running pulls first, finished ones after, newest end first.
+ * Like the other list models: emit nothing when unchanged (progress arrives on every line, but an
+ * unchanged progress must not disturb the view).
  */
 class ImagePullModel : public QAbstractListModel
 {
@@ -104,11 +106,11 @@ public:
         return m_entries;
     }
     /*!
-     * 按引用查找行号；不存在返回 -1。
+     * Row for a reference, -1 if absent.
      *
-     * 必须是 Q_INVOKABLE：QML 只能调用 Q_INVOKABLE / 槽 / 属性，
-     * 普通 C++ 成员函数在 QML 里是 undefined，调用时会抛
-     * `TypeError: Property 'rowForReference' ... is not a function`。
+     * Must be Q_INVOKABLE: QML only reaches Q_INVOKABLE / slots / properties, so a plain C++
+     * member is undefined there and calling it throws
+     * `TypeError: Property 'rowForReference' ... is not a function`.
      */
     Q_INVOKABLE int rowForReference(const QString &reference) const;
 

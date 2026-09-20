@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -25,10 +25,10 @@ namespace
 {
 
 /*!
- * `HostConfig.PortBindings` → 声明的绑定。
+ * `HostConfig.PortBindings` → declared bindings.
  *
- * 结构是 `{"80/tcp": [{"HostIp": "", "HostPort": "8100"}, …], …}`：
- * `HostPort` 是**字符串**，可能是区间（`"47300-47309"`），也可能是空串（随机分配 → 跳过）。
+ * Shape is `{"80/tcp": [{"HostIp": "", "HostPort": "8100"}, …], …}`: `HostPort` is a **string**
+ * that may be a range (`"47300-47309"`) or empty (random assignment → skipped).
  */
 QList<DockerDeclaredPortDTO> parseDeclaredPorts(const QJsonObject &hostConfig)
 {
@@ -55,15 +55,15 @@ QList<DockerDeclaredPortDTO> parseDeclaredPorts(const QJsonObject &hostConfig)
             quint16 first = 0;
             quint16 last = 0;
             if (!PortBindingRules::parseHostPortSpec(stringValue(binding, QStringLiteral("HostPort")), &first, &last)) {
-                continue; // 空串（随机分配）与坏值都不进模型
+                continue; // empty (random assignment) and bad values both stay out of the model
             }
             dto.hostPort = first;
             dto.hostPortEnd = last;
             declared.append(dto);
         }
     }
-    // 顺序稳定（QJsonObject 本身按键排序，不能依赖它）：按容器端口、宿主端口排一下，
-    // 端口页刷新时行才不会跳
+    // Stable order (QJsonObject sorts by key, which must not be relied on): sort by container
+    // port then host port so rows do not jump when the ports page refreshes
     std::sort(declared.begin(), declared.end(), [](const DockerDeclaredPortDTO &lhs, const DockerDeclaredPortDTO &rhs) {
         if (lhs.containerPort != rhs.containerPort) {
             return lhs.containerPort < rhs.containerPort;
@@ -81,7 +81,7 @@ QList<DockerPortDTO> parsePorts(const QJsonObject &networkSettings)
     QList<DockerPortDTO> ports;
     const QJsonObject portMap = networkSettings.value(QStringLiteral("Ports")).toObject();
     for (auto it = portMap.constBegin(); it != portMap.constEnd(); ++it) {
-        // key 形如 "80/tcp" 或 "53/udp"
+        // key looks like "80/tcp" or "53/udp"
         const QString key = it.key();
         const int slash = key.indexOf(QLatin1Char('/'));
         DockerPortDTO port;
@@ -90,7 +90,7 @@ QList<DockerPortDTO> parsePorts(const QJsonObject &networkSettings)
 
         const QJsonValue bindings = it.value();
         if (!bindings.isArray() || bindings.toArray().isEmpty()) {
-            ports.append(port); // 未发布到宿主
+            ports.append(port); // not published to the host
             continue;
         }
         const QJsonArray array = bindings.toArray();
@@ -167,7 +167,7 @@ std::optional<DockerContainerInspectDTO> DockerContainerInspectDTO::fromJson(con
     if (dto.name.startsWith(QLatin1Char('/'))) {
         dto.name.remove(0, 1);
     }
-    // 注意：顶层 Image 是镜像 ID；用户可读的 repository:tag 在 Config.Image
+    // Note: the top-level Image is the image ID; the user-readable repository:tag is Config.Image
     dto.imageId = stringValue(object, QStringLiteral("Image"));
     dto.image = stringValue(object.value(QStringLiteral("Config")).toObject(), QStringLiteral("Image"));
     if (dto.image.isEmpty()) {
@@ -199,7 +199,7 @@ std::optional<DockerContainerInspectDTO> DockerContainerInspectDTO::fromJson(con
     dto.entrypoint = stringListValue(config, QStringLiteral("Entrypoint"));
     dto.labels = stringListValue(config, QStringLiteral("Labels"));
     if (dto.labels.isEmpty()) {
-        // Labels 也可能是对象形式
+        // Labels may also arrive as an object
         const QJsonObject labelObject = config.value(QStringLiteral("Labels")).toObject();
         for (auto it = labelObject.constBegin(); it != labelObject.constEnd(); ++it) {
             dto.labels.append(it.key() + QLatin1Char('=') + it.value().toString());

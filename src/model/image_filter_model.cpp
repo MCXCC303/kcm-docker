@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -65,7 +65,7 @@ void ImageFilterModel::setSortKey(const QString &key)
 
 void ImageFilterModel::updateSorting()
 {
-    // ARCH_V2 §10：默认 Repository 升序（同样必须用 setSortRole）
+    // ARCH_V2 §10: default is Repository ascending (setSortRole is required here too)
     if (m_sortKey == QLatin1String("created")) {
         setSortRole(ImageModel::CreatedRole);
         sort(0, Qt::DescendingOrder);

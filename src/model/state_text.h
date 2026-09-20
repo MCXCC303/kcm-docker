@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,8 +13,8 @@ namespace Kontainer
 {
 
 /*!
- * 状态语义 → 用户可见文案（ARCH_V2 §26：文案属于 presentation 层，
- * domain object 只保留机器可读语义与稳定 key）。
+ * State semantics → user-visible text (ARCH_V2 §26: text belongs to the presentation layer;
+ * domain objects keep only machine-readable semantics and stable keys).
  */
 QString containerStateText(ContainerState state);
 QString healthStateText(HealthState health);

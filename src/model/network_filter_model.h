@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,14 +14,14 @@ namespace Kontainer
 {
 
 /*!
- * 网络列表的搜索 / 过滤 / 排序代理（ARCH_V5_V8 §3.2）。
+ * Search / filter / sort proxy for the network list (ARCH_V5_V8 §3.2).
  *
- * 与容器/镜像列表同一套约定：
+ * Same conventions as the container/image lists:
  *
- * - Search：名称 / Id / 短 Id / 驱动 / 子网 的大小写不敏感 substring 匹配
- * - Filter：All / 预定义 / 自定义（内置网络往往要藏起来，用户只关心自己建的）
- * - 排序：Name（默认，升序）/ driver / scope / members（成员数降序）
- * - 条件由代理自己持有：后台刷新（source reset）不会重置用户条件（§32）
+ * - Search: case-insensitive substring match on name / Id / short Id / driver / subnet
+ * - Filter: All / predefined / custom (built-in networks are usually hidden; users want their own)
+ * - Sort: Name (default, ascending) / driver / scope / members (member count descending)
+ * - The proxy owns the criteria, so a background source reset never drops the user's filter (§32)
  */
 class NetworkFilterModel : public QSortFilterProxyModel
 {

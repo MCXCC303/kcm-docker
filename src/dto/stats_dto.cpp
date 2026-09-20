@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -19,7 +19,7 @@ using namespace JsonHelpers;
 namespace
 {
 
-/*! 取嵌套对象里的 64 位计数（缺失或类型不符时返回 0）。 */
+/*! Read a 64-bit counter from a nested object (0 when missing or mistyped). */
 quint64 nestedCounter(const QJsonObject &object, const QString &outer, const QString &inner)
 {
     const QJsonValue value = object.value(outer);
@@ -31,8 +31,8 @@ quint64 nestedCounter(const QJsonObject &object, const QString &outer, const QSt
 }
 
 /*!
- * cgroup v1 用 cache / total_inactive_file，cgroup v2 用 inactive_file 表示 page cache。
- * 三者取第一个存在的值，抹平版本差异（§17.2：内部保存原始语义）。
+ * cgroup v1 calls page cache cache / total_inactive_file, cgroup v2 calls it inactive_file.
+ * Take the first value present to smooth over the version difference (§17.2: keep raw semantics).
  */
 quint64 parseMemoryCacheBytes(const QJsonObject &memoryStats)
 {
@@ -66,8 +66,9 @@ quint64 networkBytes(const QJsonObject &object, const QString &key)
 }
 
 /*!
- * blkio_stats.io_service_bytes_recursive 的 op 可能是 read/write，也可能是 sync/async/total。
- * 优先用精确的 read/write，避免把 sync+async 重复计入；只有在完全没有 read/write 时才回退。
+ * blkio_stats.io_service_bytes_recursive ops may be read/write or sync/async/total.
+ * Prefer the exact read/write values so sync+async is not double counted; fall back only when
+ * there is no read/write at all.
  */
 void blockIoBytes(const QJsonObject &object, quint64 &readBytes, quint64 &writeBytes)
 {
@@ -99,7 +100,7 @@ void blockIoBytes(const QJsonObject &object, quint64 &readBytes, quint64 &writeB
     }
 
     if (exactRead == 0 && exactWrite == 0 && (syncBytes > 0 || asyncBytes > 0)) {
-        // 老引擎只给 sync/async：无法区分方向时按总量归入 read，避免编造数据
+        // Old engines give only sync/async: with no direction, count the total as read, not invented data
         readBytes = syncBytes + asyncBytes;
         writeBytes = 0;
         return;
@@ -131,7 +132,7 @@ std::optional<DockerStatsDTO> DockerStatsDTO::fromJson(const QJsonObject &object
 
     dto.onlineCpus = intValue(cpuStats, QStringLiteral("online_cpus"));
     if (dto.onlineCpus <= 0) {
-        // 老引擎没有 online_cpus：用 percpu_usage 的条目数兜底
+        // Old engines lack online_cpus: fall back to the percpu_usage entry count
         dto.onlineCpus = cpuStats.value(QStringLiteral("cpu_usage")).toObject().value(QStringLiteral("percpu_usage")).toArray().size();
     }
 

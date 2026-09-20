@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -80,7 +80,7 @@ int MountListModel::blockedCount() const
 
 void MountListModel::setMounts(const QList<MountEntry> &mounts)
 {
-    // 内容没变就不发信号（ARCH_V2 §32/§34，ARCH_V3 附录 A.1e）
+    // unchanged content emits nothing (ARCH_V2 §32/§34, ARCH_V3 appendix A.1e)
     if (m_mounts == mounts) {
         return;
     }

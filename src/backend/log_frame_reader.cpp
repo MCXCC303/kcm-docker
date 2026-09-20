@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,11 +14,11 @@ constexpr int kHeaderBytes = 8;
 constexpr char kEscape = '\x1b';
 
 /*!
- * 剥离 ANSI 转义序列（CSI / OSC / 两字符转义）。
+ * Strip ANSI escape sequences (CSI / OSC / two-character escapes).
  *
- * 只做"去掉"，不做任何渲染：§3.1 明确日志是纯显示，不做主题定制。
- * 解析必须容忍**序列跨包**：这里按字节扫描，遇到不完整的序列就把余下的留在
- * `m_pendingLine` 之后的下一次调用里继续（见 appendText 的处理）。
+ * Removal only, no rendering: §3.1 says the log is plain display with no theming. Parsing must
+ * tolerate sequences split across packets: scanning stops at an incomplete sequence and leaves
+ * the rest for the next call via `incompleteTail` (see appendText).
  */
 QByteArray stripAnsi(const QByteArray &input, QByteArray *incompleteTail)
 {
@@ -33,14 +33,14 @@ QByteArray stripAnsi(const QByteArray &input, QByteArray *incompleteTail)
             continue;
         }
 
-        // ESC 开头的序列：先看第二个字节属于哪一类
+        // Escape sequence: classify it by the second byte
         if (i + 1 >= input.size()) {
-            *incompleteTail = input.mid(i); // 序列被切断了，留给下一次
+            *incompleteTail = input.mid(i); // truncated sequence, keep for the next call
             return out;
         }
         const char kind = input.at(i + 1);
         if (kind == '[') {
-            // CSI：参数直到 0x40–0x7e 的终止字节
+            // CSI: parameters run to a final byte in 0x40–0x7e
             int j = i + 2;
             while (j < input.size() && (static_cast<unsigned char>(input.at(j)) < 0x40 || static_cast<unsigned char>(input.at(j)) > 0x7e)) {
                 ++j;
@@ -53,7 +53,7 @@ QByteArray stripAnsi(const QByteArray &input, QByteArray *incompleteTail)
             continue;
         }
         if (kind == ']') {
-            // OSC：直到 BEL 或 ST(ESC \)
+            // OSC: runs to BEL or ST (ESC \)
             int j = i + 2;
             while (j < input.size()) {
                 if (input.at(j) == '\x07') {
@@ -71,7 +71,7 @@ QByteArray stripAnsi(const QByteArray &input, QByteArray *incompleteTail)
             i = (input.at(j) == '\x07') ? j + 1 : j + 2;
             continue;
         }
-        // 其余两字符转义（ESC c、ESC ( B …）：保守起见最多吃两个字符
+        // Other two-character escapes (ESC c, ESC ( B …): consume at most two bytes
         i += 2;
     }
     return out;
@@ -85,14 +85,14 @@ LogFrameReader::LogFrameReader(bool tty)
 
 void LogFrameReader::appendText(LogLine::Stream stream, const QByteArray &data, QList<LogLine> *out)
 {
-    // 上一次调用留下的、未结束的转义序列：接到这次数据前面一起解析
+    // Unfinished escape sequence from the previous call: parse it together with this data
     QByteArray combined = m_ansiPending + data;
     m_ansiPending.clear();
 
     QByteArray incomplete;
     const QByteArray clean = stripAnsi(combined, &incomplete);
     if (!incomplete.isEmpty()) {
-        // 序列被切断：留到下一次（绝不能当成正文输出）
+        // Truncated sequence: keep it for the next call (never emit it as text)
         m_ansiPending = incomplete;
     }
 
@@ -100,11 +100,11 @@ void LogFrameReader::appendText(LogLine::Stream stream, const QByteArray &data, 
         if (m_crPending) {
             m_crPending = false;
             if (ch == '\n') {
-                closePendingLine(stream, out); // CRLF：就是行尾
+                closePendingLine(stream, out); // CRLF: a real line end
                 continue;
             }
-            // 单独的 \r：回车覆盖——先把当前内容作为**临时行**发出去（进度条能实时看到），
-            // 再清空缓冲，后面的字节重写这一行；控制台按"临时行"语义替换最后一行
+            // Lone \r: overwrite — first emit the current content as a **provisional** line (progress
+            // visible immediately), then clear the buffer and let later bytes rewrite it
             emitProvisionalLine(out);
             m_pendingLine.clear();
             m_hasPending = true;
@@ -135,7 +135,7 @@ void LogFrameReader::emitProvisionalLine(QList<LogLine> *out)
     LogLine line;
     line.stream = m_pendingStream;
     line.text = QString::fromUtf8(m_pendingLine);
-    line.complete = false; // 临时：控制台应当替换最后一行，而不是新增一行
+    line.complete = false; // provisional: the console must replace its last line, not append
     out->append(line);
 }
 
@@ -171,20 +171,20 @@ QList<LogLine> LogFrameReader::feed(const QByteArray &data)
             | (quint32(static_cast<unsigned char>(m_frameBuffer.at(6))) << 8)
             | quint32(static_cast<unsigned char>(m_frameBuffer.at(7)));
 
-        // 合法性：流号只能是 1/2（0 = stdin，实测不会出现；其余视为畸形）
+        // Validity: stream byte must be 1/2 (0 = stdin never occurs here; the rest is malformed)
         if (streamByte != 1 && streamByte != 2) {
             m_discardedBytes += m_frameBuffer.size();
             m_frameBuffer.clear();
             break;
         }
         if (payloadSize > quint32(kMaxFrameBytes)) {
-            // 一个坏长度不能让我们分配 4 GB：丢掉这个帧头并放弃整个缓冲
+            // A bad length must not make us allocate 4 GB: drop the header and the whole buffer
             m_discardedBytes += m_frameBuffer.size();
             m_frameBuffer.clear();
             break;
         }
         if (quint32(m_frameBuffer.size() - kHeaderBytes) < payloadSize) {
-            break; // 半帧：等后续字节
+            break; // partial frame: wait for more bytes
         }
 
         const QByteArray payload = m_frameBuffer.mid(kHeaderBytes, int(payloadSize));
@@ -199,13 +199,13 @@ QList<LogLine> LogFrameReader::flush()
 {
     QList<LogLine> lines;
     if (m_crPending) {
-        // 流在 `\r` 之后结束：这一行已被覆盖成空（进度条常见形态）
+        // Stream ended right after `\r`: the line was overwritten with nothing (typical progress bar)
         m_crPending = false;
         m_pendingLine.clear();
         m_hasPending = true;
     }
     if (!m_ansiPending.isEmpty()) {
-        // 未结束的转义序列在流结束时没有意义
+        // An unfinished escape sequence is meaningless at end of stream
         m_discardedBytes += m_ansiPending.size();
         m_ansiPending.clear();
     }
@@ -219,7 +219,7 @@ QList<LogLine> LogFrameReader::flush()
         m_hasPending = false;
         m_pendingStartsNewLine = true;
     }
-    // 半帧与未完成的转义序列在流结束时没有意义：计入丢弃量，便于自检
+    // A partial frame and unfinished escapes are meaningless at end of stream: count them as discarded
     m_discardedBytes += m_frameBuffer.size();
     m_frameBuffer.clear();
     return lines;

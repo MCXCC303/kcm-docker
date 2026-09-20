@@ -1,18 +1,19 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    Image Detail（ARCH_V2 §8/§52 / ARCH_V3 §2.3）：
+    Image Detail (ARCH_V2 §8/§52 / ARCH_V3 §2.3):
 
-    Repository / Tag / 完整引用 / ID / Digest / Size / Architecture / OS /
-    Layers / 使用该镜像的容器（只读关联）/ Environment（默认折叠）。
+    Repository / tag / full reference / ID / digest / size / architecture / OS /
+    layers / containers using the image (read-only relation) / environment (collapsed by default).
 
-    三期的两处收敛（§2.3）：
-    - 层次默认只显示前 5 层，可展开全部（层数可达数十，全铺会把页面撑得很长）
-    - 多 tag 用 chip 呈现，不再逐行占高
+    Two convergences from phase 3 (§2.3):
+    - Layers show the first 5 by default and can be expanded (there can be dozens; showing all
+      would make the page very long)
+    - Multiple tags are rendered as chips instead of one row each
 
-    详情内容明显高于窗口：仍然用可滚动页面（Kirigami.Page 不提供滚动），
-    正文限宽居中避免宽窗口下一行过长（§1.2）。
+    The content is clearly taller than the window, so the page still scrolls (Kirigami.Page does not scroll);
+    the body is width-capped and centered so lines stay short in wide windows (§1.2).
 */
 
 import QtQuick
@@ -31,33 +32,34 @@ KCM.SimpleKCM {
     property string imageId: ""
 
     readonly property var controller: kcm.controller.imageDetail
-    /*! 写操作控制器（ARCH_V4 §2.4）。 */
+    /*! Write-operation controller (ARCH_V4 §2.4). */
     readonly property var operations: kcm.controller.operations
     readonly property bool ready: controller.loadStateKey === "ready"
 
-    /*! 折叠时显示的层数（§2.3）。 */
+    /*! Layer count shown while collapsed (§2.3). */
     readonly property int collapsedLayerCount: 5
     property bool layersExpanded: false
 
-    /*! 请求返回列表页（由 main.qml 接 StackView.pop）。
-        注意：不能叫 backRequested——Kirigami.Page 已经声明了同名信号。 */
+    /*! Request a return to the list page (main.qml connects it to StackView.pop).
+        Not named backRequested: Kirigami.Page already declares a signal by that name. */
     signal closeRequested
-    /*! 打开仓库认证页并把该镜像的仓库预填进登录框（ARCH_V5_V8 §2.7）。 */
+    /*! Open the registry auth page with this image's registry prefilled (ARCH_V5_V8 §2.7). */
     signal registryAuthRequested(string serverAddress)
-    /*! 基于这个镜像创建容器（七期 §4.5）。 */
+    /*! Create a container from this image (phase 7 §4.5). */
     signal createContainerRequested(string imageReference)
-    /*! 打开关联容器的详情（与网络详情页的成员行同一个交互）。 */
+    /*! Open a related container's detail page (same interaction as member rows on network detail). */
     signal containerRequested(string containerId)
 
     /*!
-        删除语义（ARCH_V4 §2.4）：
-        - 有标签 → 按「仓库:标签」删除，只移除该标签，其他标签保留
-        - 有多个标签 → 额外提供「删除全部标签」，走 force=true
-        - 无标签（dangling）→ 按 ID 删除
-        被容器引用时引擎返回 409，文案会说明原因，不自动 force。
+        Delete semantics (ARCH_V4 §2.4):
+        - Tagged → delete by repository:tag, removing that tag only and keeping the others
+        - Multiple tags → additionally offer "Delete all tags", which uses force=true
+        - Untagged (dangling) → delete by ID
+        When a container references the image the engine answers 409; the message explains why and
+        nothing is force-deleted automatically.
     */
     readonly property bool targetBusy: {
-        // 同上：函数调用本身不建立依赖，必须先读 stateRevision
+        // As above: the call itself creates no dependency, so read stateRevision first
         page.operations.stateRevision;
         return page.operations.isImageBusy(page.imageId);
     }
@@ -65,16 +67,16 @@ KCM.SimpleKCM {
     readonly property bool hasTags: controller.primaryTag.length > 0
     readonly property bool multipleTags: controller.tags.count > 1
 
-    /*! 正文最大宽度：约 42 gridUnit，避免宽窗口下一行过长（§1.2）。 */
+    /*! Content max width: ~42 gridUnit, keeping lines short in wide windows (§1.2). */
     readonly property real contentMaxWidth: Kirigami.Units.gridUnit * 42
 
     Component.onCompleted: {
-        // 二次进入同一镜像也要重新加载
+        // Re-entering the same image must reload too
         if (page.imageId.length > 0) {
             controller.imageId = page.imageId;
             controller.start();
         }
-        // 层列表默认折叠：只让 model 暴露前 N 条（§2.3）
+        // Layer list collapses by default: expose only the first N rows from the model (§2.3)
         controller.layers.limit = page.collapsedLayerCount;
     }
 
@@ -82,21 +84,21 @@ KCM.SimpleKCM {
 
     function toggleLayers() {
         page.layersExpanded = !page.layersExpanded;
-        // 0 = 不限制
+        // 0 = no limit
         controller.layers.limit = page.layersExpanded ? 0 : page.collapsedLayerCount;
     }
 
     ColumnLayout {
         spacing: Kirigami.Units.largeSpacing
 
-        /* 本页触发的操作结果（拉取 / 删除）在这里呈现 */
+        /* Results of operations started on this page (pull / delete) appear here */
         Components.OperationMessage {
             Layout.fillWidth: true
             operations: page.operations
         }
 
         /* ------------------------------------------------------------------ */
-        /* 页头：返回 + 镜像名（与容器详情保持一致，用户始终知道自己在看哪个镜像）  */
+        /* Header: back + image name (same as container detail, so users always know which image this is) */
         /* ------------------------------------------------------------------ */
         RowLayout {
             Layout.fillWidth: true
@@ -166,7 +168,7 @@ KCM.SimpleKCM {
         }
 
         /* ------------------------------------------------------------------ */
-        /* 正文：限宽居中（§1.2）                                                */
+        /* Body: width-capped and centered (§1.2)                                */
         /* ------------------------------------------------------------------ */
         ColumnLayout {
             Layout.fillWidth: true
@@ -178,9 +180,10 @@ KCM.SimpleKCM {
             /* ---------------- Overview ---------------- */
             Kirigami.FormLayout {
                 /*
-                 * 按内容宽度收缩 + 左对齐：Kirigami 的 FormLayout 会把 `[标签][字段]`
-                 * 这一组右对齐，撑满整行时整块内容会跑到右半边（实测反馈：太靠右）。
-                 * 需要宽度的字段（长命令这类）自带 Layout.preferredWidth，不依赖整行宽度。
+                 * Shrink to content and align left: Kirigami's FormLayout right-aligns the
+                 * `[label][field]` group, so at full width the block drifts to the right
+                 * (user report: too far right). Fields needing width (long commands) set their
+                 * own Layout.preferredWidth instead of relying on the row.
                  */
                 Layout.fillWidth: false
                 Layout.alignment: Qt.AlignLeft
@@ -239,7 +242,7 @@ KCM.SimpleKCM {
                 }
             }
 
-            /* ---------------- Tags（chip 呈现，§2.3） ---------------- */
+            /* ---------------- Tags (chips, §2.3) ---------------- */
             Kirigami.Heading {
                 level: 3
                 visible: controller.tags.count > 0
@@ -262,7 +265,7 @@ KCM.SimpleKCM {
                         required property string label
 
                         text: label
-                        // tag 只是展示，不可点击删除（三期没有写操作）
+                        // Tags are display-only, not clickable to delete (phase 3 has no write actions)
                         Accessible.role: Accessible.StaticText
                         Accessible.name: label
                     }
@@ -304,7 +307,8 @@ KCM.SimpleKCM {
                         QQC2.Label {
                             Layout.fillWidth: true
                             text: value
-                            // 不能先整体赋值 font 再赋值 font.family（QML 会报 Property has already been assigned）
+                            // Never assign `font` as a whole and then font.family: QML errors with
+                            // "Property has already been assigned"
                             font.family: "monospace"
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             opacity: 0.6
@@ -314,7 +318,7 @@ KCM.SimpleKCM {
                 }
             }
 
-            /* ---------------- Layers（默认折叠前 5 层，§2.3） ---------------- */
+            /* ---------------- Layers (first 5 while collapsed, §2.3) ---------------- */
             Kirigami.Heading {
                 level: 3
                 text: i18ncp("@info image layer count", "Layers (%1)", "Layers (%1)", controller.layerCount)
@@ -369,7 +373,7 @@ KCM.SimpleKCM {
                 onClicked: page.toggleLayers()
             }
 
-            /* ---------------- Containers using this image（只读关联，§52） ---------------- */
+            /* ---------------- Containers using this image (read-only relation, §52) ---------------- */
             Kirigami.Heading {
                 level: 3
                 text: i18n("Containers")
@@ -391,8 +395,8 @@ KCM.SimpleKCM {
                 Repeater {
                     model: controller.usedByContainers
 
-                    // 与「网络 → 已连接容器」同一种行：状态图标 + 名称 + 状态 + 跳转箭头，
-                    // 并且**可以点击**打开容器详情（用户反馈：镜像这边以前点不动）
+                    // Same row as "network → connected containers": state icon + name + state + arrow,
+                    // and it **is clickable** to open the container (user report: this used to be inert)
                     delegate: QQC2.ItemDelegate {
                         id: usedByRow
 
@@ -438,19 +442,19 @@ KCM.SimpleKCM {
                 }
             }
 
-            /* ---------------- Environment（默认折叠，§40） ---------------- */
+            /* ---------------- Environment (collapsed by default, §40) ---------------- */
             Components.CollapsibleSection {
                 Layout.fillWidth: true
                 contentObjectName: "imageEnvironmentValues"
                 title: i18ncp("@info environment variable count", "Environment (%1 variable)", "Environment (%1 variables)", controller.environmentCount)
 
-                // 镜像的 environment 是字符串列表（"KEY=value"），不是键值模型
+                // An image's environment is a string list ("KEY=value"), not a key/value model
                 ColumnLayout {
                     Layout.fillWidth: true
                     spacing: 0
 
-                    /* 同 MainPage：model 用长度而不是 QStringList 属性本身，
-                       避免列表变化时在布局 polish 期间重建条目。 */
+                    /* As in MainPage: use the length, not the QStringList property itself, so list
+                       changes do not rebuild items during layout polish. */
                     Repeater {
                         model: controller.environment.length
 
@@ -469,8 +473,8 @@ KCM.SimpleKCM {
     }
 
     /*!
-        删除入口（ARCH_V4 §2.4）：破坏性操作只在详情页，且必须二次确认。
-        权限门不允许写时整条 footer 不出现。
+        Delete entry point (ARCH_V4 §2.4): destructive actions live on the detail page only and always
+        require confirmation. When the permission gate denies writes the whole footer is absent.
     */
     footer: QQC2.ToolBar {
         id: actionBar
@@ -512,7 +516,7 @@ KCM.SimpleKCM {
         }
     }
 
-    /* 删除单个标签（默认动作） */
+    /* Delete a single tag (the default action) */
     Components.ConfirmDialog {
         id: removeDialog
 
@@ -533,7 +537,7 @@ KCM.SimpleKCM {
         }
     }
 
-    /* 删除全部标签：force，且不提供「顺便清理」之类的额外选项 */
+    /* Delete all tags: force, with no extra options such as "clean up afterwards" */
     Components.ConfirmDialog {
         id: removeAllTagsDialog
 
@@ -546,7 +550,7 @@ KCM.SimpleKCM {
         onConfirmed: page.operations.removeImage(page.imageId, true)
     }
 
-    /* 删除成功后本页目标已不存在：返回列表 */
+    /* After a successful delete this page's target no longer exists: return to the list */
     Connections {
         target: page.operations
         function onImageRemoved(id) {

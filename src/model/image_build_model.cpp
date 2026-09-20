@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -118,11 +118,11 @@ int ImageBuildModel::rowForBuildId(const QString &buildId) const
 void ImageBuildModel::setEntries(const QList<ImageBuildEntry> &entries)
 {
     if (entries == m_entries) {
-        return; // 内容没变：不发信号（进度行来得很密，重复行不该打扰视图）
+        return; // unchanged: emit nothing (progress lines arrive densely; duplicates must not disturb the view)
     }
 
     if (entries.size() == m_entries.size()) {
-        // 数量相同：逐行比较，只对真正变化的行发 dataChanged
+        // same count: compare row by row and emit dataChanged only for rows that really changed
         bool sameShape = true;
         for (int row = 0; row < entries.size(); ++row) {
             if (entries.at(row).id != m_entries.at(row).id) {

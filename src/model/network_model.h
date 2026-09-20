@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,14 +14,14 @@ namespace Kontainer
 {
 
 /*!
- * 网络列表模型（ARCH_V5_V8 §3.2）。
+ * Network list model (ARCH_V5_V8 §3.2).
  *
- * 与容器/镜像列表一样：内容未变不发信号（后台刷新不重建 delegate）；
- * 排序交给代理模型，模型本身只按 daemon 给的顺序保存。
+ * Like the container/image lists: emit nothing when unchanged (a background refresh must not
+ * rebuild delegates); sorting belongs to the proxy model, the model keeps the daemon's order.
  *
- * 列表页需要的信息（名称、驱动、范围、子网、成员数、是否内置）都在 role 里，
- * 详情页需要的成员/标签/选项也在——`/networks` 返回的就是完整对象（§3.2 实测），
- * 因此详情页直接用同一份数据，不再单独发请求。
+ * Everything the list page needs (name, driver, scope, subnet, member count, predefined) is a role,
+ * and so are the members/labels/options the detail page needs — `/networks` already returns full
+ * objects (§3.2, measured), so the detail page reuses the same data and sends no extra request.
  */
 class NetworkModel : public KeyedListModel<NetworkModel, Network>
 {
@@ -40,15 +40,15 @@ public:
         CreatedRole,
         SubnetRole,
         GatewayRole,
-        /*! 是否是 daemon 预定义网络（bridge/host/none）——界面据此隐藏删除入口。 */
+        /*! Whether this is a daemon-predefined network (bridge/host/none); the UI hides delete. */
         PredefinedRole,
         InternalRole,
         AttachableRole,
         IngressRole,
         MemberCountRole,
-        /*! 成员容器（`QList<NetworkMember>`），详情页用。 */
+        /*! Member containers (`QList<NetworkMember>`), used by the detail page. */
         MembersRole,
-        /*! 标签与驱动选项（`QList<QPair<QString,QString>>`）。 */
+        /*! Labels and driver options (`QList<QPair<QString,QString>>`). */
         LabelsRole,
         OptionsRole,
     };
@@ -63,35 +63,35 @@ public:
     int count() const;
     bool empty() const;
     const QList<Network> &networks() const;
-    /*! 内容未变则完全不动模型。 */
+    /*! Unchanged content leaves the model untouched. */
     void setNetworks(const QList<Network> &networks);
-    /*! 清空（失败时不让旧数据继续冒充最新）。 */
+    /*! Clear (on failure, stale data must not keep passing as current). */
     void clear();
 
     /*!
-     * 全部网络名（按当前顺序）。
+     * All network names in current order.
      *
-     * 界面有时需要在**没有 delegate** 的情况下知道有哪些网络（例如连接对话框要算
-     * "还能连几个"），而 QML 不能直接按 role 读模型。
+     * The UI sometimes needs the networks **without a delegate** (e.g. the connect dialog counts
+     * how many are still connectable), and QML cannot read a model by role.
      */
     Q_INVOKABLE QStringList names() const;
 
     /*!
-     * 全部网络的纯数据摘要：`[{id, name, driver, predefined}]`。
+     * Plain-data summary of all networks: `[{id, name, driver, predefined}]`.
      *
-     * 给"需要在没有 delegate 的情况下拿到列表"的界面用（例如连接网络对话框）：
-     * QML 不能按 role 读模型，而对话框的内容在弹层里有自己的实例树，
-     * 递一个普通数组比递模型对象可靠得多。
+     * For UIs that need the list **without a delegate** (e.g. the connect-network dialog): QML
+     * cannot read a model by role, and the dialog has its own instance tree inside a popup, so a
+     * plain array is far more reliable than the model object.
      */
     Q_INVOKABLE QVariantList summaries() const;
 
-    /*! 按 Id 找行；找不到返回 -1（详情页导航用）。 */
+    /*! Row for an Id, -1 if not found (used for detail-page navigation). */
     Q_INVOKABLE int rowForId(const QString &id) const;
     /*!
-     * 按名字找 Id（找不到返回空）。
+     * Id for a name (empty if not found).
      *
-     * 容器详情里只拿得到网络名（inspect 的 `NetworkSettings.Networks` 以名字为键），
-     * 而连接/断开接口用的是网络 Id——转换只有这一处实现。
+     * Container detail only exposes network names (inspect's `NetworkSettings.Networks` is keyed by
+     * name) while connect/disconnect take a network Id — this is the single conversion point.
      */
     Q_INVOKABLE QString idForName(const QString &name) const;
 

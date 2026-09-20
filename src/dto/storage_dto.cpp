@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,7 +18,7 @@ using namespace JsonHelpers;
 namespace
 {
 
-/*! 累加明细数组里的某个数值字段（字段缺失的条目跳过）。 */
+/*! Sum one numeric field over a detail array (entries lacking the field are skipped). */
 qint64 sumDetailField(const QJsonObject &object, const QString &arrayKey, const QString &field, bool *sawArray)
 {
     const QJsonValue value = object.value(arrayKey);
@@ -45,7 +45,7 @@ qint64 sumDetailField(const QJsonObject &object, const QString &arrayKey, const 
     return total;
 }
 
-/*! Volumes 的用量在嵌套的 UsageData.Size 里。 */
+/*! Volume usage lives in the nested UsageData.Size. */
 qint64 sumVolumeSizes(const QJsonObject &object, bool *sawArray)
 {
     const QJsonValue value = object.value(QStringLiteral("Volumes"));
@@ -123,7 +123,7 @@ StorageUsage storageUsageFromDto(const DockerStorageDTO &dto)
     usage.valid = true;
     usage.buildCacheAvailable = dto.buildCachePresent || dto.buildCacheUsage >= 0;
 
-    // 优先使用引擎给出的类别合计；缺失时退回明细求和（§24）
+    // Prefer the per-category totals the engine reports; fall back to summing details (§24)
     const auto pick = [](qint64 primary, qint64 fallback) -> qint64 {
         if (primary >= 0) {
             return primary;

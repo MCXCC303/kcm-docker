@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -29,7 +29,7 @@ namespace Kontainer
 
 namespace
 {
-/*! QVariant（QStringList 或 QVariantList）→ QStringList：界面可能用任一种表达。 */
+/*! QVariant (QStringList or QVariantList) → QStringList: the UI may send either form. */
 QStringList stringListFromVariant(const QVariant &value)
 {
     QStringList result;
@@ -57,9 +57,9 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
 
     connect(m_backend, &DockerBackendInterface::mutationFinished, this, &OperationController::onBackendMutationFinished);
     connect(m_backend, &DockerBackendInterface::imagePullProgress, this, &OperationController::onPullProgress);
-    // 清理数据卷的"成功明细"（删了哪些、回收多少）：mutationFinished 只带错误，放不下这份内容
-    // 创建成功才能拿到 id；"创建并启动"在这里串行发起第二步（两步结果分别呈现）
-    // 构建进度：逐行更新列表里的那一条（失败原因由后端拼好失败步骤）
+    // volume-prune success detail (which volumes, how much reclaimed): mutationFinished carries errors only
+    // the id exists only after a successful create; create-and-start chains step 2 here (one result each)
+    // build progress: update that entry row by row (the backend assembles the failing step into the reason)
     connect(m_backend, &DockerBackendInterface::imageBuildProgress, this, [this](const QString &buildId, const ImageBuildUpdate &update) {
         const int row = m_builds->rowForBuildId(buildId);
         if (row < 0) {
@@ -107,7 +107,7 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
                     break;
                 case MutationOutcome::Failed:
                     entry.statusKey = QStringLiteral("failed");
-                    // 失败原因里已经带上了失败的步骤（后端拼的），没拼上时退回引擎原文
+                    // the reason already names the failing step (backend-assembled); fall back to raw text
                     entry.detailText = entry.detailText.isEmpty() ? error.detail() : entry.detailText;
                     entry.errorKindKey = DockerError::kindKey(error.kind());
                     setResult(Result::Error, failureText(Mutation::BuildImage, error), entry.detailText, error);
@@ -119,9 +119,9 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
     connect(m_backend, &DockerBackendInterface::containerCreated, this, [this](const QString &id, const QString &warning) {
         m_createdContainerId = id;
         const bool startNow = m_pendingStartAfterCreate;
-        Q_EMIT containerCreatedSignal(id, false); // 先报"已创建"；启动成功后再报一次 started=true
+        Q_EMIT containerCreatedSignal(id, false); // report "created" first; started=true follows after step 2 succeeds
         if (startNow) {
-            // 第二步：启动。完成时（成功或失败）文案都要说明"这是创建之后的启动"
+            // step 2: start; its result text must say this was the start following the create
             m_startAfterCreateInFlight = true;
             m_backend->startContainer(id);
         }
@@ -135,8 +135,8 @@ OperationController::OperationController(DockerBackendInterface *backend, QObjec
     });
 
     connect(m_backend, &DockerBackendInterface::volumesPruned, this, [this](const QStringList &names, qint64 reclaimedBytes) {
-        // 只**记下**明细：紧接着 mutationFinished 会走统一的结果通道，
-        // 由 successText() 把这份内容当作这次清理的结果文案（直接 setResult 会被它覆盖）
+        // only **record** the details: mutationFinished runs right after through the shared result
+        // channel and successText() uses them as the prune text (a setResult here would be overwritten)
         m_pruneDetailText.clear();
         m_pruneDetailList.clear();
         if (names.isEmpty()) {
@@ -228,7 +228,7 @@ bool OperationController::writeAllowed() const
 
 QString OperationController::writeAccessKey() const
 {
-    // 限定命名空间：成员函数同名，不加前缀会被类作用域截住
+    // qualify the namespace: a same-named member function would be caught by class scope
     return Kontainer::writeAccessKey(effectiveWriteAccess());
 }
 
@@ -236,7 +236,7 @@ QString OperationController::writeAccessText() const
 {
     switch (effectiveWriteAccess()) {
     case WriteAccess::Allowed:
-        // 只在降级后才有可说的话（刚才是可写的，被引擎拒绝了）
+        // only meaningful after a downgrade (writing worked until the engine refused it)
         return m_writeDegraded ? i18n("The Docker daemon refused the last write operation because of missing permissions. Kontainer switched to read-only for this session.") : QString();
     case WriteAccess::SocketNotWritable:
         return i18n("Kontainer can only read from this Docker socket: the current user is not allowed to write it. "
@@ -279,7 +279,7 @@ void OperationController::degradeToReadOnly(const DockerError &error)
     qCWarning(kontainerBackend) << "write access denied by the engine: switching this session to read-only";
     m_degradedAccess = WriteAccess::SocketNotWritable;
     setWriteAccess(m_degradedAccess, true);
-    // 已经在途的操作会各自失败并给出结果，这里只需要让写入口消失
+    // in-flight operations fail and report on their own; here only the write entry points must disappear
     Q_UNUSED(error)
 }
 
@@ -301,7 +301,7 @@ bool OperationController::isImageBusy(const QString &reference) const
 bool OperationController::admit(const QString &targetKey, const QString &what)
 {
     if (!writeAllowed()) {
-        // 界面本应隐藏写入口；能走到这里说明有代码绕过了它，因此给出明确结果而不是静默
+        // the UI should hide write entry points; reaching here means code bypassed them, so report it
         setResult(Result::Error, i18n("Kontainer is in read-only mode, so %1 was not performed.", what), QString(), DockerError(DockerError::Kind::PermissionDenied));
         return false;
     }
@@ -319,7 +319,7 @@ void OperationController::beginOperation(Mutation mutation, const QString &targe
 {
     m_busyTargets.insert(targetKey);
     ++m_stateRevision;
-    // 新操作开始：清掉上一次的结果，避免旧提示被误读成这次的结果
+    // a new operation starts: clear the previous result so the old notice is not read as this one's
     setResult(Result::None, QString());
     Q_EMIT stateChanged();
     Q_UNUSED(mutation)
@@ -354,7 +354,7 @@ void OperationController::dismissResultIfObsolete()
         setResult(Result::None, QString());
         return;
     case Result::Error:
-        return; // 失败留着：用户还要看原因
+        return; // keep failures: the user still needs the reason
     }
 }
 
@@ -459,8 +459,8 @@ void OperationController::pullImage(const QString &reference)
         return;
     }
 
-    // 新拉取放到列表最前面，并立刻进入「进行中」状态：进度条先显示为不确定态，
-    // 不阻塞界面，也不影响别的镜像拉取
+    // put a new pull at the top and mark it running at once: the bar starts indeterminate, the UI
+    // never blocks, and other image pulls are unaffected
     ImagePullEntry entry;
     entry.reference = normalized;
     entry.statusKey = QStringLiteral("pulling");
@@ -468,8 +468,8 @@ void OperationController::pullImage(const QString &reference)
     m_pullEntries.prepend(entry);
     publishPulls();
 
-    // 拉取不再占用「操作忙碌」集合：它可能跑很久，不该让整页看起来在忙。
-    // 私有仓库的凭据来自钱包（没有就是匿名拉取，引擎会回 401，用户看得见原因）
+    // pulls stay out of the busy set: they can run long and must not make the page look busy.
+    // Credentials come from the wallet (empty = anonymous; the engine then answers 401, visibly)
     const RegistryCredential credential = m_credentialStore ? m_credentialStore->credentialForImage(normalized) : RegistryCredential();
     m_backend->pullImage(normalized, credential);
 }
@@ -521,7 +521,7 @@ bool OperationController::createNetwork(const QString &name,
                                         bool attachable,
                                         const QVariantList &labels)
 {
-    // 校验：名称规则 + 子网/网关格式 + 与现有网络重名（都在 C++ 侧，界面只显示 key）
+    // validation: name rules + subnet/gateway format + name collision (all in C++, the UI shows keys)
     const QString nameError = validateNetworkName(name);
     if (!nameError.isEmpty()) {
         setResult(Result::Error, i18n("The network was not created because the name is not valid."), nameError);
@@ -570,7 +570,7 @@ bool OperationController::createNetwork(const QString &name,
         }
     }
 
-    // 同一个名字不允许并发提交两次
+    // one name must not be submitted twice concurrently
     const QString targetKey = OperationTarget::network(request.name);
     if (isTargetBusy(targetKey)) {
         setResult(Result::Error,
@@ -615,7 +615,7 @@ bool OperationController::imageExistsLocally(const QString &reference) const
     if (reference.isEmpty()) {
         return false;
     }
-    // 按引用与 id 都能匹配：界面可能选的是列表里的镜像（带 tag），也可能直接填了 id
+    // match by reference and by id: the UI may pick a tagged image from the list or type an id
     const QList<Image> images = m_backend->images();
     for (const Image &image : images) {
         if (image.id == reference) {
@@ -636,7 +636,7 @@ bool OperationController::containerNameTaken(const QString &name) const
     if (trimmed.isEmpty()) {
         return false;
     }
-    // 引擎允许更长的名字，界面按完整名字比对；容器名前缀 `/` 是 docker CLI 的写法，这里不涉及
+    // the engine allows longer names, so compare full names; the "/" prefix is docker CLI syntax, unused here
     const QList<Container> containers = m_backend->containers();
     for (const Container &container : containers) {
         if (container.name.compare(trimmed, Qt::CaseInsensitive) == 0) {
@@ -648,7 +648,7 @@ bool OperationController::containerNameTaken(const QString &name) const
 
 QString OperationController::hostPortHolder(const QString &hostIp, int hostPort) const
 {
-    // 判定规则统一在 HostPortUsage 里（谁都不许再抄第二份，见 ARCH_next_ports.md §3）
+    // the rule lives once in HostPortUsage (no second copy allowed — ARCH_next_ports.md §3)
     return HostPortUsage::holderFor(m_backend->containers(), hostIp, hostPort);
 }
 
@@ -662,7 +662,7 @@ bool OperationController::createContainer(const QVariantMap &request, bool allow
     const QString name = request.value(QStringLiteral("name")).toString().trimmed();
     const QString image = request.value(QStringLiteral("image")).toString().trimmed();
 
-    // 1) 名称与镜像：名称规则 / 重名 / 镜像必须存在
+    // 1) name and image: name rules / collision / image must exist
     const QString nameError = validateContainerName(name);
     if (!nameError.isEmpty()) {
         setResult(Result::Error, i18n("The container was not created because the name is not valid."), nameError);
@@ -687,7 +687,7 @@ bool OperationController::createContainer(const QVariantMap &request, bool allow
         return false;
     }
 
-    // 2) 端口冲突：对照现有容器（引擎也会拒绝，但在这里挡住能给出更清楚的提示）
+    // 2) port conflicts with existing containers (the engine refuses too; blocking here explains better)
     const QVariantList ports = request.value(QStringLiteral("ports")).toList();
     for (const QVariant &entry : ports) {
         const QVariantMap port = entry.toMap();
@@ -702,7 +702,7 @@ bool OperationController::createContainer(const QVariantMap &request, bool allow
         }
     }
 
-    // 3) 挂载与环境变量的字段级校验
+    // 3) field-level validation of mounts and environment variables
     const QVariantList mounts = request.value(QStringLiteral("mounts")).toList();
     for (const QVariant &entry : mounts) {
         const QVariantMap mount = entry.toMap();
@@ -733,7 +733,7 @@ bool OperationController::createContainer(const QVariantMap &request, bool allow
         return false;
     }
 
-    // 4) QVariantMap → 请求结构（界面只传表单字段，映射细节在这里收口）
+    // 4) QVariantMap → request struct (the UI passes form fields only; the mapping is centralized here)
     ContainerCreateRequest create;
     create.name = name;
     create.image = image;
@@ -793,7 +793,7 @@ QString OperationController::volumeNameError(const QString &name) const
     if (trimmed.isEmpty()) {
         return QStringLiteral("nameRequired");
     }
-    // 与 Docker 一致：字母数字开头，其余允许 . _ -
+    // same as Docker: alphanumeric first character, then . _ -
     static const QRegularExpression allowed(QStringLiteral("^[A-Za-z0-9][A-Za-z0-9_.-]*$"));
     if (!allowed.match(trimmed).hasMatch()) {
         return QStringLiteral("nameInvalid");
@@ -903,7 +903,7 @@ bool OperationController::pruneVolumes()
                   DockerError(DockerError::Kind::PreconditionFailed));
         return false;
     }
-    // 清掉上一次的明细：否则这次若没拿到明细，会显示上一次的"删了哪些"
+    // clear the previous details: otherwise a prune without details would show the previous list
     m_pruneDetailText.clear();
     m_pruneDetailList.clear();
     beginOperation(Mutation::PruneVolumes, targetKey);
@@ -1002,7 +1002,7 @@ bool OperationController::buildImage(const QString &contextDirectory,
         return false;
     }
 
-    // 上下文先打包：本地能发现的错误（目录不存在、没有 Dockerfile、太大）不必等引擎
+    // pack the context first: local errors (missing directory, no Dockerfile, too large) need no engine
     BuildContextOptions options;
     options.directory = contextDirectory;
     options.dockerfile = dockerfile.isEmpty() ? QStringLiteral("Dockerfile") : dockerfile;
@@ -1030,7 +1030,7 @@ bool OperationController::buildImage(const QString &contextDirectory,
             request.labels.append({key, label.value(QStringLiteral("value")).toString()});
         }
     }
-    // 私有基础镜像：凭据查询与拉取走同一条路径（八期 §5.3）
+    // private base images: credential lookup takes the same path as pulls (phase 8 §5.3)
     const RegistryCredential credential = m_credentialStore
         ? m_credentialStore->credentialForImage(tags.first().trimmed())
         : RegistryCredential();
@@ -1095,7 +1095,7 @@ void OperationController::publishBuild(const ImageBuildEntry &entry)
     } else {
         entries.append(entry);
     }
-    // 进行中的在前，已结束的排在后面（与拉取列表一致）
+    // running first, finished after (same as the pull list)
     std::stable_sort(entries.begin(), entries.end(), [](const ImageBuildEntry &lhs, const ImageBuildEntry &rhs) {
         return lhs.active && !rhs.active;
     });
@@ -1157,7 +1157,7 @@ ImagePullEntry *OperationController::findPull(const QString &reference)
 
 void OperationController::publishPulls()
 {
-    // 进行中的在前，已结束的保持「最近结束的在前」
+    // running first; finished ones keep the most-recently-finished-first order
     QList<ImagePullEntry> ordered;
     ordered.reserve(m_pullEntries.size());
     for (const ImagePullEntry &entry : std::as_const(m_pullEntries)) {
@@ -1221,8 +1221,8 @@ void OperationController::onMutationFinished(Mutation mutation,
     }
 
     if (mutation == Mutation::PullImage) {
-        // 拉取结束：更新列表里的那一条（成功 / 失败 / 取消都保留在列表里，
-        // 失败原因因此不会被静默丢掉，用户处理完再手动移除）
+        // pull finished: update that entry (success / failure / cancellation all stay in the list,
+        // so the failure reason is never dropped silently; the user removes it after dealing with it)
         const QString reference = targetKey.section(QLatin1Char(':'), 1);
         ImagePullEntry *entry = findPull(reference);
         if (entry) {
@@ -1257,7 +1257,7 @@ void OperationController::onMutationFinished(Mutation mutation,
             break;
         }
         if (mutation == Mutation::PruneVolumes) {
-            // 清理的明细（卷名列表）放在"技术细节"行里，用户可以核对删了什么
+            // the prune details (volume names) go into the "technical details" line so the user can verify
             setResult(Result::Success, successText(mutation, targetKey), m_pruneDetailList);
         } else {
             setResult(Result::Success, successText(mutation, targetKey));
@@ -1274,7 +1274,7 @@ void OperationController::onMutationFinished(Mutation mutation,
         break;
     case MutationOutcome::Failed: {
         if (m_startAfterCreateInFlight && mutation == Mutation::StartContainer) {
-            // 创建成功、启动失败：必须说清是哪一步失败（§4.6）
+            // created but start failed: the message must name which step failed (§4.6)
             m_startAfterCreateInFlight = false;
             setResult(Result::Error,
                       i18n("The container was created but could not be started: %1", dockerErrorText(error)),
@@ -1283,7 +1283,7 @@ void OperationController::onMutationFinished(Mutation mutation,
             refreshAfter(Mutation::CreateContainer, targetKey);
             break;
         }
-        // 权限被拒 → 本次会话降级为只读（不可逆）
+        // permission denied → downgrade this session to read-only (irreversible)
         if (error.kind() == DockerError::Kind::PermissionDenied) {
             degradeToReadOnly(error);
         }
@@ -1315,7 +1315,7 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         break;
     }
     case Mutation::PullImage:
-        // 拉取成功后镜像列表与存储占用都会变
+        // a successful pull changes the image list and storage usage
         m_backend->refreshImages();
         m_backend->refreshStorageUsage();
         break;
@@ -1332,35 +1332,35 @@ void OperationController::refreshAfter(Mutation mutation, const QString &targetK
         break;
     case Mutation::RemoveNetwork:
         m_backend->refreshNetworks();
-        // 网络被删掉后容器的网络信息也变了（详情页要重读）
+        // removing a network also changes container network info (the detail page must re-read)
         m_backend->refreshContainers();
         Q_EMIT networksChanged();
         break;
     case Mutation::CreateContainer:
-        // 创建成功后容器列表与存储占用都会变；"创建并启动"由 containerCreated 的
-        // 回调串行发起启动（见构造函数里的连接）
+        // a successful create changes the container list and storage usage; create-and-start fires
+        // step 2 from the containerCreated callback (see the connection in the constructor)
         m_backend->refreshContainers();
         m_backend->refreshStorageUsage();
         break;
     case Mutation::BuildImage:
-        // 构建成功会多出镜像与构建缓存；失败也无所谓，刷新一次不贵
+        // a successful build adds an image and build cache; on failure the refresh is cheap anyway
         m_backend->refreshImages();
         m_backend->refreshStorageUsage();
         break;
     case Mutation::PruneBuildCache:
-        // 清理后存储占用变了（构建缓存那一段）
+        // pruning changes storage usage (the build-cache part)
         m_backend->refreshStorageUsage();
         break;
     case Mutation::CreateVolume:
     case Mutation::RemoveVolume:
     case Mutation::PruneVolumes:
-        m_backend->refreshVolumes(false); // 只要列表：占用由 storage 那次刷新负责
+        m_backend->refreshVolumes(false); // list only: the storage refresh covers usage
         m_backend->refreshStorageUsage();
         Q_EMIT volumesChanged();
         break;
     case Mutation::ConnectNetwork:
     case Mutation::DisconnectNetwork: {
-        // 网络成员列表与容器详情的网络分区都会变：两边都重读
+        // the network member list and the container detail's network section both change: re-read both
         const QString containerId = targetKey.section(QLatin1Char('/'), 1);
         m_backend->refreshNetworks();
         m_backend->refreshContainers();
@@ -1403,12 +1403,12 @@ QString OperationController::successText(Mutation mutation, const QString &targe
     case Mutation::DisconnectNetwork:
         return i18n("Container disconnected from the network.");
     case Mutation::CreateContainer: {
-        // 只声明"已创建"：启动是第二步，成功或失败都会另给一条结果（§4.6）
+        // claim only "created": start is step 2 and reports its own result either way (§4.6)
         const QString name = targetKey.section(QLatin1Char(':'), 1);
         return i18n("Container created: %1", name);
     }
     case Mutation::BuildImage: {
-        // 构建的进度与结果主要在构建列表里；这里只给一句总的结果
+        // build progress and result live in the build list; here only a one-line summary
         return i18n("Image built.");
     }
     case Mutation::PruneBuildCache:
@@ -1423,7 +1423,7 @@ QString OperationController::successText(Mutation mutation, const QString &targe
     case Mutation::RemoveVolume:
         return i18n("Volume removed.");
     case Mutation::PruneVolumes:
-        // 明细（删了哪些、回收多少）由 volumesPruned 先记下来，这里用它当结果文案
+        // volumesPruned records the details first (which volumes, how much reclaimed); use them here
         return m_pruneDetailText.isEmpty() ? i18n("Unused volumes cleaned up.") : m_pruneDetailText;
     }
     return i18n("Done.");
@@ -1434,10 +1434,11 @@ QString OperationController::failureText(Mutation mutation, const DockerError &e
     const QString base = dockerErrorText(error);
 
     /*
-     * 宿主端口已被占用（启动时才暴露，创建请求本身是合法的）：
-     * 引擎原文是 `driver failed programming external connectivity … Bind for 0.0.0.0:8100 failed:
-     * port is already allocated`，普通用户读不出"我该做什么"。这里翻成一句可行动的说明，
-     * 并把端口号提出来（能提出来才翻，提不出来就保留原文，不猜）。
+     * Host port already in use (surfaces only at start; the create request itself is valid): the raw
+     * engine text `driver failed programming external connectivity … Bind for 0.0.0.0:8100 failed:
+     * port is already allocated` tells a normal user nothing about what to do. Translate it into an
+     * actionable sentence and extract the port number — only when it can be extracted; otherwise keep
+     * the raw text rather than guess.
      */
     const QString detail = error.detail();
     if (detail.contains(QLatin1String("port is already allocated"), Qt::CaseInsensitive)) {
@@ -1451,13 +1452,13 @@ QString OperationController::failureText(Mutation mutation, const DockerError &e
         }
         return i18n("The container could not be started because a host port is already used by another container. Choose a different host port or stop that container.");
     }
-    // 拉取卡住（引擎联系不上镜像仓库）时，光说「超时」用户不知道能做什么
+    // when a pull stalls (the daemon cannot reach the registry), "timeout" alone leaves the user stuck
     if (mutation == Mutation::PullImage && error.kind() == DockerError::Kind::Timeout) {
         return i18n("%1 The registry may be unreachable from the Docker daemon (network, proxy, or IPv6 routing).",
                     base);
     }
     if (mutation == Mutation::BuildImage) {
-        // 具体的失败步骤在 detail 里（后端拼好的"Step N/M (命令) failed: …"）
+        // the failing step is in detail (backend-assembled "Step N/M (command) failed: …")
         return i18n("The image could not be built: %1", base);
     }
     return base;

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -122,7 +122,7 @@ void HttpResponseParser::parse()
             m_buffer.remove(0, eol + crlfSize);
 
             if (line.isEmpty()) {
-                // 头部结束，决定响应体的结束方式
+                // End of headers: decide how the body ends
                 if (header("transfer-encoding").toLower().contains("chunked")) {
                     m_bodyMode = BodyMode::Chunked;
                     m_state = State::ChunkSize;
@@ -146,7 +146,7 @@ void HttpResponseParser::parse()
                     m_state = State::Complete;
                     break;
                 }
-                // 既没有长度也不是 chunked：读到连接关闭为止
+                // Neither length nor chunked: read until the connection closes
                 m_bodyMode = BodyMode::UntilEof;
                 m_state = State::Body;
                 break;
@@ -163,13 +163,13 @@ void HttpResponseParser::parse()
         case State::Body: {
             if (m_bodyMode == BodyMode::ContentLength) {
                 if (m_buffer.size() < m_expectedBody) {
-                    return; // 等待更多数据
+                    return; // wait for more data
                 }
                 m_body.append(m_buffer.left(m_expectedBody));
                 m_buffer.remove(0, m_expectedBody);
                 m_state = State::Complete;
             } else {
-                // UntilEof：先收下已有数据，等 finishInput() 判定结束
+                // UntilEof: buffer what we have; finishInput() decides the end
                 m_body.append(m_buffer);
                 m_buffer.clear();
                 return;
@@ -185,7 +185,7 @@ void HttpResponseParser::parse()
             m_buffer.remove(0, eol + crlfSize);
             const int semicolon = line.indexOf(';');
             if (semicolon >= 0) {
-                line = line.left(semicolon); // 忽略 chunk extension
+                line = line.left(semicolon); // drop chunk extensions
             }
             bool ok = false;
             const qint64 size = line.trimmed().toLongLong(&ok, 16);

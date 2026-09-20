@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,12 +17,13 @@ class KioHostPathService;
 class PrivilegedConfigClient;
 
 /*!
- * KCM Layer（ARCH_V1 §6.1）。
+ * KCM layer (ARCH_V1 §6.1).
  *
- * 只负责：KCM 生命周期、QML 页面加载、把 presentation model 暴露给 QML、
- * 用户触发的刷新。不做 URL 拼接、JSON 解析、HTTP 状态码判断或 socket 访问。
+ * Responsible only for: KCM lifecycle, QML page loading, exposing presentation models to QML and
+ * user-triggered refreshes. It does no URL building, JSON parsing, HTTP status handling or socket
+ * access.
  *
- * 一期是只读状态面板，没有可保存的配置，因此不提供 Apply/Default 按钮（§37）。
+ * Phase 1 is a read-only status panel with nothing to save, hence no Apply/Default buttons (§37).
  */
 class DockerKcm : public KQuickConfigModule
 {
@@ -41,9 +42,9 @@ public:
 
 private:
     DockerBackend *m_backend = nullptr;
-    /*! 挂载分区「打开宿主目录」的生产实现（ARCH_V4 §2.1.1）。 */
+    /*! Production implementation of "open host folder" for mount rows (ARCH_V4 §2.1.1). */
     KioHostPathService *m_hostPaths = nullptr;
-    /*! 受限提权客户端（唯一以 root 运行的是 helper，不是本进程）。 */
+    /*! Restricted privileged client (the helper runs as root, never this process). */
     PrivilegedConfigClient *m_privilegedClient = nullptr;
     StatusController *m_controller = nullptr;
 };

@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,14 +14,15 @@ namespace Kontainer
 {
 
 /*!
- * 容器列表的搜索 / 过滤 / 排序代理（ARCH_V2 §9/§10/§32）。
+ * Search / filter / sort proxy for the container list (ARCH_V2 §9/§10/§32).
  *
- * - Search：name / ID / image 的大小写不敏感 substring 匹配（§9.2）
- * - Filter：All / Running / Paused / Stopped / Restarting / Dead（§9.3）
- * - 条件可组合：State == Running AND search matches（§9.4）
- * - 排序固定默认值：Name 升序（§10，写在注释与测试里）
+ * - Search: case-insensitive substring match on name / ID / image (§9.2)
+ * - Filter: All / Running / Paused / Stopped / Restarting / Dead (§9.3)
+ * - Conditions combine: State == Running AND search matches (§9.4)
+ * - Sort fixed at the default: Name ascending (§10, stated here and in tests)
  *
- * 代理自身持有搜索/过滤/排序状态，因此后台刷新（source model reset）不会重置用户条件（§32）。
+ * The proxy owns the search/filter/sort state, so a background refresh (source model reset) does not
+ * reset the user's conditions (§32).
  */
 class ContainerFilterModel : public QSortFilterProxyModel
 {

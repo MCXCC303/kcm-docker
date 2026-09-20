@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -29,10 +29,10 @@ namespace
 constexpr auto kDockerUnit = "docker.service";
 
 /*!
- * KAuth 失败 → 界面用的稳定 key（文案在 QML 侧，不在这里拼用户可见文本）。
+ * KAuth failure -> stable key for the UI (text lives in QML; no user-visible strings are built here).
  *
- * 分三类：用户自己取消的、权限被拒的、以及"根本没有可用 helper"的
- * —— 最后一类必须与"失败"区分开，因为界面要给出"自己动手"的命令而不是重试。
+ * Three groups: user-cancelled, authorization denied, and "no usable helper at all" — the last must
+ * stay distinct from plain failure, because the UI then offers a do-it-yourself command, not a retry.
  */
 QString errorKeyForJob(KAuth::ExecuteJob *job)
 {
@@ -46,13 +46,13 @@ QString errorKeyForJob(KAuth::ExecuteJob *job)
     case KAuth::ActionReply::NoSuchActionError:
     case KAuth::ActionReply::NoResponderError:
     case KAuth::ActionReply::InvalidActionError:
-        // policy 或 helper 没安装：这不是"操作失败"，而是"这条路不存在" → 界面给降级命令
+        // policy or helper missing: not a failed operation but a path that does not exist -> fallback command
         return QStringLiteral("helperUnavailable");
     default:
         break;
     }
 
-    // helper 自己返回的错误码（见 kcm_docker_helper.cpp 的 ErrorCode）
+    // error codes returned by the helper itself (see ErrorCode in kcm_docker_helper.cpp)
     switch (job->data().value(QStringLiteral("errorCode")).toInt()) {
     case 1:
         return QStringLiteral("invalidRequest");
@@ -79,8 +79,8 @@ PrivilegedConfigClient::PrivilegedConfigClient(QObject *parent)
 
 bool PrivilegedConfigClient::writeAvailable() const
 {
-    // KAuth 的 action 只有在 policy 与 helper 都安装时才"可用"；
-    // 这里只做一次便宜的判断，真正的结论以执行结果为准（失败会给 helperUnavailable）
+    // A KAuth action is valid only when both policy and helper are installed; this is a cheap
+    // check, the real answer comes from execution (failure yields helperUnavailable)
     KAuth::Action action(QString::fromLatin1(kSaveActionName));
     action.setHelperId(QString::fromLatin1(kHelperId));
     return action.isValid();
@@ -104,7 +104,7 @@ void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
         return;
     }
     QVariantMap arguments;
-    // 只传白名单键的编辑意图：helper 自己读文件、自己合并（调用方给不了任意内容）
+    // Only whitelisted edit intents: the helper reads and merges the file itself (no arbitrary content)
     if (edits.setRegistryMirrors) {
         arguments.insert(QStringLiteral("registry-mirrors"), edits.registryMirrors);
     }
@@ -133,7 +133,7 @@ void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
         break;
     }
     if (!removeKeys.isEmpty()) {
-        // 显式的删除意图：helper 只接受它管理范围内的键名
+        // Explicit removal intent: the helper accepts only keys it manages
         arguments.insert(QStringLiteral("remove"), removeKeys);
     }
     runHelperAction(QString::fromLatin1(kSaveActionName), arguments, Operation::WriteConfig);
@@ -142,7 +142,7 @@ void PrivilegedConfigClient::writeConfig(const DaemonConfigEdits &edits)
 void PrivilegedConfigClient::restartDocker(bool systemService)
 {
     if (!systemService) {
-        // rootless：重启属于用户自己的服务，不需要提权
+        // rootless: restarting the user's own service needs no privilege
         restartViaSessionSystemd();
         return;
     }
@@ -158,13 +158,13 @@ void PrivilegedConfigClient::restartDocker(bool systemService)
 void PrivilegedConfigClient::runHelperAction(const QString &actionName, const QVariantMap &arguments, Operation operation)
 {
     KAuth::Action action(actionName);
-    // 必须显式声明 helper：polkit 后端的执行路径要求动作带 helper
-    // （KAuth 的 Polkit1Backend 声明的是 AuthorizeFromHelperCapability，
-    //  ExecuteJob 在"没有 helper"时直接返回 InvalidActionReply，不会去执行任何东西）
+    // The helper must be set explicitly: the polkit backend's execute path requires it (KAuth's
+    // Polkit1Backend advertises AuthorizeFromHelperCapability; with no helper ExecuteJob returns
+    // InvalidActionReply and executes nothing)
     action.setHelperId(QString::fromLatin1(kHelperId));
     action.setArguments(arguments);
     if (!action.isValid()) {
-        // policy / helper 未安装：直接走降级路径，而不是弹一个必然失败的授权框
+        // policy / helper not installed: take the fallback path instead of showing a doomed auth dialog
         Q_EMIT finished(operation, false, QStringLiteral("helperUnavailable"));
         return;
     }
@@ -173,7 +173,7 @@ void PrivilegedConfigClient::runHelperAction(const QString &actionName, const QV
     KAuth::ExecuteJob *job = action.execute();
     connect(job, &KJob::result, this, [this, job, operation] {
         m_inFlight = false;
-        // KJob::error() 才是结果：HelperFailed/UserCancelled/AuthorizationDenied… 都在这里
+        // KJob::error() is the result: HelperFailed/UserCancelled/AuthorizationDenied all land here
         const bool success = job->error() == KJob::NoError;
         const QString errorKey = success ? QString() : errorKeyForJob(job);
         if (!success) {
@@ -189,7 +189,7 @@ void PrivilegedConfigClient::controlService(const QString &unit, const QString &
 {
     ServiceVerb verb = ServiceVerb::Start;
     if (!serviceControlArgumentError(unit, verbKey).isEmpty() || !serviceVerbFromKey(verbKey, &verb)) {
-        // 非法请求：不发任何提权动作，直接按失败上报（错误 key 由调用方按同一函数算出来）
+        // Invalid request: no privileged action, report failure (caller derives the key the same way)
         Q_EMIT finished(Operation::ServiceControl, false, serviceControlArgumentError(unit, verbKey));
         return;
     }

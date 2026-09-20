@@ -1,16 +1,18 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    字符串列表编辑器（ARCH_V5_V8 §1.6 的补充）。
+    String list editor (supplement to ARCH_V5_V8 §1.6).
 
-    用于镜像加速器、insecure-registries 这类"一串字符串"的字段：
-    增、删、上移下移（顺序对镜像源有意义：靠前的先被尝试）。
+    For fields that are "a series of strings", such as registry mirrors and
+    insecure-registries: add, remove, move up/down (order matters for mirrors: earlier
+    ones are tried first).
 
-    校验通过 `validator` 回调注入（返回空字符串表示合法，否则返回错误文案），
-    这样"什么算合法的镜像源地址"只有一份实现。
+    Validation is injected through the `validator` callback (an empty string means valid,
+    otherwise the error text), so "what counts as a valid mirror address" has one
+    implementation only.
 
-    用法：
+    Usage:
 
         Components.StringListEditor {
             id: mirrors
@@ -20,7 +22,7 @@
         }
 */
 
-// delegate 需要访问外层 id（调用 ListModel 的增删改）：固定用 Unbound 语义
+// Delegates need the outer id (to add/remove/modify the ListModel): pin Unbound semantics
 pragma ComponentBehavior: Unbound
 
 import QtQuick
@@ -34,22 +36,22 @@ import "." as Local
 ColumnLayout {
     id: root
 
-    /*! 初始条目（组件创建时读取一次）。 */
+    /*! Initial entries (read once when the component is created). */
     property var initialEntries: []
     /*!
-     * 校验回调：`function(value) -> string`。
-     * 返回空字符串表示合法；返回文案会在该行下方显示，并阻止提交。
+     * Validation callback: `function(value) -> string`.
+     * An empty string means valid; a returned text is shown under that row and blocks submission.
      */
     property var validator: null
-    /*! 添加按钮文案。 */
+    /*! Text of the add button. */
     property string addText: i18n("Add")
-    /*! 输入占位文本。 */
+    /*! Placeholder text of the input. */
     property string placeholderText: ""
 
-    /*! 条目发生变化（增删改序）。 */
+    /*! Entries changed (added, removed, edited or reordered). */
     signal changed
 
-    /*! 是否可编辑；受保护区未解锁时为 false（字段看得见但改不了）。 */
+    /*! Whether the list is editable; false while the protected area is locked (fields stay visible). */
     property bool editable: true
 
     spacing: Kirigami.Units.smallSpacing
@@ -61,13 +63,14 @@ ColumnLayout {
     }
 
     /*!
-     * 把控制器给出的列表同步进模型。
+     * Sync the list given by the controller into the model.
      *
-     * 为什么要判断"内容是否相同"：自动刷新会让 `initialEntries` 重新求值。
-     * 无条件重建会把用户正在输入的那一行（以及光标位置）一起丢掉；
-     * 而内容相同时重建没有任何意义——用户在控件里的改动本来就会立刻写回控制器，
-     * 因此两边一致恰恰是"不需要动"的信号。真正的外部变化（重新读盘、恢复备份）
-     * 才会走到重建这一步。
+     * Why "is the content identical" is checked: automatic refreshes re-evaluate
+     * `initialEntries`, and an unconditional rebuild would drop the row the user is typing
+     * in (and the cursor position) — with identical content the rebuild is pointless anyway:
+     * edits in the control are written back to the controller immediately, so both sides
+     * agreeing is exactly the "do not touch it" signal. Only real external changes (re-reading
+     * the file, restoring a backup) reach the rebuild.
      */
     onInitialEntriesChanged: root.syncFromInitialEntries()
 
@@ -76,10 +79,11 @@ ColumnLayout {
         for (const value of root.initialEntries) {
             incoming.push(String(value));
         }
-        // 与"当前条目的**有意义**内容"比较，而不是逐行比较原始值：
-        // 用户刚点「添加」得到的是一个空行（待填写的草稿），而 values() 会把空行丢掉，
-        // 于是控制器里的列表并不包含它。逐行比较会把这个空行当成"外部变化"清掉——
-        // 表现为"点了添加，只是变成未保存，条目没出现"（真实反馈）。
+        // Compare against the **meaningful** content of the current entries, not raw rows: after
+        // "Add" the user has an empty draft row, which values() drops, so the controller's list
+        // does not contain it. A raw row comparison would treat that empty row as an "external
+        // change" and clear it — the symptom being "clicking Add only marks the form unsaved and
+        // no entry appears" (real feedback).
         const current = root.values();
         if (incoming.length === current.length) {
             let identical = true;
@@ -147,8 +151,9 @@ ColumnLayout {
                 enabled: root.editable && index > 0
                 Accessible.name: i18n("Move up")
                 onClicked: {
-                    // 顺序很重要：先发信号，再改模型 —— remove()/move() 会同步销毁当前 delegate，
-                    // 之后再访问外层 id 会抛 ReferenceError（真实踩过）
+                    // Order matters: emit the signal first, then change the model — remove()/move()
+                    // synchronously destroy the current delegate, after which the outer id throws a
+                    // ReferenceError (hit in practice)
                     root.changed();
                     entries.move(index, index - 1, 1);
                 }
@@ -192,7 +197,7 @@ ColumnLayout {
         }
     }
 
-    /*! 当前条目（去掉首尾空白，丢掉空行）。 */
+    /*! Current entries (trimmed, empty rows dropped). */
     function values(): var {
         const result = [];
         for (let i = 0; i < entries.count; ++i) {
@@ -204,7 +209,7 @@ ColumnLayout {
         return result;
     }
 
-    /*! 是否有条目没通过校验（空行不算错误，提交时会被忽略）。 */
+    /*! Whether any entry failed validation (empty rows are not errors; they are ignored on submit). */
     function hasErrors(): bool {
         if (!root.validator) {
             return false;
@@ -221,7 +226,7 @@ ColumnLayout {
         return false;
     }
 
-    /*! 用新的一组值替换现有内容。 */
+    /*! Replace the current content with a new set of values. */
     function setValues(list): void {
         entries.clear();
         for (const value of list) {

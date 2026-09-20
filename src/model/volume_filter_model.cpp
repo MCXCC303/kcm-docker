@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -10,7 +10,7 @@ namespace Kontainer
 
 namespace
 {
-/*! 使用情况过滤：`all` / `unused` / `inUse`（未知的使用情况不归入任何一侧）。 */
+/*! Usage filter: `all` / `unused` / `inUse` (unknown usage falls into neither side). */
 bool matchesUsageFilter(bool inUse, bool usageKnown, const QString &filter)
 {
     if (filter == QLatin1String("unused")) {
@@ -83,7 +83,7 @@ void VolumeFilterModel::updateSorting()
         sort(0, Qt::AscendingOrder);
     } else if (m_sortKey == QLatin1String("size")) {
         setSortRole(VolumeModel::SizeBytesRole);
-        sort(0, Qt::DescendingOrder); // 最大的在最前面（清理时最有用）
+        sort(0, Qt::DescendingOrder); // biggest first (most useful when cleaning up)
     } else if (m_sortKey == QLatin1String("refs")) {
         setSortRole(VolumeModel::RefCountRole);
         sort(0, Qt::DescendingOrder);

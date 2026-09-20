@@ -1,16 +1,18 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    创建网络对话框（ARCH_V5_V8 §3.3）。
+    Create-network dialog (ARCH_V5_V8 §3.3).
 
-    范围被有意限制：**只创建 bridge 网络**。其它驱动（overlay / macvlan / ipvlan）
-    在列表与详情里正常展示，但这里不提供创建入口——overlay 需要 swarm，macvlan/ipvlan
-    需要父接口配置，都不是"填个名字"能完成的事（§3.7 明确不做）。
+    Scope is deliberately limited: **bridge networks only**. Other drivers
+    (overlay / macvlan / ipvlan) still appear in lists and details, but cannot be created
+    here — overlay needs swarm, macvlan/ipvlan need parent-interface configuration, and
+    neither is "just type a name" (§3.7 rules it out).
 
-    校验规则只有一份实现（OperationController 转发的 domain 函数）：
-    这里做**实时**校验并就地给出原因，提交时控制器会**再校验一次**。
-    错误文案由稳定 key 映射而来（C++ 不拼用户可见文本）。
+    Validation exists once (domain functions forwarded by OperationController): this
+    dialog validates **live** and shows the reason inline, and the controller
+    **validates again** on submit. Error text maps stable keys to strings, since C++
+    builds no user-visible text.
 */
 
 import QtQuick
@@ -24,7 +26,7 @@ import "." as Local
 Kirigami.Dialog {
     id: dialog
 
-    /*! `OperationController`（校验、提交、结果都在它身上）。 */
+    /*! `OperationController` (validation, submit and result all live there). */
     required property var operations
 
     signal created(string name)
@@ -35,7 +37,7 @@ Kirigami.Dialog {
     standardButtons: Kirigami.Dialog.NoButton
     preferredWidth: Kirigami.Units.gridUnit * 28
 
-    /*! 错误 key → 文案。 */
+    /*! Error key → text. */
     function messageFor(key: string): string {
         switch (key) {
         case "nameRequired":
@@ -55,10 +57,10 @@ Kirigami.Dialog {
         }
     }
 
-    /*! 当前输入的第一个问题（空 = 可以提交）。 */
+    /*! First problem with the current input (empty = submittable). */
     readonly property string currentError: {
         if (nameField.text.trim().length === 0) {
-            return ""; // 还没开始填：不提前报错
+            return ""; // nothing typed yet: no premature error
         }
         const nameError = dialog.operations.networkNameError(nameField.text);
         if (nameError.length > 0) {
@@ -96,7 +98,7 @@ Kirigami.Dialog {
             return;
         }
         const name = nameField.text.trim();
-        // 标签直接来自编辑器（空行与非法键由它自己过滤/报错）
+        // Labels come straight from the editor (it filters/reports blank rows and invalid keys)
         const labels = labelsEditor.entries();
         if (dialog.operations.createNetwork(name,
                                             subnetField.text.trim(),

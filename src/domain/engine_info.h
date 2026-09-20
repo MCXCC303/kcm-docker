@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,14 +13,14 @@ namespace Kontainer
 {
 
 /*!
- * Engine 域数据（ARCH_V2 §25/§26：domain object 是 Kontainer 自己的稳定语义，
- * 既不是 Docker API 的 DTO 镜像，也不含任何 UI 文案）。
+ * Engine domain data (ARCH_V2 §25/§26: a domain object is Kontainer's own stable semantics —
+ * not a DTO mirror of the Docker API, and free of UI text).
  */
 /*!
- * `/version` 的 `Components[]` 里的一项（Engine / containerd / runc / docker-init …）。
+ * One entry of `/version`'s `Components[]` (Engine / containerd / runc / docker-init …).
  *
- * 引擎版本只说明 dockerd 自己；containerd、runc 的版本同样影响行为
- * （例如 cgroup v2、镜像格式支持），因此一并展示。
+ * The engine version only describes dockerd itself; containerd and runc versions affect
+ * behavior too (cgroup v2, image format support), so they are shown as well.
  */
 struct EngineComponent {
     QString name;
@@ -33,10 +33,10 @@ struct EngineComponent {
 };
 
 struct EngineInfo {
-    bool available = false; /*!< /_ping 与 /version 成功 */
-    bool countsAvailable = false; /*!< /info 成功（容器/镜像计数可信） */
+    bool available = false; /*!< /_ping and /version succeeded */
+    bool countsAvailable = false; /*!< /info succeeded (container/image counts are trustworthy) */
     QString serverVersion;
-    QString apiVersion; /*!< 协商后实际使用的客户端 API 版本 */
+    QString apiVersion; /*!< client API version actually used after negotiation */
     QString minApiVersion;
     QString osType;
     QString architecture;
@@ -50,25 +50,25 @@ struct EngineInfo {
     int containersPaused = 0;
     int containersStopped = 0;
     int imageCount = 0;
-    /*! 宿主内存总量（/info 的 MemTotal）：用于判断容器 memory limit 是否为“无限制”。 */
+    /*! Host total memory (/info MemTotal): tells whether a container's memory limit is "unlimited". */
     qint64 memoryTotalBytes = 0;
-    /*! `/info` 的 SecurityOptions：含 `name=rootless` 即为 rootless 部署。 */
+    /*! /info SecurityOptions: containing `name=rootless` means a rootless deployment. */
     QStringList securityOptions;
-    /*! `/info` 的 DockerRootDir。 */
+    /*! /info DockerRootDir. */
     QString dockerRootDir;
-    /*! `/info` 的 LoggingDriver。 */
+    /*! /info LoggingDriver. */
     QString loggingDriver;
-    /*! `/info` 的 RegistryConfig.Mirrors：与配置文件对照可判断「已生效 / 待重启」。 */
+    /*! /info RegistryConfig.Mirrors: comparing with the config file shows "applied / needs restart". */
     QStringList registryMirrors;
-    /*! `/info` 的 LiveRestoreEnabled：为真时重启 daemon 不会停掉运行中的容器。 */
+    /*! /info LiveRestoreEnabled: when true, restarting the daemon keeps running containers alive. */
     bool liveRestoreEnabled = false;
-    /*! `/version` 的 `Components[]`：dockerd / containerd / runc 等的版本。 */
+    /*! /version `Components[]`: versions of dockerd / containerd / runc etc. */
     QList<EngineComponent> components;
-    /*! `/info` 的 CgroupDriver（`systemd` / `cgroupfs`）。 */
+    /*! /info CgroupDriver (`systemd` / `cgroupfs`). */
     QString cgroupDriver;
-    /*! `/info` 的 NCPU。 */
+    /*! /info NCPU. */
     int cpuCount = 0;
-    /*! `/info` 的 Warnings：引擎自己报的配置问题，值得原样展示。 */
+    /*! /info Warnings: configuration problems reported by the engine; worth showing verbatim. */
     QStringList warnings;
 };
 

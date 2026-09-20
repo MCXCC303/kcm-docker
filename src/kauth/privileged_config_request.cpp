@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -20,10 +20,11 @@ constexpr auto kRegistryMirrors = "registry-mirrors";
 constexpr auto kInsecureRegistries = "insecure-registries";
 constexpr auto kMaxConcurrentDownloads = "max-concurrent-downloads";
 constexpr auto kLogDriver = "log-driver";
-/*! 控制键：要删除的键名列表（不是 daemon.json 的键）。 */
+/*! Control key: list of key names to delete (not a daemon.json key). */
 constexpr auto kRemove = "remove";
 
-/*! 与界面侧 `Presentation::registryMirrorErrorKey` 相同的形态；helper 侧必须独立校验（不信任调用方）。 */
+/*! Same shape as `Presentation::registryMirrorErrorKey`; the helper must validate on its own
+ * (never trust the caller). */
 bool isValidMirror(const QString &value)
 {
     static const QRegularExpression pattern(QStringLiteral("^https?://[A-Za-z0-9._\\-]+(:[0-9]{1,5})?/?$"));
@@ -42,7 +43,7 @@ bool parseStringList(const QVariant &value, QStringList *out)
         *out = value.toStringList();
         return true;
     }
-    // QML/KAuth 可能把它传成 QVariantList
+    // QML/KAuth may pass it as a QVariantList
     if (value.canConvert<QVariantList>()) {
         const QVariantList list = value.toList();
         QStringList strings;
@@ -66,7 +67,7 @@ QStringList PrivilegedConfigRequest::allowedControlKeys()
 
 QStringList PrivilegedConfigRequest::removableKeys()
 {
-    // 只允许删除我们管理的键：helper 不能删掉它看不懂的东西
+    // Only keys we manage may be deleted: the helper must not delete what it cannot understand
     return allowedKeys();
 }
 
@@ -82,7 +83,7 @@ QStringList PrivilegedConfigRequest::allowedKeys()
 
 QStringList PrivilegedConfigRequest::allowedLogDrivers()
 {
-    // daemon 支持的常见日志驱动；不接受任意字符串（helper 写的是 root 拥有的文件）
+    // Common log drivers the daemon supports; no arbitrary strings (the helper writes a root-owned file)
     return {
         QStringLiteral("json-file"),
         QStringLiteral("local"),
@@ -108,7 +109,7 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
 
     for (auto it = arguments.constBegin(); it != arguments.constEnd(); ++it) {
         if (!allowedKeys().contains(it.key()) && !allowedControlKeys().contains(it.key())) {
-            // 未知键 → 整请求拒绝（"忽略未知参数"会让调用方以为生效了）
+            // Unknown key → reject the whole request (ignoring unknown args would look like success)
             return fail("unknownKey");
         }
     }
@@ -177,10 +178,10 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
         }
         for (const QString &key : keys) {
             if (!removableKeys().contains(key)) {
-                // 不在管理范围内的键一律拒绝（"忽略"会让调用方以为删掉了）
+                // Keys outside our scope are rejected (ignoring one would look like a deletion)
                 return fail("unknownKey");
             }
-            // 同一个键既赋值又要求删除：拒绝，而不是替调用方猜哪个优先
+            // One key both assigned and marked for removal: reject instead of guessing the winner
             if ((key == QLatin1String(kMaxConcurrentDownloads) && parsed.m_setMaxConcurrentDownloads)
                 || (key == QLatin1String(kLogDriver) && parsed.m_setLogDriver)
                 || (key == QLatin1String(kRegistryMirrors) && parsed.m_setRegistryMirrors)
@@ -191,7 +192,7 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
         parsed.m_removeKeys = keys;
     }
 
-    // dryRun 允许空编辑集（「解锁」时用户还没改任何东西）
+    // dryRun allows an empty edit set (nothing is changed yet when the user unlocks)
     if (parsed.isEmpty() && !parsed.m_dryRun) {
         return fail("noEdits");
     }
@@ -204,11 +205,11 @@ bool PrivilegedConfigRequest::fromArguments(const QVariantMap &arguments, Privil
 
 QByteArray PrivilegedConfigRequest::mergeInto(const QByteArray &existingContent) const
 {
-    // 用与界面侧完全相同的合并实现：未知键保留、只动白名单键
+    // Use exactly the merge implementation from the UI side: keep unknown keys, touch whitelisted ones
     const QByteArray existing = existingContent.trimmed().isEmpty() ? QByteArrayLiteral("{}") : existingContent;
     const DaemonConfigDocument document = DaemonConfigDocument::fromContent(existing);
     if (!document.isValid()) {
-        // 看不懂的既有文件绝不覆写（helper 侧同样遵守）
+        // Never overwrite an existing file we cannot parse (the helper obeys this too)
         return {};
     }
 
@@ -221,7 +222,7 @@ QByteArray PrivilegedConfigRequest::mergeInto(const QByteArray &existingContent)
     edits.maxConcurrentDownloads = m_maxConcurrentDownloads;
     edits.logDriverEdit = m_setLogDriver ? ConfigEdit::Set : ConfigEdit::Unchanged;
     edits.logDriver = m_logDriver;
-    // 删除意图（remove 列表里的每个键都对应一次 Remove）
+    // Removal intents (every key in the remove list maps to one Remove)
     for (const QString &key : m_removeKeys) {
         if (key == QLatin1String(kMaxConcurrentDownloads)) {
             edits.concurrentDownloadsEdit = ConfigEdit::Remove;

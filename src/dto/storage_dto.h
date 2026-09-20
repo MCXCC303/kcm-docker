@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -16,10 +16,11 @@ namespace Kontainer
 {
 
 /*!
- * `GET /system/df` 的 DTO。
+ * DTO for `GET /system/df`.
  *
- * 新版引擎直接给出各类别的用量合计（ImageUsage/ContainerUsage/VolumeUsage/BuildCacheUsage），
- * 老版本只有明细数组，因此这里两者都保留，由映射阶段决定优先使用哪个（§24：结构化 API）。
+ * Newer engines report per-category totals (ImageUsage/ContainerUsage/VolumeUsage/BuildCacheUsage)
+ * while older ones only have the detail arrays, so both are kept and the mapping stage decides
+ * which to prefer (§24: structured API).
  */
 struct DockerStorageDTO {
     qint64 layersSize = -1;
@@ -43,7 +44,7 @@ struct DockerStorageDTO {
     static std::optional<DockerStorageDTO> fromPayload(const QByteArray &payload, QString *error = nullptr);
 };
 
-/*! DTO → domain（§26）。 */
+/*! DTO → domain (§26). */
 StorageUsage storageUsageFromDto(const DockerStorageDTO &dto);
 
 } // namespace Kontainer

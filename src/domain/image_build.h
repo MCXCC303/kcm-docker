@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,28 +14,30 @@ namespace Kontainer
 {
 
 /*!
- * 一次镜像构建的请求（ARCH_V5_V8 §5.3）。
+ * One image build request (ARCH_V5_V8 §5.3).
  *
- * 上下文已经由 `packBuildContext()` 打成 tar（`contextArchive`），后端只负责上传与读进度。
+ * `packBuildContext()` already packed the context into a tar (`contextArchive`); the backend
+ * only uploads it and reads progress.
  */
 struct ImageBuildRequest {
-    /*! 请求标识：模型里每一条构建用它对应（与拉取按引用对应同理）。 */
+    /*! Request id: the model keys each build by it, as it keys pulls by reference. */
     QString id;
-    /*! 上下文 tar 的路径（调用方负责在上传结束后删除）。 */
+    /*! Path of the context tar (the caller deletes it after the upload). */
     QString contextArchive;
-    /*! 上下文目录（只用于错误提示与"再次构建"）。 */
+    /*! Context directory (only for error hints and "build again"). */
     QString contextDirectory;
-    /*! Dockerfile 在上下文里的相对路径（默认 `Dockerfile`）。 */
+    /*! Dockerfile path relative to the context (default `Dockerfile`). */
     QString dockerfile = QStringLiteral("Dockerfile");
-    /*! 标签（`t` 可以出现多次）。 */
+    /*! Tags (`t` may appear multiple times). */
     QStringList tags;
     /*!
-     * 已编码的 `X-Registry-Auth`（基础镜像在私有仓库时需要）。
+     * Encoded `X-Registry-Auth` (needed when the base image lives in a private registry).
      *
-     * 由控制器从凭据存储取出并编码——与拉取同一条路径，后端不认识凭据存储。
+     * The controller reads it from the credential store and encodes it — the same path as pulls;
+     * the backend knows nothing about credential stores.
      */
     QByteArray registryAuthHeader;
-    QStringList buildArgs; /*!< `KEY=value` 形式 */
+    QStringList buildArgs; /*!< `KEY=value` entries */
     QList<QPair<QString, QString>> labels;
     QString target;
     QString platform;
@@ -45,26 +47,27 @@ struct ImageBuildRequest {
 };
 
 /*!
- * 构建流的一行聚合出来的增量（后端 → 模型）。
+ * Increment aggregated from one build-stream line (backend → model).
  *
- * 字段都按"引擎原文照搬、界面按数据显示"的约定：`statusText` / `stepCommand` 不翻译。
+ * Fields follow "copy the engine verbatim, the UI shows the data": `statusText` / `stepCommand`
+ * are never translated.
  */
 struct ImageBuildUpdate {
-    /*! 引擎给的整行原文（stream 或 status）。 */
+    /*! Whole line as given by the engine (stream or status). */
     QString statusText;
-    /*! 当前步骤号（1 起）与总步数；未知为 0。 */
+    /*! Current step (1-based) and total steps; 0 when unknown. */
     int stepIndex = 0;
     int totalSteps = 0;
-    /*! 当前步骤的命令原文。 */
+    /*! Raw command of the current step. */
     QString stepCommand;
-    /*! 该步骤是否命中缓存。 */
+    /*! Whether the step hit the cache. */
     bool cached = false;
-    /*! 已知进度（0.0 ~ 1.0）；未知时 `progressKnown` 为 false。 */
+    /*! Known progress (0.0 ~ 1.0); `progressKnown` is false when unknown. */
     double progress = -1.0;
     bool progressKnown = false;
-    /*! 失败原因（引擎原文；成功与进行中为空）。含失败步骤的完整描述会被写在这里。 */
+    /*! Failure reason (engine text; empty on success/running), with the failing step's full description. */
     QString errorText;
-    /*! 构建成功时引擎给出的镜像 id（`aux.ID`）。 */
+    /*! Image id reported by the engine on success (`aux.ID`). */
     QString auxImageId;
 };
 

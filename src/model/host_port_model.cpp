@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -61,7 +61,7 @@ QVariant HostPortModel::data(const QModelIndex &index, int role) const
     case ContainerImageRole:
         return entry.containerImage;
     case ActionableRole:
-        // 只有真的占着端口的容器才谈得上"停止"；声明未生效的只给跳转
+        // Only a container really holding the port can be "stopped"; declared-only rows get navigation only
         return entry.stateKey == QLatin1String("inUse");
     default:
         break;

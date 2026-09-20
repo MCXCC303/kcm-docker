@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,7 +14,7 @@ namespace Kontainer
 
 namespace
 {
-/*! 引擎在日志驱动不支持读取时的措辞（实测 journald / syslog 等会这样回）。 */
+/*! Wording the engine uses when the log driver cannot be read (seen with journald / syslog). */
 bool looksLikeUnsupportedLogDriver(const QString &detail)
 {
     static const QStringList hints = {
@@ -131,7 +131,7 @@ void ContainerLogController::connectTo(const QString &containerId, bool tty, int
         setState(QStringLiteral("failed"), QStringLiteral("containerGone"));
         return;
     }
-    // 换容器/重连：先停掉旧的流（它的 Cancelled 结束会被 handleFinished 忽略）
+    // Switch/reconnect: stop the old stream first (its Cancelled end is ignored by handleFinished)
     if (m_connected) {
         m_backend->stopContainerLogs(m_containerId);
     }
@@ -186,7 +186,7 @@ void ContainerLogController::resume()
     m_paused = false;
     Q_EMIT pausedChanged();
     setState(QStringLiteral("streaming"));
-    // 暂停期间累积的内容一次性补上（不丢日志）
+    // Append everything accumulated while paused in one go (no log lines lost)
     flushNow();
 }
 
@@ -206,8 +206,8 @@ void ContainerLogController::clear()
 
 void ContainerLogController::appendLine(const LogLine &line)
 {
-    // 上一条临时行可能已经刷新到可见缓冲里了：先把它"拉回"待定区，
-    // 这样下面的替换逻辑只需要面对一种情况（否则会出现 "10%\n50%" 这种半截输出）
+    // The previous provisional line may already be flushed into the visible buffer: pull it back into
+    // pending so the replacement logic below faces a single case (else "10%\n50%" half-output appears)
     if (m_pending.isEmpty() && m_lastLineProvisional && !m_lines.isEmpty()) {
         const QString previous = m_lines.takeLast();
         if (!m_lineComplete.isEmpty()) {
@@ -220,10 +220,11 @@ void ContainerLogController::appendLine(const LogLine &line)
         m_lastLineProvisional = false;
     }
 
-    // 上一条是临时行（`\r` 覆盖中 / 流结束的半行）→ 新内容替换它，而不是新增一行。
-    // 注意**不要求**新行也是临时的：一行写完（遇到 `\n`）时，它同样是"这一行的最终内容"，
-    // 因此也要替换掉之前的临时版本，否则会留下 "50%\n100% done" 这样的半截输出。
-    // 只比较"是否临时"，不比较来源流：控制台不按 stdout/stderr 上色（§3.1 范围）
+    // Previous line provisional (`\r` overwrite in progress / half line at stream end) -> the new content
+    // replaces it rather than adding a row. The new line need **not** be provisional: a finished line
+    // (hit `\n`) is that row's final content too, so it must replace the provisional version or
+    // "50%\n100% done" half-output remains. Only provisionality is compared, not the source stream:
+    // the console does not color stdout/stderr differently (§3.1 scope)
     if (!m_pending.isEmpty() && !m_pendingComplete.at(m_pendingComplete.size() - 1)) {
         m_pendingBytes -= int(m_pending.last().toUtf8().size());
         m_pending.removeLast();
@@ -237,7 +238,7 @@ void ContainerLogController::appendLine(const LogLine &line)
 void ContainerLogController::handleLines(const QString &id, const QList<LogLine> &lines)
 {
     if (!m_connected || id != m_containerId) {
-        return; // 别的容器（或已经断开的流）的内容
+        return; // Content from another container (or a stream already disconnected)
     }
     for (const LogLine &line : lines) {
         appendLine(line);
@@ -247,7 +248,7 @@ void ContainerLogController::handleLines(const QString &id, const QList<LogLine>
     }
     if (m_pendingBytes >= kFlushBytes) {
         if (m_paused) {
-            return; // 暂停期间只累积，等恢复时一次补上
+            return; // While paused: accumulate only, append it all on resume
         }
         flushNow();
         return;
@@ -258,7 +259,7 @@ void ContainerLogController::handleLines(const QString &id, const QList<LogLine>
 void ContainerLogController::scheduleFlush()
 {
     if (m_paused) {
-        return; // 暂停：不排刷新，内容留在 m_pending 里
+        return; // Paused: schedule no flush, content stays in m_pending
     }
     if (m_flushIntervalMs <= 0) {
         flushNow();
@@ -292,7 +293,7 @@ void ContainerLogController::flushNow()
 
 void ContainerLogController::trimToLimits()
 {
-    // 双上限：行数与字节都要守。从**头部**丢（保留最新的，日志看起来才像 tail）
+    // Dual limits: honor both lines and bytes. Drop from the **head** (keep the newest, like tail)
     while (m_lines.size() > kMaxLines || (m_bytes > kMaxBytes && m_lines.size() > 1) || m_lineComplete.size() > kMaxLines) {
         m_bytes -= int(m_lines.first().toUtf8().size()) + 1;
         m_lines.removeFirst();
@@ -310,7 +311,7 @@ void ContainerLogController::rebuildText()
     for (int i = 0; i < m_lines.size(); ++i) {
         const bool complete = i < m_lineComplete.size() ? m_lineComplete.at(i) : true;
         const bool isLast = i == m_lines.size() - 1;
-        // 最后一行若是临时行（`\r` 覆盖中 / 流结束的半行），先不加换行
+        // If the last line is provisional (`\r` overwrite / half line at stream end), add no newline yet
         withNewlines.append(complete || !isLast ? m_lines.at(i) + QLatin1Char('\n') : m_lines.at(i));
     }
     const QString rebuilt = withNewlines.join(QString());
@@ -327,7 +328,7 @@ void ContainerLogController::handleFinished(const QString &id, DockerBackendInte
         return;
     }
     if (end == DockerBackendInterface::LogStreamEnd::Cancelled) {
-        // 我们自己停的（换容器 / 离开分区 / 重连）：不是用户可见的错误
+        // Stopped by us (container switch / leaving the section / reconnect): not a user-visible error
         return;
     }
     m_connected = false;

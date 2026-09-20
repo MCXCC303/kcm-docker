@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -14,15 +14,16 @@ namespace Kontainer
 {
 
 /*!
- * "按稳定键增量更新"的列表模型基类（ARCH_V5_V8 §体验修复）。
+ * Base class for list models that update incrementally by stable key (ARCH_V5_V8 §UX fixes).
  *
- * 为什么需要基类：`beginInsertRows()` / `beginMoveRows()` 是 `QAbstractItemModel` 的
- * **protected** 成员，只有派生类自己能调；自由函数（哪怕传了模型指针）没有这个权限。
- * 因此把"执行计划"这一步放进基类，具体模型只提供 role/data（算法仍在可单测的
- * `planRowSync()` 里）。
+ * Why a base class: `beginInsertRows()` / `beginMoveRows()` are **protected** members of
+ * `QAbstractItemModel`, callable only from a derived class — a free function has no access even
+ * with a model pointer. So applying the plan lives here, and concrete models only supply
+ * role/data (the algorithm stays in the unit-testable `planRowSync()`).
  *
- * 解决的问题（用户实测）：点击启动/停止、或从详情页返回后，列表被拉回最上方——
- * 根因是原来每次刷新都 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
+ * Fixes (reported by users): clicking start/stop or returning from the detail page scrolled the
+ * list back to the top; every refresh used `beginResetModel()`, and a model reset always resets
+ * the ListView scroll position.
  */
 template<typename Derived, typename T>
 class KeyedListModel : public QAbstractListModel
@@ -32,12 +33,13 @@ public:
 
 protected:
     /*!
-     * 按稳定键把 `incoming` 增量同步到 `storage`。
+     * Incrementally sync `incoming` into `storage` by stable key.
      *
-     * 只有键序列（行数 / 顺序）真的变了才动视图位置；键相同而值不同只发 `dataChanged`
-     * ——后者不会移动视图，用户滚动到哪就停在哪。
+     * Only a real change of the key sequence (row count / order) touches the view; the same key
+     * with a different value emits `dataChanged`, which does not move the view and leaves the
+     * scroll position alone.
      *
-     * @return 是否有变化（决定要不要发 `countChanged` 之类的附加信号）
+     * @return whether anything changed (decides extra signals such as `countChanged`)
      */
     template<typename KeyFn, typename DiffersFn>
     bool syncRows(QList<T> &storage, const QList<T> &incoming, KeyFn keyOf, DiffersFn differs)
@@ -81,7 +83,7 @@ protected:
             }
         }
 
-        // 位置已经就位：值变了的行发 dataChanged（不移动视图）
+        // positions are settled: emit dataChanged for rows whose value changed (does not move the view)
         bool touched = !plan.isEmpty();
         const int rows = qMin(storage.size(), incoming.size());
         for (int row = 0; row < rows; ++row) {

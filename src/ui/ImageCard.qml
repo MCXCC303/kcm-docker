@@ -1,11 +1,12 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    镜像卡片（ARCH_V2 §6：整张卡片可点击进入 Image Detail；ARCH_V3 §2.1）。
+    Image card (ARCH_V2 §6: the whole card opens Image Detail; ARCH_V3 §2.1).
 
-    - 悬空镜像（0 引用）视觉弱化（ARCH_V3_pre §1.9），颜色统一走 StatusPalette
-    - 复制入口：复制完整引用（repo:tag）；悬空镜像没有引用，退化为复制镜像 ID
+    - Dangling images (0 references) are visually de-emphasized (ARCH_V3_pre §1.9);
+      all colors come from StatusPalette
+    - Copy copies the full reference (repo:tag); dangling images have none, so it falls back to the image ID
 */
 
 import QtQuick
@@ -39,7 +40,7 @@ QQC2.ItemDelegate {
 
     onClicked: card.activated()
 
-    /*! 复制目标：有引用时复制引用，悬空镜像复制完整 ID。 */
+    /*! Copy target: the reference when one exists, otherwise the full image ID. */
     readonly property string copyTarget: card.primaryTag.length > 0 ? card.primaryTag : card.imageId
 
     Accessible.name: card.dangling ? i18n("Dangling image %1", card.shortId) : i18n("Image %1", card.primaryTag)
@@ -50,7 +51,7 @@ QQC2.ItemDelegate {
 
         Kirigami.Icon {
             source: "image-x-generic"
-            // 悬空镜像不是错误状态，只是「没有引用」，因此用中性语义而不是负向语义
+            // A dangling image is not an error, just unreferenced: neutral semantics, not negative
             color: card.dangling ? Components.StatusPalette.color("neutral") : Kirigami.Theme.textColor
             implicitWidth: Kirigami.Units.iconSizes.smallMedium
             implicitHeight: Kirigami.Units.iconSizes.smallMedium
@@ -96,7 +97,7 @@ QQC2.ItemDelegate {
             }
         }
 
-        // 列表里的复制入口（§1.3）：按钮自行接受鼠标事件，不会触发卡片导航
+        // List copy entry (§1.3): the button accepts the mouse event itself, so it never triggers navigation
         Components.CopyButton {
             value: card.copyTarget
             fieldLabel: card.primaryTag.length > 0 ? i18n("image reference") : i18n("image ID")

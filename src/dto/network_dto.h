@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,21 +17,21 @@ namespace Kontainer
 {
 
 /*!
- * `GET /networks` 的单条记录（ARCH_V5_V8 §3.2）。
+ * One record of `GET /networks` (ARCH_V5_V8 §3.2).
  *
- * 实测（附录 A.3 复核）：`/networks` 返回的**已经是完整对象**——IPAM、Options、
- * Labels、Containers 都在里面，因此详情页不需要再发一次 `/networks/{id}`
- * （少一次往返，也不会出现"列表与详情不一致"的中间态）。
+ * Measured (re-checked in appendix A.3): `/networks` already returns **complete objects** — IPAM,
+ * Options, Labels and Containers are all included — so the detail page needs no extra
+ * `/networks/{id}` call (one round trip less, and no list-vs-detail intermediate state).
  *
- * 字段按可选处理：不同驱动给的字段差别很大（`host`/`none` 没有 IPAM，
- * overlay 有 `Peers`，swarm 有 `Ingress`…），缺字段一律走默认值。
+ * All fields are optional: drivers differ a lot (`host`/`none` have no IPAM, overlay has `Peers`,
+ * swarm has `Ingress`…), so anything missing falls back to its default.
  */
 struct DockerNetworkDTO {
     QString id;
     QString name;
     QString driver;
     QString scope;
-    QString created; /*!< RFC3339，交给 domain 解析 */
+    QString created; /*!< RFC3339, parsed by domain */
     bool internal = false;
     bool attachable = false;
     bool ingress = false;
@@ -44,7 +44,7 @@ struct DockerNetworkDTO {
     static QList<DockerNetworkDTO> listFromJson(const QByteArray &payload, QString *error = nullptr, int *skipped = nullptr);
 };
 
-/*! DTO → domain object（方向：dto → domain）。 */
+/*! DTO → domain object (direction: dto → domain). */
 Network networkFromDto(const DockerNetworkDTO &dto);
 QList<Network> networksFromDto(const QList<DockerNetworkDTO> &dtos);
 

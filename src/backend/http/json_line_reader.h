@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,37 +13,38 @@ namespace Kontainer
 {
 
 /*!
- * 字节流 → 完整 JSON 行（ARCH_V4 §2.2.1）。
+ * Byte stream → complete JSON lines (ARCH_V4 §2.2.1).
  *
- * Docker 的 `POST /images/create` 返回的是一串「一行一个 JSON 对象」的流，
- * TCP 分片与 JSON 行边界毫无关系：一行可能跨多个 chunk，一个 chunk 也可能含多行。
- * 这个类只做拼行与解析，不做 I/O、不判断业务语义，因此可以脱离 socket 单测。
+ * Docker's `POST /images/create` streams one JSON object per line, and TCP fragmentation has
+ * nothing to do with line boundaries: a line may span chunks, a chunk may hold several lines.
+ * This class only joins and parses lines — no I/O, no business semantics — so it can be
+ * unit-tested without a socket.
  *
- * 非法行不会被抛成错误：拉取过程中出现一行看不懂的内容不应该让整个拉取失败，
- * 调用方可以用 malformedLines() 观察并记录（只记数量，不记内容）。
+ * Malformed lines are not errors: one unreadable line during a pull must not fail the whole
+ * pull; callers can observe them via malformedLines() (count only, never content).
  */
 class JsonLineReader
 {
 public:
-    /*! 行长度上限：超过即丢弃整行（防御性上限，避免畸形流把内存吃掉）。 */
+    /*! Line length cap; longer lines are dropped whole, so a malformed stream cannot eat memory. */
     static constexpr int kMaxLineBytes = 1024 * 1024;
 
-    /*! 喂入一段字节，返回其中已经完整解析出来的 JSON 对象。 */
+    /*! Feed a chunk; returns the JSON objects that are now complete. */
     QList<QJsonObject> feed(const QByteArray &chunk);
-    /*! 流结束：把最后一行（可能没有换行符）也解析出来。 */
+    /*! End of stream: also parse the last line, which may lack a newline. */
     QList<QJsonObject> finish();
 
-    /*! 解析失败的行数（只用于日志计数）。 */
+    /*! Number of unparsable lines (log counter only). */
     int malformedLines() const
     {
         return m_malformedLines;
     }
-    /*! 因超长被丢弃的行数。 */
+    /*! Number of lines dropped as oversized. */
     int droppedLines() const
     {
         return m_droppedLines;
     }
-    /*! 当前还留在缓冲区里的半行字节数。 */
+    /*! Bytes of the partial line still buffered. */
     int pendingBytes() const
     {
         return m_buffer.size();

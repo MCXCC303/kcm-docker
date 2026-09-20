@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,39 +17,41 @@ namespace Kontainer
 {
 
 /*!
- * 容器日志的控制器（ARCH_V5_V8 §3.1.2/§3.1.4）。
+ * Controller for container logs (ARCH_V5_V8 §3.1.2/§3.1.4).
  *
- * 它把"字节流"变成"控制台文本"，并守住三件容易出问题的事：
+ * Turns a byte stream into console text and guards three things that break easily:
  *
- *  1. **有界**：行数与字节**双上限**（默认 5000 行 / 512 KiB）。日志可以无限增长，
- *     不设上限迟早把 KCM 拖垮；裁剪时从**头部**丢，并如实报告丢了多少行。
- *  2. **批处理**：按 ~100 ms 或累计 32 KiB 合并刷新一次，避免每来一帧都触发
- *     QML 绑定更新与滚动（§3.1.3）。
- *  3. **暂停是"缓冲"而不是"丢弃"**：暂停期间继续接收、但不追加到可见文本也不滚动；
- *     恢复时一次性补上——这样用户暂停去看一段日志时不会漏掉这期间发生的事。
+ *  1. **Bounded**: dual limits on lines and bytes (default 5000 lines / 512 KiB). Logs grow without end
+ *     and would eventually drag the KCM down; trimming drops from the **head** and reports how many
+ *     lines went away.
+ *  2. **Batched**: flush on ~100 ms or 32 KiB accumulated, so every frame does not trigger QML binding
+ *     updates and scrolling (§3.1.3).
+ *  3. **Pause buffers, never discards**: while paused, lines are still received but not appended to the
+ *     visible text and not scrolled; resume appends them all at once, so pausing to read loses nothing.
  *
- * 文本形态刻意是**一整块字符串**（给单块只读等宽 TextArea 用），不是"每行一个 delegate"：
- * 日志是高频追加场景，逐行 delegate 会不断创建/销毁条目并触发布局重排（§3.1.3）。
+ * The text is deliberately **one whole string** (for a single read-only monospace TextArea), not one
+ * delegate per line: logs append at high frequency and per-line delegates churn items and relayout
+ * (§3.1.3).
  */
 class ContainerLogController : public QObject
 {
     Q_OBJECT
 
-    /*! 控制台文本（已按上限裁剪）。 */
+    /*! Console text (already trimmed to the limits). */
     Q_PROPERTY(QString text READ text NOTIFY textChanged)
-    /*! 行数（裁剪后仍在缓冲里的）。 */
+    /*! Line count (still in the buffer after trimming). */
     Q_PROPERTY(int lineCount READ lineCount NOTIFY textChanged)
-    /*! 被上限裁掉的行数（界面据此提示"较早的日志已省略"）。 */
+    /*! Lines dropped by the limits (the UI uses it to say "older log lines were omitted"). */
     Q_PROPERTY(int droppedLineCount READ droppedLineCount NOTIFY textChanged)
-    /*! `idle` / `connecting` / `streaming` / `paused` / `ended` / `failed`。 */
+    /*! `idle` / `connecting` / `streaming` / `paused` / `ended` / `failed`. */
     Q_PROPERTY(QString stateKey READ stateKey NOTIFY stateChanged)
-    /*! 失败原因 key（`containerGone` / `driverUnsupported` / `failed`…）；成功为空。 */
+    /*! Failure reason key (`containerGone` / `driverUnsupported` / `failed`…); empty on success. */
     Q_PROPERTY(QString errorKey READ errorKey NOTIFY stateChanged)
-    /*! 引擎/传输层的原始说明，仅用于"技术细节"。 */
+    /*! Raw engine/transport message, only for "technical details". */
     Q_PROPERTY(QString errorText READ errorText NOTIFY stateChanged)
-    /*! 是否处于暂停（暂停期间仍在接收，只是不追加到可见文本）。 */
+    /*! Whether paused (receiving continues, content is just not appended to the visible text). */
     Q_PROPERTY(bool paused READ paused NOTIFY pausedChanged)
-    /*! 批处理间隔（毫秒）；0 = 立即刷新（测试用）。 */
+    /*! Batch interval in ms; 0 = flush immediately (for tests). */
     Q_PROPERTY(int flushIntervalMs READ flushIntervalMs WRITE setFlushIntervalMs NOTIFY flushIntervalChanged)
 
 public:
@@ -65,26 +67,27 @@ public:
     int flushIntervalMs() const;
     void setFlushIntervalMs(int intervalMs);
 
-    /*! 有界缓冲的上限（行数 / 字节）。 */
+    /*! Limits of the bounded buffer (lines / bytes). */
     static constexpr int kMaxLines = 5000;
     static constexpr int kMaxBytes = 512 * 1024;
-    /*! 累计多少字节就立刻刷新（不必等满一个批处理周期）。 */
+    /*! Bytes accumulated before flushing at once (without waiting out a batch interval). */
     static constexpr int kFlushBytes = 32 * 1024;
 
     /*!
-     * 开始读取某个容器的日志（进入日志分区时调用）。
+     * Start reading a container's logs (called on entering the logs section).
      *
-     * `tailLines` 是首次读取的历史行数；`tty` 来自容器详情（`Config.Tty`）。
-     * 会先断开同一控制台上已有的流，并清空文本（重连=重新从 tail 读，避免重复输出）。
+     * `tailLines` is how much history to read first; `tty` comes from container detail (`Config.Tty`).
+     * Any stream already on this console is stopped and the text cleared (reconnect = read from tail
+     * again, so nothing is printed twice).
      */
     Q_INVOKABLE void connectTo(const QString &containerId, bool tty, int tailLines = 200);
-    /*! 离开分区：停止流并清空状态（文本保留，直到下次连接）。 */
+    /*! Leave the section: stop the stream and clear state (text stays until the next connect). */
     Q_INVOKABLE void disconnect();
-    /*! 重新连接（清空后重新读 tail；容器停止后用户点「重新连接」）。 */
+    /*! Reconnect (clear, then read tail again; used after a container stops). */
     Q_INVOKABLE void reconnect();
     Q_INVOKABLE void pause();
     Q_INVOKABLE void resume();
-    /*! 清空文本（不改变连接状态）。 */
+    /*! Clear the text (connection state unchanged). */
     Q_INVOKABLE void clear();
 
 Q_SIGNALS:
@@ -92,7 +95,7 @@ Q_SIGNALS:
     void stateChanged();
     void pausedChanged();
     void flushIntervalChanged();
-    /*! 有新内容追加（界面据此决定是否滚到底；暂停时不发）。 */
+    /*! New content was appended (the UI scrolls to the end; not emitted while paused). */
     void appended();
 
 private:
@@ -100,7 +103,7 @@ private:
     void handleFinished(const QString &id, DockerBackendInterface::LogStreamEnd end, const DockerError &error);
     void appendLine(const LogLine &line);
     void scheduleFlush();
-    /*! 把待定内容并进可见文本（暂停时不调用）。 */
+    /*! Merge pending content into the visible text (not called while paused). */
     void flushNow();
     void trimToLimits();
     void rebuildText();
@@ -115,13 +118,14 @@ private:
     int m_tailLines = 200;
     bool m_connected = false;
 
-    /*! 已可见的行（最后一次刷新之后的追加都在 m_pending 里）。 */
+    /*! Visible lines (anything appended after the last flush sits in m_pending). */
     QStringList m_lines;
-    /*! 行尾是否带换行（临时行没有，替换时要注意）。 */
+    /*! Whether each line ends with a newline (provisional lines do not; matters when replacing). */
     QList<bool> m_lineComplete;
-    /*! 最后一行是否为"临时行"（`\r` 覆盖或流结束的半行）：下一条临时行替换它。 */
+    /*! Whether the last line is provisional (a `\r` overwrite or a half line at stream end);
+     * the next provisional line replaces it. */
     bool m_lastLineProvisional = false;
-    /*! 待刷新（批处理窗口内累积）的行。 */
+    /*! Pending lines (accumulated within the batch window). */
     QStringList m_pending;
     QList<bool> m_pendingComplete;
     int m_pendingBytes = 0;

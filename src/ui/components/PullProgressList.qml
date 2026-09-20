@@ -1,18 +1,19 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    拉取列表（ARCH_V4 §2.4）。
+    Pull list (ARCH_V4 §2.4).
 
-    拉取是长任务：可以同时进行多个不同镜像，关掉拉取对话框也不会中断。
-    因此进度不放在模态对话框里，而是放在这里——
+    Pulling is a long task: several different images can run at once, and closing the pull
+    dialog does not interrupt them. So progress lives here rather than in the modal dialog:
 
-      - 进行中：进度条（总量未知时是不确定态）+ 引擎状态原文 + 层数 + 取消
-      - 已结束：成功 / 已取消 / 失败；**失败会带着引擎原文一直留着**，
-        直到用户点掉它，这样「拉取失败」不会被静默吞掉
-      - 多个已完成记录可以一键清空
+      - active: progress bar (indeterminate while the total is unknown) + raw engine status
+        + layer count + cancel
+      - finished: success / cancelled / failure; **a failure stays with its raw engine text**
+        until the user dismisses it, so "pull failed" is never swallowed silently
+      - several finished entries can be cleared in one go
 
-    用法：
+    Usage:
 
         Components.PullProgressList {
             Layout.fillWidth: true
@@ -33,7 +34,7 @@ ColumnLayout {
 
     required property var operations
 
-    /*! 凭据相关的失败（引擎回 401/403）：引导用户去登录，而不是反复重试。 */
+    /*! Credential-related failure (engine returned 401/403): guide the user to log in instead of retrying. */
     signal loginRequested(string reference)
 
     objectName: "pullProgressList"
@@ -48,7 +49,7 @@ ColumnLayout {
             : i18n("Recent pulls")
     }
 
-    // 「清空已结束」只在确实有已结束记录时出现
+    // "Clear finished" only appears when there really are finished entries
     QQC2.Button {
         objectName: "clearFinishedPullsButton"
         Layout.alignment: Qt.AlignRight
@@ -74,7 +75,7 @@ ColumnLayout {
             required property int completedLayers
             required property int totalLayers
             required property bool active
-            /*! 失败种类 key（`permissionDenied` 时给「去登录…」）。 */
+            /*! Failure kind key (`permissionDenied` offers "Log in…"). */
             required property string errorKindKey
 
             objectName: "pullEntry"
@@ -116,7 +117,7 @@ ColumnLayout {
                         implicitHeight: Kirigami.Units.iconSizes.smallMedium
                     }
 
-                    // 进行中：可以取消这一路（不影响其它镜像的拉取）
+                    // Active: this one pull can be cancelled (other images keep pulling)
                     QQC2.Button {
                         objectName: "cancelPullButton"
                         visible: pullCard.active
@@ -126,7 +127,7 @@ ColumnLayout {
                         onClicked: root.operations.cancelPull(pullCard.reference)
                     }
 
-                    // 凭据相关的失败（引擎回 401/403）：先去登录，而不是反复重试
+                    // Credential-related failure (engine returned 401/403): log in first instead of retrying
                     QQC2.Button {
                         objectName: "pullLoginButton"
                         visible: !pullCard.active && pullCard.statusKey === "failed" && pullCard.errorKindKey === "permissionDenied"
@@ -136,7 +137,7 @@ ColumnLayout {
                         onClicked: root.loginRequested(pullCard.reference)
                     }
 
-                    // 已结束：移除这条记录（失败的记录也要用户显式处理掉）
+                    // Finished: remove this entry (failures too must be dismissed explicitly by the user)
                     QQC2.Button {
                         objectName: "dismissPullButton"
                         visible: !pullCard.active
@@ -153,7 +154,7 @@ ColumnLayout {
                     objectName: "pullProgressBar"
                     Layout.fillWidth: true
                     visible: pullCard.active
-                    // 总量未知时是不确定态：不能假装知道进度
+                    // Indeterminate while the total is unknown: we must not pretend to know the progress
                     indeterminate: !pullCard.progressKnown
                     from: 0
                     to: 1

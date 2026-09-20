@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,7 +13,7 @@
 namespace Kontainer
 {
 
-/*! 镜像列表的 presentation model（只读；一期不含任何写操作）。 */
+/*! Image list presentation model (read-only; this phase has no write operations). */
 class ImageModel : public KeyedListModel<ImageModel, Image>
 {
     Q_OBJECT

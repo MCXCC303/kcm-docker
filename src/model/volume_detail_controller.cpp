@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -15,7 +15,7 @@ VolumeDetailController::VolumeDetailController(DockerBackendInterface *backend, 
     , m_options(new DetailListModel(this))
 {
     Q_ASSERT(m_backend);
-    // 列表刷新后重新取快照：详情页显示的是"当前这一刻"的卷
+    // Re-snapshot after a list refresh: the detail page shows the volume as of now
     connect(m_backend, &DockerBackendInterface::volumesUpdated, this, &VolumeDetailController::reload);
 }
 

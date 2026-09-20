@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -11,68 +11,69 @@ namespace Kontainer::RefreshPolicy
 {
 
 /*!
- * 二期刷新策略集中定义（ARCH_V2 §13.1/§13.2/§16/§21）。
+ * Central definition of the phase-2 refresh policy (ARCH_V2 §13.1/§13.2/§16/§21).
  *
- * 禁止在多个 C++/QML 文件里散落 5000 / 30 / 60 这类数字：
- * 所有间隔、采样数、stale 阈值只在这里出现一次。
+ * No magic numbers like 5000 / 30 / 60 scattered across C++/QML files: every interval, sample
+ * count and stale threshold is defined here exactly once.
  */
 
-/*! 高频：Engine 概要 + 容器列表 + 镜像列表。 */
+/*! High frequency: engine summary + container list + image list. */
 inline constexpr std::chrono::seconds kDefaultRefreshInterval{5};
 
-/*! 中频：Docker disk usage（/system/df 相对昂贵）。 */
+/*! Medium frequency: Docker disk usage (/system/df is comparatively expensive). */
 inline constexpr std::chrono::seconds kStorageRefreshInterval{30};
 
-/*! 资源采样间隔（容器详情页打开期间）。 */
+/*! Resource sampling interval while a container detail page is open. */
 inline constexpr std::chrono::seconds kStatsSampleInterval{5};
 
 /*!
- * 详情页静态信息（inspect）的复核间隔。
- * §13.2 把 detail 归为「低频 / 页面进入时」，因此比高频的 5 秒宽得多。
+ * Re-check interval for static detail info (inspect).
+ * §13.2 classifies detail as "low frequency / on page entry", hence far wider than the 5s cadence.
  */
 inline constexpr std::chrono::seconds kDetailRefreshInterval{30};
 
-/*! 单次 HTTP 请求超时（Docker socket 本地调用，10 秒足够）。 */
+/*! Timeout for a single HTTP request (local Docker socket calls; 10s is plenty). */
 inline constexpr std::chrono::seconds kRequestTimeout{10};
 
 /*!
- * 写操作（start / stop / restart / remove / 删除镜像）的超时（ARCH_V4 §2.2.1）。
- * 比只读请求宽：引擎可能需要先做 cgroup / 文件系统操作。
+ * Timeout for mutations (start / stop / restart / remove / image delete) (ARCH_V4 §2.2.1).
+ * Wider than read requests: the engine may need cgroup or filesystem work first.
  */
 inline constexpr std::chrono::seconds kMutationTimeout{30};
 
 /*!
- * `POST /containers/{id}/stop?t=` 的等待秒数：先礼貌地终止，超时才强杀。
- * 这个值由 backend 统一决定，不由 UI 传（ARCH_V4 §2.3）。
+ * Grace period in seconds for `POST /containers/{id}/stop?t=`: stop politely, kill on timeout.
+ * Decided centrally by the backend, never passed from the UI (ARCH_V4 §2.3).
  */
 inline constexpr int kStopTimeoutSeconds{10};
 
 /*!
- * 流式请求（镜像拉取）的静默超时：多久没有新数据就算卡死。
- * 拉取本身可以合法地跑很久，因此不能设总时长上限。
+ * Idle timeout for streaming requests (image pull): no new data for this long means stuck.
+ * A pull may legitimately run for very long, so it cannot get an overall deadline.
  */
 inline constexpr std::chrono::seconds kPullIdleTimeout{60};
 
-/*! 上传构建上下文阶段的静默超时（八期 §5.1）：上传几十 MB 时"多久没进展"才算异常。 */
+/*! Idle timeout while uploading the build context (phase 8 §5.1): stall tolerance for tens of MB. */
 inline constexpr std::chrono::seconds kBuildUploadTimeout{120};
-/*! 构建响应阶段的静默超时：构建可能长时间没有输出（例如编译一个内核模块）。 */
+/*! Idle timeout on the build response stream: a build may go quiet for long (e.g. a kernel module). */
 inline constexpr std::chrono::seconds kBuildIdleTimeout{300};
 
-/*! 资源采样连续失败多少次后停止轮询（容器可能已经停止）。 */
+/*! Consecutive stats failures before polling stops (the container may have exited). */
 inline constexpr int kMaxConsecutiveStatsFailures{3};
 
 /*!
- * 在途请求的看门狗上限：超过它仍在 loading 就放弃并报告超时（用户实测 B3/B4）。
+ * Watchdog cap for in-flight requests: still loading past this and we give up with a timeout
+ * (seen in user testing, B3/B4).
  *
- * 取值比最慢的正常请求（拉取/构建之外的读写都是十几秒级）宽一些，
- * 目的是"兜底"，不是"超时策略"——正常超时由每个请求自己的 idle/headers 超时负责。
+ * Set a little above the slowest normal request (reads/writes outside pull/build are tens of
+ * seconds); this is a backstop, not the timeout policy — per-request idle/header timeouts do that.
  */
 inline constexpr std::chrono::seconds kInFlightWatchdog{20};
 
-/*! 每个详情页保留的短期采样点数：60 × 5s ≈ 5 分钟（内存中，离开页面即释放）。 */
+/*! Short-term samples kept per detail page: 60 × 5s ≈ 5 minutes (in memory, freed on leaving). */
 inline constexpr int kMetricsHistorySamples{60};
 
-/*! 连续失败达到该周期数后，已有数据被标记为 stale（§16）。 */
+/*! After this many failed cycles, existing data is marked stale (§16). */
 inline constexpr int kStaleAfterFailedCycles{2};
 
 } // namespace Kontainer::RefreshPolicy

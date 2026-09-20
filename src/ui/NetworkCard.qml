@@ -1,12 +1,12 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    网络卡片（ARCH_V5_V8 §3.2）：整张卡片可点击进入网络详情。
+    Network card (ARCH_V5_V8 §3.2): the whole card is clickable and opens the network details.
 
-    内置网络（`bridge` / `host` / `none`）用中性芯片标注：它们**删不掉**
-    （daemon 回 403 `is a pre-defined network`），界面在列表里就把这件事说清楚，
-    而不是等用户点删除才失败。
+    Built-in networks (`bridge` / `host` / `none`) carry a neutral chip: they **cannot** be removed
+    (daemon replies 403 `is a pre-defined network`), so the list states this up front instead of
+    failing only when the user clicks remove.
 */
 
 import QtQuick
@@ -116,7 +116,7 @@ QQC2.ItemDelegate {
 
                 QQC2.Label {
                     objectName: "networkMembersLabel"
-                    // 成员数为 0 时也显示：这是"这个网络有没有在用"的直接信号
+                    // Shown even at 0 members: the direct signal of whether this network is in use
                     text: i18ncp("@info network member count", "%1 container", "%1 containers", card.memberCount)
                     opacity: 0.8
                 }

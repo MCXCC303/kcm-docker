@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -26,10 +26,11 @@ namespace Kontainer
 class HttpResponseParser;
 
 /*!
- * 一次 Docker Engine 请求的句柄（语义类似 QNetworkReply）。
+ * Handle for one Docker Engine request (semantically like QNetworkReply).
  *
- * 生命周期：DockerClient 的请求方法返回的指针归调用者所有（parent 为 client），
- * 请求结束（成功、失败或被取消）时发出一次 finished()，之后状态不再变化。
+ * Ownership: the pointer returned by the DockerClient request methods belongs to the
+ * caller (parent = client). finished() is emitted exactly once when the request ends
+ * (success, failure or cancel); the state is final afterwards.
  */
 class DockerReply : public QObject
 {
@@ -37,14 +38,16 @@ class DockerReply : public QObject
 
 public:
     /*!
-     * 请求头是否安全（名字与值都不得含 CR/LF，值里也不能有裸控制字符）。
+     * Is the header safe? Name and value must be free of CR/LF, and the value may
+     * not contain bare control characters either.
      *
-     * `X-Registry-Auth` 的值由 `RegistryAuth::encode()` 生成、可控，但凭据最终
-     * 来自用户输入或钱包，因此在真正写进 socket 之前必须再挡一次。
+     * `X-Registry-Auth` comes from `RegistryAuth::encode()`, but the credentials
+     * originate from user input or the wallet, so re-check before writing to the
+     * socket.
      */
     static bool isHeaderSafe(const QByteArray &name, const QByteArray &value);
 
-    /*! 四期只用到这三个方法（ARCH_V4 §2.2.1）。 */
+    /*! Phase 4 uses only these three methods (ARCH_V4 §2.2.1). */
     enum class Method {
         Get,
         Post,
@@ -56,53 +59,58 @@ public:
         Pending,
         Succeeded,
         Failed,
-        /*! 被调用方主动取消：不是错误（ARCH_V4 §2.2.1）。 */
+        /*! Cancelled by the caller: not an error (ARCH_V4 §2.2.1). */
         Cancelled,
     };
     Q_ENUM(State)
 
-    /*! 一次请求的完整描述（由 DockerClient 构造）。 */
+    /*! Full description of one request (built by DockerClient). */
     struct Request {
         Method method = Method::Get;
         QString path;
         QUrlQuery query;
         int timeoutMs = 0;
-        /*! 上传请求体阶段的静默超时（0 = 沿用 timeoutMs）。 */
+        /*! Idle timeout while uploading the request body (0 = reuse timeoutMs). */
         int uploadTimeoutMs = 0;
         /*!
-         * 请求体（JSON）。
+         * Request body (JSON).
          *
-         * 四期的写操作都靠 query 参数；六期创建网络需要 `POST /networks/create`
-         * 带 JSON 体，因此在这里按需加上（并统一声明 `Content-Type: application/json`）。
+         * Phase 4 writes everything via query parameters; phase 6 creates networks
+         * with `POST /networks/create`, which needs a JSON body (declared as
+         * `Content-Type: application/json`).
          */
         QByteArray body;
         /*!
-         * 从**文件**流式上传的请求体（八期构建镜像的 tar 上下文）。
+         * Request body streamed from a **file** (the phase 8 image build tar context).
          *
-         * 与 `body` 二选一：设置它时按文件大小写 `Content-Length`，然后分块写入
-         * （避免几十上百 MB 的上下文一次性进内存）。文件的所有权在调用方，
-         * 上传期间必须一直存在。
+         * Mutually exclusive with `body`: `Content-Length` comes from the file size
+         * and the data is written in chunks (a context of tens or hundreds of MB must
+         * not land in memory at once). The caller owns the file; it must stay alive
+         * for the whole upload.
          */
         QString bodyFile;
-        /*! 上传的内容类型（默认 application/json；构建上下文是 application/x-tar）。 */
+        /*! Content type of the upload (default application/json; build context is application/x-tar). */
         QByteArray bodyContentType = QByteArrayLiteral("application/json");
         /*!
-         * 流式请求的「首个响应」超时：在收到响应头之前用这个值。
+         * "First response" timeout for streaming requests: used until response
+         * headers arrive.
          *
-         * 为什么需要两段超时：拉取镜像时引擎要先联系镜像仓库，如果仓库不可达
-         * （网络 / 代理 / IPv6 没有出口），引擎会**一个字节都不回**。
-         * 这时用 60 秒的静默超时太久了——用户看到的只是「点了没反应」；
-         * 10 秒内没有响应头就判定「拉取没能开始」，给出可操作的提示（ARCH_V4 §2.2.1）。
+         * Why two timeouts: a pull makes the engine contact the registry first. If
+         * the registry is unreachable (network / proxy / no IPv6 route), the engine
+         * sends **not a single byte**. A 60 s idle timeout is far too long there,
+         * since the user only sees "clicked, nothing happened"; no headers within
+         * 10 s means the pull never started, which yields an actionable hint
+         * (ARCH_V4 §2.2.1).
          */
         int headersTimeoutMs = 0;
-        /*! 流式响应：超时按「多久没有新数据」计算，而不是整个请求的总时长。 */
+        /*! Streaming response: timeout counts idle time, not total request duration. */
         bool streaming = false;
         /*!
-         * 额外请求头（例如 `X-Registry-Auth`）。
+         * Extra request headers (e.g. `X-Registry-Auth`).
          *
-         * 值是 base64url，本来就不会含 CR/LF；但这里仍然在发送前做一次校验
-         * （见 `isHeaderSafe()`）——手写 HTTP 请求不能让任何来源拼出换行，
-         * 否则就是请求头注入。
+         * The value is base64url and cannot contain CR/LF, but it is still validated
+         * before sending (see `isHeaderSafe()`): a hand-written HTTP request must not
+         * let any source inject a line break, which would be header injection.
          */
         QMap<QByteArray, QByteArray> headers;
     };
@@ -125,17 +133,17 @@ public:
     {
         return m_request.streaming;
     }
-    /*! 已解析出的 HTTP 状态码；尚未收到响应头时为 0。 */
+    /*! Parsed HTTP status code; 0 until response headers arrive. */
     int httpStatus() const
     {
         return m_httpStatus;
     }
-    /*! 完整响应体（请求结束后才有意义）。 */
+    /*! Full response body (meaningful once the request finished). */
     QByteArray body() const
     {
         return m_body;
     }
-    /*! 取走尚未消费的响应体增量（流式请求用；body() 仍是全量）。 */
+    /*! Take the unconsumed response body delta (streaming; body() still holds all of it). */
     QByteArray takeBody();
     DockerError error() const
     {
@@ -143,39 +151,39 @@ public:
     }
 
     /*!
-     * 主动取消：关闭连接、状态置 Cancelled，并恰好发一次 finished()。
-     * 取消后调用的 takeBody()/body() 仍能看到已收到的部分数据。
+     * Cancel: closes the connection, sets state to Cancelled and emits finished()
+     * exactly once. takeBody()/body() still return the data received so far.
      */
     void cancel();
 
-    /*! 上传阶段（写请求体）的静默超时：写完之前用它，避免用流式空闲超时误杀上传。 */
+    /*! Idle timeout for the upload phase: the streaming idle timeout must not kill an upload. */
     void setUploadTimeoutMs(int timeoutMs)
     {
         m_request.uploadTimeoutMs = timeoutMs;
     }
 
-    /*! 请求体来自文件（`postFile`）：start() 之后由上传流程打开并分块写。 */
+    /*! Body comes from a file (`postFile`): opened and chunk-written after start(). */
     void setBodyFile(const QString &filePath)
     {
         m_request.bodyFile = filePath;
     }
 
-    /*! 请求体的内容类型。 */
+    /*! Content type of the request body. */
     void setBodyContentType(const QByteArray &contentType)
     {
         m_request.bodyContentType = contentType;
     }
 
-    /*! 流式请求：收到响应头之前使用的超时（由 DockerClient 设置）。 */
+    /*! Streaming request: timeout used before response headers arrive (set by DockerClient). */
     void setHeadersTimeoutMs(int timeoutMs)
     {
         m_request.headersTimeoutMs = timeoutMs;
     }
 
 Q_SIGNALS:
-    /*! 响应头已解析：httpStatus() 可用，流式请求据此先判断 2xx / 非 2xx。 */
+    /*! Response headers parsed: httpStatus() is valid; streams check 2xx / non-2xx here. */
     void streamStarted();
-    /*! 收到了新的响应体增量（用 takeBody() 取走）。 */
+    /*! A new response body delta arrived (take it with takeBody()). */
     void bodyChunk();
     void finished();
 
@@ -186,11 +194,11 @@ private:
 
     void start();
     void onConnected();
-    /*! 继续写请求体（分块上传）：由 bytesWritten 驱动，写完切回响应超时。 */
+    /*! Continue the chunked upload; bytesWritten drives it until the response timeout resumes. */
     void writeNextBodyChunk();
-    /*! 写出去一块：接着写下一块（背压）。 */
+    /*! One chunk written: queue the next one (backpressure). */
     void onBytesWritten(qint64 bytes);
-    /*! 打开待上传的文件；失败时返回错误（调用方负责发出）。 */
+    /*! Open the file to upload; on failure returns an error (the caller emits it). */
     bool openBodyFile(DockerError *error);
     void onReadyRead();
     void onDisconnected();
@@ -200,14 +208,15 @@ private:
     void succeed(int httpStatus, QByteArray body);
     void fail(const DockerError &error);
     /*!
-     * 延迟到下一个事件循环再失败的路径。
+     * Fail on the next event loop iteration.
      *
-     * start() 可能在调用方 connect(finished) 之前就发现错误（endpoint 无效、
-     * socket 不存在），此时必须异步发出信号，否则请求会永远悬挂。
+     * start() can already hit an error (invalid endpoint, missing socket) before the
+     * caller connects finished(); emitting synchronously would leave the request
+     * hanging forever.
      */
     void failLater(const DockerError &error);
     void processBuffer();
-    /*! 首次拿到状态码时发出 streamStarted()。 */
+    /*! Emit streamStarted() the first time a status code is known. */
     void notifyStreamStarted();
     static DockerError errorFromResponse(int httpStatus, const QByteArray &body);
 
@@ -216,11 +225,11 @@ private:
 
     QLocalSocket *m_socket = nullptr;
     QTimer *m_timer = nullptr;
-    /*! 正在上传的请求体文件（`bodyFile` 模式）。 */
+    /*! Request body file being uploaded (`bodyFile` mode). */
     QFile *m_bodyFile = nullptr;
-    /*! 还剩多少字节没写。 */
+    /*! Bytes left to write. */
     qint64 m_bodyRemaining = 0;
-    /*! 单次写入的块大小：够大以减少系统调用，又不至于让一次 write 卡住事件循环。 */
+    /*! Chunk size per write: large enough to cut syscalls, small enough not to stall the event loop. */
     static constexpr qint64 kBodyChunkBytes = 256 * 1024;
     std::unique_ptr<HttpResponseParser> m_parser;
 
@@ -228,20 +237,21 @@ private:
     int m_httpStatus = 0;
     QByteArray m_body;
     DockerError m_error;
-    /*! 已看到的响应体总量（用于判断有没有新数据要通知）。 */
+    /*! Total response body seen so far (to detect new data worth signalling). */
     qsizetype m_seenBodyBytes = 0;
     bool m_streamStarted = false;
 };
 
 /*!
- * Docker Engine HTTP API 的薄封装（ARCH_V1 §10/§11，ARCH_V4 §2.2.1）。
+ * Thin wrapper around the Docker Engine HTTP API (ARCH_V1 §10/§11, ARCH_V4 §2.2.1).
  *
- * 四期起本类同时提供只读 GET 与写请求（POST / DELETE）。写请求只允许被
- * `docker_backend.cpp` 调用——这条约束由 tests/model/tst_source_conventions.cpp
- * 的 `mutationsHaveSingleChokePoint` 断言，避免写操作从某处顺手发出。
+ * Since phase 4 it offers both read-only GET and write requests (POST / DELETE).
+ * Write requests may only be issued by `docker_backend.cpp` — asserted by
+ * `mutationsHaveSingleChokePoint` in tests/model/tst_source_conventions.cpp, so
+ * mutations cannot leak out from anywhere else.
  *
- * 所有 I/O 都是异步的（QLocalSocket + 事件循环），UI 线程永不阻塞（§18）。
- * API 版本前缀集中在这里通过 ApiVersion 拼接（§8）。
+ * All I/O is asynchronous (QLocalSocket + event loop); the UI thread never blocks
+ * (§18). The API version prefix is appended here via ApiVersion (§8).
  */
 class DockerClient : public QObject
 {
@@ -283,13 +293,13 @@ public:
     }
     void setTimeoutMs(int timeoutMs);
 
-    /*! 未版本化请求，仅用于 /_ping 与 /version 的版本协商。 */
+    /*! Unversioned request, only for /_ping and /version negotiation. */
     DockerReply *getUnversioned(const QString &apiPath);
-    /*! 常规只读请求；已知 API 版本时自动加 v1.xx 前缀。 */
+    /*! Regular read-only request; adds the v1.xx prefix when the API version is known. */
     DockerReply *get(const QString &apiPath, const QUrlQuery &query = {});
     /*!
-     * 写请求（无请求体，带 Content-Length: 0）。
-     * `timeoutMs <= 0` 时使用客户端默认超时。
+     * Write request (no body, Content-Length: 0). `timeoutMs <= 0` uses the client
+     * default timeout.
      */
     DockerReply *post(const QString &apiPath,
                       const QUrlQuery &query = {},
@@ -297,10 +307,10 @@ public:
                       const QMap<QByteArray, QByteArray> &headers = {},
                       const QByteArray &body = {});
     /*!
-     * 从文件上传请求体（`POST /build` 的 tar 上下文）。
+     * Upload the body from a file (the `POST /build` tar context).
      *
-     * `uploadTimeoutMs` 是**写入阶段**的静默超时：上传期间用较宽的值，
-     * 写完之后切回流式空闲超时（`idleTimeoutMs`）。
+     * `uploadTimeoutMs` is the **write-phase** idle timeout; once the upload is done
+     * it switches back to the streaming idle timeout (`idleTimeoutMs`).
      */
     DockerReply *postFile(const QString &apiPath,
                           const QUrlQuery &query,
@@ -311,24 +321,27 @@ public:
                           const QMap<QByteArray, QByteArray> &headers = {});
     DockerReply *del(const QString &apiPath, const QUrlQuery &query = {}, int timeoutMs = 0);
     /*!
-     * 流式读请求（日志跟随是 GET）。
+     * Streaming read request (log follow is a GET).
      *
-     * `idleTimeoutMs <= 0` 表示**不设静默超时**：`follow=1` 的日志流可以合法地
-     * 长时间没有数据（ARCH_V5_V8 §3.1.1），只能靠取消或页面生命周期结束。
+     * `idleTimeoutMs <= 0` means **no idle timeout**: a `follow=1` log stream may
+     * legitimately stay silent for a long time (ARCH_V5_V8 §3.1.1); only cancel or
+     * page teardown ends it.
      */
     DockerReply *getStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0);
 
     /*!
-     * 流式写请求：超时按「多久没有新数据」计算（镜像拉取可以合法地跑很久）。
+     * Streaming write request: the timeout counts idle time (a pull may legitimately
+     * run for a long time).
      */
     DockerReply *postStream(const QString &apiPath, const QUrlQuery &query = {}, int idleTimeoutMs = 0, const QMap<QByteArray, QByteArray> &headers = {});
 
-    /*! 通用入口：路径拼接（版本前缀）、超时与流式标记都在这里统一处理。 */
+    /*! Common entry point: path prefixing, timeouts and the streaming flag live here. */
     /*!
-     * 构造并**立刻启动**一个请求。
+     * Builds a request and **starts it immediately**.
      *
-     * `bodyFile` / `bodyContentType` / `uploadTimeoutMs` 必须在这里传入：
-     * `start()` 会马上把请求写进 socket，之后再设置就晚了（§5.1 的同一个坑）。
+     * `bodyFile` / `bodyContentType` / `uploadTimeoutMs` must be passed here:
+     * `start()` writes the request to the socket right away, so setting them later
+     * is too late (same trap as §5.1).
      */
     DockerReply *request(DockerReply::Method method,
                          const QString &apiPath,

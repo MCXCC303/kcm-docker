@@ -1,17 +1,18 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    仓库登录对话框（ARCH_V5_V8 §2.7）。
+    Registry login dialog (ARCH_V5_V8 §2.7).
 
-    三条硬规则（都在注释里写明，改动时别破坏）：
+    Three hard rules (stated here so changes do not break them):
 
-      1. **密码不回显、不进剪贴板**：`echoMode: Password`（Qt 会同时禁止复制），
-         并且这里没有 CopyButton——导出凭据只能通过"登录"动作。
-      2. **只在"登录"被点击后把凭据交给控制器**，控制器负责 `POST /auth` 校验，
-         校验成功才写钱包。对话框自己不保存任何东西，关闭即丢弃。
-      3. **错误就地显示**：校验失败的原因必须出现在对话框里（用户正看着它），
-         而不是只在他身后的页面上。
+      1. **The password is never echoed or copied**: `echoMode: Password` (Qt also disables
+         copying), and there is no CopyButton here — credentials only leave via "Log in".
+      2. **Credentials reach the controller only after "Log in" is clicked**; the controller
+         does the `POST /auth` check and only writes the wallet on success. The dialog stores
+         nothing itself and discards everything on close.
+      3. **Errors are shown in place**: the reason a check failed must appear in the dialog
+         (the user is looking at it), not only on the page behind it.
 */
 
 import QtQuick
@@ -23,15 +24,15 @@ import org.kde.kirigami as Kirigami
 Kirigami.Dialog {
     id: dialog
 
-    /*! 默认仓库（Docker Hub 的历史写法，与 config.json 一致）。 */
+    /*! Default registry (Docker Hub's historical spelling, matching config.json). */
     readonly property string defaultServerAddress: "https://index.docker.io/v1/"
 
-    /*! 预填的仓库地址（例如从拉取失败的镜像引用带过来）。 */
+    /*! Pre-filled registry address (e.g. carried over from the image reference of a failed pull). */
     property string presetServerAddress: ""
 
-    /*! 最近一次校验失败的文案（由调用方从控制器的 key 映射后回填）。 */
+    /*! Text of the last failed check (filled in by the caller after mapping the controller key). */
     property string errorText: ""
-    /*! 校验进行中：按钮禁用，避免重复提交。 */
+    /*! A check is running: buttons are disabled to prevent duplicate submissions. */
     property bool busy: false
 
     signal loginRequested(string serverAddress, string username, string password, string token)
@@ -43,7 +44,7 @@ Kirigami.Dialog {
     standardButtons: Kirigami.Dialog.NoButton
     preferredWidth: Kirigami.Units.gridUnit * 24
 
-    /*! 打开前重置：不复用上一次的输入（尤其是密码）。 */
+    /*! Reset before opening: never reuse the previous input (especially the password). */
     function reset(startAddress: string): void {
         serverField.text = startAddress.length > 0 ? startAddress : defaultServerAddress;
         userField.text = "";
@@ -82,7 +83,7 @@ Kirigami.Dialog {
             objectName: "loginServerField"
             Layout.fillWidth: true
             enabled: !dialog.busy
-            placeholderText: "https://index.docker.io/v1/" // i18n-lint: allow 示例地址（数据，不翻译）
+            placeholderText: "https://index.docker.io/v1/" // i18n-lint: allow Sample address (data)
             Accessible.name: i18n("Registry")
         }
 
@@ -112,7 +113,7 @@ Kirigami.Dialog {
             Layout.fillWidth: true
             visible: !tokenMode.checked
             enabled: !dialog.busy
-            // 不回显、也不提供复制入口（Qt 在密码模式下同时禁止复制）
+            // Never echoed, and no way to copy it out (Qt disables copying in password mode)
             echoMode: TextInput.Password
             Accessible.name: i18n("Password")
             placeholderText: i18n("Password")

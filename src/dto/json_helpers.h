@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -17,8 +17,8 @@ namespace Kontainer
 {
 
 /*!
- * DTO 解析用的小工具（ARCH_V1 §41）：字段可能缺失、类型可能不符、未知字段直接忽略。
- * 这些函数永远不抛异常，也永远不因为可选字段异常而让整个响应失败。
+ * Small helpers for DTO parsing (ARCH_V1 §41): fields may be missing or mistyped, unknown fields
+ * are ignored. They never throw and never fail a whole response over one optional field.
  */
 namespace JsonHelpers
 {
@@ -55,11 +55,11 @@ inline bool boolValue(const QJsonObject &object, const QString &key, bool fallba
 }
 
 /*!
- * Docker 的时间戳解析。
+ * Docker timestamp parsing.
  *
- * Docker 会返回纳秒精度（9 位小数）的 RFC3339 时间，而 Qt 的 ISODateWithMs 只接受毫秒，
- * 因此这里把小数的多余位数截断；另外 Go 的零值时间（0001-01-01T00:00:00Z，表示"从未发生"）
- * 统一视为无效时间。
+ * Docker returns RFC3339 times with nanosecond precision (9 fractional digits) while Qt's
+ * ISODateWithMs accepts milliseconds only, so the extra digits are truncated; Go's zero time
+ * (0001-01-01T00:00:00Z, meaning "never happened") counts as invalid.
  */
 inline QDateTime parseDockerTimestamp(const QString &value)
 {

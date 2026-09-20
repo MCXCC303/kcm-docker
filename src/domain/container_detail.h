@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -18,22 +18,22 @@
 namespace Kontainer
 {
 
-/*! 容器接入的网络（inspect → NetworkSettings.Networks）。 */
+/*! Networks the container is attached to (inspect → NetworkSettings.Networks). */
 /*!
- * 容器**声明**的宿主端口绑定（来自 inspect 的 `HostConfig.PortBindings`）。
+ * Host port bindings **declared** by the container (from inspect's `HostConfig.PortBindings`).
  *
- * 与"实际发布的端口"（`ports`，来自 `NetworkSettings.Ports`）是两回事：
- * 实测 `alpine-82dc` 运行中、声明了绑定，但 `NetworkSettings.Ports` 是空的——
- * 端口页要如实分列这两种状态（用户拍板决定 3）。
+ * Distinct from the actually published ports (`ports`, from `NetworkSettings.Ports`): the running
+ * `alpine-82dc` had declared bindings while `NetworkSettings.Ports` stayed empty, so the ports page
+ * lists the two states side by side (user decision 3).
  *
- * `HostPort` 可以是**区间**（实测 `WinBoat` 用 `"47300-47309"`），因此终点单独一个字段。
+ * `HostPort` may be a **range** (`WinBoat` used `"47300-47309"`), hence the separate end field.
  */
 struct DeclaredPortBinding {
     quint16 containerPort = 0;
     QString protocol; /*!< tcp / udp / sctp */
-    QString hostIp; /*!< 空 = 所有接口 */
+    QString hostIp; /*!< empty = all interfaces */
     quint16 hostPort = 0;
-    /*! 区间终点；单端口时等于 `hostPort`。 */
+    /*! Range end; equals `hostPort` for a single port. */
     quint16 hostPortEnd = 0;
 
     bool isRange() const
@@ -47,10 +47,10 @@ struct DeclaredPortBinding {
     }
 };
 
-/*! 容器挂载（inspect → Mounts）。 */
+/*! Container mount (inspect → Mounts). */
 struct ContainerMount {
     QString type; /*!< bind / volume / tmpfs */
-    QString name; /*!< 命名卷名；bind 与匿名卷为空 */
+    QString name; /*!< named volume name; empty for bind and anonymous volumes */
     QString source;
     QString destination;
     QString mode;
@@ -58,13 +58,14 @@ struct ContainerMount {
 };
 
 /*!
- * 容器详情 domain object（ARCH_V2 §7/§25）。
+ * Container detail domain object (ARCH_V2 §7/§25).
  *
- * 这是按用户理解方式重新组织的运行信息，不是 `docker inspect` JSON 的平铺：
- * 只保留界面需要的字段，且保存原始可计算数据（QDateTime / 枚举 / 结构化列表）。
+ * Runtime information reorganized the way users understand it, not a flattening of the
+ * `docker inspect` JSON: only fields the UI needs, kept as raw computable data (QDateTime / enums /
+ * structured lists).
  *
- * 注意（§40）：env / labels / mount source 属于潜在敏感信息，只在用户显式展开时展示，
- * 不写日志、不做 debug 输出、不持久化。
+ * Note (§40): env / labels / mount source are potentially sensitive — shown only when the user
+ * explicitly expands them, never logged, debug-printed or persisted.
  */
 struct ContainerDetail {
     QString id;
@@ -73,7 +74,7 @@ struct ContainerDetail {
     QString imageId;
     ContainerState state = ContainerState::Unknown;
     HealthState health = HealthState::Unknown;
-    QString status; /*!< Docker 的 status 摘要，不是程序状态机（§11.2） */
+    QString status; /*!< Docker's status summary, not the program state machine (§11.2) */
 
     QDateTime created;
     QDateTime started;
@@ -88,7 +89,7 @@ struct ContainerDetail {
     QString platform;
 
     QList<Port> ports;
-    /*! `HostConfig.PortBindings` 里**声明**的宿主绑定（可能是区间；未声明时为空）。 */
+    /*! Host bindings **declared** in `HostConfig.PortBindings` (may be ranges; empty when none). */
     QList<DeclaredPortBinding> declaredPorts;
     QList<ContainerNetwork> networks;
     QList<ContainerMount> mounts;
@@ -100,10 +101,11 @@ struct ContainerDetail {
     QString user;
     QString hostname;
     /*!
-     * 是否分配了 TTY（`Config.Tty`）。
+     * Whether a TTY is allocated (`Config.Tty`).
      *
-     * 日志流据此分形态：TTY 容器输出**原始字节**，非 TTY 是 8 字节帧的 stdcopy 流
-     * （ARCH_V5_V8 §3.1.1）。判错会让日志里混进帧头字节。
+     * This selects the log stream format: a TTY container emits **raw bytes**, a non-TTY one emits
+     * the 8-byte-framed stdcopy stream (ARCH_V5_V8 §3.1.1). Getting it wrong mixes frame-header
+     * bytes into the log.
      */
     bool tty = false;
     QList<QPair<QString, QString>> labels;

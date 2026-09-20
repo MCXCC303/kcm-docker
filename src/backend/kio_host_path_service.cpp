@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -26,7 +26,7 @@ HostPathState KioHostPathService::probe(const QString &path) const
     if (path.isEmpty()) {
         return HostPathState::NotApplicable;
     }
-    // 只做一次 stat：不读文件内容、不递归、不解析符号链接之外的任何东西
+    // One stat only: no file contents, no recursion, nothing beyond resolving symlinks
     const QFileInfo info(path);
     if (!info.exists()) {
         return HostPathState::Missing;
@@ -50,9 +50,9 @@ bool KioHostPathService::openDirectory(const QString &path)
         return false;
     }
 
-    // 用 OpenUrlJob 而不是 OpenFileManagerWindowJob：后者只是「在父目录里高亮」，
-    // 传目录进去不会打开它（KIO 头文件明确写了这一点）。
-    // 这里也不记录路径本身：挂载源路径属潜在敏感信息（ARCH_V2 §40）。
+    // Use OpenUrlJob, not OpenFileManagerWindowJob: the latter only highlights inside the parent
+    // directory and will not open a directory passed to it (stated in the KIO headers).
+    // The path itself is not logged either: mount sources are potentially sensitive (ARCH_V2 §40).
     auto *job = new KIO::OpenUrlJob(QUrl::fromLocalFile(path), this);
     job->setShowOpenOrExecuteDialog(false);
     connect(job, &KJob::result, this, [this, job] {

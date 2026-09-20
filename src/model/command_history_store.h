@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -13,46 +13,46 @@ namespace Kontainer
 {
 
 /*!
- * 命令历史（用户实测 F3：复杂命令希望能快速复用）。
+ * Command history (user test F3: complex commands should be reusable).
  *
- * 两个来源：
- *  1. **本地记录**：每次成功提交创建请求时记下命令（`~/.config/kcm_dockerrc` 的 `[CommandHistory]`，
- *     上限 20 条，重复的命令提到最前）；
- *  2. **已有容器的命令**：由界面按需喂进来（`mergeExternal()`），只用于候选展示，不写盘—— 
- *     容器可能随时被删除，把它们的命令持久化下来没有意义。
+ * Two sources:
+ *  1. **Local**: every successfully submitted create request records its command (`[CommandHistory]` in
+ *     `~/.config/kcm_dockerrc`, max 20 entries, duplicates moved to the front);
+ *  2. **Existing containers' commands**: fed in on demand by the UI (`mergeExternal()`), shown as candidates
+ *     only, never written to disk -- containers can be deleted at any time, so persisting them is pointless.
  *
- * 存储形态：一个 JSON 数组（命令本身是多行文本，用 `QStringList` 存会被换行拆散）。
+ * Stored as one JSON array (commands are multi-line text; a `QStringList` would split them on newlines).
  */
 class CommandHistoryStore : public QObject
 {
     Q_OBJECT
 
     /*!
-     * 候选列表 `[{command, source}]`（`source` 是 `local` / `container`）。
+     * Candidate list `[{command, source}]` (`source` is `local` / `container`).
      *
-     * 必须是**属性**（带 NOTIFY）：QML 里 `model: store.entries()` 这种函数调用不建立依赖，
-     * Repeater/ComboBox 不会跟着更新（这个坑在日志、网络、数据卷、预设上各踩过一次）。
+     * Must be a **property** (with NOTIFY): in QML a call like `model: store.entries()` creates no
+     * dependency, so Repeater/ComboBox never update (hit once each on logs, networks, volumes, presets).
      */
     Q_PROPERTY(QVariantList entries READ entries NOTIFY changed)
     Q_PROPERTY(bool empty READ empty NOTIFY changed)
 
 public:
-    /*! 上限：再多也不方便在下拉里挑。 */
+    /*! Cap: more than this is unwieldy in a dropdown. */
     static constexpr int kMaxEntries = 20;
 
-    /*! `configPath` 为空时用 `QStandardPaths` 的 `kcm_dockerrc`（测试传临时路径）。 */
+    /*! Empty `configPath` uses `QStandardPaths`' `kcm_dockerrc` (tests pass a temp path). */
     explicit CommandHistoryStore(const QString &configPath = {}, QObject *parent = nullptr);
 
     bool empty() const;
     QVariantList entries() const;
-    /*! 纯命令列表（本地记录在前，外部来源在后；已去重）。 */
+    /*! Plain command list (local first, external after; deduplicated). */
     QStringList commands() const;
 
-    /*! 记录一条命令：空的不记，重复的提到最前，超出上限丢弃最旧的。 */
+    /*! Record a command: empty ignored, duplicate moved to the front, oldest dropped past the cap. */
     Q_INVOKABLE void record(const QString &command);
-    /*! 合并外部来源（已有容器的命令）：不写盘，重复的忽略。 */
+    /*! Merge external source (existing containers' commands): not persisted, duplicates ignored. */
     Q_INVOKABLE void mergeExternal(const QStringList &commands);
-    /*! 只清掉本地记录（外部来源是临时的，本来就不落盘）。 */
+    /*! Clears local records only (external ones are transient and never persisted). */
     Q_INVOKABLE void clearLocal();
 
 Q_SIGNALS:
@@ -61,13 +61,13 @@ Q_SIGNALS:
 private:
     void load();
     void save() const;
-    /*! 重新计算展示用的候选（本地 + 外部，去重）。 */
+    /*! Recompute the display candidates (local + external, deduplicated). */
     void rebuild() const;
 
     QString m_configPath;
     QStringList m_local;
     QStringList m_external;
-    /*! 缓存（`entries()`/`commands()` 是 const，展示列表在这里算一次）。 */
+    /*! Cache (`entries()`/`commands()` are const, so the merged list is computed once here). */
     mutable QStringList m_merged;
 };
 

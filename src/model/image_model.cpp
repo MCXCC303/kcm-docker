@@ -1,5 +1,5 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 */
 
@@ -79,9 +79,10 @@ QHash<int, QByteArray> ImageModel::roleNames() const
 void ImageModel::setImages(const QList<Image> &images)
 {
     /*
-     * 增量同步（而不是整表重置）：用户实测"点启动/停止、或从详情页返回后，列表被拉回最上方"——
-     * 根因是原来无条件 `beginResetModel()`，而模型重置必然让 ListView 跳回顶部。
-     * 现在只有行数/顺序真的变了才调整视图位置，纯数据变化只发 `dataChanged`。
+     * Incremental sync instead of a full reset: users saw the list jump back to the top on
+     * start/stop or when returning from the detail page — the unconditional `beginResetModel()`
+     * was the cause, and a reset always resets the ListView scroll position. Now only real
+     * row-count/order changes touch the view; pure data changes emit `dataChanged`.
      */
     const bool touched = syncRows(
         m_images,

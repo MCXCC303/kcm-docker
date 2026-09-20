@@ -1,14 +1,17 @@
 /*
-    SPDX-FileCopyrightText: 2026 kontainer developers
+    SPDX-FileCopyrightText: 2026 kcm-docker developers
     SPDX-License-Identifier: GPL-2.0-or-later
 
-    挂载预设管理（ARCH_V5_V8 §4.2）。
+    Mount preset management (ARCH_V5_V8 §4.2).
 
-    用户实测反馈："预设管理建议单独开一个标签页，在创建容器中进行预设管理不是很方便"——
-    因此把管理界面从创建向导里搬到这里（主页面「挂载预设」标签页），向导里只留"快速添加"。
+    User feedback: "preset management deserves its own tab; managing presets inside the create
+    container flow is inconvenient" — so the management UI moved here (the main page's "Mount
+    presets" tab), and the wizard keeps only "quick add".
 
-    每一条可改宿主/容器路径、切换收藏、上移/下移、删除；底部一行可新增。
-    编辑直接写回存储（失焦即保存），因为预设是"这个工具的数据"而不是待提交的表单。
+    Each row can edit the host/container paths, toggle the favourite flag, move up/down and
+    delete; a row at the bottom adds new ones. Edits are written straight back to storage
+    (saved on focus loss), because presets are "this tool's data" rather than a form awaiting
+    submission.
 */
 
 import QtQuick
@@ -22,13 +25,13 @@ import "." as Local
 ColumnLayout {
     id: root
 
-    /*! 预设存储（`kcm.controller.mountPresets`）。 */
+    /*! Preset store (`kcm.controller.mountPresets`). */
     required property var store
-    /*! 目录选择（`kcm.controller.directoryPicker`）：宿主路径用它挑。 */
+    /*! Directory chooser (`kcm.controller.directoryPicker`): used to pick host paths. */
     required property var directoryPicker
 
     /*!
-     * delegate 用的中转对象（Unbound 下 delegate 拿不到根对象 id，见 CreateContainer.qml）。
+     * Intermediary for delegates (under Unbound a delegate cannot reach the root id).
      */
     QtObject {
         id: manager
@@ -51,7 +54,7 @@ ColumnLayout {
             manager.store.update(presetId, source, destination, readOnly, note);
         }
         function add(source, destination) {
-            // 只读在挂载时设置，因此预设一律按"可写"保存（字段保留以兼容旧配置）
+            // Read-only is chosen at mount time, so presets are stored writable (field kept for old configs)
             return manager.store.add(source, destination, "bind", false, "");
         }
     }
@@ -67,8 +70,9 @@ ColumnLayout {
             : ""
     }
 
-    /* ------------------------------ 新建（置顶） ------------------------------ */
-    /* 用户实测：新建入口应该在**顶端**，浏览按钮放在宿主路径/卷名的**前面**，添加后列表新增一项 */
+    /* ------------------------------ New entry (on top) ------------------------------ */
+    /* User report: creation belongs at the **top**, the browse button goes **before** the host
+       path/volume name, and adding appends one entry to the list */
     RowLayout {
         objectName: "presetManagerNewRow"
         Layout.fillWidth: true
@@ -81,7 +85,7 @@ ColumnLayout {
             onClicked: {
                 const chosen = root.directoryPicker.chooseDirectory(newSource.text);
                 if (chosen.length > 0) {
-                    // 取消（空串）时保持原值：不要把手打的路径清掉
+                    // On cancel (empty string) keep the current value: do not clear a hand-typed path
                     newSource.text = chosen;
                 }
             }
@@ -126,8 +130,8 @@ ColumnLayout {
     }
 
     Repeater {
-        // 必须用**属性**（summaries 有 NOTIFY）：函数调用不建立依赖，
-        // 否则新增/删除预设时列表不会重铺
+        // Must be a **property** (summaries has NOTIFY): a function call establishes no dependency,
+        // so without this the list would not repopulate when presets are added or removed
         model: root.store.summaries
 
         delegate: Kirigami.AbstractCard {
@@ -175,8 +179,9 @@ ColumnLayout {
                         onEditingFinished: manager.update(presetCard.id, presetCard.source, text, presetCard.readOnly, presetCard.note)
                     }
 
-                    // 只读与否在**挂载时**（创建容器页的挂载行）设置，不在这里：
-                    // 同一条预设在不同容器里可能一次只读、一次可写（用户实测）
+                    // Whether a mount is read-only is decided **at mount time** (the mount rows on the
+                    // create container page), not here: the same preset may be mounted read-only in one
+                    // container and writable in another (user report)
                     QQC2.CheckBox {
                         objectName: "presetManagerFavorite"
                         text: i18n("Favourite")
@@ -219,7 +224,7 @@ ColumnLayout {
         }
     }
 
-    // 校验规则与存储共用一份实现：非法输入会被拒绝，这里把原因说出来
+    // Validation rules share one implementation with the store: illegal input is rejected, with a reason
     Kirigami.InlineMessage {
         objectName: "presetManagerError"
         Layout.fillWidth: true
